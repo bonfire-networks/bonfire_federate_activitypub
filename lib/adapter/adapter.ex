@@ -49,13 +49,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_username(username) do
-    case Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_username(username) do
-      {:ok, character} ->
-        {:ok, Bonfire.Federate.ActivityPub.Types.character_to_actor(character)}
-
-      _ ->
-        {:error, "not found"}
-    end
+    # TODO: Make more generic (currently assumes the actor is person)
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    apply(module, :get_actor_by_username, [username])
   end
 
   def get_actor_by_ap_id(ap_id) do
@@ -89,18 +85,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    keys = Map.get(params, :keys)
-    params = Map.put(params, :signing_key, keys)
-    # FIXME - does it work for characters other than user?
-    with {:ok, local_actor} <-
-           Bonfire.Me.Identity.Characters.one(username: actor.data["preferredUsername"]),
-         {:ok, local_actor} <-
-           Bonfire.Me.Identity.Characters.update(%Bonfire.Data.Identity.User{}, local_actor, params),
-         {:ok, local_actor} <- get_actor_by_username(local_actor.preferred_username) do
-      {:ok, local_actor}
-    else
-      {:error, e} -> {:error, e}
-    end
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    apply(module, :update_local_actor, [actor, params])
   end
 
   def update_remote_actor(actor_object) do
@@ -143,20 +129,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def maybe_create_remote_actor(actor) do
-    host = URI.parse(actor.data["id"]).host
-    username = actor.data["preferredUsername"] <> "@" <> host
-
-    case Bonfire.Me.Identity.Characters.one(username: username) do
-      {:error, _} ->
-        with {:ok, _actor} <-
-               Bonfire.Federate.ActivityPub.Receiver.create_remote_character(actor.data, username) do
-          :ok
-        else
-          _e -> {:error, "Could not create remote actor"}
-        end
-
-      _ ->
-        :ok
-    end
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    apply(module, :maybe_create_remote_actor, [actor])
   end
 end
