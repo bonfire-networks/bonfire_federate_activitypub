@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Utils do
   alias ActivityPub.Actor
-  alias Bonfire.Me.Social.Threads
+  alias Bonfire.Social.Threads
 
   require Logger
 
