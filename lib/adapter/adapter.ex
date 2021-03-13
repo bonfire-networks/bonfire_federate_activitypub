@@ -114,7 +114,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       # FIXME
       case character do
         # %Bonfire.Data.Identity.User{} ->
-        #   Bonfire.Me.Identity.Users.ap_receive_update(character, params, creator)
+        #   Bonfire.Me.Users.ap_receive_update(character, params, creator)
 
         # %CommonsPub.Communities.Community{} ->
         #   CommonsPub.Communities.ap_receive_update(character, params, creator)
@@ -123,7 +123,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         #   CommonsPub.Collections.ap_receive_update(character, params, creator)
 
         true ->
-          Bonfire.Me.Identity.Characters.ap_receive_update(character, params, creator)
+          Bonfire.Me.Characters.ap_receive_update(character, params, creator)
       end
     end
   end

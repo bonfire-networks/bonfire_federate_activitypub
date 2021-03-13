@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
 
   def user_count() do
     # FIXME
-    {:ok, users} = Bonfire.Me.Identity.Users.many(preset: :character, peer: nil)
+    {:ok, users} = Bonfire.Me.Users.many(preset: :character, peer: nil)
     length(users)
   end
 
@@ -18,7 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
     %Nodeinfo{
       app_name: Bonfire.Application.name() |> String.downcase(),
       app_version: Bonfire.Application.version(),
-      open_registrations: Config.get([Bonfire.Me.Identity.Users, :public_registration]),
+      open_registrations: Config.get([Bonfire.Me.Users, :public_registration]),
       user_count: user_count(),
       node_name: instance[:name],
       node_description: instance[:description],

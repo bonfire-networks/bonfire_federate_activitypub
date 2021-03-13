@@ -227,7 +227,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     {:ok, created_actor, creator} =
       case actor["type"] do
         "Person" ->
-          {:ok, created_actor} = Bonfire.Me.Identity.Users.register(create_attrs)
+          {:ok, created_actor} = Bonfire.Me.Users.register(create_attrs)
           {:ok, created_actor, created_actor}
 
         "Group" ->
@@ -256,7 +256,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     {:ok, updated_actor} =
       case created_actor do
         %Bonfire.Data.Identity.User{} ->
-          Bonfire.Me.Identity.Users.update_remote(created_actor, %{icon_id: icon_id, image_id: image_id})
+          Bonfire.Me.Users.update_remote(created_actor, %{icon_id: icon_id, image_id: image_id})
 
         # %CommonsPub.Communities.Community{} ->
         #   CommonsPub.Communities.update(%Bonfire.Data.Identity.User{}, created_actor, %{

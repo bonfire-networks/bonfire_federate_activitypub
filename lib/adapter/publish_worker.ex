@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   #        verb,
   #        commit_fn
   #      ) do
-  #   with {:ok, character} <- Bonfire.Me.Identity.Characters.one(id: context_id),
+  #   with {:ok, character} <- Bonfire.Me.Characters.one(id: context_id),
   #        true <- is_nil(character.peer_id) do
   #     commit_fn.(verb, context)
   #   else

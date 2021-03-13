@@ -115,10 +115,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_raw_character_by_username(username) when is_binary(username) do
     # FIXME: this should be only one query, and support other types (or two, using pointers?)
-        #  with {:error, _e} <- Bonfire.Me.Identity.Users.one([:default, username: username]),
+        #  with {:error, _e} <- Bonfire.Me.Users.one([:default, username: username]),
         #  {:error, _e} <- CommonsPub.Communities.one([:default, username: username]),
         #  {:error, _e} <- CommonsPub.Collections.one([:default, username: username]),
-    with {:error, _e} <- Bonfire.Me.Identity.Characters.one([:default, username: username]) do
+    with {:error, _e} <- Bonfire.Me.Characters.one([:default, username: username]) do
       {:error, "not found"}
     end
   end
@@ -127,10 +127,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_raw_character_by_id(id) when is_binary(id) do
     # FIXME: this should be only one query, and support other types (or two, using pointers?)
-        # with {:error, _e} <- Bonfire.Me.Identity.Users.one([:default, id: id]),
+        # with {:error, _e} <- Bonfire.Me.Users.one([:default, id: id]),
         #  {:error, _e} <- CommonsPub.Communities.one([:default, id: id]),
         #  {:error, _e} <- CommonsPub.Collections.one([:default, id: id]),
-         with {:error, _e} <- Bonfire.Me.Identity.Characters.one([:default, id: id]) do
+         with {:error, _e} <- Bonfire.Me.Characters.one([:default, id: id]) do
       {:error, "not found"}
     end
   end
