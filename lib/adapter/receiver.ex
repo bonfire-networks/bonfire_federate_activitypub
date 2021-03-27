@@ -36,8 +36,8 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       ) do
     object = Bonfire.Federate.ActivityPub.Utils.get_object_or_actor_by_ap_id!(object_id)
 
-    # IO.inspect(activity: activity)
-    # IO.inspect(object: object)
+    #IO.inspect(activity: activity)
+    #IO.inspect(object: object)
 
     receive_activity(activity, object)
   end

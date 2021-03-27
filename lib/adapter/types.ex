@@ -26,7 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.Types do
 
     username = Bonfire.Federate.ActivityPub.Utils.get_actor_username(character)
 
-    # IO.inspect(character)
+    #IO.inspect(character)
 
     data =
       %{

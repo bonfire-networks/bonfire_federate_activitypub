@@ -40,7 +40,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_actor_by_id(id) do
     case Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_id(id) do
       {:ok, character} ->
-        # IO.inspect(get_raw_character_by_id: actor)
+        #IO.inspect(get_raw_character_by_id: actor)
         {:ok, Bonfire.Federate.ActivityPub.Types.character_to_actor(character)}
 
       _ ->
