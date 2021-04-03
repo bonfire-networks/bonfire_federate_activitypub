@@ -25,16 +25,16 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_follower_local_ids(actor) do
     {:ok, actor} = Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_id(actor.pointer_id)
-    {:ok, follows} = Bonfire.Social.Follows.many(context: actor.id)
+    {:ok, follows} = Bonfire.Social.Follows.by_followed(actor.id)
 
-    follows |> Enum.map(fn follow -> follow.creator_id end)
+    follows #|> Enum.map(fn follow -> follow.creator_id end)
   end
 
   def get_following_local_ids(actor) do
     {:ok, actor} = Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_id(actor.pointer_id)
-    {:ok, follows} = Bonfire.Social.Follows.many(creator: actor.id)
+    {:ok, follows} = Bonfire.Social.Follows.by_follower(actor.id)
 
-    follows |> Enum.map(fn follow -> follow.context_id end)
+    follows #|> Enum.map(fn follow -> follow.context_id end)
   end
 
   def get_actor_by_id(id) do
@@ -75,7 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     if System.get_env("LIVEVIEW_ENABLED", "true") == "true" do
       case Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_username(username) do
         {:ok, character} ->
-          url = Bonfire.Common.Utils.object_url(character)
+          url = Bonfire.Me.Characters.character_url(character)
           if !String.contains?(url, "/404"), do: url
 
         _ ->
@@ -113,8 +113,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
       # FIXME
       case character do
-        # %Bonfire.Data.Identity.User{} ->
-        #   Bonfire.Me.Users.ap_receive_update(character, params, creator)
+        %Bonfire.Data.Identity.User{} ->
+          Bonfire.Me.Users.ActivityPub.update(character, params)
 
         # %CommonsPub.Communities.Community{} ->
         #   CommonsPub.Communities.ap_receive_update(character, params, creator)
@@ -123,7 +123,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         #   CommonsPub.Collections.ap_receive_update(character, params, creator)
 
         true ->
-          Bonfire.Me.Characters.ap_receive_update(character, params, creator)
+          Bonfire.Me.Characters.ap_receive_update(character, params, creator) # TODO fallback
       end
     end
   end

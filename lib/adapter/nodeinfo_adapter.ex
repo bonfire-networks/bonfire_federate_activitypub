@@ -8,8 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
 
   def user_count() do
     # FIXME
-    {:ok, users} = Bonfire.Me.Users.many(preset: :character, peer: nil)
-    length(users)
+    1
   end
 
   def gather_nodeinfo_data() do

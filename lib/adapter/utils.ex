@@ -118,7 +118,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
         #  with {:error, _e} <- Bonfire.Me.Users.one([:default, username: username]),
         #  {:error, _e} <- CommonsPub.Communities.one([:default, username: username]),
         #  {:error, _e} <- CommonsPub.Collections.one([:default, username: username]),
-    with {:error, _e} <- Bonfire.Me.Characters.one([:default, username: username]) do
+    with {:error, _e} <- Bonfire.Me.Characters.by_username(username) do
       {:error, "not found"}
     end
   end
@@ -130,7 +130,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
         # with {:error, _e} <- Bonfire.Me.Users.one([:default, id: id]),
         #  {:error, _e} <- CommonsPub.Communities.one([:default, id: id]),
         #  {:error, _e} <- CommonsPub.Collections.one([:default, id: id]),
-         with {:error, _e} <- Bonfire.Me.Characters.one([:default, id: id]) do
+         with {:error, _e} <- Bonfire.Me.Characters.get(id) do
       {:error, "not found"}
     end
   end

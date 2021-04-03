@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
   # the following constants are derived from config, so please make any changes/additions there
 
-  @actor_modules Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :actor_modules])
+  # @actor_modules Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :actor_modules]) # TODO
   @activity_modules Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :activity_modules])
   @object_modules Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :object_modules])
 
@@ -193,15 +193,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     uri = URI.parse(actor["id"])
     ap_base = uri.scheme <> "://" <> uri.host
 
-    peer =
-      case Bonfire.Repo.get_by(CommonsPub.Peers.Peer, ap_url_base: ap_base) do
-        nil ->
-          {:ok, peer} = CommonsPub.Peers.create(%{ap_url_base: ap_base, domain: uri.host})
-          peer
-
-        peer ->
-          peer
-      end
+    peer = Bonfire.Federate.ActivityPub.Peers.get_or_create(ap_base, uri.host)
 
     name =
       case actor["name"] do
@@ -224,48 +216,49 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       canonical_url: actor["id"]
     }
 
-    {:ok, created_actor, creator} =
+    {:ok, created_character, creator} =
       case actor["type"] do
         "Person" ->
-          {:ok, created_actor} = Bonfire.Me.Users.register(create_attrs)
-          {:ok, created_actor, created_actor}
+          {:ok, created_character} = Bonfire.Me.Users.ActivityPub.create(create_attrs)
+          {:ok, created_character, created_character}
+
+        "Organization" ->
+            {:ok, created_character} = Bonfire.Me.SharedUsers.create(create_attrs, :remote) # TODO
+            {:ok, created_character, created_character}
 
         "Group" ->
           {:ok, creator} =
             Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(actor["attributedTo"])
 
-          {:ok, created_actor} = CommonsPub.Communities.create_remote(creator, create_attrs)
-          {:ok, created_actor, creator}
+          {:ok, created_character} = Bonfire.Groups.create(creator, create_attrs, :remote) # FIXME when we have Groups
+          {:ok, created_character, creator}
 
-        "MN:Collection" ->
+        _ ->
           {:ok, creator} =
             Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(actor["attributedTo"])
 
-          {:ok, community} =
-            Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(actor["context"])
+          {:ok, created_character} =
+            Bonfire.Me.Characters.create(creator, create_attrs, :remote) # TODO as fallback
 
-          {:ok, created_actor} =
-            CommonsPub.Collections.create_remote(creator, community, create_attrs)
-
-          {:ok, created_actor, creator}
+          {:ok, created_character, creator}
       end
 
     icon_id = Bonfire.Federate.ActivityPub.Utils.maybe_create_icon_object(icon_url, creator)
     image_id = Bonfire.Federate.ActivityPub.Utils.maybe_create_image_object(image_url, creator)
 
     {:ok, updated_actor} =
-      case created_actor do
+      case created_character do
         %Bonfire.Data.Identity.User{} ->
-          Bonfire.Me.Users.update_remote(created_actor, %{icon_id: icon_id, image_id: image_id})
+          Bonfire.Me.Users.ActivityPub.update(created_character, %{icon_id: icon_id, image_id: image_id})
 
         # %CommonsPub.Communities.Community{} ->
-        #   CommonsPub.Communities.update(%Bonfire.Data.Identity.User{}, created_actor, %{
+        #   CommonsPub.Communities.update(%Bonfire.Data.Identity.User{}, created_character, %{
         #     icon_id: icon_id,
         #     image_id: image_id
         #   })
 
         # %CommonsPub.Collections.Collection{} ->
-        #   CommonsPub.Collections.update(%Bonfire.Data.Identity.User{}, created_actor, %{
+        #   CommonsPub.Collections.update(%Bonfire.Data.Identity.User{}, created_character, %{
         #     icon_id: icon_id,
         #     image_id: image_id
         #   })
@@ -273,7 +266,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
     object = ActivityPub.Object.get_cached_by_ap_id(actor["id"])
 
-    ActivityPub.Object.update(object, %{pointer_id: created_actor.id})
+    ActivityPub.Object.update(object, %{pointer_id: created_character.id})
     Indexer.maybe_index_object(updated_actor)
     {:ok, updated_actor}
   end

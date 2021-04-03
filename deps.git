@@ -1,4 +1,5 @@
 bonfire_common = "https://github.com/bonfire-ecosystem/bonfire_common#main"
 bonfire_me = "https://github.com/bonfire-ecosystem/bonfire_me#main"
+bonfire_social = "https://github.com/bonfire-ecosystem/bonfire_social#main"
 # bonfire_web_phoenix = "https://github.com/bonfire-ecosystem/bonfire_web_phoenix#main"
 pointers = "https://github.com/bonfire-ecosystem/pointers#main"
