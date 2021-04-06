@@ -188,7 +188,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     )
   end
 
-  # TODO: Rewrite this whole thing tbh
+  @deprecated "Define in host application context modules instead"
   def create_remote_character(actor, username) do
     uri = URI.parse(actor["id"])
     ap_base = uri.scheme <> "://" <> uri.host
