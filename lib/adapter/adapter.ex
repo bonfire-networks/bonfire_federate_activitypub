@@ -38,14 +38,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_id(id) do
-    case Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_id(id) do
-      {:ok, character} ->
-        #IO.inspect(get_raw_character_by_id: actor)
-        {:ok, Bonfire.Federate.ActivityPub.Types.character_to_actor(character)}
-
-      _ ->
-        {:error, "not found"}
-    end
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    apply(module, :get_actor_by_id, [id])
   end
 
   def get_actor_by_username(username) do
@@ -55,13 +49,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_ap_id(ap_id) do
-    case Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(ap_id) do
-      {:ok, character} ->
-        {:ok, Bonfire.Federate.ActivityPub.Types.character_to_actor(character)}
-
-      _ ->
-        {:error, "not found"}
-    end
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    apply(module, :get_actor_by_ap_id, [ap_id])
   end
 
   # def redirect_to_object(id) do
