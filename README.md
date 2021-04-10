@@ -3,7 +3,7 @@
 An extension for [Bonfire](https://bonfire.cafe/) that handles:
 
 - Extensible/configurable tools for translating Bonfire data to/from ActivityStreams
-- Bonfire Adapter for the [ActivityPub federation library ](https://github.com/bonfire-ecosystem/activity_pub)
+- Bonfire Adapter for the [ActivityPub federation library ](https://github.com/bonfire-networks/activity_pub)
 
 ## Usage
 
