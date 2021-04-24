@@ -8,6 +8,3 @@ pointers = "~> 0.5.1"
 postgrex = ">= 0.0.0"
 telemetry_metrics = "~> 0.4"
 telemetry_poller = "~> 0.4"
-# for this extension:
-geocoder = "~> 1.0"
-geo_postgis = "~> 3.1"
