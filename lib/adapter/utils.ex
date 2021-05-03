@@ -363,8 +363,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def maybe_create_image_object(nil, _actor), do: nil
 
   def maybe_create_image_object(url, actor) do
-    # FIXME: replace with upcoming upload feature
-    case CommonsPub.Uploads.upload(CommonsPub.Uploads.ImageUploader, actor, %{url: url}, %{}) do
+    case Bonfire.Files.upload(Bonfire.Files.ImageUploader, actor, %{url: url}, %{}) do
       {:ok, upload} -> upload.id
       {:error, _} -> nil
     end
@@ -382,8 +381,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def maybe_create_icon_object(nil, _actor), do: nil
 
   def maybe_create_icon_object(url, actor) do
-    # FIXME: replace with upcoming upload feature
-    case CommonsPub.Uploads.upload(CommonsPub.Uploads.IconUploader, actor, %{url: url}, %{}) do
+    case Bonfire.Files.upload(Bonfire.Files.IconUploader, actor, %{url: url}, %{}) do
       {:ok, upload} -> upload.id
       {:error, _} -> nil
     end
