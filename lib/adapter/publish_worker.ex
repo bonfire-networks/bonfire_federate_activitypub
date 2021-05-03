@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
-  use ActivityPub.Workers.WorkerHelper, queue: "mn_ap_publish", max_attempts: 1
+  use ActivityPub.Workers.WorkerHelper, queue: "ap_publish", max_attempts: 1
 
   @moduledoc """
   Module for publishing ActivityPub activities.
