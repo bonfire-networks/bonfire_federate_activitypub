@@ -25,8 +25,8 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
       import Phoenix.LiveViewTest
       import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers
-      require Bonfire.Common.Utils
-      Bonfire.Common.Utils.quoted_import_if_enabled(Bonfire.Me.Fake)
+
+      Bonfire.Common.Extend.quoted_import_if_enabled(Bonfire.Me.Fake)
       alias Bonfire.Federate.ActivityPub.Fake
       alias Bonfire.Federate.ActivityPub.Web.Router.Helpers, as: Routes
 

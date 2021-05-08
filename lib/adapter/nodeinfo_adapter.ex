@@ -15,7 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
     instance = Application.get_env(:activity_pub, :instance)
 
     %Nodeinfo{
-      app_name: Bonfire.Application.name() |> String.downcase(),
+      app_name: Bonfire.Application.name(),
       app_version: Bonfire.Application.version(),
       open_registrations: Config.get([Bonfire.Me.Users, :public_registration]),
       user_count: user_count(),
