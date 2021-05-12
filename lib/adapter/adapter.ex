@@ -24,17 +24,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_follower_local_ids(actor) do
-    {:ok, actor} = Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_id(actor.pointer_id)
-    {:ok, follows} = Bonfire.Social.Follows.by_followed(actor.id)
-
-    follows #|> Enum.map(fn follow -> follow.creator_id end)
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    apply(module, :get_follower_local_ids, [actor])
   end
 
   def get_following_local_ids(actor) do
-    {:ok, actor} = Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_id(actor.pointer_id)
-    {:ok, follows} = Bonfire.Social.Follows.by_follower(actor.id)
-
-    follows #|> Enum.map(fn follow -> follow.context_id end)
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    apply(module, :get_following_local_ids, [actor])
   end
 
   def get_actor_by_id(id) do
