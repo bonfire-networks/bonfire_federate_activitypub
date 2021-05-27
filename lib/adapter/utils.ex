@@ -378,6 +378,15 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     }
   end
 
+  def maybe_create_image_object_from_path(nil), do: nil
+
+  def maybe_create_image_object_from_path(url) do
+    %{
+      "type" => "Image",
+      "url" => Bonfire.Federate.ActivityPub.Adapter.base_url() <> url
+    }
+  end
+
   def maybe_create_icon_object(nil, _actor), do: nil
 
   def maybe_create_icon_object(url, actor) do
