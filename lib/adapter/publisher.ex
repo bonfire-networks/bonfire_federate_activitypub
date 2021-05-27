@@ -27,7 +27,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
            to: [Bonfire.Federate.ActivityPub.Utils.public_uri()],
            cc: [actor.data["followers"]],
            object: actor_object,
-           actor: actor.ap_id,
+           actor: actor,
            local: true
          } do
       ActivityPub.Actor.set_cache(actor)
