@@ -75,6 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert conn["preferredUsername"] == user.character.username
     assert conn["name"] == user.profile.name
     assert conn["summary"] == user.profile.summary
+    assert conn["publicKey"]
   end
 
   test "remote actor creation" do
@@ -82,5 +83,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert {:ok, user} = Bonfire.Me.Users.ActivityPub.by_username(actor.username)
     assert actor.data["summary"] == user.profile.summary
     assert actor.data["name"] == user.profile.name
+    assert user.profile.icon_id
+    assert user.profile.image_id
   end
 end
