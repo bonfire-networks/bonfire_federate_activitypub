@@ -66,6 +66,13 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "fetch users from AP API" do
     user = fake_user!()
 
+    _conn =
+      build_conn()
+      |> get("/pub/actors/#{user.character.username}")
+      |> response(200)
+      |> Jason.decode!
+
+    # Fetching twice to check for a caching bug
     conn =
       build_conn()
       |> get("/pub/actors/#{user.character.username}")
