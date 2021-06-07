@@ -5,6 +5,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   """
   # alias Bonfire.Federate.ActivityPub.Utils
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
+  alias Bonfire.Common.Utils
+  alias Bonfire.Common.URIs
   require Logger
 
   @behaviour ActivityPub.Adapter
@@ -116,5 +118,26 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_create_remote_actor(actor) do
     module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
     apply(module, :maybe_create_remote_actor, [actor])
+  end
+
+  def get_redirect_url(username_or_id) do
+    if Utils.is_ulid?(username_or_id) do
+      get_object_url(username_or_id)
+    else
+      get_actor_url(username_or_id)
+    end
+  end
+
+  def get_object_url(id) do
+    URIs.path(id)
+  end
+
+  def get_actor_url(username) do
+    #FIXME: naughty
+    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    case module.by_username(username) do
+      {:ok, user} -> URIs.path(user)
+      {:error, _} -> "/404"
+    end
   end
 end
