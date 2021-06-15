@@ -181,7 +181,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
   def handle_activity_with(module, activity, object) do
-    Bonfire.Contexts.run_context_function(
+    Bonfire.Common.ContextModules.maybe_apply(
       module,
       :ap_receive_activity,
       [activity, object]

@@ -64,7 +64,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   end
 
   def publish(verb, %{__struct__: object_type} = local_object) do
-    Bonfire.Contexts.run_context_function(object_type, :ap_publish_activity, [verb, local_object], &error/2)
+    Bonfire.Common.ContextModules.maybe_apply(object_type, :ap_publish_activity, [verb, local_object], &error/2)
   end
 
 
