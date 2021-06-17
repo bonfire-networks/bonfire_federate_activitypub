@@ -26,28 +26,28 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_follower_local_ids(actor) do
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     apply(module, :get_follower_local_ids, [actor])
   end
 
   def get_following_local_ids(actor) do
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     apply(module, :get_following_local_ids, [actor])
   end
 
   def get_actor_by_id(id) do
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     apply(module, :get_actor_by_id, [id])
   end
 
   def get_actor_by_username(username) do
     # TODO: Make more generic (currently assumes the actor is person)
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     apply(module, :get_actor_by_username, [username])
   end
 
   def get_actor_by_ap_id(ap_id) do
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     apply(module, :get_actor_by_ap_id, [ap_id])
   end
 
@@ -72,7 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     apply(module, :update_local_actor, [actor, params])
   end
 
@@ -116,7 +116,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def maybe_create_remote_actor(actor) do
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     apply(module, :maybe_create_remote_actor, [actor])
   end
 
@@ -134,10 +134,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_actor_url(username) do
     #FIXME: naughty
-    module = Bonfire.Common.Config.get!(Bonfire.Federate.ActivityPub.Adapter)[:actor_modules]["Person"]
+    module = character_module("Person")
     case module.by_username(username) do
       {:ok, user} -> URIs.path(user)
       {:error, _} -> "/404"
     end
+  end
+
+  def character_module(type) do
+    Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :actor_modules, type])
   end
 end

@@ -79,7 +79,8 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
       {:ok, ap_followed} = ActivityPub.Adapter.get_actor_by_id(followed.id)
       {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
-      Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
     end
   end
 end

@@ -71,16 +71,12 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   def publish(verb, object) do
     error("Unrecognised object for AP publisher", [verb, object])
 
-    IO.inspect(object: object)
-
     :ignored
   end
 
   def error(error, [verb, %{__struct__: object_type, id: id} = object]) do
     Logger.error(
-      "ActivityPub - Unable to federate - #{error}... object ID: #{id} ; verb: #{verb} ; object type: #{
-        object_type
-      }"
+      "ActivityPub - Unable to federate out - #{error}... object ID: #{id} ; verb: #{verb} ; object type: #{object_type}"
     )
     IO.inspect(object: object)
 
@@ -88,7 +84,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   end
 
   def error(error, [verb, object]) do
-    Logger.error("ActivityPub - Unable to federate - #{error}... verb: #{verb}}")
+    Logger.error("ActivityPub - Unable to federate out - #{error}... verb: #{verb}}")
 
     IO.inspect(object: object)
 

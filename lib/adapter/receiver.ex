@@ -1,6 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.Receiver do
   require Logger
   alias Bonfire.Search.Indexer
+  alias Bonfire.Common.Utils
 
   # the following constants are derived from config, so please make any changes/additions there
 
@@ -181,10 +182,11 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
   def handle_activity_with(module, activity, object) do
-    Bonfire.Common.ContextModules.maybe_apply(
+    Utils.maybe_apply(
       module,
       :ap_receive_activity,
-      [activity, object]
+      [activity, object],
+      &error/2
     )
   end
 
@@ -267,7 +269,9 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     object = ActivityPub.Object.get_cached_by_ap_id(actor["id"])
 
     ActivityPub.Object.update(object, %{pointer_id: created_character.id})
-    Indexer.maybe_index_object(updated_actor)
+
+    # Indexer.maybe_index_object(updated_actor) # this should be done in the context function being called
+
     {:ok, updated_actor}
   end
 
@@ -275,5 +279,13 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     if(Bonfire.Common.Config.get([:logging, :tests_output_ap])) do
       Logger.warn(l)
     end
+  end
+
+  def error(error, attrs) do
+    Logger.error("ActivityPub - Unable to process incoming federated activity - #{error}")
+
+    IO.inspect(attrs: attrs)
+
+    {:error, error}
   end
 end
