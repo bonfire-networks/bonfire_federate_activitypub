@@ -6,6 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   # alias Bonfire.Federate.ActivityPub.Utils
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
   alias Bonfire.Common.Utils
+  import Utils, only: [maybe_apply: 3]
   alias Bonfire.Common.URIs
   require Logger
 
@@ -26,29 +27,29 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_follower_local_ids(actor) do
-    module = character_module("Person")
-    apply(module, :get_follower_local_ids, [actor])
+    character_module("Person")
+    |> maybe_apply(:get_follower_local_ids, [actor])
   end
 
   def get_following_local_ids(actor) do
-    module = character_module("Person")
-    apply(module, :get_following_local_ids, [actor])
+    character_module("Person")
+    |> maybe_apply(:get_following_local_ids, [actor])
   end
 
   def get_actor_by_id(id) do
-    module = character_module("Person")
-    apply(module, :get_actor_by_id, [id])
+    character_module("Person")
+    |> maybe_apply(:get_actor_by_id, [id])
   end
 
   def get_actor_by_username(username) do
     # TODO: Make more generic (currently assumes the actor is person)
-    module = character_module("Person")
-    apply(module, :get_actor_by_username, [username])
+    character_module("Person")
+    |> maybe_apply(:get_actor_by_username, [username])
   end
 
   def get_actor_by_ap_id(ap_id) do
-    module = character_module("Person")
-    apply(module, :get_actor_by_ap_id, [ap_id])
+    character_module("Person")
+    |> maybe_apply(:get_actor_by_ap_id, [ap_id])
   end
 
   # def redirect_to_object(id) do
@@ -72,8 +73,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    module = character_module("Person")
-    apply(module, :update_local_actor, [actor, params])
+    character_module("Person")
+    |> maybe_apply(:update_local_actor, [actor, params])
   end
 
   def update_remote_actor(actor_object) do
@@ -116,8 +117,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def maybe_create_remote_actor(actor) do
-    module = character_module("Person")
-    apply(module, :maybe_create_remote_actor, [actor])
+    character_module("Person")
+    |> maybe_apply(:maybe_create_remote_actor, [actor])
   end
 
   def get_redirect_url(username_or_id) do
@@ -142,6 +143,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def character_module(type) do
-    Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :actor_modules, type])
+    with {:ok, module} <- Bonfire.Federate.ActivityPub.FederationModules.federation_module(type) do
+      module
+    else _ ->
+      Bonfire.Me.Users.ActivityPub # fallback
+    end
   end
+
 end

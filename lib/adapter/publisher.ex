@@ -12,11 +12,6 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
                       Bonfire.Data.Identity.Character
                     ])
 
-  # defines default types that can be federated as AP Objects (overriden by config)
-  @types_inventory Bonfire.Common.Config.get([Bonfire.Instance, :types_inventory], [
-                     Bonfire.Data.Social.Post,
-                    #  CommonsPub.Resources.Resource
-                   ])
 
   def publish("update", %{__struct__: type, id: id})
       when type in @types_characters do
@@ -55,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
     end
   end
 
-  def publish("delete", %{__struct__: type} = thing) when type in @types_inventory do
+  def publish("delete", %{__struct__: type} = thing) do # delete anything else
     with %ActivityPub.Object{} = object <- ActivityPub.Object.get_cached_by_pointer_id(thing.id) do
       ActivityPub.delete(object)
     else

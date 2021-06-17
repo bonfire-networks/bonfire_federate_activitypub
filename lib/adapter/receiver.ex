@@ -2,39 +2,31 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   require Logger
   alias Bonfire.Search.Indexer
   alias Bonfire.Common.Utils
+  alias Bonfire.Federate.ActivityPub.Adapter
 
   # the following constants are derived from config, so please make any changes/additions there
 
-  # @actor_modules Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :actor_modules]) # TODO
-  @activity_modules Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :activity_modules])
-  @object_modules Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :object_modules])
+  @actor_types Bonfire.Common.Config.get([Bonfire.Federate.ActivityPub.Adapter, :actor_types], ["Person", "Group", "Application", "Service", "Organization"])
 
-  @actor_types Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :actor_types])
-  @activity_types Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :activity_types])
-  @object_types Bonfire.Common.Config.get!([Bonfire.Federate.ActivityPub.Adapter, :object_types])
-
-  @doc """
-  load the activity data
-  """
   def receive_activity(activity_id) when is_binary(activity_id) do
-    activity = ActivityPub.Object.get_by_id(activity_id)
-
-    receive_activity(activity)
+    log("AP - load the activity data")
+    ActivityPub.Object.get_by_id(activity_id)
+    |> receive_activity()
   end
 
   def receive_activity(activity) when not is_map_key(activity, :data) do
-    # for cases when the worker gives us an activity
+    log("AP - case when the worker gives us an activity")
     receive_activity(%{data: activity})
   end
 
-  # load the object data
   def receive_activity(
         %{
           data: %{
             "object" => object_id
           }
         } = activity
-      ) do
+      ) when is_binary(object_id) do
+    log("AP - load the object data")
     object = Bonfire.Federate.ActivityPub.Utils.get_object_or_actor_by_ap_id!(object_id)
 
     #IO.inspect(activity: activity)
@@ -43,8 +35,23 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     receive_activity(activity, object)
   end
 
+  def receive_activity(
+        %{
+          data: %{
+            "object" => object
+          }
+        } = activity
+      ) do
+    log("AP - case #1 when the object comes to us embeded in the activity")
+
+    #IO.inspect(activity: activity)
+    #IO.inspect(object: object)
+
+    receive_activity(activity, object)
+  end
+
   def receive_activity(activity, object) when not is_map_key(object, :data) do
-    # for cases when the object comes to us embeded in the activity
+    log("AP - case #2 when the object comes to us embeded in the activity")
     receive_activity(activity, %{data: object})
   end
 
@@ -58,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
     with {:ok, actor} <- ActivityPub.Actor.get_cached_by_ap_id(ap_id),
          {:ok, actor} <- Bonfire.Federate.ActivityPub.Adapter.update_remote_actor(actor) do
-      Indexer.maybe_index_object(actor)
+      # Indexer.maybe_index_object(actor)
       :ok
     end
   end
@@ -71,123 +78,140 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         } = activity,
         %{data: %{"type" => object_type}} = object
       )
-      when activity_type in @activity_types and object_type in @object_types do
+      when is_binary(activity_type) and is_binary(object_type) do
+
     log(
-      "AP Match#1 - by activity_type and object_type: #{activity_type} + #{object_type} = #{
-        @activity_modules[activity_type]
-      } or #{@object_modules[object_type]}"
+      "AP Match#1 - with activity_type and object_type: #{activity_type} & #{object_type}"
     )
 
-    if @activity_modules[activity_type] == @object_modules[object_type] do
-      handle_activity_with(
-        @activity_modules[activity_type],
-        activity,
-        object
-      )
-    else
-      log(
-        "AP Match#1.5 - mismatched activity_type and object_type, try first based on activity, otherwise on object"
-      )
-
-      with {:error, e1} <-
-             handle_activity_with(
-               @activity_modules[activity_type],
-               activity,
-               object
-             ),
-           {:error, e2} <-
-             handle_activity_with(
-               @object_modules[object_type],
-               activity,
-               object
-             ) do
-        {:error, e1 || e2}
-      end
+    with {:ok, actor} <- activity_character(activity),
+        {:error, _} <-
+            handle_activity_with(
+              Bonfire.Federate.ActivityPub.FederationModules.federation_module({activity_type, object_type}),
+              actor,
+              activity,
+              object
+            ),
+        {:error, _} <-
+            handle_activity_with(
+              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type),
+              actor,
+              activity,
+              object
+            ),
+        {:error, _} <-
+            handle_activity_with(
+              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type),
+              actor,
+              activity,
+              object
+            ) do
+      receive_activity_fallback(activity, object, actor)
     end
   end
 
   def receive_activity(
-        %{
-          data: %{
-            "type" => activity_type
-          }
-        } = activity,
-        %{data: %{"type" => object_type}} = object
-      )
-      when activity_type in @activity_types do
-    log(
-      "AP Match#2 - by activity_type: #{activity_type} + #{object_type} = #{
-        @activity_modules[activity_type]
-      }"
-    )
-
-    handle_activity_with(
-      @activity_modules[activity_type],
-      activity,
+      %{
+        data: %{
+          "type" => activity_type
+        }
+      } = activity,
       object
     )
+    when is_binary(activity_type) do
+      log(
+        "AP Match#2 - by activity_type only: #{activity_type}"
+      )
+
+      with {:ok, actor} <- activity_character(activity),
+        {:error, _} <-
+          handle_activity_with(
+            Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type),
+            actor,
+            activity,
+            object
+          ) do
+      receive_activity_fallback(activity, object, actor)
+    end
   end
 
   def receive_activity(
-        %{
-          data: %{
-            "type" => activity_type
-          }
-        } = activity,
+        activity,
         %{data: %{"type" => object_type}} = object
       )
-      when object_type in @object_types do
+      when is_binary(object_type) do
     log(
-      "AP Match#3 - by object_type: #{activity_type} + #{object_type} = #{
-        @object_modules[object_type]
-      }"
+      "AP Match#3 - by object_type only: #{object_type}"
     )
 
-    handle_activity_with(
-      @object_modules[object_type],
-      activity,
-      object
-    )
+    with {:ok, actor} <- activity_character(activity),
+        {:error, _} <-
+            handle_activity_with(
+              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type),
+              actor,
+              activity,
+              object
+            ) do
+      receive_activity_fallback(activity, object, actor)
+    end
   end
 
-  def receive_activity(
-        %{
-          data: %{
-            "type" => activity_type
-          }
-        } = activity,
-        object
-      )
-      when activity_type in @activity_types do
-    log(
-      "AP Match#4 - Only activity_type known: #{activity_type} = #{
-        @activity_modules[activity_type]
-      }"
-    )
-
-    handle_activity_with(
-      @activity_modules[activity_type],
-      activity,
-      object
-    )
-  end
 
   def receive_activity(activity, object) do
-    # TODO actually save this rather than discard
+    receive_activity_fallback(activity, object)
+  end
+
+  defp receive_activity_fallback(activity, object, actor \\ nil) do
+    # TODO save this as an Activity so it can be displayed in feeds using the JSON
     error = "ActivityPub - ignored incoming activity - unhandled activity or object type"
     Logger.error("#{error}")
-    log("activity: #{inspect(activity, pretty: true)}")
-    log("object: #{inspect(object, pretty: true)}")
+    log("AP activity: #{inspect(activity, pretty: true)}")
+    log("AP object: #{inspect(object, pretty: true)}")
     {:error, error}
   end
 
-  def handle_activity_with(module, activity, object) do
-    Utils.maybe_apply(
+
+  defp handle_activity_with(module, actor, activity, object)
+    when is_atom(module) and not is_nil(module) do
+    log("AP - handle_activity_with: #{module}")
+
+    with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
       module,
       :ap_receive_activity,
-      [activity, object],
+      [actor, activity, object],
       &error/2
-    )
+    ) do
+
+      if !Map.get(activity, :pointer_id) && Map.get(pointable_object, :activity), do: ActivityPub.Object.update(activity, %{pointer_id: Map.get(pointable_object.activity, :id)}) # necessary?
+
+      if !Map.get(object, :pointer_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
+
+      {:ok, pointable_object}
+    end
+  end
+
+  # defp handle_activity_with(_module, {:error, _}, activity, _) do
+  #   error("AP - could not find local character for the actor", activity)
+  # end
+
+  defp handle_activity_with(_module, _actor, _activity, _object) do
+    log("AP - no module defined to handle_activity_with")
+    {:error, :skip}
+  end
+
+  def activity_character(%{data: %{"actor" => %{"id" => actor}}} = _activity) do
+    activity_character(actor)
+  end
+
+  def activity_character(%{data: %{"actor" => actor}} = _activity) do
+    activity_character(actor)
+  end
+
+  def activity_character(actor) when is_binary(actor) do
+    # FIXME to handle actor types other than Person/User
+    with {:error, :not_found} <- Adapter.character_module("Person").by_ap_id(actor) do
+      error("AP - could not find local character for the actor", actor)
+    end
   end
 
   @deprecated "Define in host application context modules instead"
@@ -228,12 +252,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
             {:ok, created_character} = Bonfire.Me.SharedUsers.create(create_attrs, :remote) # TODO
             {:ok, created_character, created_character}
 
-        "Group" ->
-          {:ok, creator} =
-            Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(actor["attributedTo"])
+        # "Group" ->
+        #   {:ok, creator} =
+        #     Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(actor["attributedTo"])
 
-          {:ok, created_character} = Bonfire.Groups.create(creator, create_attrs, :remote) # FIXME when we have Groups
-          {:ok, created_character, creator}
+        #   {:ok, created_character} = Bonfire.Groups.create(creator, create_attrs, :remote) # FIXME when we have Groups
+        #   {:ok, created_character, creator}
 
         _ ->
           {:ok, creator} =
@@ -276,7 +300,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
   def log(l) do
-    if(Bonfire.Common.Config.get([:logging, :tests_output_ap])) do
+    if(Bonfire.Common.Config.get(:log_federation)) do
       Logger.warn(l)
     end
   end

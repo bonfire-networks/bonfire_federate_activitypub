@@ -26,9 +26,8 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
       import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers
 
-      Bonfire.Common.Extend.quoted_import_if_enabled(Bonfire.Me.Fake)
-      alias Bonfire.Federate.ActivityPub.Fake
-      alias Bonfire.Federate.ActivityPub.Web.Router.Helpers, as: Routes
+      import Bonfire.Me.Fake
+      alias Bonfire.Federate.ActivityPub.Simulate
 
       # The default endpoint for testing
       @endpoint Bonfire.Common.Config.get!(:endpoint_module)
