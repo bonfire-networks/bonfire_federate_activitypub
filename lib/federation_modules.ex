@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.FederationModules do
   @moduledoc """
-  A Global cache of known federation modules to be queried by associated schema, or vice versa.
+  A Global cache of known federation modules to be queried by activity and/or object type.
 
   Use of the FederationModules Service requires:
 
-  1. Exporting `federation_module/0` in relevant modules (in schemas pointing to federation modules and/or in federation modules pointing to schemas), returning a Module atom
-  2. To populate `:bonfire, :federation_search_path` in config the list of OTP applications where federation_modules are declared.
+  1. Exporting `federation_module/0` in relevant modules (in context modules indicating what activity or object types the module can handle)
+  2. To populate `:bonfire, :federation_search_path` in config with the list of OTP applications where federation_modules are declared.
   3. Start the `Bonfire.Federate.ActivityPub.FederationModules` application before querying.
   4. OTP 21.2 or greater, though we recommend using the most recent
      release available.
@@ -41,7 +41,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   @spec federation_module(query :: query) :: {:ok, atom} | {:error, :not_found}
-  @doc "Get a Queryable identified by name or id."
+  @doc "Get a Federation Module identified by activity and/or object type, as string or {activity, object} tuple."
   def federation_module(query) when is_binary(query) or is_atom(query) or is_tuple(query) do
     case Map.get(data(), query) do
       nil -> {:error, :not_found}
@@ -49,12 +49,12 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     end
   end
 
-  @spec federation_module!(query) :: Queryable.t
-  @doc "Look up a Queryable by name or id, throw :not_found if not found."
+  @spec federation_module!(query) :: Federation Module.t
+  @doc "Look up a Federation Module, throw :not_found if not found."
   def federation_module!(query), do: Map.get(data(), query) || throw(:not_found)
 
   @spec federation_modules([binary | atom]) :: [binary]
-  @doc "Look up many ids at once, throw :not_found if any of them are not found"
+  @doc "Look up many types at once, throw :not_found if any of them are not found"
   def federation_modules(modules) do
     data = data()
     Enum.map(modules, &Map.get(data, &1))
@@ -64,12 +64,12 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     with {:ok, module} <- federation_module(query) do
       module
     else _ -> # fallback
-      Utils.maybe_apply(query, :federation_module, [], &federation_function_error/2)
+      nil
     end
   end
 
   def federation_function_error(error, _args, level \\ :info) do
-    Logger.log(level, "FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 that returns this schema atom. 2) #{error}")
+    Logger.log(level, "FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2) #{error}")
 
     nil
   end
