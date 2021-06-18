@@ -171,7 +171,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
 
-  defp handle_activity_with(module, character, activity, object)
+  defp handle_activity_with({:ok, module}, character, activity, object)
     when is_atom(module) and not is_nil(module) do
     log("AP - handle_activity_with: #{module}")
 
