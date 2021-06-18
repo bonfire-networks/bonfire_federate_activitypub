@@ -171,16 +171,18 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
 
-  defp handle_activity_with(module, actor, activity, object)
+  defp handle_activity_with(module, character, activity, object)
     when is_atom(module) and not is_nil(module) do
     log("AP - handle_activity_with: #{module}")
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
       module,
       :ap_receive_activity,
-      [actor, activity, object],
+      [character, activity, object],
       &error/2
     ) do
+
+      Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, object.data["id"])
 
       if !Map.get(activity, :pointer_id) && Map.get(pointable_object, :activity), do: ActivityPub.Object.update(activity, %{pointer_id: Map.get(pointable_object.activity, :id)}) # necessary?
 
@@ -216,10 +218,8 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
   @deprecated "Define in host application context modules instead"
   def create_remote_character(actor, username) do
-    uri = URI.parse(actor["id"])
-    ap_base = uri.scheme <> "://" <> uri.host
 
-    peer = Bonfire.Federate.ActivityPub.Peers.get_or_create(ap_base, uri.host)
+    peer = Bonfire.Federate.ActivityPub.Peers.get_or_create(actor)
 
     name =
       case actor["name"] do

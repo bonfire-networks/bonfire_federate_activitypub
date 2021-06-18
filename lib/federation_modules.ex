@@ -49,7 +49,6 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     end
   end
 
-  @spec federation_module!(query) :: Federation Module.t
   @doc "Look up a Federation Module, throw :not_found if not found."
   def federation_module!(query), do: Map.get(data(), query) || throw(:not_found)
 

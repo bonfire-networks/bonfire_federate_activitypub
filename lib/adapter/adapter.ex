@@ -77,6 +77,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     |> maybe_apply(:update_local_actor, [actor, params])
   end
 
+  # TODO: refactor & move to Me context(s)?
   def update_remote_actor(actor_object) do
     data = actor_object.data
 
