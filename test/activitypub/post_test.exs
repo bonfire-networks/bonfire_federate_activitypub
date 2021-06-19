@@ -18,7 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
   test "Post publishing works" do
     user = fake_user!()
 
-    attrs = %{circles: [:guests], post_content: %{html_body: "content"}}
+    attrs = %{circles: [:guest], post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(user, attrs)
 
