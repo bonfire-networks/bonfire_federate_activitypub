@@ -14,7 +14,6 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     :ok
   end
 
-
   test "Post publishing works" do
     user = fake_user!()
 
@@ -22,13 +21,10 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
     {:ok, post} = Posts.publish(user, attrs)
 
-
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
     # IO.inspect(ap_activity)
     assert ap_activity.object.data["content"] == attrs.post_content.html_body
-
   end
-
 
   test "creates a Post for an incoming Note" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
@@ -52,10 +48,5 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
     # IO.inspect(post)
     assert object["content"] == post.post_content.html_body
-
   end
-
-
-
-
 end

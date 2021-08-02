@@ -2,7 +2,6 @@ defmodule Bonfire.Federate.ActivityPub.Test.ConnHelpers do
   require Phoenix.ConnTest
   alias Phoenix.{ConnTest, Controller}
   alias Plug.{Conn, Session}
-  import ExUnit.Assertions
 
   @endpoint Bonfire.Common.Config.get!(:endpoint_module)
 
