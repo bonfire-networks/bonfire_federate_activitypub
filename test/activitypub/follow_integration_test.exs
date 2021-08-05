@@ -31,4 +31,18 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
   end
 
+  test "unfollow receiving works" do
+    followed = fake_user!()
+    {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, ap_followed} = ActivityPub.Adapter.get_actor_by_id(followed.id)
+    {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
+
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+
+    {:ok, unfollow_activity} = ActivityPub.unfollow(ap_follower, ap_followed)
+
+    IO.inspect(unfollow_activity)
+
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(unfollow_activity)
+  end
 end
