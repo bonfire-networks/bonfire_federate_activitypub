@@ -170,8 +170,10 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     {:error, error}
   end
 
-
-  defp handle_activity_with({:ok, module}, character, activity, object)
+  # TODO: figure out when we need to save canonical url/update pointer
+  # This should not be done if the object is local, i. e. local actor
+  # as the object of a follow
+  defp handle_activity_with({:ok, module}, character, %{data: %{"type" => "Create"}} = activity, object)
     when is_atom(module) and not is_nil(module) do
     log("AP - handle_activity_with: #{module}")
 
@@ -184,10 +186,24 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
       Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, object.data["id"])
 
-      if !Map.get(activity, :pointer_id) && Map.get(pointable_object, :activity), do: ActivityPub.Object.update(activity, %{pointer_id: Map.get(pointable_object.activity, :id)}) # necessary?
+      object = ActivityPub.Object.normalize(object)
 
       if !Map.get(object, :pointer_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
 
+      {:ok, pointable_object}
+    end
+  end
+
+  defp handle_activity_with({:ok, module}, character, activity, object)
+    when is_atom(module) and not is_nil(module) do
+    log("AP - handle_activity_with: #{module}")
+
+    with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
+      module,
+      :ap_receive_activity,
+      [character, activity, object],
+      &error/2
+    ) do
       {:ok, pointable_object}
     end
   end
