@@ -41,8 +41,6 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     {:ok, unfollow_activity} = ActivityPub.unfollow(ap_follower, ap_followed)
 
-    IO.inspect(unfollow_activity)
-
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(unfollow_activity)
   end
 end
