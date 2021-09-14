@@ -25,12 +25,12 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     true
   end
 
-  def check_local(%{creator: %{peered: nil}}) do
+  def check_local(%{created: %{peered: nil}}) do
     # publish if author is local
     true
   end
 
-  def check_local(_), do: false
+  def check_local(context), do: false
 
   def get_actor_username(%{preferred_username: u}) when is_binary(u),
     do: u

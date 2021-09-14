@@ -28,6 +28,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
     Bonfire.Common.Pointers.one!(id: context_id)
     |> Bonfire.Common.Pointers.follow!(deleted: true)
     |> Bonfire.Repo.maybe_preload(:character)
+    |> Bonfire.Repo.maybe_preload(created: [:peered])
     |> only_local("delete", &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 
@@ -35,7 +36,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
     Bonfire.Common.Pointers.one!(id: context_id)
     |> Bonfire.Common.Pointers.follow!()
     |> Bonfire.Repo.maybe_preload(:character)
-    |> Bonfire.Repo.maybe_preload(creator: [:character])
+    |> Bonfire.Repo.maybe_preload(created: [:peered])
     |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 
@@ -57,6 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
     if Bonfire.Federate.ActivityPub.Utils.check_local(context) do
       commit_fn.(verb, context)
     else
+      IO.puts("ignored due to non local activity")
       :ignored
     end
   end
