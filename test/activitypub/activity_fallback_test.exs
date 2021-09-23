@@ -15,8 +15,9 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
   test "peertube video object" do
     data =
-      # FIXME: This only works when forked
-      File.read!("forks/bonfire_federate_activitypub/test/fixtures/peertube-video.json")
+      "../fixtures/peertube-video.json"
+      |> Path.expand(__DIR__)
+      |> File.read!()
       |> Jason.decode!()
 
     {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
@@ -40,8 +41,9 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
     data =
-      # FIXME: This only works when forked
-      File.read!("forks/bonfire_federate_activitypub/test/fixtures/pleroma-emojireact.json")
+      "../fixtures/pleroma-emojireact.json"
+      |> Path.expand(__DIR__)
+      |> File.read!()
       |> Jason.decode!()
       |> Map.put("object", ap_activity.data["object"])
 
