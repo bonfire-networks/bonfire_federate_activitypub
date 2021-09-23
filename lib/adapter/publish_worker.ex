@@ -58,8 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
     if Bonfire.Federate.ActivityPub.Utils.check_local(context) do
       commit_fn.(verb, context)
     else
-      IO.puts("ignored due to non local activity")
-      :ignored
+      {:discard, :not_local}
     end
   end
 end
