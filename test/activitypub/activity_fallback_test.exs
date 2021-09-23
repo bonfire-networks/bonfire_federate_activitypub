@@ -25,4 +25,18 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
     assert activity.json["object"]["type"] == "Video"
     assert is_binary(activity.json["object"]["content"])
   end
+
+  test "pleroma emoji react" do
+    ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+
+    data =
+      # FIXME: This only works when forked
+      File.read!("forks/bonfire_federate_activitypub/test/fixtures/pleroma-emojireact.json")
+      |> Jason.decode!()
+
+    {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
+
+    assert {:ok, activity} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(data)
+    assert activity.json["type"] == "EmojiReact"
+  end
 end

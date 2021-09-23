@@ -1,0 +1,20 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://kawen.space/schemas/litepub-0.1.jsonld",
+        {
+            "@language": "und"
+        }
+    ],
+    "actor": "https://kawen.space/users/karen",
+    "cc": [
+        "https://bonfiredev.kawen.space/pub/actors/Kawen"
+    ],
+    "content": "😠",
+    "context": "https://kawen.space/contexts/d554a6a5-c957-486f-9d6e-cac6f9b08d5b",
+    "id": "https://kawen.space/activities/01e0f4dd-af13-4f48-95ab-e9d2ebf5e42f",
+    "object": "https://kawen.space/objects/2b74094e-27ae-4c95-a8d0-be3a49b818bc",
+    "to": [],
+    "type": "EmojiReact",
+    "username": "Kawen"
+}
