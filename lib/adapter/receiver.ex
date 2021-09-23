@@ -162,12 +162,17 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
   defp receive_activity_fallback(activity, object, actor \\ nil) do
-    # TODO save this as an Activity so it can be displayed in feeds using the JSON
-    error = "ActivityPub - ignored incoming activity - unhandled activity or object type"
-    Logger.error("#{error}")
-    log("AP activity: #{inspect(activity, pretty: true)}")
-    log("AP object: #{inspect(object, pretty: true)}")
-    {:error, error}
+    if Application.get_env(:bonfire, :federation_fallback_module) do
+      log("AP - handling activity with fallback")
+      module = Application.get_env(:bonfire, :federation_fallback_module)
+      module.create(activity, object, actor)
+    else
+      error = "ActivityPub - ignored incoming activity - unhandled activity or object type"
+      Logger.error("#{error}")
+      log("AP activity: #{inspect(activity, pretty: true)}")
+      log("AP object: #{inspect(object, pretty: true)}")
+      {:error, error}
+    end
   end
 
   # TODO: figure out when we need to save canonical url/update pointer
