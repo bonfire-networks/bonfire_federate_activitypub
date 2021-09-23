@@ -61,7 +61,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def redirect_to_actor(username) do
     if System.get_env("LIVEVIEW_ENABLED", "true") == "true" do
-      case Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_username(username) do
+      case Bonfire.Federate.ActivityPub.Utils.get_character_by_username(username) do
         {:ok, character} ->
           url = Bonfire.Me.Characters.character_url(character)
           if !String.contains?(url, "/404"), do: url
@@ -82,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     data = actor_object.data
 
     with {:ok, character} <-
-           Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_id(actor_object.pointer_id),
+           Bonfire.Federate.ActivityPub.Utils.get_character_by_id(actor_object.pointer_id),
          creator <- Bonfire.Repo.maybe_preload(character, :creator) |> Map.get(:creator, nil) do
       # FIXME - support other types
       params = %{

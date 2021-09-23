@@ -35,12 +35,15 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_actor_username(%{preferred_username: u}) when is_binary(u),
     do: u
 
-  def get_actor_username(%{character: %{preferred_username: u}}) when is_binary(u),
+  def get_actor_username(%{username: u}) when is_binary(u),
     do: u
 
   def get_actor_username(%{character: %Ecto.Association.NotLoaded{}} = obj) do
-    get_actor_username(Map.get(Bonfire.Repo.maybe_preload(obj, :character), :character))
+    get_actor_username(Bonfire.Repo.maybe_preload(obj, :character))
   end
+
+  def get_actor_username(%{character: c}),
+    do: get_actor_username(c)
 
   def get_actor_username(u) when is_binary(u),
     do: u
@@ -113,63 +116,92 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     generate_object_ap_id(object)
   end
 
-  def get_raw_character_by_username(username) when is_binary(username) do
-    # FIXME: this should be only one query, and support other types (or two, using pointers?)
-        #  with {:error, _e} <- Bonfire.Me.Users.one([:default, username: username]),
-        #  {:error, _e} <- CommonsPub.Communities.one([:default, username: username]),
-        #  {:error, _e} <- CommonsPub.Collections.one([:default, username: username]),
-    with {:error, _e} <- Bonfire.Me.Characters.by_username(username) do
+  def get_character_by_username("@"<>username), do: get_character_by_username(username)
+
+  def get_character_by_username(username) when is_binary(username) do
+    with {:ok, character} <- Bonfire.Me.Characters.by_username(username) do
+      get_character_by_id(character.id) # FIXME? this results in two more queries
+    else e ->
       {:error, "not found"}
     end
   end
 
-  def get_raw_character_by_username(%{} = character), do: character
+  def get_character_by_username(%{} = character), do: character
 
-  def get_raw_character_by_id(id) when is_binary(id) do
-    # FIXME: this should be only one query, and support other types (or two, using pointers?)
-        # with {:error, _e} <- Bonfire.Me.Users.one([:default, id: id]),
-        #  {:error, _e} <- CommonsPub.Communities.one([:default, id: id]),
-        #  {:error, _e} <- CommonsPub.Collections.one([:default, id: id]),
-         with {:error, _e} <- Bonfire.Me.Characters.get(id) do
+  def get_character_by_id(id) when is_binary(id) do
+    with {:error, _e} <- Bonfire.Common.Pointers.get(id) do
       {:error, "not found"}
     end
   end
 
-  def get_raw_character_by_id(%{} = character), do: character
+  def get_character_by_id(%{} = character), do: character
 
-  def get_raw_character_by_ap_id(ap_id) when is_binary(ap_id) do
+  def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
     # FIXME: this should not query the AP db
+    # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
     with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
-      get_raw_character_by_ap_id(actor)
+      get_character_by_ap_id(actor)
     else
       {:error, e} -> {:error, e}
     end
   end
 
-  def get_raw_character_by_ap_id(%{"id" => id}) do
-    get_raw_character_by_ap_id(id)
+  def get_character_by_ap_id(%{"id" => id}) do
+    get_character_by_ap_id(id)
   end
 
-  def get_raw_character_by_ap_id(%{username: username} = _actor)
+  def get_character_by_ap_id(%{username: username} = _actor)
       when is_binary(username) do
-    with {:ok, character} <- get_raw_character_by_username(username) do
+    with {:ok, character} <- get_character_by_username(username) do
       {:ok, character}
     else
       {:error, e} -> {:error, e}
     end
   end
 
-  def get_raw_character_by_ap_id(%{data: data}) do
-    get_raw_character_by_ap_id(data)
+  def get_character_by_ap_id(%{data: data}) do
+    get_character_by_ap_id(data)
   end
 
-  def get_raw_character_by_ap_id(%{} = character), do: character
+  def get_character_by_ap_id(%{} = character), do: character
 
-  def get_raw_character_by_ap_id!(ap_id) do
-    with {:ok, character} <- get_raw_character_by_ap_id(ap_id) do
+  def get_character_by_ap_id!(ap_id) do
+    with {:ok, character} <- get_character_by_ap_id(ap_id) do
       character
     else
       _ -> nil
+    end
+  end
+
+  def get_by_url_ap_id_or_username("@"<>username), do: get_or_fetch_and_create_by_userame(username)
+  def get_by_url_ap_id_or_username("http:"<>_ = url), do: get_or_fetch_and_create(url)
+  def get_by_url_ap_id_or_username("https:"<>_ = url), do: get_or_fetch_and_create(url)
+  def get_by_url_ap_id_or_username(string) when is_binary(string) do
+    if validate_url(string) do
+      get_or_fetch_and_create(string)
+    else
+      if String.contains?(string, "@"), do: get_or_fetch_and_create_by_userame(string)
+    end
+  end
+
+  defp get_or_fetch_and_create_by_userame(q) do
+    with {:ok, object} <- ActivityPub.Actor.get_or_fetch_by_username(q) do
+      Bonfire.Common.Pointers.get(object)
+    end
+  end
+
+  defp get_or_fetch_and_create(q) do
+    with {:ok, object} <- ActivityPub.Fetcher.get_or_fetch_and_create(q) do
+      Bonfire.Common.Pointers.get(object)
+    end
+  end
+
+  def validate_url(str) do
+    uri = URI.parse(str)
+    case uri do
+      %URI{scheme: nil} -> false
+      %URI{host: nil} -> false
+      uri -> true
     end
   end
 
@@ -190,6 +222,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
+    # FIXME?
     ActivityPub.Object.get_cached_by_ap_id(ap_id) ||
       get_or_fetch_actor_by_ap_id!(ap_id) || ap_id
   end
@@ -197,6 +230,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_object_or_actor_by_ap_id!(ap_id) do
     ap_id
   end
+
 
   def get_creator_ap_id(%{creator_id: creator_id}) when not is_nil(creator_id) do
     with {:ok, %{ap_id: ap_id}} <- ActivityPub.Actor.get_cached_by_local_id(creator_id) do

@@ -273,16 +273,19 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
             {:ok, created_character} = Bonfire.Me.SharedUsers.create(create_attrs, :remote) # TODO
             {:ok, created_character, created_character}
 
+
+        # FIXME when we have Groups
+        # FIXME we should handle some Groups (eg. Guppe, and Bonfire categories/topics) as Categories
         # "Group" ->
         #   {:ok, creator} =
-        #     Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(actor["attributedTo"])
+        #     Bonfire.Federate.ActivityPub.Utils.get_character_by_ap_id(actor["attributedTo"])
 
-        #   {:ok, created_character} = Bonfire.Groups.create(creator, create_attrs, :remote) # FIXME when we have Groups
+        #   {:ok, created_character} = Bonfire.Groups.create(creator, create_attrs, :remote)
         #   {:ok, created_character, creator}
 
         _ ->
           {:ok, creator} =
-            Bonfire.Federate.ActivityPub.Utils.get_raw_character_by_ap_id(actor["attributedTo"])
+            Bonfire.Federate.ActivityPub.Utils.get_character_by_ap_id(actor["attributedTo"])
 
           {:ok, created_character} =
             Bonfire.Me.Characters.create(creator, create_attrs, :remote) # TODO as fallback
