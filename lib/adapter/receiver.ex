@@ -270,9 +270,11 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
           {:ok, created_character, created_character}
 
         "Organization" ->
+
+          if Utils.module_enabled?(Bonfire.Data.SharedUser) do
             {:ok, created_character} = Bonfire.Me.SharedUsers.create(create_attrs, :remote) # TODO
             {:ok, created_character, created_character}
-
+          end
 
         # FIXME when we have Groups
         # FIXME we should handle some Groups (eg. Guppe, and Bonfire categories/topics) as Categories
