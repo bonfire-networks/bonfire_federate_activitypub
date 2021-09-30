@@ -192,8 +192,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   defp get_or_fetch_and_create(q) do
+    # IO.inspect(get_or_fetch_and_create: q)
     with {:ok, object} <- ActivityPub.Fetcher.get_or_fetch_and_create(q) do
-      Bonfire.Common.Pointers.get(object)
+      # IO.inspect(object: object)
+      Bonfire.Common.Pointers.get(object) #|> IO.inspect
     end
   end
 
