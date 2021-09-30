@@ -7,9 +7,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
   alias Bonfire.Federate.ActivityPub.Utils
   alias Bonfire.Common.Pointers
-  import Bonfire.Common.Utils, only: [maybe_apply: 3]
+  import Bonfire.Common.Utils, only: [maybe_apply: 3, is_ulid?: 1]
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
+  import Bonfire.Federate.ActivityPub.Integration
   require Logger
 
   @behaviour ActivityPub.Adapter
@@ -145,17 +146,57 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
       {:error, _} -> # new character, create it...
 
-        character_module(actor.data["type"])
-        |> maybe_apply(:create_remote_actor, [actor])
+        create_remote_actor(actor)
 
+    end
+  end
+
+  defp create_remote_actor(actor) do
+
+    character_module = character_module(actor.data["type"])
+
+    actor_object = ActivityPub.Object.get_by_ap_id(actor.ap_id)
+
+    icon_url = Utils.maybe_fix_image_object(actor.data["icon"])
+    image_url = Utils.maybe_fix_image_object(actor.data["image"])
+
+    with {:ok, user_etc} <- repo().transact_with(fn ->
+      with  {:ok, peer} =  Bonfire.Federate.ActivityPub.Peers.get_or_create(actor),
+            {:ok, user_etc} <- maybe_apply(character_module, [:create_remote, :create], %{
+              character: %{
+                username: actor.username
+              },
+              profile: %{
+                name: actor.data["name"],
+                summary: actor.data["summary"]
+              },
+              peered: %{
+                peer_id: peer.id,
+                canonical_uri: actor.ap_id
+              }
+            }),
+            {:ok, _object} <- ActivityPub.Object.update(actor_object, %{pointer_id: user_etc.id}) do
+        {:ok, user_etc}
+      end
+    end) do
+
+      # after creating the user, in case of timeouts downloading the images
+      icon_id = Utils.maybe_create_icon_object(icon_url, user_etc)
+      image_id = Utils.maybe_create_image_object(image_url, user_etc)
+
+      with {:ok, updated_user} <- maybe_apply(character_module, [:update_remote, :update],[user_etc, %{"profile" => %{"icon_id" => icon_id, "image_id" => image_id}}]) do
+        {:ok, updated_user}
+      else _ ->
+        {:ok, user_etc}
+      end
     end
   end
 
   def get_redirect_url(id_or_username_or_object)
 
-  def get_redirect_url(id_or_username, object) when is_binary(id_or_username) do
+  def get_redirect_url(id_or_username) when is_binary(id_or_username) do
     # IO.inspect(object)
-    if Utils.is_ulid?(id_or_username) do
+    if is_ulid?(id_or_username) do
       get_object_url(id_or_username)
     else
       get_url_by_username(id_or_username)
