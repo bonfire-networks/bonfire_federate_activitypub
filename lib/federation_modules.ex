@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   Use of the FederationModules Service requires:
 
   1. Exporting `federation_module/0` in relevant modules (in context modules indicating what activity or object types the module can handle)
-  2. To populate `:bonfire, :federation_search_path` in config with the list of OTP applications where federation_modules are declared.
+  2. To populate `:bonfire, :federation_search_path` in config with the list of OTP applications where federation modules are declared.
   3. Start the `Bonfire.Federate.ActivityPub.FederationModules` application before querying.
   4. OTP 21.2 or greater, though we recommend using the most recent
      release available.
@@ -21,6 +21,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   require Logger
   alias Bonfire.Common.Utils
+
 
   use GenServer, restart: :transient
 

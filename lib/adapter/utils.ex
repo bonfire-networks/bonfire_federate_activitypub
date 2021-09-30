@@ -2,6 +2,7 @@
 defmodule Bonfire.Federate.ActivityPub.Utils do
   alias ActivityPub.Actor
   alias Bonfire.Social.Threads
+  alias Bonfire.Common.Utils
 
   require Logger
 
@@ -136,6 +137,25 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_character_by_id(%{} = character), do: character
 
+  # def get_character_by_ap_id(%{ap_id: id}) do
+  #   get_character_by_ap_id(id)
+  # end
+
+  def get_character_by_ap_id(%{"id" => id}) do
+    get_character_by_ap_id(id)
+  end
+
+  def get_character_by_ap_id(%{username: username} = _actor)
+      when is_binary(username) do
+    get_character_by_username(username)
+  end
+
+  def get_character_by_ap_id(%{data: data}) do
+    get_character_by_ap_id(data)
+  end
+
+  def get_character_by_ap_id(%{} = character), do: character
+
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
     # FIXME: this should not query the AP db
     # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
@@ -145,25 +165,6 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       {:error, e} -> {:error, e}
     end
   end
-
-  def get_character_by_ap_id(%{"id" => id}) do
-    get_character_by_ap_id(id)
-  end
-
-  def get_character_by_ap_id(%{username: username} = _actor)
-      when is_binary(username) do
-    with {:ok, character} <- get_character_by_username(username) do
-      {:ok, character}
-    else
-      {:error, e} -> {:error, e}
-    end
-  end
-
-  def get_character_by_ap_id(%{data: data}) do
-    get_character_by_ap_id(data)
-  end
-
-  def get_character_by_ap_id(%{} = character), do: character
 
   def get_character_by_ap_id!(ap_id) do
     with {:ok, character} <- get_character_by_ap_id(ap_id) do
@@ -258,6 +259,44 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_context_ap_id(_), do: nil
+
+
+  def format_actor(%{} = user_etc, type \\ "Person") do
+    user_etc = Bonfire.Repo.preload(user_etc, [profile: [:image, :icon], character: [:actor]]) #|> IO.inspect()
+    ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
+    id = Bonfire.Common.URIs.base_url() <> ap_base_path <> "/actors/#{user_etc.character.username}"
+
+    icon = maybe_create_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
+    image = maybe_create_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
+
+    data = %{
+      "type" => type,
+      "id" => id,
+      "inbox" => "#{id}/inbox",
+      "outbox" => "#{id}/outbox",
+      "followers" => "#{id}/followers",
+      "following" => "#{id}/following",
+      "preferredUsername" => user_etc.character.username,
+      "name" => user_etc.profile.name,
+      "summary" => Map.get(user_etc.profile, :summary),
+      "icon" => icon,
+      "image" => image,
+      "endpoints" => %{
+        "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
+      }
+    }
+
+    %Actor{
+      id: user_etc.id,
+      data: data,
+      keys: Bonfire.Common.Utils.maybe_get(user_etc.character.actor, :signing_key),
+      local: true,
+      ap_id: id,
+      pointer_id: user_etc.id,
+      username: user_etc.character.username,
+      deactivated: false
+    }
+  end
 
   def determine_recipients(actor, comment) do
     determine_recipients(actor, comment, [public_uri()], [actor.data["followers"]])

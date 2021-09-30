@@ -180,7 +180,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   # as the object of a follow
   defp handle_activity_with({:ok, module}, character, %{data: %{"type" => "Create"}} = activity, object)
     when is_atom(module) and not is_nil(module) do
-    log("AP - handle_activity_with: #{module}")
+    log("AP - create - handle_activity_with: #{module}")
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
       module,
@@ -266,7 +266,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     {:ok, created_character, creator} =
       case actor["type"] do
         "Person" ->
-          {:ok, created_character} = Bonfire.Me.Users.ActivityPub.create(create_attrs)
+          {:ok, created_character} = Bonfire.Me.Users.create_remote(create_attrs)
           {:ok, created_character, created_character}
 
         "Organization" ->
@@ -301,7 +301,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     {:ok, updated_actor} =
       case created_character do
         %Bonfire.Data.Identity.User{} ->
-          Bonfire.Me.Users.ActivityPub.update(created_character, %{icon_id: icon_id, image_id: image_id})
+          Bonfire.Me.Users.update_remote(created_character, %{icon_id: icon_id, image_id: image_id})
 
         # %CommonsPub.Communities.Community{} ->
         #   CommonsPub.Communities.update(%Bonfire.Data.Identity.User{}, created_character, %{

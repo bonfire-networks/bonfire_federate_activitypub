@@ -3,11 +3,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   @moduledoc """
   Adapter functions delegated from the `ActivityPub` Library
   """
-  # alias Bonfire.Federate.ActivityPub.Utils
+  # alias Utils
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
-  alias Bonfire.Common.Utils
-  import Utils, only: [maybe_apply: 3]
+  alias Bonfire.Federate.ActivityPub.Utils
+  alias Bonfire.Common.Pointers
+  import Bonfire.Common.Utils, only: [maybe_apply: 3]
   alias Bonfire.Common.URIs
+  alias Bonfire.Me.Characters
   require Logger
 
   @behaviour ActivityPub.Adapter
@@ -27,29 +29,42 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_follower_local_ids(actor) do
-    character_module("Person")
-    |> maybe_apply(:get_follower_local_ids, [actor])
+    with {:ok, character} <- Characters.by_username(actor.username) do
+      Bonfire.Social.Follows.follower_by_followed(character)
+    end
   end
 
   def get_following_local_ids(actor) do
-    character_module("Person")
-    |> maybe_apply(:get_following_local_ids, [actor])
+    with {:ok, character} <- Characters.by_username(actor.username) do
+      Bonfire.Social.Follows.by_follower(character)
+    end
   end
 
   def get_actor_by_id(id) do
-    character_module("Person")
-    |> maybe_apply(:get_actor_by_id, [id])
+    # character_module("Person") # FIXME
+    # |> maybe_apply(:get_actor_by_id, [id])
+
+    with {:ok, character} = Utils.get_character_by_id(id),
+    %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
+      {:ok, actor} # TODO: use federation_module instead of context_module?
+    end
   end
 
   def get_actor_by_username(username) do
     # TODO: Make more generic (currently assumes the actor is person)
-    character_module("Person")
-    |> maybe_apply(:get_actor_by_username, [username])
+    # character_module("Person")
+    # |> maybe_apply(:get_actor_by_username, [username])
+
+    with {:ok, character} = Utils.get_character_by_username(username),
+    %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
+      {:ok, actor} # TODO: use federation_module instead of context_module?
+    end
   end
 
   def get_actor_by_ap_id(ap_id) do
-    character_module("Person")
-    |> maybe_apply(:get_actor_by_ap_id, [ap_id])
+    with {:ok, %{username: username}} = ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
+      get_actor_by_username(username)
+    end
   end
 
   # def redirect_to_object(id) do
@@ -61,7 +76,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def redirect_to_actor(username) do
     if System.get_env("LIVEVIEW_ENABLED", "true") == "true" do
-      case Bonfire.Federate.ActivityPub.Utils.get_character_by_username(username) do
+      case Utils.get_character_by_username(username) do
         {:ok, character} ->
           url = Bonfire.Me.Characters.character_url(character)
           if !String.contains?(url, "/404"), do: url
@@ -73,8 +88,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    character_module("Person")
-    |> maybe_apply(:update_local_actor, [actor, params])
+    # character_module("Person")
+    # |> maybe_apply(:update_local_actor, [actor, params])
+
+  with {:ok, character} = Utils.get_character_by_ap_id(actor) do
+     Bonfire.Common.ContextModules.maybe_apply(character, :update_local_actor, [actor, params]) # FIXME use federation_module?
+    end
   end
 
   # TODO: refactor & move to Me context(s)?
@@ -82,20 +101,20 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     data = actor_object.data
 
     with {:ok, character} <-
-           Bonfire.Federate.ActivityPub.Utils.get_character_by_id(actor_object.pointer_id),
+           Utils.get_character_by_id(actor_object.pointer_id),
          creator <- Bonfire.Repo.maybe_preload(character, :creator) |> Map.get(:creator, nil) do
       # FIXME - support other types
       params = %{
         name: data["name"],
         summary: data["summary"],
         icon_id:
-          Bonfire.Federate.ActivityPub.Utils.maybe_create_icon_object(
-            Bonfire.Federate.ActivityPub.Utils.maybe_fix_image_object(data["icon"]),
+          Utils.maybe_create_icon_object(
+            Utils.maybe_fix_image_object(data["icon"]),
             creator
           ),
         image_id:
-          Bonfire.Federate.ActivityPub.Utils.maybe_create_image_object(
-            Bonfire.Federate.ActivityPub.Utils.maybe_fix_image_object(data["image"]),
+          Utils.maybe_create_image_object(
+            Utils.maybe_fix_image_object(data["image"]),
             creator
           )
       }
@@ -103,7 +122,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       # FIXME
       case character do
         %Bonfire.Data.Identity.User{} ->
-          Bonfire.Me.Users.ActivityPub.update(character, params)
+          Bonfire.Me.Users.update_remote(character, params)
 
         # %CommonsPub.Communities.Community{} ->
         #   CommonsPub.Communities.ap_receive_update(character, params, creator)
@@ -112,33 +131,45 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         #   CommonsPub.Collections.ap_receive_update(character, params, creator)
 
         true ->
-          Bonfire.Me.Characters.ap_receive_update(character, params, creator) # TODO fallback
+          Characters.ap_receive_update(character, params, creator) # TODO fallback
       end
     end
   end
 
   def maybe_create_remote_actor(actor) do
-    character_module("Person")
-    |> maybe_apply(:maybe_create_remote_actor, [actor])
-  end
+    # IO.inspect(maybe_create_remote_actor: actor)
 
-  def get_redirect_url(username_or_id) do
-    if Utils.is_ulid?(username_or_id) do
-      get_object_url(username_or_id)
-    else
-      get_actor_url(username_or_id)
+    case Utils.get_character_by_ap_id(actor) do
+
+      {:ok, _} -> :ok # already exists
+
+      {:error, _} -> # new character, create it...
+
+        character_module(actor.data["type"])
+        |> maybe_apply(:create_remote_actor, [actor])
+
     end
   end
 
-  def get_object_url(id) do
-    URIs.path(id)
+  def get_redirect_url(id_or_username_or_object)
+
+  def get_redirect_url(id_or_username, object) when is_binary(id_or_username) do
+    # IO.inspect(object)
+    if Utils.is_ulid?(id_or_username) do
+      get_object_url(id_or_username)
+    else
+      get_url_by_username(id_or_username)
+    end
   end
 
-  def get_actor_url(username) do
-    #FIXME: naughty
-    module = character_module("Person")
-    case module.by_username(username) do
-      {:ok, user} -> URIs.path(user)
+  def get_redirect_url(%{} = object), do: URIs.path(object)
+
+
+  def get_object_url(id), do: URIs.path(id)
+
+  defp get_url_by_username(username) do
+    case Utils.get_character_by_username(username) do
+      {:ok, user_etc} -> URIs.path(user_etc)
       {:error, _} -> "/404"
     end
   end
@@ -147,7 +178,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     with {:ok, module} <- Bonfire.Federate.ActivityPub.FederationModules.federation_module(type) do
       module
     else _ ->
-      Bonfire.Me.Users.ActivityPub # fallback
+      Bonfire.Me.Users # fallback
     end
   end
 
