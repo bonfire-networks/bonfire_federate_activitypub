@@ -191,7 +191,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     end
   end
 
-  defp get_or_fetch_and_create(q) do
+  defp get_or_fetch_and_create(q) when is_binary(q) do
     # IO.inspect(get_or_fetch_and_create: q)
     with {:ok, object} <- ActivityPub.Fetcher.get_or_fetch_and_create(q) do
       # IO.inspect(object: object)
