@@ -6,8 +6,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   # alias Utils
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
   alias Bonfire.Federate.ActivityPub.Utils
-  alias Bonfire.Common.Pointers
+  import Utils, only: [log: 1]
   import Bonfire.Common.Utils, only: [maybe_apply: 3, is_ulid?: 1]
+  alias Bonfire.Common.Pointers
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
   import Bonfire.Federate.ActivityPub.Integration
@@ -138,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def maybe_create_remote_actor(actor) do
-    # IO.inspect(maybe_create_remote_actor: actor)
+    log("AP - maybe_create_remote_actor")
 
     case Utils.get_character_by_ap_id(actor) do
 
@@ -152,8 +153,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   defp create_remote_actor(actor) do
-
     character_module = character_module(actor.data["type"])
+
+    log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
 
     actor_object = ActivityPub.Object.get_by_ap_id(actor.ap_id)
 
@@ -218,7 +220,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def character_module(type) do
     with {:ok, module} <- Bonfire.Federate.ActivityPub.FederationModules.federation_module(type) do
       module
-    else _ ->
+    else e ->
+      log("AP - federation module not found (#{inspect e}) for type '#{type}', falling back to Users")
       Bonfire.Me.Users # fallback
     end
   end

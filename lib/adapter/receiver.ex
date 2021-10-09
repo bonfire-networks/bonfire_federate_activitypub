@@ -3,6 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   alias Bonfire.Search.Indexer
   alias Bonfire.Common.Utils
   alias Bonfire.Federate.ActivityPub.Adapter
+  import Bonfire.Federate.ActivityPub.Utils, only: [log: 1]
 
   # the following constants are derived from config, so please make any changes/additions there
 
@@ -158,6 +159,10 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
 
   def receive_activity(activity, object) do
+    log(
+      "AP Match#4 - receive_activity_fallback"
+    )
+
     receive_activity_fallback(activity, object)
   end
 
@@ -231,17 +236,14 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
   def activity_character(actor) when is_binary(actor) do
+    log("AP - activity_character for #{actor}")
     # FIXME to handle actor types other than Person/User
     with {:error, :not_found} <- Adapter.character_module("Person").by_ap_id(actor) do
       error("AP - could not find local character for the actor", actor)
     end
   end
 
-  def log(l) do
-    if(Bonfire.Common.Config.get(:log_federation)) do
-      Logger.warn(l)
-    end
-  end
+
 
   def error(error, attrs) do
     Logger.error("ActivityPub - Unable to process incoming federated activity - #{error}")

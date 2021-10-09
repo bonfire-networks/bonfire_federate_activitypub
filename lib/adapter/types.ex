@@ -2,8 +2,9 @@ defmodule Bonfire.Federate.ActivityPub.Types do
   def character_to_actor(character) do
     type =
       case character do
+        # TODO generate based on FederationModules?
         %Bonfire.Data.Identity.User{} -> "Person"
-        # %CommonsPub.Communities.Community{} -> "Group"
+        %Bonfire.Classify.Category{} -> "Group"
         %Bonfire.Data.Identity.Character{} -> "Bonfire:" <> Map.get(character, :facet, "Character")
         _ -> "Bonfire:Character"
       end

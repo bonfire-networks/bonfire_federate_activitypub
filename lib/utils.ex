@@ -8,8 +8,12 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
-  def public_uri() do
-    @public_uri
+  def public_uri(), do: @public_uri
+
+  def log(l) do
+    if(Bonfire.Common.Config.get(:log_federation)) do
+      Logger.warn(l)
+    end
   end
 
   def ap_base_url() do
@@ -192,7 +196,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   defp get_or_fetch_and_create(q) when is_binary(q) do
-    # IO.inspect(get_or_fetch_and_create: q)
+    log("AP - get_or_fetch_and_create: "<> q)
     with {:ok, object} <- ActivityPub.Fetcher.get_or_fetch_and_create(q) do
       # IO.inspect(object: object)
       Bonfire.Common.Pointers.get(object) #|> IO.inspect
@@ -208,7 +212,8 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     end
   end
 
-  def get_or_fetch_actor_by_ap_id!(ap_id) do
+  def get_or_fetch_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
+    log("AP - get_or_fetch_actor_by_ap_id! : "<> ap_id)
     with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
       actor
     else
@@ -216,7 +221,8 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     end
   end
 
-  def get_cached_actor_by_local_id!(ap_id) do
+  def get_cached_actor_by_local_id!(ap_id) when is_binary(ap_id) do
+    log("AP - get_cached_actor_by_local_id! : "<> ap_id)
     with {:ok, actor} <- ActivityPub.Actor.get_cached_by_local_id(ap_id) do
       actor
     else
@@ -225,6 +231,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
+    log("AP - get_object_or_actor_by_ap_id! : "<> ap_id)
     # FIXME?
     ActivityPub.Object.get_cached_by_ap_id(ap_id) ||
       get_or_fetch_actor_by_ap_id!(ap_id) || ap_id
@@ -236,6 +243,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
 
   def get_creator_ap_id(%{creator_id: creator_id}) when not is_nil(creator_id) do
+    log("AP - get_creator_ap_id! : "<> creator_id)
     with {:ok, %{ap_id: ap_id}} <- ActivityPub.Actor.get_cached_by_local_id(creator_id) do
       ap_id
     else
@@ -247,12 +255,13 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_different_creator_ap_id(%{id: id, creator_id: creator_id} = character)
       when id != creator_id do
-    Bonfire.Federate.ActivityPub.Utils.get_creator_ap_id(character)
+    get_creator_ap_id(character)
   end
 
   def get_different_creator_ap_id(_), do: nil
 
   def get_context_ap_id(%{context_id: context_id}) when not is_nil(context_id) do
+    log("AP - get_context_ap_id! : "<> context_id)
     with {:ok, %{ap_id: ap_id}} <- ActivityPub.Actor.get_cached_by_local_id(context_id) do
       ap_id
     else
@@ -376,7 +385,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_object_ap_id!(object) do
     with {:error, e} <- get_object_ap_id(object) do
-      Logger.warn("get_object_ap_id!/1 - #{e}")
+      log("AP - get_object_ap_id!/1 - #{e}")
       nil
     end
   end
