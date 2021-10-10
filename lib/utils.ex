@@ -272,6 +272,14 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_context_ap_id(_), do: nil
 
 
+  def character_to_actor(character) do
+    with %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
+      {:ok, actor} # TODO: use federation_module instead of context_module?
+    else _ ->
+      format_actor(character)
+    end
+  end
+
   def format_actor(%{} = user_etc, type \\ "Person") do
     user_etc = Bonfire.Repo.preload(user_etc, [profile: [:image, :icon], character: [:actor]]) #|> IO.inspect()
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")

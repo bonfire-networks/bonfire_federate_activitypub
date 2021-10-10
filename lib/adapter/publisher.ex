@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Publisher do
   require Logger
+  alias Bonfire.Federate.ActivityPub.Utils
 
   # TODO: move specialised publish funcs to context modules (or make them extensible for extra types)
 
@@ -19,7 +20,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
     with {:ok, actor} <- ActivityPub.Actor.get_by_local_id(id),
          actor_object <- ActivityPubWeb.ActorView.render("actor.json", %{actor: actor}),
          params <- %{
-           to: [Bonfire.Federate.ActivityPub.Utils.public_uri()],
+           to: [Utils.public_uri()],
            cc: [actor.data["followers"]],
            object: actor_object,
            actor: actor,
@@ -34,7 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
 
   def publish("delete", %Bonfire.Data.Identity.User{} = user) do
     # is this broken?
-    with actor <- Bonfire.Federate.ActivityPub.Types.character_to_actor(user) do
+    with actor <- Utils.character_to_actor(user) do
       ActivityPub.Actor.set_cache(actor)
       ActivityPub.delete(actor)
     end
@@ -44,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
     # Works for Collections, Communities (not User or MN.ActivityPub.Actor)
 
     with {:ok, creator} <- ActivityPub.Actor.get_by_local_id(character.creator_id),
-         actor <- Bonfire.Federate.ActivityPub.Types.character_to_actor(character) do
+         actor <- Utils.character_to_actor(character) do
       ActivityPub.Actor.invalidate_cache(actor)
       ActivityPub.delete(actor, true, creator.ap_id)
     end
