@@ -23,20 +23,24 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   end
 
   @impl Worker
-  def perform(%{args: %{"op" => "delete", "context_id" => context_id}}) do
-    # filter for deleted objects
+  def perform(%{args: %{"op" => "delete" = verb, "context_id" => context_id}}) do
+    # filter to include deleted objects
     Bonfire.Common.Pointers.one!(id: context_id)
     |> Bonfire.Common.Pointers.follow!(deleted: true)
-    |> Bonfire.Repo.maybe_preload(:character)
-    |> Bonfire.Repo.maybe_preload(created: [:peered])
-    |> only_local("delete", &Bonfire.Federate.ActivityPub.Publisher.publish/2)
+    |> do_perform(verb)
   end
 
-  def perform(%{args: %{"context_id" => context_id, "op" => verb}}) do
+  def perform(%{args: %{"op" => verb, "context_id" => context_id}}) do
     Bonfire.Common.Pointers.one!(id: context_id)
     |> Bonfire.Common.Pointers.follow!()
-    |> Bonfire.Repo.maybe_preload(:character)
+    |> do_perform(verb)
+  end
+
+  defp do_perform(object, verb) do
+    object
+    |> Bonfire.Repo.maybe_preload(character: [:peered])
     |> Bonfire.Repo.maybe_preload(created: [:peered])
+    |> Bonfire.Repo.maybe_preload(creator: [:peered])
     |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 

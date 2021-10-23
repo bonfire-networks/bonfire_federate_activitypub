@@ -198,7 +198,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
       object = ActivityPub.Object.normalize(object)
 
-      if !Map.get(object, :pointer_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
+      if object && !Utils.e(object, :pointer_id, nil), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
 
       {:ok, pointable_object}
     end

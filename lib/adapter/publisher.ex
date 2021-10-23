@@ -60,19 +60,18 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   end
 
   def publish(verb, %{__struct__: object_type} = local_object) do
+    Logger.debug("Federate.ActivityPub - looking for module to handle verb '#{verb}' for object type #{object_type}")
     Bonfire.Common.ContextModules.maybe_apply(object_type, :ap_publish_activity, [verb, local_object], &error/2)
   end
 
 
   def publish(verb, object) do
     error("Unrecognised object for AP publisher", [verb, object])
-
-    :ignored
   end
 
   def error(error, [verb, %{__struct__: object_type, id: id} = object]) do
     Logger.error(
-      "ActivityPub - Unable to federate out - #{error}... object ID: #{id} ; verb: #{verb} ; object type: #{object_type}"
+      "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} ; verb: #{verb} ; object type: #{object_type}"
     )
     IO.inspect(object: object)
 
@@ -80,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   end
 
   def error(error, [verb, object]) do
-    Logger.error("ActivityPub - Unable to federate out - #{error}... verb: #{verb}}")
+    Logger.error("Federate.ActivityPub - Unable to federate out - #{error}... verb: #{verb}}")
 
     IO.inspect(object: object)
 

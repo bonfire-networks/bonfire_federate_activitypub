@@ -25,13 +25,23 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     true
   end
 
+  def check_local(%{character: %{peered: nil}}) do
+    # publish local characters
+    true
+  end
+
   def check_local(%{peered: nil}) do
     # publish local characters
     true
   end
 
   def check_local(%{created: %{peered: nil}}) do
-    # publish if author is local
+    # publish if author (using created mixin) is local
+    true
+  end
+
+  def check_local(%{creator: %{peered: nil}}) do
+    # publish if author (in VF) is local
     true
   end
 
