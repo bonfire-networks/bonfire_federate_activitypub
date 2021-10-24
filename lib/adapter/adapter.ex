@@ -207,6 +207,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_redirect_url(%{} = object), do: URIs.path(object)
 
+  def get_redirect_url(_), do: nil
 
   def get_object_url(id), do: URIs.path(id)
 
