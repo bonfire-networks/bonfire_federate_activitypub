@@ -18,7 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   test "boost publishing works" do
     user = fake_user!()
 
-    attrs = %{circles: [:guest], post_content: %{html_body: "content"}}
+    attrs = %{to_circles: [:guest], post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(user, attrs)
 
@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   test "boost receiving works" do
     user = fake_user!()
 
-    attrs = %{circles: [:guest], post_content: %{html_body: "content"}}
+    attrs = %{to_circles: [:guest], post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(user, attrs)
 
@@ -47,7 +47,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   test "unboost receiving works" do
     user = fake_user!()
 
-    attrs = %{circles: [:guest], post_content: %{html_body: "content"}}
+    attrs = %{to_circles: [:guest], post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(user, attrs)
 

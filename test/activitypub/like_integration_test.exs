@@ -18,7 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
   test "like publishing works" do
     user = fake_user!()
 
-    attrs = %{circles: [:guest], post_content: %{html_body: "content"}}
+    attrs = %{to_circles: [:guest], post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(user, attrs)
 
@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
   test "like receiving works" do
     user = fake_user!()
 
-    attrs = %{circles: [:guest], post_content: %{html_body: "content"}}
+    attrs = %{to_circles: [:guest], post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(user, attrs)
 
@@ -47,7 +47,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
   test "unlike receiving works" do
     user = fake_user!()
 
-    attrs = %{circles: [:guest], post_content: %{html_body: "content"}}
+    attrs = %{to_circles: [:guest], post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(user, attrs)
 
