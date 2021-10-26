@@ -32,6 +32,8 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     }
 
     user = fake_user!()
+    ap_user = ActivityPub.Actor.get_by_local_id!(user.id)
+    replier = fake_user!()
     assert {:ok, post} = Posts.publish(user, attrs)
 
     assert {:ok, original_activity} =
@@ -42,29 +44,32 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
       reply_to_id: post.id
     }
 
-    assert {:ok, post_reply} = Posts.publish(user, attrs_reply)
+    assert {:ok, post_reply} = Posts.publish(replier, attrs_reply)
 
     assert {:ok, ap_activity} =
              Bonfire.Federate.ActivityPub.Publisher.publish("create", post_reply)
 
     assert ap_activity.object.data["inReplyTo"] == original_activity.object.data["id"]
+    assert ap_user.ap_id in ap_activity.data["to"]
   end
 
   test "creates a Post for an incoming Note" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    recipient = fake_user!()
+    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
     context = "blabla"
 
     object = %{
       "content" => "content",
       "type" => "Note",
       "to" => [
-        "https://testing.kawen.dance/users/karen",
+        recipient_actor.ap_id,
         "https://www.w3.org/ns/activitystreams#Public"
       ]
     }
 
     to = [
-      "https://testing.kawen.dance/users/karen",
+      recipient_actor.ap_id,
       "https://www.w3.org/ns/activitystreams#Public"
     ]
 
@@ -88,19 +93,21 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
   test "creates a a reply for an incoming note with a reply" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    recipient = fake_user!()
+    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
     context = "blabla"
 
     object = %{
       "content" => "content",
       "type" => "Note",
       "to" => [
-        "https://testing.kawen.dance/users/karen",
+        recipient_actor.ap_id,
         "https://www.w3.org/ns/activitystreams#Public"
       ]
     }
 
     to = [
-      "https://testing.kawen.dance/users/karen",
+      recipient_actor.ap_id,
       "https://www.w3.org/ns/activitystreams#Public"
     ]
 
@@ -136,18 +143,20 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
   test "does not set public circle for objects missing AP public URI" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    recipient = fake_user!()
+    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
     context = "blabla"
 
     object = %{
       "content" => "content",
       "type" => "Note",
       "to" => [
-        "https://testing.kawen.dance/users/karen"
+        recipient_actor.ap_id
       ]
     }
 
     to = [
-      "https://testing.kawen.dance/users/karen"
+      recipient_actor.ap_id
     ]
 
     params = %{
