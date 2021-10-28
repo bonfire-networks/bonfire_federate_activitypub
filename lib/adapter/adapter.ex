@@ -3,14 +3,18 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   @moduledoc """
   Adapter functions delegated from the `ActivityPub` Library
   """
-  # alias Utils
-  alias Bonfire.Federate.ActivityPub.APReceiverWorker
-  alias Bonfire.Federate.ActivityPub.Utils
-  import Utils, only: [log: 1]
-  import Bonfire.Common.Utils, only: [maybe_apply: 3, is_ulid?: 1]
+
+  alias Bonfire.Federate.ActivityPub.Utils, as: APUtils
+  import APUtils, only: [log: 1]
+
+  alias Bonfire.Common.Utils
+  import Utils, only: [maybe_apply: 3, is_ulid?: 1]
+
   alias Bonfire.Common.Pointers
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
+  alias Bonfire.Federate.ActivityPub.APReceiverWorker
+
   import Bonfire.Federate.ActivityPub.Integration
   require Logger
 
@@ -46,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # character_module("Person") # FIXME
     # |> maybe_apply(:get_actor_by_id, [id])
 
-    with {:ok, character} = Utils.get_character_by_id(id),
+    with {:ok, character} = APUtils.get_character_by_id(id),
     %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
       {:ok, actor} # TODO: use federation_module instead of context_module?
     end
@@ -57,7 +61,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # character_module("Person")
     # |> maybe_apply(:get_actor_by_username, [username])
 
-    with {:ok, character} = Utils.get_character_by_username(username),
+    with {:ok, character} = APUtils.get_character_by_username(username),
     %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
       {:ok, actor} # TODO: use federation_module instead of context_module?
     end
@@ -71,14 +75,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   # def redirect_to_object(id) do
   #   if System.get_env("LIVEVIEW_ENABLED", "true") == "true" do
-  #     url = Bonfire.Common.Utils.object_url(id)
+  #     url = Utils.object_url(id)
   #     if !String.contains?(url, "/404"), do: url
   #   end
   # end
 
   def redirect_to_actor(username) do
     if System.get_env("LIVEVIEW_ENABLED", "true") == "true" do
-      case Utils.get_character_by_username(username) do
+      case APUtils.get_character_by_username(username) do
         {:ok, character} ->
           url = Bonfire.Me.Characters.character_url(character)
           if !String.contains?(url, "/404"), do: url
@@ -90,33 +94,35 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    # character_module("Person")
-    # |> maybe_apply(:update_local_actor, [actor, params])
 
-  with {:ok, character} = Utils.get_character_by_ap_id(actor) do
-     Bonfire.Common.ContextModules.maybe_apply(character, :update_local_actor, [actor, params]) # FIXME use federation_module?
+    with {:ok, character} = APUtils.get_character_by_ap_id(actor) do
+      keys = Utils.e(params, :keys, nil)
+      params = params
+      |> Map.put(:character, %{id: character.id, actor: %{signing_key: keys}})
+      # Logger.info("update_local_actor: #{inspect character} with #{inspect params}")
+      Bonfire.Common.ContextModules.maybe_apply(character, :update_local_actor, [character, params]) # FIXME use federation_module?
     end
   end
 
   # TODO: refactor & move to Me context(s)?
   def update_remote_actor(actor_object) do
-    data = actor_object.data
 
-    with {:ok, character} <-
-           Utils.get_character_by_id(actor_object.pointer_id),
+    with data = actor_object.data,
+         {:ok, character} <-
+           APUtils.get_character_by_id(actor_object.pointer_id),
          creator <- Bonfire.Repo.maybe_preload(character, :creator) |> Map.get(:creator, nil) do
       # FIXME - support other types
       params = %{
         name: data["name"],
         summary: data["summary"],
         icon_id:
-          Utils.maybe_create_icon_object(
-            Utils.maybe_fix_image_object(data["icon"]),
+          APUtils.maybe_create_icon_object(
+            APUtils.maybe_fix_image_object(data["icon"]),
             creator
           ),
         image_id:
-          Utils.maybe_create_image_object(
-            Utils.maybe_fix_image_object(data["image"]),
+          APUtils.maybe_create_image_object(
+            APUtils.maybe_fix_image_object(data["image"]),
             creator
           )
       }
@@ -141,7 +147,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_create_remote_actor(actor) do
     log("AP - maybe_create_remote_actor")
 
-    case Utils.get_character_by_ap_id(actor) do
+    case APUtils.get_character_by_ap_id(actor) do
 
       {:ok, _} -> :ok # already exists
 
@@ -159,8 +165,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
     actor_object = ActivityPub.Object.get_by_ap_id(actor.ap_id)
 
-    icon_url = Utils.maybe_fix_image_object(actor.data["icon"])
-    image_url = Utils.maybe_fix_image_object(actor.data["image"])
+    icon_url = APUtils.maybe_fix_image_object(actor.data["icon"])
+    image_url = APUtils.maybe_fix_image_object(actor.data["image"])
 
     with {:ok, user_etc} <- repo().transact_with(fn ->
       with  {:ok, peer} =  Bonfire.Federate.ActivityPub.Peers.get_or_create(actor),
@@ -183,8 +189,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end) do
 
       # after creating the user, in case of timeouts downloading the images
-      icon_id = Utils.maybe_create_icon_object(icon_url, user_etc)
-      image_id = Utils.maybe_create_image_object(image_url, user_etc)
+      icon_id = APUtils.maybe_create_icon_object(icon_url, user_etc)
+      image_id = APUtils.maybe_create_image_object(image_url, user_etc)
 
       with {:ok, updated_user} <- maybe_apply(character_module, [:update_remote, :update],[user_etc, %{"profile" => %{"icon_id" => icon_id, "image_id" => image_id}}]) do
         {:ok, updated_user}
@@ -212,7 +218,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_object_url(id), do: URIs.path(id)
 
   defp get_url_by_username(username) do
-    case Utils.get_character_by_username(username) do
+    case APUtils.get_character_by_username(username) do
       {:ok, user_etc} -> URIs.path(user_etc)
       {:error, _} -> "/404"
     end

@@ -34,7 +34,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     user = fake_user!()
     ap_user = ActivityPub.Actor.get_by_local_id!(user.id)
     replier = fake_user!()
-    assert {:ok, post} = Posts.publish(user, attrs)
+    assert {:ok, post} = Posts.publish(user, attrs, "public")
 
     assert {:ok, original_activity} =
              Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
       reply_to_id: post.id
     }
 
-    assert {:ok, post_reply} = Posts.publish(replier, attrs_reply)
+    assert {:ok, post_reply} = Posts.publish(replier, attrs_reply, "public")
 
     assert {:ok, ap_activity} =
              Bonfire.Federate.ActivityPub.Publisher.publish("create", post_reply)

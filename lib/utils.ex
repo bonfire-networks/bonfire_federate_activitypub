@@ -155,6 +155,11 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   #   get_character_by_ap_id(id)
   # end
 
+  def get_character_by_id(other) do
+    Logger.error("get_character_by_id: dunno how to get character for #{inspect other}")
+    {:error, "not found"}
+  end
+
   def get_character_by_ap_id(%{"id" => id}) do
     get_character_by_ap_id(id)
   end
@@ -175,9 +180,12 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
     with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
       get_character_by_ap_id(actor)
-    else
-      {:error, e} -> {:error, e}
     end
+  end
+
+  def get_character_by_ap_id(other) do
+    Logger.error("get_character_by_ap_id: dunno how to get character for #{inspect other}")
+    {:error, "not found"}
   end
 
   def get_character_by_ap_id!(ap_id) do
@@ -195,7 +203,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     if validate_url(string) do
       get_or_fetch_and_create(string)
     else
-      if String.contains?(string, "@"), do: get_or_fetch_and_create_by_userame(string)
+      get_or_fetch_and_create_by_userame(string)
     end
   end
 
