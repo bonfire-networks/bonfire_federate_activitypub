@@ -50,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # character_module("Person") # FIXME
     # |> maybe_apply(:get_actor_by_id, [id])
 
-    with {:ok, character} = APUtils.get_character_by_id(id),
+    with {:ok, character} <- APUtils.get_character_by_id(id),
     %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
       {:ok, actor} # TODO: use federation_module instead of context_module?
     end
@@ -61,14 +61,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # character_module("Person")
     # |> maybe_apply(:get_actor_by_username, [username])
 
-    with {:ok, character} = APUtils.get_character_by_username(username),
+    with {:ok, character} <- APUtils.get_character_by_username(username),
     %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
       {:ok, actor} # TODO: use federation_module instead of context_module?
     end
   end
 
   def get_actor_by_ap_id(ap_id) do
-    with {:ok, %{username: username}} = ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
+    with {:ok, %{username: username}} <- ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
       get_actor_by_username(username)
     end
   end
