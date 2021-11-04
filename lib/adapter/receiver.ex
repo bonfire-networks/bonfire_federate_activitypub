@@ -180,6 +180,13 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     end
   end
 
+  @doc """
+  Create an object without an activity
+  """
+  def receive_object(creator, object) do
+    receive_activity(%{"actor" => creator}, object)
+  end
+
   # TODO: figure out when we need to save canonical url/update pointer
   # This should not be done if the object is local, i. e. local actor
   # as the object of a follow
@@ -227,12 +234,16 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     {:error, :skip}
   end
 
-  def activity_character(%{data: %{"actor" => %{"id" => actor}}} = _activity) do
+  def activity_character(%{"actor" => %{"id" => actor}}) do
     activity_character(actor)
   end
 
-  def activity_character(%{data: %{"actor" => actor}} = _activity) do
+  def activity_character(%{"actor" => actor}) do
     activity_character(actor)
+  end
+
+  def activity_character(%{data: data}) do
+    activity_character(data)
   end
 
   def activity_character(actor) when is_binary(actor) do
@@ -243,6 +254,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     end
   end
 
+  def activity_character(actor), do: {:ok, nil}
 
 
   def error(error, attrs) do
