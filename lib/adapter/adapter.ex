@@ -149,7 +149,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
     case APUtils.get_character_by_ap_id(actor) do
 
-      {:ok, _} -> :ok # already exists
+      {:ok, character} -> {:ok, character} # already exists
 
       {:error, _} -> # new character, create it...
 
