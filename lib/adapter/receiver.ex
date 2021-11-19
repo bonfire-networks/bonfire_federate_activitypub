@@ -184,7 +184,8 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   Create an object without an activity
   """
   def receive_object(creator, object) do
-    receive_activity(%{"actor" => creator}, object)
+    log("AP - Create an object without an activity")
+    receive_activity(%{data: %{"type" => "Create", "actor" => creator}}, object)
   end
 
   # TODO: figure out when we need to save canonical url/update pointer
@@ -192,7 +193,9 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   # as the object of a follow
   defp handle_activity_with({:ok, module}, character, %{data: %{"type" => "Create"}} = activity, object)
     when is_atom(module) and not is_nil(module) do
-    log("AP - create - handle_activity_with: #{module}")
+
+    ap_obj_id = object.data["id"]
+    log("AP - create - handle_activity_with: #{module} for #{ap_obj_id}")
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
       module,
@@ -201,13 +204,20 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       &error/2
     ) do
 
-      Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, object.data["id"])
+      log("AP - created remote object as local pointable #{pointable_object_id} for #{ap_obj_id}")
+      # IO.inspect(pointable_object)
+
+      Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id)
 
       object = ActivityPub.Object.normalize(object)
 
       if object && !Utils.e(object, :pointer_id, nil), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
 
       {:ok, pointable_object}
+    else
+      e ->
+        log(inspect e)
+        throw {:error, "AP - could not create activity for #{ap_obj_id}"}
     end
   end
 
