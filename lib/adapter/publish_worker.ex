@@ -26,7 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   def perform(%{args: %{"op" => "delete" = verb, "context_id" => context_id}}) do
     # filter to include deleted objects
     Bonfire.Common.Pointers.one!(id: context_id)
-    |> Bonfire.Common.Pointers.follow!(deleted: true)
+    |> Bonfire.Common.Pointers.follow!(filters_override: [deleted: true])
     |> do_perform(verb)
   end
 
