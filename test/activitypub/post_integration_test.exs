@@ -23,7 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
     # IO.inspect(ap_activity)
-    assert ap_activity.object.data["content"] == attrs.post_content.html_body
+    assert post.post_content.html_body =~ ap_activity.object.data["content"]
   end
 
   test "Reply publishing works" do
@@ -86,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     assert object["content"] == activity.object.data["content"]
 
     assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
-    assert object["content"] == post.post_content.html_body
+    assert post.post_content.html_body =~ object["content"]
 
     assert Bonfire.Boundaries.Circles.circles[:guest] in Bonfire.Social.FeedActivities.feeds_for_activity(post.activity)
   end

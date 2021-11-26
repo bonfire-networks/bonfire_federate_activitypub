@@ -144,7 +144,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_character_by_username(%{} = character), do: character
 
   def get_character_by_id(id) when is_binary(id) do
-    with {:error, _e} <- Bonfire.Common.Pointers.get(id) do
+    with {:error, _e} <- Bonfire.Common.Pointers.get(id, skip_boundary_check: true) do
       {:error, "not found"}
     end
   end
