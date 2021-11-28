@@ -25,14 +25,12 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   @impl Worker
   def perform(%{args: %{"op" => "delete" = verb, "context_id" => context_id}}) do
     # filter to include deleted objects
-    Bonfire.Common.Pointers.one!(id: context_id)
-    |> Bonfire.Common.Pointers.follow!(filters_override: [deleted: true])
+    Bonfire.Common.Pointers.get!(context_id, filters_override: [deleted: true])
     |> do_perform(verb)
   end
 
   def perform(%{args: %{"op" => verb, "context_id" => context_id}}) do
-    Bonfire.Common.Pointers.one!(id: context_id)
-    |> Bonfire.Common.Pointers.follow!()
+    Bonfire.Common.Pointers.get!(context_id, skip_boundary_check: true)
     |> do_perform(verb)
   end
 

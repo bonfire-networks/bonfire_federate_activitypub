@@ -209,7 +209,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   defp get_or_fetch_and_create_by_userame(q) do
     with {:ok, object} <- ActivityPub.Actor.get_or_fetch_by_username(q) do
-      Bonfire.Common.Pointers.get(object)
+      Bonfire.Common.Pointers.get(object, skip_boundary_check: true)
     end
   end
 
@@ -217,7 +217,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     log("AP - get_or_fetch_and_create: "<> q)
     with {:ok, object} <- ActivityPub.Fetcher.get_or_fetch_and_create(q) do
       # IO.inspect(object: object)
-      Bonfire.Common.Pointers.get(object) #|> IO.inspect
+      Bonfire.Common.Pointers.get(object, skip_boundary_check: true) #|> IO.inspect
     end
   end
 
