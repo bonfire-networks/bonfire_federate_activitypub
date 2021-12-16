@@ -1,6 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.Peers do
   alias Bonfire.Data.ActivityPub.Peer
-  import Bonfire.Federate.ActivityPub.Integration
+  import Bonfire.Federate.ActivityPub
   import Ecto.Query
 
   defp create(attrs) do

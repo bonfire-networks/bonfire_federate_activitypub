@@ -1,4 +1,4 @@
-# Bonfire:Federate:ActivityPub
+# Bonfire.Federate.ActivityPub
 
 An extension for [Bonfire](https://bonfire.cafe/) that handles:
 

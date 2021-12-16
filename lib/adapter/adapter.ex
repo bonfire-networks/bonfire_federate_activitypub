@@ -15,7 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Me.Characters
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
 
-  import Bonfire.Federate.ActivityPub.Integration
+  import Bonfire.Federate.ActivityPub
   require Logger
 
   @behaviour ActivityPub.Adapter

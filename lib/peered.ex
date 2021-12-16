@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.Peered do
   alias Bonfire.Data.ActivityPub.Peered
   alias Bonfire.Common.Utils
-  import Bonfire.Federate.ActivityPub.Integration
+  import Bonfire.Federate.ActivityPub
   import Ecto.Query
   require Logger
 

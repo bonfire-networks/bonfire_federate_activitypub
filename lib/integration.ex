@@ -1,7 +1,7 @@
 # check that this extension is configured
 # Bonfire.Common.Config.require_extension_config!(:bonfire_federate_activitypub)
 
-defmodule Bonfire.Federate.ActivityPub.Integration do
+defmodule Bonfire.Federate.ActivityPub do
   alias Bonfire.Common.Config
 
   def repo, do: Config.get!(:repo_module)
