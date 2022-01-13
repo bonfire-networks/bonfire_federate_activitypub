@@ -36,7 +36,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
     attrs = %{to_circles: [:guest], post_content: %{html_body: "content"}}
 
-    {:ok, post} = Posts.publish(user, attrs)
+    {:ok, post} = Posts.publish(user, attrs, "public")
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
