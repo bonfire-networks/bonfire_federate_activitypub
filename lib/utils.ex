@@ -45,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     true
   end
 
-  def check_local(%{follower: %{peered: nil}}) do
+  def check_local(%{follower: %{peered: nil}, followed: %{peered: p}}) when not is_nil(p) do
     # publish local follows
     true
   end
