@@ -106,11 +106,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   # TODO: refactor & move to Me context(s)?
   def update_remote_actor(actor_object) do
-
     with data = actor_object.data,
          {:ok, character} <-
-           APUtils.get_character_by_id(actor_object.pointer_id),
-         creator <- Bonfire.Repo.maybe_preload(character, :creator) |> Map.get(:creator, nil) do
+           APUtils.get_character_by_id(actor_object.pointer_id) do
       # FIXME - support other types
       params = %{
         name: data["name"],
@@ -118,29 +116,16 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         icon_id:
           APUtils.maybe_create_icon_object(
             APUtils.maybe_fix_image_object(data["icon"]),
-            creator
+            character
           ),
         image_id:
           APUtils.maybe_create_image_object(
             APUtils.maybe_fix_image_object(data["image"]),
-            creator
+            character
           )
       }
 
-      # FIXME
-      case character do
-        %Bonfire.Data.Identity.User{} ->
-          Bonfire.Me.Users.update_remote(character, params)
-
-        # %CommonsPub.Communities.Community{} ->
-        #   CommonsPub.Communities.ap_receive_update(character, params, creator)
-
-        # %CommonsPub.Collections.Collection{} ->
-        #   CommonsPub.Collections.ap_receive_update(character, params, creator)
-
-        true ->
-          Characters.ap_receive_update(character, params, creator) # TODO fallback
-      end
+      Bonfire.Me.Users.update_remote(character, params)
     end
   end
 
