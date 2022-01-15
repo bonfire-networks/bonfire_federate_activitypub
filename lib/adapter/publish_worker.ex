@@ -39,6 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
     |> Bonfire.Repo.maybe_preload(character: [:peered])
     |> Bonfire.Repo.maybe_preload(created: [:peered])
     |> Bonfire.Repo.maybe_preload(creator: [:peered])
+    |> Bonfire.Repo.maybe_preload(follower: [:peered])
     |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 
