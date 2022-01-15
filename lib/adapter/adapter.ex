@@ -126,6 +126,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       }
 
       Bonfire.Me.Users.update_remote(character, params)
+      :ok
     end
   end
 
