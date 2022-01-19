@@ -53,6 +53,18 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     assert ap_user.ap_id in ap_activity.data["to"]
   end
 
+  test "mention publishing works" do
+    me = fake_user!()
+    mentioned = fake_user!()
+    ap_user = ActivityPub.Actor.get_by_local_id!(mentioned.id)
+    msg = "hey @#{mentioned.character.username} you have an epic text message"
+    attrs = %{post_content: %{html_body: msg}}
+    assert {:ok, post} = Posts.publish(me, attrs, "mentions")
+
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert ap_user.ap_id in ap_activity.data["to"]
+  end
+
   test "creates a Post for an incoming Note" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
     recipient = fake_user!()
