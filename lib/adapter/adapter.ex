@@ -189,7 +189,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_redirect_url(id_or_username_or_object)
 
   def get_redirect_url(id_or_username) when is_binary(id_or_username) do
-    # IO.inspect(object)
+    # IO.inspect(get_redirect_url: id_or_username)
     if is_ulid?(id_or_username) do
       get_object_url(id_or_username)
     else
@@ -204,9 +204,15 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_object_url(id), do: URIs.path(id)
 
   defp get_url_by_username(username) do
-    case APUtils.get_character_by_username(username) do
-      {:ok, user_etc} -> URIs.path(user_etc)
-      {:error, _} -> "/404"
+    case URIs.path(username) do
+      path when is_binary(path) ->
+        path
+
+      _ ->
+        case APUtils.get_character_by_username(username) do
+          {:ok, user_etc} -> URIs.path(user_etc)
+          {:error, _} -> "/404"
+        end
     end
   end
 
