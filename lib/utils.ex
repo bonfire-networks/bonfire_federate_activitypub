@@ -399,10 +399,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_in_reply_to(comment) do
-    reply_id = Map.get(comment, :reply_to_id)
+    reply_to_id = Map.get(comment, :reply_to_id)
 
-    if reply_id do
-      case ActivityPub.Object.get_cached_by_pointer_id(reply_id) do
+    if reply_to_id do
+      case ActivityPub.Object.get_cached_by_pointer_id(reply_to_id) do
         nil ->
           nil
 
