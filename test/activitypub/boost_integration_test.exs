@@ -26,7 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     {:ok, boost} = Boosts.boost(user, post)
 
-    assert {:ok, _, _} = Bonfire.Federate.ActivityPub.Publisher.publish("create", boost)
+    assert {:ok, _, _} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => boost.id}})
   end
 
   test "boost receiving works" do

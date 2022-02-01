@@ -36,16 +36,9 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
 
   defp do_perform(object, verb) do
     object
-    # This doesn't seem ideal anymore
     |> Bonfire.Repo.maybe_preload(character: [:peered])
     |> Bonfire.Repo.maybe_preload(created: [:peered])
     |> Bonfire.Repo.maybe_preload(creator: [:peered])
-    |> Bonfire.Repo.maybe_preload(follower: [:peered])
-    |> Bonfire.Repo.maybe_preload(followed: [:peered])
-    |> Bonfire.Repo.maybe_preload(blocker: [:peered])
-    |> Bonfire.Repo.maybe_preload(blocked: [:peered])
-    |> Bonfire.Repo.maybe_preload(liker: [:peered])
-    |> Bonfire.Repo.maybe_preload(booster: [:peered])
     |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 

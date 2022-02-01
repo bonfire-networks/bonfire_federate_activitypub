@@ -21,7 +21,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
     {:ok, post} = Posts.publish(user, attrs, "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => post.id}})
     # IO.inspect(ap_activity)
     assert post.post_content.html_body =~ ap_activity.object.data["content"]
   end

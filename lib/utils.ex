@@ -45,26 +45,6 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     true
   end
 
-  def check_local(%{liker: %{peered: nil}}) do
-    # publish if author is local
-    true
-  end
-
-  def check_local(%{booster: %{peered: nil}}) do
-    # publish if author is local
-    true
-  end
-
-  def check_local(%{follower: %{peered: nil}, followed: %{peered: p}}) when not is_nil(p) do
-    # publish local follows
-    true
-  end
-
-  def check_local(%{blocker: %{peered: nil}, blocked: %{peered: p}}) when not is_nil(p) do
-    # publish local blocks
-    true
-  end
-
   def check_local(context), do: false
 
   def get_actor_username(%{preferred_username: u}) when is_binary(u),

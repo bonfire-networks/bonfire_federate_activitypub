@@ -19,7 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     followed = fake_user!()
     {:ok, follow} = Follows.follow(follower, followed)
 
-    assert {:ok, _follow_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", follow)
+    assert {:ok, _follow_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => follow.id}})
   end
 
   test "follow receiving works" do
