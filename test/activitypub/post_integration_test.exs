@@ -100,7 +100,9 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
     assert post.post_content.html_body =~ object["content"]
 
-    assert Bonfire.Boundaries.Circles.circles[:guest].id in Bonfire.Social.FeedActivities.feeds_for_activity(post.activity)
+    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    IO.inspect(feed_entry)
   end
 
   test "creates a a reply for an incoming note with a reply" do
