@@ -44,4 +44,10 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert user.profile.icon_id
     assert user.profile.image_id
   end
+
+  test "can follow pointers to remote actors" do
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
+    assert {:ok, _} = Bonfire.Common.Pointers.one(user.id)
+  end
 end
