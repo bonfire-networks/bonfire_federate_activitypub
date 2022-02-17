@@ -105,7 +105,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     IO.inspect(feed_entry)
   end
 
-  test "creates a a reply for an incoming note with a reply" do
+  test "creates a reply for an incoming note with a reply" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
     recipient = fake_user!()
     recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)

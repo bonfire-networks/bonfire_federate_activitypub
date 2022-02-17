@@ -46,7 +46,7 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
 
   def save_canonical_uri(%{id: id}, canonical_uri), do: save_canonical_uri(id, canonical_uri)
   def save_canonical_uri(id, canonical_uri) when is_binary(id) and is_binary(canonical_uri) do
-    %Peered{} = actor = get_or_create(canonical_uri, id)
+    get_or_create(canonical_uri, id)
   end
 
   def get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
@@ -56,7 +56,7 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
           {:ok, peered}
 
         _ ->
-          if id, do: create(id, peer, canonical_uri), else: peer
+          if id, do: create(id, peer, canonical_uri), else: {:ok, peer}
       end
     end
   end

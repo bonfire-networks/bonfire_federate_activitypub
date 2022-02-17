@@ -1,9 +1,10 @@
 defmodule Bonfire.Federate.ActivityPub.Receiver do
   require Logger
+  import Bonfire.Federate.ActivityPub.Utils, only: [log: 1]
   alias Bonfire.Search.Indexer
   alias Bonfire.Common.Utils
   alias Bonfire.Federate.ActivityPub.Adapter
-  import Bonfire.Federate.ActivityPub.Utils, only: [log: 1]
+  alias Bonfire.Data.ActivityPub.Peered
 
   # the following constants are derived from config, so please make any changes/additions there
 
@@ -198,16 +199,15 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     log("AP - create - handle_activity_with: #{module} for #{ap_obj_id}")
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
-      module,
-      :ap_receive_activity,
-      [character, activity, object],
-      &error/2
-    ) do
+        module,
+        :ap_receive_activity,
+        [character, activity, object],
+        &error/2
+      ),
+      {:ok, %Peered{}} <- Bonfire.Federate.ActivityPub.Actors.save_canonical_uri(pointable_object_id, ap_obj_id) do
 
       log("AP - created remote object as local pointable #{pointable_object_id} for #{ap_obj_id}")
       # IO.inspect(pointable_object)
-
-      Bonfire.Federate.ActivityPub.Actors.save_canonical_uri(pointable_object_id, ap_obj_id)
 
       object = ActivityPub.Object.normalize(object)
 
