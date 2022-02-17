@@ -7,8 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Federate.ActivityPub.Utils, as: APUtils
   import APUtils, only: [log: 1]
 
-  alias Bonfire.Common.Utils
-  import Utils, only: [maybe_apply: 3, is_ulid?: 1]
+  use Bonfire.Common.Utils
 
   alias Bonfire.Common.Pointers
   alias Bonfire.Common.URIs
@@ -175,10 +174,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         {:ok, user_etc}
       end
     end) do
+      # Utils.debug(user_etc, "user created")
 
       # after creating the user, in case of timeouts downloading the images
       icon_id = APUtils.maybe_create_icon_object(icon_url, user_etc)
-      image_id = APUtils.maybe_create_image_object(image_url, user_etc)
+      image_id = APUtils.maybe_create_image_object(image_url, user_etc) |> Utils.debug
 
       with {:ok, updated_user} <- maybe_apply(character_module, [:update_remote, :update],[user_etc, %{"profile" => %{"icon_id" => icon_id, "image_id" => image_id}}]) do
         {:ok, updated_user}

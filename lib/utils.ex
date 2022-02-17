@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Utils do
+  use Bonfire.Common.Utils
   alias ActivityPub.Actor
   alias Bonfire.Social.Threads
-  alias Bonfire.Common.Utils
 
   require Logger
 
@@ -12,7 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def log(l) do
     if(Bonfire.Common.Config.get(:log_federation)) do
-      Logger.warn(l)
+      Logger.info(inspect l)
     end
   end
 
@@ -475,11 +475,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def maybe_create_image_object(nil, _actor), do: nil
 
   def maybe_create_image_object(url, actor) do
-    with {:ok, upload} <- Bonfire.Files.upload(Bonfire.Files.ImageUploader, actor, url, %{}) do
-      upload.id
-    else _ ->
-      nil
-    end
+    maybe_upload(Bonfire.Files.ImageUploader, url, actor)
   end
 
   def maybe_create_image_object(nil), do: nil
@@ -503,8 +499,13 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def maybe_create_icon_object(nil, _actor), do: nil
 
   def maybe_create_icon_object(url, actor) do
-    with {:ok, upload} <- Bonfire.Files.upload(Bonfire.Files.IconUploader, actor, url, %{}) do
-      upload.id
+    maybe_upload(Bonfire.Files.IconUploader, url, actor)
+  end
+
+  defp maybe_upload(adapter, url, actor) do
+    Utils.debug(url)
+    with {:ok, %{id: id}} <- Bonfire.Files.upload(Bonfire.Files.IconUploader, actor, url, %{}) do
+      id
     else _ ->
       nil
     end

@@ -23,7 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
     {:ok, activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", message)
 
-    assert activity.object.data["content"] == msg
+    assert activity.object.data["content"] =~ msg
   end
 
   test "can receive federated messages" do
