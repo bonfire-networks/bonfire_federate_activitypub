@@ -23,7 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       import Bonfire.Federate.ActivityPub.DataCase
-
+      use Bonfire.Common.Utils
       import Bonfire.Me.Fake
       alias Bonfire.Federate.ActivityPub.Simulate
     end

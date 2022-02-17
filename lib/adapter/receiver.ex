@@ -207,7 +207,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       log("AP - created remote object as local pointable #{pointable_object_id} for #{ap_obj_id}")
       # IO.inspect(pointable_object)
 
-      Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id)
+      Bonfire.Federate.ActivityPub.Actors.save_canonical_uri(pointable_object_id, ap_obj_id)
 
       object = ActivityPub.Object.normalize(object)
 

@@ -156,7 +156,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     image_url = APUtils.maybe_fix_image_object(actor.data["image"])
 
     with {:ok, user_etc} <- repo().transact_with(fn ->
-      with  {:ok, peer} =  Bonfire.Federate.ActivityPub.Peers.get_or_create(actor),
+      with  {:ok, peer} =  Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),
             {:ok, user_etc} <- maybe_apply(character_module, [:create_remote, :create], %{
               character: %{
                 username: actor.username

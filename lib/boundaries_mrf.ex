@@ -6,8 +6,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   @supported_actor_types ActivityPub.Utils.supported_actor_types()
 
-  defp check_block(actor, object) do
-    actor_info = URI.parse(actor)
+  defp check_block(canonical_uri) when is_binary(canonical_uri) do
+    uri = URI.parse(canonical_uri)
 
     rejects = (
       ActivityPub.Config.get([:boundaries, :mute])
@@ -16,36 +16,23 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       ) |> MRF.subdomains_regex()
         # |> IO.inspect(label: "MRF blocks")
 
-    with {:ok, object} <- check_instance_block(actor_info, object, rejects),
-         {:ok, object} <- check_actor_block(actor_info, object, rejects) do
-      {:ok, filter_recipients(object)}
-    else
-      _e -> {:reject, nil}
-    end
+    check_instance_block(uri, rejects) || check_actor_block(uri, rejects)
   end
 
-  defp check_instance_block(%{host: actor_host} = _actor_info, object, rejects) do
-    # IO.inspect(actor_host, label: "actor_host")
+  defp check_block(_canonical_uri), do: nil
 
-    if MRF.subdomain_match?(rejects, actor_host) do
-      {:reject, nil}
-    else
-      {:ok, object}
-    end
+  defp check_instance_block(%{host: actor_host} = actor_uri, rejects) do
+    MRF.subdomain_match?(rejects, actor_host) # || Bonfire.Federate.ActivityPub.Instances.is_blocked?(actor_uri) # no need to check the instance block in DB here because that's handled by Peered.is_blocked?
   end
 
-  defp check_actor_block(%{host: actor_host, path: actor_path} = _actor_info, object, rejects) do
+  defp check_actor_block(%{host: actor_host, path: actor_path} = actor_uri, rejects) do
     clean_url = "#{actor_host}#{actor_path}"
-    # IO.inspect(path, label: "path")
+    # IO.inspect(actor_uri, label: "actor_uri")
 
-    if MRF.subdomain_match?(rejects, clean_url) do
-      {:reject, nil}
-    else
-      {:ok, object}
-    end
+    MRF.subdomain_match?(rejects, clean_url) || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri) #|> IO.inspect
   end
 
-  defp filter_recipients(object) do
+  defp filter_recipients(activity) do
     deafen = (
       ActivityPub.Config.get([:boundaries, :deafen])
       ++
@@ -53,7 +40,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       ) |> MRF.subdomains_regex()
         # |> IO.inspect(label: "MRF deafen")
 
-    object
+    activity
     |> filter_recipients("to", deafen)
     |> filter_recipients("cc", deafen)
     |> filter_recipients("bto", deafen)
@@ -61,13 +48,13 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     |> filter_recipients("audience", deafen)
   end
 
-  defp filter_recipients(object, field, deafen) do
-    case object[field] do
+  defp filter_recipients(activity, field, deafen) do
+    case activity[field] do
       recipients when is_list(recipients) ->
-        Map.put(object, field, filter_actors(recipients, deafen))
+        Map.put(activity, field, filter_actors(recipients, deafen))
       recipient when is_binary(recipient) ->
-        Map.put(object, field, filter_actors([recipient], deafen))
-      _ -> object
+        Map.put(activity, field, filter_actors([recipient], deafen))
+      _ -> activity
     end
   end
 
@@ -75,23 +62,23 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     Enum.reject(actors || [], &filter_actor(&1, deafen))
   end
   defp filter_actor(actor, deafen) do
-    actor_info = URI.parse(actor)
-    clean_url = "#{actor_info.host}#{actor_info.path}"
-    MRF.subdomain_match?(deafen, actor_info.host) || MRF.subdomain_match?(deafen, clean_url)
+    actor_uri = URI.parse(actor)
+    clean_url = "#{actor_uri.host}#{actor_uri.path}"
+    MRF.subdomain_match?(deafen, actor_uri.host) || MRF.subdomain_match?(deafen, clean_url) || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri)
   end
 
   @impl true
-  def filter(%{"actor" => actor} = object) do
-    check_block(actor, object)
+  def filter(activity) do
+    # TODO: also check that actors and object instances aren't from blocked instances
+
+    if  !check_block(activity["id"])
+        and !check_block(activity["actor"])
+        and !check_block(activity["object"]["attributedTo"])
+        and !check_block(activity["object"]["id"]) do
+      {:ok, filter_recipients(activity)}
+    else
+      {:reject, nil}
+    end
   end
 
-  def filter(%{"id" => actor, "type" => obj_type} = object)
-      when obj_type in @supported_actor_types do
-    check_block(actor, object)
-  end
-
-  def filter(object) do
-    Logger.warn("BoundariesMRF: no matching filter for #{object}")
-    {:ok, object}
-  end
 end
