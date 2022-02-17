@@ -69,7 +69,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   @impl true
   def filter(activity) do
-    # TODO: also check that actors and object instances aren't from blocked instances
+    # check that actors and URIs of the activity and object aren't from blocked instances or actors
 
     if  !check_block(activity["id"])
         and !check_block(activity["actor"])
