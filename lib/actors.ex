@@ -72,26 +72,28 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
     )
   end
 
-  def is_blocked?(uri) when is_binary(uri) do
-    get_or_create(uri)
-    # ~> debug
-    ~> is_blocked?
-  end
+  def is_blocked?(peered, opts \\ [])
 
-  def is_blocked?(%URI{} = uri) do
-    URI.to_string(uri) |> is_blocked?()
-  end
-
-  def is_blocked?(%Peered{} = peered) do
+  def is_blocked?(%Peered{} = peered, opts) do
     peered = peered |> repo().maybe_preload(:peer) #|> debug
     # check if either of instance or actor is blocked
-    Instances.is_blocked?(Map.get(peered, :peer))
+    Instances.is_blocked?(Map.get(peered, :peer), opts)
       ||
-    Bonfire.Boundaries.is_blocked?(peered)
+    Bonfire.Me.Boundaries.is_blocked?(peered, opts)
   end
 
-  def is_blocked?(%Peer{} = peer) do
-    Instances.is_blocked?(peer)
+  def is_blocked?(uri, opts) when is_binary(uri) do
+    get_or_create(uri)
+    # ~> debug
+    ~> is_blocked?(opts)
+  end
+
+  def is_blocked?(%URI{} = uri, opts) do
+    URI.to_string(uri) |> is_blocked?(opts)
+  end
+
+  def is_blocked?(%Peer{} = peer, opts) do # fallback to just check the instance if that's all we have
+    Instances.is_blocked?(peer, opts)
   end
 
 

@@ -29,21 +29,44 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
 
   defp build_local_activity_for(to \\ @remote_actor) do
-    ap_base_path = System.get_env("AP_BASE_PATH", "/pub")
+    local_user = fake_user!()
+    {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
 
     %{
-      "actor" => ActivityPubWeb.base_url() <> ap_base_path <> "/actors/alice",
+      "actor" => local_actor.ap_id,
       "to" => [to]
     }
   end
 
    defp build_remote_activity_for(to \\ nil) do
-    ap_base_path = System.get_env("AP_BASE_PATH", "/pub")
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
-    %{
-      "actor" => @remote_actor ,
-      "to" => [to || (ActivityPubWeb.base_url() <> ap_base_path <> "/actors/alice")]
+    to = to || (
+      local_user = fake_user!()
+      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+      local_actor.ap_id
+    )
+
+    context = "blabla"
+
+    to = [
+      to,
+      "https://www.w3.org/ns/activitystreams#Public"
+    ]
+
+    object = %{
+      "content" => "content",
+      "type" => "Note",
+      "to" => to
     }
+
+    params = %{
+      actor: actor,
+      context: context,
+      object: object,
+      to: to
+    }
+
   end
 
   defp build_activity_from(actor \\ @remote_actor) do
@@ -63,6 +86,12 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     user
   end
 
+  def prepare_remote_activity_for(recipient) do
+    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+    params = build_remote_activity_for(recipient_actor.data)
+    with {:ok, activity} <- ActivityPub.create(params), do:
+      assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+  end
 
   describe "do not block when" do
     test "there's no matching remote activity" do
@@ -84,20 +113,37 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     end
   end
 
-  describe "block when" do
+  describe "block" do
 
-    test "there's a remote activity with per-user blocked host (in DB/boundaries)" do
+    test "from my feed when there's a remote activity from a per-user blocked instance (in DB/boundaries)" do
       recipient = fake_user!()
-      recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
 
       remote_actor_user()
       |> e(:character, :peered, :peer_id, nil)
-      |> debug
+      # |> debug
       |> Bonfire.Me.Boundaries.block(recipient)
 
-      remote_activity = build_remote_activity_for(recipient_actor.ap_id)
+      remote_activity = prepare_remote_activity_for(recipient)
 
-      assert BoundariesMRF.filter(remote_activity) == {:reject, nil}
+      assert %{edges: []} = Bonfire.Social.FeedActivities.my_feed(recipient)
+    end
+
+    test "follow from a per-user blocked instance" do
+      followed = fake_user!()
+      {:ok, followed_actor} = ActivityPub.Adapter.get_actor_by_id(followed.id)
+
+      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
+
+      remote_user
+      |> e(:character, :peered, :peer_id, nil)
+      # |> debug
+      |> Bonfire.Me.Boundaries.block(followed)
+
+      {:ok, follow_activity} = ActivityPub.follow(remote_actor, followed_actor)
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+      assert false = Bonfire.Social.Follows.following?(remote_user, followed)
     end
 
     test "there's a remote actor with per-user blocked host (in DB/boundaries)" do
@@ -129,10 +175,10 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       Bonfire.Federate.ActivityPub.Actors.get_or_create(@remote_actor)
       |> Bonfire.Me.Boundaries.block(:instance)
 
-      local_activity = build_local_activity_for()
+      local_activity = build_local_activity_for() |> debug
 
       assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/alice", "to" => []}
+        %{"actor" => local_activity["actor"], "to" => []}
       }
     end
 
@@ -144,7 +190,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       local_activity = build_local_activity_for(@remote_actor)
 
       assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/alice", "to" => []}
+        %{"actor" => local_activity["actor"], "to" => []}
       }
     end
 
@@ -156,7 +202,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       local_activity = build_local_activity_for(@remote_actor)
 
       assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/alice", "to" => []}
+        %{"actor" => local_activity["actor"], "to" => []}
       }
     end
 

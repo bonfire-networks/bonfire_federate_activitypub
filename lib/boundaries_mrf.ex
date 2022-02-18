@@ -1,6 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   @moduledoc "Filter activities depending on their origin instance, actor, or other criteria"
   use Bonfire.Common.Utils
+  use Arrows
   alias ActivityPub.MRF
   @behaviour MRF
 
@@ -8,15 +9,27 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   @impl true
   def filter(activity) do
-    # check that actors and URIs of the activity and object aren't from blocked instances or actors
+    debug(activity, "to filter")
+    ap_base_uri = ActivityPubWeb.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
+    debug(ap_base_uri, "ap_base_uri")
 
-    recipients = all_recipients(activity, ["to", "bto", "cc", "bcc", "audience"]) |> debug
+    authors = all_actors(activity)
+    local_authors = Enum.filter(authors, &( String.starts_with?(&1, ap_base_uri)))
 
-    if  !check_block(activity["id"])
-        and !check_block(activity["actor"])
-        and !check_block(activity["object"]["attributedTo"])
-        and !check_block(activity["object"]["id"]) do
-      {:ok, filter_recipients(activity)}
+    recipients = all_recipients(activity)
+    local_recipients = Enum.filter(recipients, &( String.starts_with?(&1, ap_base_uri)))
+
+    local_user_ids = (local_authors ++ local_recipients)
+    |> Enum.uniq()
+    |> Enum.map(&( ActivityPub.Actor.get_or_fetch_by_ap_id(&1) ~> e(:pointer_id, nil) ))
+    |> debug("local_user_ids")
+
+    if  !check_block(e(activity, "id", nil))
+        and !check_block(e(activity, "actor", nil))
+        and !check_block(e(activity, "object", nil))
+        and !check_block(e(activity, "object", "attributedTo", nil))
+        and !check_block(e(activity, "object", "id", nil)) do
+      {:ok, filter_recipients(activity, local_user_ids)} |> debug("filtered")
     else
       {:reject, nil}
     end
@@ -48,7 +61,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     MRF.subdomain_match?(rejects, clean_url) || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri) #|> IO.inspect
   end
 
-  defp filter_recipients(activity) do
+  defp filter_recipients(activity, local_user_ids) do
     deafen = (
       ActivityPub.Config.get([:boundaries, :deafen])
       ++
@@ -57,35 +70,71 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         # |> IO.inspect(label: "MRF deafen")
 
     activity
-    |> filter_recipients("to", deafen)
-    |> filter_recipients("cc", deafen)
-    |> filter_recipients("bto", deafen)
-    |> filter_recipients("bcc", deafen)
-    |> filter_recipients("audience", deafen)
+    |> filter_recipients("to", deafen, local_user_ids)
+    |> filter_recipients("cc", deafen, local_user_ids)
+    |> filter_recipients("bto", deafen, local_user_ids)
+    |> filter_recipients("bcc", deafen, local_user_ids)
+    |> filter_recipients("audience", deafen, local_user_ids)
   end
 
-  defp filter_recipients(activity, field, deafen) do
+  defp filter_recipients(activity, field, deafen, local_user_ids) do
     case activity[field] do
       recipients when is_list(recipients) ->
-        Map.put(activity, field, filter_actors(recipients, deafen))
+        Map.put(activity, field, filter_actors(recipients, deafen, local_user_ids))
       recipient when is_binary(recipient) ->
-        Map.put(activity, field, filter_actors([recipient], deafen))
+        Map.put(activity, field, filter_actors([recipient], deafen, local_user_ids))
       _ -> activity
     end
   end
 
-  defp filter_actors(actors, deafen) do
-    Enum.reject(actors || [], &filter_actor(&1, deafen))
+  defp filter_actors(actors, deafen, local_user_ids) do
+    Enum.reject(actors || [], &filter_actor(&1, deafen, local_user_ids))
   end
-  defp filter_actor(actor, deafen) do
+  defp filter_actor(%{ap_id: actor}, deafen, local_user_ids) when is_binary(actor) do
+    filter_actor(actor, deafen, local_user_ids)
+  end
+  defp filter_actor(%{"id" => actor}, deafen, local_user_ids) when is_binary(actor) do
+    filter_actor(actor, deafen, local_user_ids)
+  end
+  defp filter_actor(actor, deafen, local_user_ids) when is_binary(actor) do
     actor_uri = URI.parse(actor)
-    clean_url = "#{actor_uri.host}#{actor_uri.path}"
-    MRF.subdomain_match?(deafen, actor_uri.host) || MRF.subdomain_match?(deafen, clean_url) || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri)
+    clean_actor_uri = "#{actor_uri.host}#{actor_uri.path}"
+    MRF.subdomain_match?(deafen, actor_uri.host) # instance blocked in config
+    || MRF.subdomain_match?(deafen, clean_actor_uri) # actor blocked in config
+    || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri, user_ids: local_user_ids) # actor or instance blocked in DB, either instance-wide or by specified local_user_ids
   end
 
-  def all_recipients(activity, fields) do
-    Enum.flat_map(fields, &( [activity[&1]] ))
+  def all_actors(activity) do
+    [e(activity, "actor", nil)]
+    ++ [e(activity, "object", "actor", nil)]
+    ++ [e(activity, "object", "attributedTo", nil)]
+    |> List.flatten()
+    |> Enum.map(&id_or_object_id/1)
+    |> filter_empty([])
+    |> Enum.uniq()
+    |> debug
   end
 
+  def all_recipients(activity, fields \\ ["to", "bto", "cc", "bcc", "audience"]) do
+    all_fields(activity, fields)
+    |> debug
+  end
+
+  defp all_fields(activity, fields) do
+    Enum.map(fields, &( activity[&1] |> id_or_object_id ))
+    |> List.flatten()
+    |> filter_empty([])
+    |> Enum.uniq()
+  end
+
+  defp id_or_object_id(%{"id" => id}) when is_binary(id) do
+    id
+  end
+  defp id_or_object_id(id) when is_binary(id) do
+    id
+  end
+  defp id_or_object_id(_) do
+    nil
+  end
 
 end

@@ -46,13 +46,15 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     get_or_create(canonical_uri)
   end
 
-  def is_blocked?(uri) when is_binary(uri) do
+  def is_blocked?(peered, opts \\ [])
+
+  def is_blocked?(uri, opts) when is_binary(uri) do
     get_or_create(uri)
-    ~> is_blocked?()
+    ~> is_blocked?(opts)
   end
 
-  def is_blocked?(%Peer{} = peer) do
-    Bonfire.Boundaries.is_blocked?(peer)
+  def is_blocked?(%Peer{} = peer, opts) do
+    Bonfire.Me.Boundaries.is_blocked?(peer, opts)
   end
 
 end

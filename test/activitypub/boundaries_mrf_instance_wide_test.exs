@@ -27,10 +27,10 @@ defmodule Bonfire.Federate.ActivityPub.MRFInstanceWideTest do
 
 
   defp build_local_activity_for(to \\ "https://remote.instance/users/bob") do
-    ap_base_path = System.get_env("AP_BASE_PATH", "/pub")
+    ap_base_path = ActivityPubWeb.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
 
     %{
-      "actor" => ActivityPubWeb.base_url() <> ap_base_path <> "/actors/alice",
+      "actor" => ap_base_path <> "/actors/alice",
       "to" => [to]
     }
   end
