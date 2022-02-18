@@ -1,10 +1,26 @@
 defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   @moduledoc "Filter activities depending on their origin instance, actor, or other criteria"
+  use Bonfire.Common.Utils
   alias ActivityPub.MRF
-  require Logger
   @behaviour MRF
 
   @supported_actor_types ActivityPub.Utils.supported_actor_types()
+
+  @impl true
+  def filter(activity) do
+    # check that actors and URIs of the activity and object aren't from blocked instances or actors
+
+    recipients = all_recipients(activity, ["to", "bto", "cc", "bcc", "audience"]) |> debug
+
+    if  !check_block(activity["id"])
+        and !check_block(activity["actor"])
+        and !check_block(activity["object"]["attributedTo"])
+        and !check_block(activity["object"]["id"]) do
+      {:ok, filter_recipients(activity)}
+    else
+      {:reject, nil}
+    end
+  end
 
   defp check_block(canonical_uri) when is_binary(canonical_uri) do
     uri = URI.parse(canonical_uri)
@@ -67,18 +83,9 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     MRF.subdomain_match?(deafen, actor_uri.host) || MRF.subdomain_match?(deafen, clean_url) || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri)
   end
 
-  @impl true
-  def filter(activity) do
-    # check that actors and URIs of the activity and object aren't from blocked instances or actors
-
-    if  !check_block(activity["id"])
-        and !check_block(activity["actor"])
-        and !check_block(activity["object"]["attributedTo"])
-        and !check_block(activity["object"]["id"]) do
-      {:ok, filter_recipients(activity)}
-    else
-      {:reject, nil}
-    end
+  def all_recipients(activity, fields) do
+    Enum.flat_map(fields, &( [activity[&1]] ))
   end
+
 
 end

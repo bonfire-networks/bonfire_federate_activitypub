@@ -26,7 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
   end
 
 
-  defp build_remote_message(actor, recipient_actor) do
+  defp build_remote_activity(actor, recipient_actor) do
     context = "blabla"
 
     object = %{
@@ -54,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
   def prepare_remote_post_for(recipient) do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
     recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
-    params = build_remote_message(actor, recipient_actor)
+    params = build_remote_activity(actor, recipient_actor)
     with {:ok, activity} <- ActivityPub.create(params), do:
       assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
   end
