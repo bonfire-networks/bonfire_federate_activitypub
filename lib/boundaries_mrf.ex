@@ -45,7 +45,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       ) |> MRF.subdomains_regex()
         # |> IO.inspect(label: "MRF blocks")
 
-    check_instance_block(uri, rejects) || check_actor_block(uri, rejects)
+    check_instance_block(uri, rejects)
+    || check_actor_block(uri, rejects)
   end
 
   defp check_block(_canonical_uri), do: nil
@@ -58,7 +59,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     clean_url = "#{actor_host}#{actor_path}"
     # IO.inspect(actor_uri, label: "actor_uri")
 
-    MRF.subdomain_match?(rejects, clean_url) || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri) #|> IO.inspect
+    MRF.subdomain_match?(rejects, clean_url)
+    || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri) #|> IO.inspect
   end
 
   defp filter_recipients(activity, local_user_ids) do
