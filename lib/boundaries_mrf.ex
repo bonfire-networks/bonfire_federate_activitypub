@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       ++
       ActivityPub.Config.get([:boundaries, :block])
       ) |> MRF.subdomains_regex()
-        # |> IO.inspect(label: "MRF blocks")
+        # |> debug(label: "MRF blocks")
 
     check_instance_block(uri, rejects)
     || check_actor_block(uri, rejects)
@@ -58,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp check_actor_block(%{host: actor_host, path: actor_path} = actor_uri, rejects) do
     clean_url = "#{actor_host}#{actor_path}"
-    # IO.inspect(actor_uri, label: "actor_uri")
+    # debug(actor_uri, label: "actor_uri")
 
     MRF.subdomain_match?(rejects, clean_url)
     || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri) #|> IO.inspect
@@ -70,7 +70,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       ++
       ActivityPub.Config.get([:boundaries, :block])
       ) |> MRF.subdomains_regex()
-        # |> IO.inspect(label: "MRF deafen")
+        # |> debug(label: "MRF deafen")
 
     activity
     |> filter_recipients("to", deafen, local_user_ids)

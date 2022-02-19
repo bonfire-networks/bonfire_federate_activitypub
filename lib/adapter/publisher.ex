@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Publisher do
-  require Logger
+  import Where
   alias Bonfire.Federate.ActivityPub.Utils
 
   # TODO: move specialised publish funcs to context modules (or make them extensible for extra types)
@@ -29,7 +29,10 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
       ActivityPub.Actor.set_cache(actor)
       ActivityPub.update(params)
     else
-      e -> {:error, e}
+      e ->
+        publish_error("Error while attempting to publish", e)
+
+        {:error, e}
     end
   end
 
@@ -60,28 +63,31 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   end
 
   def publish(verb, %{__struct__: object_type} = local_object) do
-    Logger.debug("Federate.ActivityPub - looking for module to handle verb '#{verb}' for object type #{object_type}")
+    debug("Federate.ActivityPub - looking for module to handle verb '#{verb}' for object type #{object_type}")
     Bonfire.Common.ContextModules.maybe_apply(object_type, :ap_publish_activity, [verb, local_object], &error/2)
   end
 
-
   def publish(verb, object) do
-    error("Unrecognised object for AP publisher", [verb, object])
+    publish_error("Unrecognised object for AP publisher", [verb, object])
   end
 
-  def error(error, [verb, %{__struct__: object_type, id: id} = object]) do
-    Logger.error(
-      "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} ; verb: #{verb} ; object type: #{object_type}"
+  def publish_error(error, [verb, %{__struct__: object_type, id: id} = object]) do
+    error(
+      object,
+      "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
     )
-    IO.inspect(object: object)
 
     :ignored
   end
 
-  def error(error, [verb, object]) do
-    Logger.error("Federate.ActivityPub - Unable to federate out - #{error}... verb: #{verb}}")
+  def publish_error(error, [verb, object]) do
+    error(object, "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}")
 
-    IO.inspect(object: object)
+    :ignored
+  end
+
+  def publish_error(error, object) do
+    error(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
 
     :ignored
   end

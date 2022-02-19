@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   alias ActivityPub.Actor
   alias Bonfire.Social.Threads
 
-  require Logger
+  import Where
 
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
@@ -12,7 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def log(l) do
     if(Bonfire.Common.Config.get(:log_federation)) do
-      Logger.info(inspect l)
+      debug(inspect l)
     end
   end
 
@@ -156,7 +156,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   # end
 
   def get_character_by_id(other) do
-    Logger.error("get_character_by_id: dunno how to get character for #{inspect other}")
+    error("get_character_by_id: dunno how to get character for #{inspect other}")
     {:error, "not found"}
   end
 
@@ -184,7 +184,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_character_by_ap_id(other) do
-    Logger.error("get_character_by_ap_id: dunno how to get character for #{inspect other}")
+    error("get_character_by_ap_id: dunno how to get character for #{inspect other}")
     {:error, "not found"}
   end
 
@@ -503,7 +503,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   defp maybe_upload(adapter, url, actor) do
-    Utils.debug(url)
+    debug(url)
     with {:ok, %{id: id}} <- Bonfire.Files.upload(Bonfire.Files.IconUploader, actor, url, %{}) do
       id
     else _ ->

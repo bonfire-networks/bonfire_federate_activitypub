@@ -19,7 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   local garbage collection.
   """
 
-  require Logger
+  import Where
   alias Bonfire.Common.Utils
 
 
@@ -68,8 +68,8 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     end
   end
 
-  def federation_function_error(error, _args, level \\ :info) do
-    Logger.log(level, "FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2) #{error}")
+  def federation_function_error(error, _args) do
+    warn("FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2) #{error}")
 
     nil
   end
@@ -87,9 +87,9 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
       search_path()
       # |> IO.inspect
       |> Enum.flat_map(&app_modules/1)
-      # |> IO.inspect(limit: :infinity)
+      # |> debug(limit: :infinity)
       |> Enum.filter(&declares_federation_module?/1)
-      # |> IO.inspect(limit: :infinity)
+      # |> debug(limit: :infinity)
       |> Enum.reduce(%{}, &index/2)
       # |> IO.inspect
     :persistent_term.put(__MODULE__, indexed)

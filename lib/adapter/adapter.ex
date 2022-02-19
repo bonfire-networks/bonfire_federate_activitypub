@@ -15,7 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
 
   import Bonfire.Federate.ActivityPub
-  require Logger
+  import Where
 
   @behaviour ActivityPub.Adapter
 
@@ -76,7 +76,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   # def redirect_to_object(id) do
   #   if System.get_env("LIVEVIEW_ENABLED", "true") == "true" do
-  #     url = Utils.object_url(id)
+  #     url = object_url(id)
   #     if !String.contains?(url, "/404"), do: url
   #   end
   # end
@@ -97,10 +97,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def update_local_actor(actor, params) do
 
     with {:ok, character} = APUtils.get_character_by_ap_id(actor) do
-      keys = Utils.e(params, :keys, nil)
+      keys = e(params, :keys, nil)
       params = params
       |> Map.put(:character, %{id: character.id, actor: %{signing_key: keys}})
-      # Logger.info("update_local_actor: #{inspect character} with #{inspect params}")
+      # debug("update_local_actor: #{inspect character} with #{inspect params}")
       Bonfire.Common.ContextModules.maybe_apply(character, :update_local_actor, [character, params]) # FIXME use federation_module?
     end
   end
@@ -174,11 +174,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         {:ok, user_etc}
       end
     end) do
-      # Utils.debug(user_etc, "user created")
+      # debug(user_etc, "user created")
 
       # after creating the user, in case of timeouts downloading the images
       icon_id = APUtils.maybe_create_icon_object(icon_url, user_etc)
-      image_id = APUtils.maybe_create_image_object(image_url, user_etc) |> Utils.debug
+      image_id = APUtils.maybe_create_image_object(image_url, user_etc) |> debug
 
       with {:ok, updated_user} <- maybe_apply(character_module, [:update_remote, :update],[user_etc, %{"profile" => %{"icon_id" => icon_id, "image_id" => image_id}}]) do
         {:ok, updated_user}

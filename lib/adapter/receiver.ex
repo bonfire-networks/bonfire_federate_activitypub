@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Receiver do
-  require Logger
+  import Where
   import Bonfire.Federate.ActivityPub.Utils, only: [log: 1]
   alias Bonfire.Search.Indexer
   alias Bonfire.Common.Utils
@@ -174,7 +174,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       module.create(activity, object, actor)
     else
       error = "ActivityPub - ignored incoming activity - unhandled activity or object type"
-      Logger.error("#{error}")
+      receive_error("#{error}")
       log("AP activity: #{inspect(activity, pretty: true)}")
       log("AP object: #{inspect(object, pretty: true)}")
       {:error, error}
@@ -236,7 +236,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   end
 
   # defp handle_activity_with(_module, {:error, _}, activity, _) do
-  #   error("AP - could not find local character for the actor", activity)
+  #   receive_error("AP - could not find local character for the actor", activity)
   # end
 
   defp handle_activity_with(_module, _actor, _activity, _object) do
@@ -260,17 +260,15 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     log("AP - activity_character for #{actor}")
     # FIXME to handle actor types other than Person/User
     with {:error, :not_found} <- Adapter.character_module("Person").by_ap_id(actor) do
-      error("AP - could not find local character for the actor", actor)
+      receive_error("AP - could not find local character for the actor", actor)
     end
   end
 
   def activity_character(actor), do: {:ok, nil}
 
 
-  def error(error, attrs) do
-    Logger.error("ActivityPub - Unable to process incoming federated activity - #{error}")
-
-    IO.inspect(attrs: attrs)
+  def receive_error(error, attrs \\ nil) do
+    error(attrs, "ActivityPub - Unable to process incoming federated activity - #{error}")
 
     {:error, error}
   end

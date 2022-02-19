@@ -7,7 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
   use Bonfire.Common.Utils
   import Bonfire.Federate.ActivityPub, except: [repo: 0]
   use Bonfire.Repo
-  require Logger
+  import Where
   alias Bonfire.Data.ActivityPub.Peer
   alias Bonfire.Data.ActivityPub.Peered
   alias Bonfire.Federate.ActivityPub.Instances
@@ -38,7 +38,7 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
     get(canonical_uri)
   end
   def get(unknown) do
-    Logger.warn("Could not get Peered for #{inspect unknown}")
+    warn("Could not get Peered for #{inspect unknown}")
     nil
   end
 
