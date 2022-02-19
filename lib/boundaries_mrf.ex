@@ -3,6 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   use Bonfire.Common.Utils
   use Arrows
   alias ActivityPub.MRF
+  import Where
   @behaviour MRF
 
   @supported_actor_types ActivityPub.Utils.supported_actor_types()
