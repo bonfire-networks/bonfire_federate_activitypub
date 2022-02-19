@@ -5,6 +5,8 @@ defmodule Bonfire.Federate.ActivityPub.MRFInstanceWideTest do
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Data.ActivityPub.Peered
 
+  @remote_actor "https://kawen.space/users/karen"
+
   setup do
     orig = Config.get!(:boundaries)
 
@@ -16,8 +18,8 @@ defmodule Bonfire.Federate.ActivityPub.MRFInstanceWideTest do
 
     # TODO: move this into fixtures
     mock(fn
-      %{method: :get, url: "https://kawen.space/users/karen"} ->
-        json(Simulate.actor_json("https://kawen.space/users/karen"))
+      %{method: :get, url: @remote_actor} ->
+        json(Simulate.actor_json(@remote_actor))
     end)
 
     on_exit(fn ->
@@ -150,7 +152,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFInstanceWideTest do
     end
 
     test "there's a remote actor with instance-wide blocked actor (in DB/boundaries)" do
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Me.Boundaries.block(user, :instance)
 
@@ -200,11 +202,11 @@ defmodule Bonfire.Federate.ActivityPub.MRFInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide blocked actor as recipient (in DB)" do
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Me.Boundaries.block(user, :instance)
 
-      local_activity = build_local_activity_for("https://kawen.space/users/karen")
+      local_activity = build_local_activity_for(@remote_actor)
 
       assert BoundariesMRF.filter(local_activity) == {:ok,
         %{"actor" => "http://localhost:4000/pub/actors/alice", "to" => []}

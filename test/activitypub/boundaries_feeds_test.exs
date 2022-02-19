@@ -5,6 +5,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Data.ActivityPub.Peered
 
+  @remote_actor "https://kawen.space/users/karen"
+
   setup do
     orig = Config.get!(:boundaries)
 
@@ -16,8 +18,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
 
     # TODO: move this into fixtures
     mock(fn
-      %{method: :get, url: "https://kawen.space/users/karen"} ->
-        json(Simulate.actor_json("https://kawen.space/users/karen"))
+      %{method: :get, url: @remote_actor} ->
+        json(Simulate.actor_json(@remote_actor))
     end)
 
     on_exit(fn ->
@@ -52,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
   end
 
   def prepare_remote_post_for(recipient) do
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
     params = build_remote_activity(actor, recipient_actor)
     with {:ok, activity} <- ActivityPub.create(params), do:
@@ -69,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
   end
 
   test "does not create a Post for an incoming Note with blocked instance" do
-    Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space/users/karen")
+    Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
       |> Bonfire.Me.Boundaries.block(:instance)
 
@@ -81,7 +83,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
   end
 
   test "does not create a Post for an incoming Note with blocked actor" do
-    {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
     Bonfire.Me.Boundaries.block(user, :instance)
 
@@ -97,13 +99,12 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesFeedsTest do
     recipient = fake_user!()
     prepare_remote_post_for(recipient)
 
-    Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space/users/karen")
+    Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
       |> Bonfire.Me.Boundaries.block(:instance)
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
   end
-
 
 end
