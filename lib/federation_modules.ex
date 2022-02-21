@@ -22,7 +22,6 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   import Where
   alias Bonfire.Common.Utils
 
-
   use GenServer, restart: :transient
 
   @typedoc """
@@ -37,7 +36,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   def data(), do: :persistent_term.get(__MODULE__) #, data_init())
 
   defp data_init() do
-    Logger.error "The FederationModules service was not started. Please add it to your Application."
+    error "The FederationModules service was not started. Please add it to your Application."
     populate()
   end
 
@@ -69,7 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   def federation_function_error(error, _args) do
-    warn("FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2) #{error}")
+    warn(error, "FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2)")
 
     nil
   end
