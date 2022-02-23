@@ -58,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp check_actor_block(%{host: actor_host, path: actor_path} = actor_uri, rejects) do
     clean_url = "#{actor_host}#{actor_path}"
-    # debug(actor_uri, label: "actor_uri")
+    # debug(actor_uri, "actor_uri")
 
     MRF.subdomain_match?(rejects, clean_url)
     || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri) #|> IO.inspect
