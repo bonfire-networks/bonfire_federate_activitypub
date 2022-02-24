@@ -50,14 +50,16 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
   end
 
   def get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
-    with  {:ok, peer} =  Instances.get_or_create(canonical_uri) do
-      case get(canonical_uri) do
-        {:ok, peered} ->
-          {:ok, peered}
+    case get(canonical_uri) do
+      {:ok, peered} ->
+        {:ok, peered}
 
-        _ ->
-          if id, do: create(id, peer, canonical_uri), else: {:ok, peer}
-      end
+      _ ->
+        with  {:ok, peer} =  Instances.get_or_create(canonical_uri) do
+          if id,
+            do: create(id, peer, canonical_uri),
+            else: {:ok, peer}
+        end
     end
   end
 
@@ -72,28 +74,28 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
     )
   end
 
-  def is_blocked?(peered, opts \\ [])
+  def is_blocked?(peered, block_type \\ :any, opts \\ [])
 
-  def is_blocked?(%Peered{} = peered, opts) do
+  def is_blocked?(%Peered{} = peered, block_type, opts) do
     peered = peered |> repo().maybe_preload(:peer) #|> debug
     # check if either of instance or actor is blocked
-    Instances.is_blocked?(Map.get(peered, :peer), opts)
+    Instances.is_blocked?(Map.get(peered, :peer), block_type, opts)
       ||
-    Bonfire.Me.Boundaries.is_blocked?(peered, opts)
+    Bonfire.Boundaries.is_blocked?(peered, block_type, opts)
   end
 
-  def is_blocked?(uri, opts) when is_binary(uri) do
+  def is_blocked?(uri, block_type, opts) when is_binary(uri) do
     get_or_create(uri)
     # ~> debug
-    ~> is_blocked?(opts)
+    ~> is_blocked?(block_type, opts)
   end
 
-  def is_blocked?(%URI{} = uri, opts) do
-    URI.to_string(uri) |> is_blocked?(opts)
+  def is_blocked?(%URI{} = uri, block_type, opts) do
+    URI.to_string(uri) |> is_blocked?(block_type, opts)
   end
 
-  def is_blocked?(%Peer{} = peer, opts) do # fallback to just check the instance if that's all we have
-    Instances.is_blocked?(peer, opts)
+  def is_blocked?(%Peer{} = peer, block_type, opts) do # fallback to just check the instance if that's all we have
+    Instances.is_blocked?(peer, block_type, opts)
   end
 
 

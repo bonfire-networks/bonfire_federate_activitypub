@@ -12,8 +12,8 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
     Config.put(:boundaries,
       block: [],
-      mute: [],
-      deafen: []
+      silence: [],
+      ghost: []
     )
 
     # TODO: move this into fixtures
@@ -121,7 +121,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       remote_actor_user()
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Me.Boundaries.block(recipient)
+      |> Bonfire.Boundaries.block(:ghost, current_user: recipient)
 
       remote_activity = prepare_remote_activity_for(recipient)
 
@@ -138,7 +138,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Me.Boundaries.block(followed)
+      |> Bonfire.Boundaries.block(:ghost, current_user: followed)
 
       {:ok, follow_activity} = ActivityPub.follow(remote_actor, followed_actor)
 
@@ -148,7 +148,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
     test "there's a remote actor with per-user blocked host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Actors.get_or_create(@remote_actor)
-      |> Bonfire.Me.Boundaries.block(:instance)
+      |> Bonfire.Boundaries.block(:ghost, :instance_wide)
 
       remote_actor = build_remote_actor()
 
@@ -160,7 +160,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
 
       remote_actor_user()
-      |> Bonfire.Me.Boundaries.block(recipient)
+      |> Bonfire.Boundaries.block(:ghost, current_user: recipient)
 
       remote_actor = build_remote_actor()
 
@@ -173,9 +173,9 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
     test "there's a local activity with per-user blocked host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Actors.get_or_create(@remote_actor)
-      |> Bonfire.Me.Boundaries.block(:instance)
+      |> Bonfire.Boundaries.block(:ghost, :instance_wide)
 
-      local_activity = build_local_activity_for() |> debug
+      local_activity = build_local_activity_for() #|> debug
 
       assert BoundariesMRF.filter(local_activity) == {:ok,
         %{"actor" => local_activity["actor"], "to" => []}
@@ -185,9 +185,9 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     test "there's a local activity with per-user blocked actor as recipient (in DB)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Me.Boundaries.block(user, :instance)
+      Bonfire.Boundaries.block(user, :ghost, :instance_wide)
 
-      local_activity = build_local_activity_for(@remote_actor)
+      local_activity = build_local_activity_for(remote_actor)
 
       assert BoundariesMRF.filter(local_activity) == {:ok,
         %{"actor" => local_activity["actor"], "to" => []}
@@ -197,9 +197,9 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     test "there's a remote activity with per-user blocked actor as recipient (in DB)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Me.Boundaries.block(user, :instance)
+      Bonfire.Boundaries.block(user, :ghost, :instance_wide)
 
-      local_activity = build_local_activity_for(@remote_actor)
+      local_activity = build_local_activity_for(remote_actor)
 
       assert BoundariesMRF.filter(local_activity) == {:ok,
         %{"actor" => local_activity["actor"], "to" => []}

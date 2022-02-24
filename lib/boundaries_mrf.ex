@@ -10,27 +10,25 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   @impl true
   def filter(activity) do
-    debug(activity, "to filter")
+    dump(activity, "to filter")
     ap_base_uri = ActivityPubWeb.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
-    debug(ap_base_uri, "ap_base_uri")
+    # |> dump("ap_base_uri")
 
     authors = all_actors(activity)
-    local_authors = Enum.filter(authors, &( String.starts_with?(&1, ap_base_uri)))
-
     recipients = all_recipients(activity)
-    local_recipients = Enum.filter(recipients, &( String.starts_with?(&1, ap_base_uri)))
 
-    local_user_ids = (local_authors ++ local_recipients)
+    local_user_ids = (authors ++ recipients)
+    |> Enum.filter(&( String.starts_with?(&1, ap_base_uri)))
     |> Enum.uniq()
     |> Enum.map(&( ActivityPub.Actor.get_or_fetch_by_ap_id(&1) ~> e(:pointer_id, nil) ))
-    |> debug("local_user_ids")
+    |> dump("local_user_ids")
 
     if  !check_block(e(activity, "id", nil))
         and !check_block(e(activity, "actor", nil))
         and !check_block(e(activity, "object", nil))
         and !check_block(e(activity, "object", "attributedTo", nil))
         and !check_block(e(activity, "object", "id", nil)) do
-      {:ok, filter_recipients(activity, local_user_ids)} |> debug("filtered")
+      {:ok, filter_recipients(activity, local_user_ids)} |> dump("filtered")
     else
       {:reject, nil}
     end
@@ -40,11 +38,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     uri = URI.parse(canonical_uri)
 
     rejects = (
-      ActivityPub.Config.get([:boundaries, :mute])
+      ActivityPub.Config.get([:boundaries, :silence])
+      ++
+      ActivityPub.Config.get([:boundaries, :ghost])
       ++
       ActivityPub.Config.get([:boundaries, :block])
-      ) |> MRF.subdomains_regex()
-        # |> debug(label: "MRF blocks")
+      )
+      |> MRF.subdomains_regex()
+      |> dump("MRF instance_wide blocks from config")
 
     check_instance_block(uri, rejects)
     || check_actor_block(uri, rejects)
@@ -53,58 +54,61 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp check_block(_canonical_uri), do: nil
 
   defp check_instance_block(%{host: actor_host} = actor_uri, rejects) do
-    MRF.subdomain_match?(rejects, actor_host) # || Bonfire.Federate.ActivityPub.Instances.is_blocked?(actor_uri) # no need to check the instance block in DB here because that's handled by Peered.is_blocked?
+    MRF.subdomain_match?(rejects, actor_host) # || Bonfire.Federate.ActivityPub.Instances.is_blocked?(actor_uri, :any, :instance_wide) # no need to check the instance block in DB here because that's handled by Peered.is_blocked?
   end
 
   defp check_actor_block(%{host: actor_host, path: actor_path} = actor_uri, rejects) do
     clean_url = "#{actor_host}#{actor_path}"
-    # debug(actor_uri, "actor_uri")
+    # dump(actor_uri, "actor_uri")
 
     MRF.subdomain_match?(rejects, clean_url)
-    || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri) #|> IO.inspect
+    || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri, :any, :instance_wide) #|> IO.inspect
   end
 
   defp filter_recipients(activity, local_user_ids) do
-    deafen = (
-      ActivityPub.Config.get([:boundaries, :deafen])
+    ghost = (
+      ActivityPub.Config.get([:boundaries, :silence])
+      ++
+      ActivityPub.Config.get([:boundaries, :ghost])
       ++
       ActivityPub.Config.get([:boundaries, :block])
       ) |> MRF.subdomains_regex()
-        # |> debug(label: "MRF deafen")
+        # |> dump("MRF filter")
 
     activity
-    |> filter_recipients("to", deafen, local_user_ids)
-    |> filter_recipients("cc", deafen, local_user_ids)
-    |> filter_recipients("bto", deafen, local_user_ids)
-    |> filter_recipients("bcc", deafen, local_user_ids)
-    |> filter_recipients("audience", deafen, local_user_ids)
+    |> filter_recipients("to", ghost, local_user_ids)
+    |> filter_recipients("cc", ghost, local_user_ids)
+    |> filter_recipients("bto", ghost, local_user_ids)
+    |> filter_recipients("bcc", ghost, local_user_ids)
+    |> filter_recipients("audience", ghost, local_user_ids)
   end
 
-  defp filter_recipients(activity, field, deafen, local_user_ids) do
+  defp filter_recipients(activity, field, ghost, local_user_ids) do
     case activity[field] do
       recipients when is_list(recipients) ->
-        Map.put(activity, field, filter_actors(recipients, deafen, local_user_ids))
+        Map.put(activity, field, filter_actors(recipients, ghost, local_user_ids))
       recipient when is_binary(recipient) ->
-        Map.put(activity, field, filter_actors([recipient], deafen, local_user_ids))
+        Map.put(activity, field, filter_actors([recipient], ghost, local_user_ids))
       _ -> activity
     end
   end
 
-  defp filter_actors(actors, deafen, local_user_ids) do
-    Enum.reject(actors || [], &filter_actor(&1, deafen, local_user_ids))
+  defp filter_actors(actors, ghost, local_user_ids) do
+    Enum.reject(actors || [], &filter_actor(&1, ghost, local_user_ids))
   end
-  defp filter_actor(%{ap_id: actor}, deafen, local_user_ids) when is_binary(actor) do
-    filter_actor(actor, deafen, local_user_ids)
+  defp filter_actor(%{ap_id: actor}, ghost, local_user_ids) when is_binary(actor) do
+    filter_actor(actor, ghost, local_user_ids)
   end
-  defp filter_actor(%{"id" => actor}, deafen, local_user_ids) when is_binary(actor) do
-    filter_actor(actor, deafen, local_user_ids)
+  defp filter_actor(%{"id" => actor}, ghost, local_user_ids) when is_binary(actor) do
+    filter_actor(actor, ghost, local_user_ids)
   end
-  defp filter_actor(actor, deafen, local_user_ids) when is_binary(actor) do
+  defp filter_actor(actor, ghost, local_user_ids) when is_binary(actor) do
     actor_uri = URI.parse(actor)
     clean_actor_uri = "#{actor_uri.host}#{actor_uri.path}"
-    MRF.subdomain_match?(deafen, actor_uri.host) # instance blocked in config
-    || MRF.subdomain_match?(deafen, clean_actor_uri) # actor blocked in config
-    || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri, user_ids: local_user_ids) # actor or instance blocked in DB, either instance-wide or by specified local_user_ids
+    MRF.subdomain_match?(ghost, actor_uri.host) # instance blocked in config
+    || MRF.subdomain_match?(ghost, clean_actor_uri) # actor blocked in config
+  #  || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri, :any, :instance_wide) # TEMP: will be included when we do per-iser
+    || Bonfire.Federate.ActivityPub.Actors.is_blocked?(actor_uri, :any, user_ids: local_user_ids) # actor or instance blocked in DB, either instance-wide or by specified local_user_ids
   end
 
   def all_actors(activity) do
