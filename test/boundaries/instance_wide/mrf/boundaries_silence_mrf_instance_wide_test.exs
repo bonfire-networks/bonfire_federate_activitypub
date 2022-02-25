@@ -39,18 +39,18 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
     end
 
     test "there's a remote activity with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
       # |> debug
-      |> Bonfire.Boundaries.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.block(:silence, :instance_wide)
       # |> debug
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
     end
 
     test "there's a remote activity with instance-wide silenced wildcard domain" do
@@ -58,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
     end
 
     test "there's a remote actor with instance-wide silenced host (in config)" do
@@ -66,16 +66,16 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
     end
 
     test "there's a remote actor with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      |> Bonfire.Boundaries.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.block(:silence, :instance_wide)
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
     end
 
     test "there's a remote actor with instance-wide silenced host" do
@@ -83,7 +83,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
     end
 
     test "there's a remote actor with instance-wide silenced wildcard domain" do
@@ -91,7 +91,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
     end
 
     test "there's a remote actor with instance-wide silenced actor (in config)" do
@@ -99,7 +99,50 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor) == {:reject, nil}
+      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+    end
+  end
+
+
+
+  describe "reject when" do
+
+    test "I try to follow someone on an instance-wide silenced instance" do
+      local_user = fake_user!()
+      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+
+      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
+
+      remote_user
+      |> e(:character, :peered, :peer_id, nil)
+      # |> debug
+      |> Bonfire.Boundaries.block(:silence, :instance_wide)
+
+       refute match? {:ok, follow_activity}, ActivityPub.follow(local_actor, remote_actor, nil, true)
+      # assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+      refute Bonfire.Social.Follows.following?(local_user, remote_user)
+    end
+  end
+
+
+  describe "accept when" do
+
+    test "someone from an instance-wide silenced instance attempts to follow" do
+      local_user = fake_user!()
+      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+
+      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
+
+      remote_user
+      |> e(:character, :peered, :peer_id, nil)
+      # |> debug
+      |> Bonfire.Boundaries.block(:silence, :instance_wide)
+
+      assert {:ok, follow_activity} = ActivityPub.follow(remote_actor, local_actor, nil, false)
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+      assert Bonfire.Social.Follows.following?(remote_user, local_user)
     end
   end
 
@@ -110,7 +153,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity) == {:ok, remote_activity}
+      assert BoundariesMRF.filter(remote_activity, false) == {:ok, remote_activity}
     end
 
     test "there's no matching remote activity" do
@@ -118,7 +161,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity) == {:ok, remote_activity}
+      assert BoundariesMRF.filter(remote_activity, false) == {:ok, remote_activity}
     end
 
     test "there's no matching remote actor" do
@@ -126,27 +169,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor) == {:ok, remote_actor}
-    end
-  end
-
-  describe "accept when" do
-
-    test "someone from an instance-wide silenced instance attempts to follow" do
-      followed = fake_user!()
-      {:ok, followed_actor} = ActivityPub.Adapter.get_actor_by_id(followed.id)
-
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-      {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
-
-      remote_user
-      |> e(:character, :peered, :peer_id, nil)
-      # |> debug
-      |> Bonfire.Boundaries.block(:silence, :instance_wide)
-
-      assert {:ok, follow_activity} = ActivityPub.follow(remote_actor, followed_actor)
-      assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
-      assert Bonfire.Social.Follows.following?(remote_user, followed)
+      assert BoundariesMRF.filter(remote_actor, false) == {:ok, remote_actor}
     end
   end
 
@@ -157,30 +180,30 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       Config.put([:boundaries, :silence], ["kawen.space"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity) == {:ok, local_activity}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      |> Bonfire.Boundaries.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.block(:silence, :instance_wide)
 
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity) == {:ok, local_activity}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced wildcard domain as recipient" do
       Config.put([:boundaries, :silence], ["*kawen.space"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity) == {:ok, local_activity}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced actor as recipient (in config)" do
       Config.put([:boundaries, :silence], ["kawen.space/users/karen"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity) == {:ok, local_activity}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced actor as recipient (in DB)" do
@@ -190,14 +213,14 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity) == {:ok, local_activity}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced domain as recipient" do
       Config.put([:boundaries, :silence], ["kawen.space"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity) == {:ok, local_activity}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
     end
   end
 
@@ -208,19 +231,19 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       Config.put([:boundaries, :silence], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/" <> @local_actor, "to" => [@remote_actor, @public_uri]}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok,
+        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
     test "there's a local activity with instance-wide silenced host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      |> Bonfire.Boundaries.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.block(:silence, :instance_wide)
 
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/" <> @local_actor, "to" => [@remote_actor, @public_uri]}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok,
+        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
@@ -228,8 +251,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       Config.put([:boundaries, :silence], ["*kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/" <> @local_actor, "to" => [@remote_actor, @public_uri]},
+      assert BoundariesMRF.filter(local_activity, true) == {:ok,
+        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]},
       }
     end
 
@@ -237,8 +260,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       Config.put([:boundaries, :silence], ["kawen.space/users/karen"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/" <> @local_actor, "to" => [@remote_actor, @public_uri]}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok,
+        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
@@ -249,8 +272,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/" <> @local_actor, "to" => [@remote_actor, @public_uri]}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok,
+        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
@@ -258,8 +281,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       Config.put([:boundaries, :silence], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity) == {:ok,
-        %{"actor" => "http://localhost:4000/pub/actors/" <> @local_actor, "to" => [@remote_actor, @public_uri]}
+      assert BoundariesMRF.filter(local_activity, true) == {:ok,
+        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
   end

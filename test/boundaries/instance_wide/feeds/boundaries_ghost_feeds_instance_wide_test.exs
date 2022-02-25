@@ -7,6 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
 
   @remote_actor "https://kawen.space/users/karen"
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
+  @local_actor "alice"
 
   setup do
     orig = Config.get!(:boundaries)
@@ -29,8 +30,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
   end
 
 
-  test "creates a Post for an incoming Note with no ghosting" do
-    recipient = fake_user!()
+  test "show in feeds a Post for an incoming Note with no ghosting" do
+    recipient = fake_user!(@local_actor)
     receive_remote_activity_to(recipient)
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
@@ -38,28 +39,28 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
     assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
   end
 
-  test "creates a Post for an incoming Note with ghosted instance" do
+  test "show in feeds a Post for an incoming Note with ghosted instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      |> Bonfire.Boundaries.block(:ghost, :instance_wide)
+      ~> Bonfire.Boundaries.block(:ghost, :instance_wide)
 
-    recipient = fake_user!()
+    recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient, @public_uri])
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
   end
 
-  test "creates a Post for an incoming Note with ghosted actor" do
+  test "show in feeds a Post for an incoming Note with ghosted actor" do
     {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
     Bonfire.Boundaries.block(user, :ghost, :instance_wide)
 
-    recipient = fake_user!()
+    recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient, @public_uri])
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
   end
 
 end

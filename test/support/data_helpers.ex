@@ -10,15 +10,20 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   def local_activity_json_to(to \\ @remote_actor)
   def local_activity_json_to(to) when is_list(to) do
     local_user = fake_user!(@local_actor)
-    {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
-
-    %{
-      "actor" => local_actor.ap_id,
-      "to" => to
-    }
+    local_activity_json(local_user, to)
   end
   def local_activity_json_to(to) do
     local_activity_json_to([to])
+  end
+
+  def local_activity_json(local_user, to) do
+    {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+
+    %{
+      actor: local_actor.ap_id,
+      to: to,
+      # local: true
+    }
   end
 
   def activity_json(actor) do
@@ -27,13 +32,6 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
 
   def remote_activity_json() do
     activity_json(@remote_actor)
-  end
-
-  def remote_actor_json(actor \\ @remote_actor) do
-    %{
-      "id" => actor,
-      "type" => "Person"
-    }
   end
 
   def remote_activity_json(actor, to) do
@@ -48,21 +46,25 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
       actor: actor,
       context: context,
       object: object,
-      to: to
+      to: to,
+      local: false
     }
   end
 
-  def remote_activity_json_to(to \\ nil) do
+  def local_actor_ids(to) when is_list(to), do: Enum.map(to, &local_actor_ids/1)
+  def local_actor_ids(nil), do: fake_user!(@local_actor) |> local_actor_ids()
+  def local_actor_ids(%Bonfire.Data.Identity.User{id: id}), do: ActivityPub.Adapter.get_actor_by_id(id) ~> local_actor_ids()
+  def local_actor_ids(%{ap_id: ap_id}), do: ap_id
+  def local_actor_ids(ap_id) when is_binary(ap_id), do: ap_id
+
+  def remote_activity_json_to(to \\ nil)
+  def remote_activity_json_to(to) do
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
-    to = to || (
-      local_user = fake_user!(@local_user)
-      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
-      local_actor.ap_id
-    )
-
-    remote_activity_json(actor, to)
+    local_actor_ids(to)
+    |> dump("local_actor_ids")
+    |> remote_activity_json(actor.ap_id, ...)
   end
 
   def receive_remote_activity_to(to) when not is_list(to), do: receive_remote_activity_to([to])
@@ -82,6 +84,13 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   end
   defp recipient(actor) do
     actor
+  end
+
+  def remote_actor_json(actor \\ @remote_actor) do
+    %{
+      "id" => actor,
+      "type" => "Person"
+    }
   end
 
   def remote_actor_user(actor_uri \\ @remote_actor) do

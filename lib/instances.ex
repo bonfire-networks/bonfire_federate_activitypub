@@ -29,6 +29,8 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     )
   end
 
+  def get_or_create("https://www.w3.org/ns/activitystreams#Public"), do: nil
+
   def get_or_create(canonical_uri) when is_binary(canonical_uri) do
     uri = URI.parse(canonical_uri)
     instance_url = "#{uri.scheme}://#{uri.host}"

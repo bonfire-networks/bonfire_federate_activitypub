@@ -55,7 +55,7 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
         {:ok, peered}
 
       _ ->
-        with  {:ok, peer} =  Instances.get_or_create(canonical_uri) do
+        with {:ok, peer} <- Instances.get_or_create(canonical_uri) do
           if id,
             do: create(id, peer, canonical_uri),
             else: {:ok, peer}
