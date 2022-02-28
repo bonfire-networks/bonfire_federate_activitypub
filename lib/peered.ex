@@ -1,6 +1,6 @@
-defmodule Bonfire.Federate.ActivityPub.Actors do
+defmodule Bonfire.Federate.ActivityPub.Peered do
   @moduledoc """
-  Federated actors
+  Federated actors or objects
   Context for `Bonfire.Data.ActivityPub.Peered`
   """
   use Arrows
@@ -50,15 +50,21 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
   end
 
   def get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
+    if !String.starts_with?(canonical_uri, Bonfire.Common.URIs.base_url()) do # only create Peer for remote instances
+      do_get_or_create(canonical_uri, id)
+    end
+  end
+
+  defp do_get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
     case get(canonical_uri) do
-      {:ok, peered} ->
+      {:ok, peered} -> # found an existing Actor or other Peered object
         {:ok, peered}
 
       _ ->
-        with {:ok, peer} <- Instances.get_or_create(canonical_uri) do
+        with {:ok, peer} <- Instances.get_or_create(canonical_uri) do # first we need an instance / Peer
           if id,
-            do: create(id, peer, canonical_uri),
-            else: {:ok, peer}
+            do: create(id, peer, canonical_uri), # create a Peered linked to the ID of the User or Object
+            else: {:ok, peer} # just return the instance
         end
     end
   end
@@ -78,10 +84,11 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
 
   def is_blocked?(%Peered{} = peered, block_type, opts) do
     peered = peered |> repo().maybe_preload(:peer) #|> debug
+    peer = Map.get(peered, :peer)
     # check if either of instance or actor is blocked
-    Instances.is_blocked?(Map.get(peered, :peer), block_type, opts)
+    Instances.is_blocked?(peer, block_type, opts) |> dump("firstly, instance blocked? #{inspect peer}")
       ||
-    Bonfire.Boundaries.is_blocked?(peered, block_type, opts)
+    Bonfire.Boundaries.is_blocked?(peered, block_type, opts) |> dump("actor blocked? #{inspect peered}")
   end
 
   def is_blocked?(uri, block_type, opts) when is_binary(uri) do
@@ -95,7 +102,7 @@ defmodule Bonfire.Federate.ActivityPub.Actors do
   end
 
   def is_blocked?(%Peer{} = peer, block_type, opts) do # fallback to just check the instance if that's all we have
-    Instances.is_blocked?(peer, block_type, opts)
+    Instances.is_blocked?(peer, block_type, opts) |> dump("instance blocked? #{inspect peer}")
   end
 
 

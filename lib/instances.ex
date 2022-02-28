@@ -12,7 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     uri = URI.parse(canonical_uri)
     instance_url = "#{uri.scheme}://#{uri.host}"
 
-    repo().single(peer_url_query(instance_url))
+    do_get(instance_url)
   end
 
   defp do_get(instance_url) do
@@ -30,8 +30,19 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   def get_or_create("https://www.w3.org/ns/activitystreams#Public"), do: nil
-
+  def get_or_create(%{ap_id: canonical_uri}) do
+    get_or_create(canonical_uri)
+  end
+  def get_or_create(%{"id"=> canonical_uri}) do
+    get_or_create(canonical_uri)
+  end
   def get_or_create(canonical_uri) when is_binary(canonical_uri) do
+    if !String.starts_with?(canonical_uri, Bonfire.Common.URIs.base_url()) do # only create Peer for remote instances
+      do_get_or_create(canonical_uri)
+    end
+  end
+
+  defp do_get_or_create(canonical_uri) when is_binary(canonical_uri) do
     uri = URI.parse(canonical_uri)
     instance_url = "#{uri.scheme}://#{uri.host}"
 
@@ -42,10 +53,6 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
       _ ->
         create(%{ap_base_uri: instance_url, display_hostname: uri.host})
     end
-  end
-
-  def get_or_create(%{ap_id: canonical_uri}) do
-    get_or_create(canonical_uri)
   end
 
   def is_blocked?(peered, block_type \\ :any, opts \\ [])

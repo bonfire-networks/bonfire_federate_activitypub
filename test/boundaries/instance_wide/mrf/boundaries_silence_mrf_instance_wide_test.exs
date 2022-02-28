@@ -16,8 +16,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
     Config.put(:boundaries,
       block: [],
-      ghost: [],
-      silence: []
+      ghost_them: [],
+      silence_them: []
     )
 
     # TODO: move this into fixtures
@@ -35,7 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
   describe "block incoming federation when" do
 
     test "there's a remote activity with instance-wide silenced host (in config)" do
-      Config.put([:boundaries, :silence], ["kawen.space"])
+      Config.put([:boundaries, :silence_them], ["kawen.space"])
 
       remote_activity = remote_activity_json()
 
@@ -54,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a remote activity with instance-wide silenced wildcard domain" do
-      Config.put([:boundaries, :silence], ["*kawen.space"])
+      Config.put([:boundaries, :silence_them], ["*kawen.space"])
 
       remote_activity = remote_activity_json()
 
@@ -62,7 +62,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a remote actor with instance-wide silenced host (in config)" do
-      Config.put([:boundaries, :silence], ["kawen.space"])
+      Config.put([:boundaries, :silence_them], ["kawen.space"])
 
       remote_actor = remote_actor_json()
 
@@ -79,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a remote actor with instance-wide silenced host" do
-      Config.put([:boundaries, :silence], ["kawen.space"])
+      Config.put([:boundaries, :silence_them], ["kawen.space"])
 
       remote_actor = remote_actor_json()
 
@@ -87,7 +87,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a remote actor with instance-wide silenced wildcard domain" do
-      Config.put([:boundaries, :silence], ["*kawen.space"])
+      Config.put([:boundaries, :silence_them], ["*kawen.space"])
 
       remote_actor = remote_actor_json()
 
@@ -95,7 +95,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a remote actor with instance-wide silenced actor (in config)" do
-      Config.put([:boundaries, :silence], ["kawen.space/users/karen"])
+      Config.put([:boundaries, :silence_them], ["kawen.space/users/karen"])
 
       remote_actor = remote_actor_json()
 
@@ -149,7 +149,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
   describe "accept incoming federation when" do
     test "there's no silencing (in config)" do
-      Config.put([:boundaries, :silence], [])
+      Config.put([:boundaries, :silence_them], [])
 
       remote_activity = remote_activity_json()
 
@@ -157,7 +157,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's no matching remote activity" do
-      Config.put([:boundaries, :silence], ["non.matching.remote"])
+      Config.put([:boundaries, :silence_them], ["non.matching.remote"])
 
       remote_activity = remote_activity_json()
 
@@ -165,7 +165,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's no matching remote actor" do
-      Config.put([:boundaries, :silence], ["non.matching.remote"])
+      Config.put([:boundaries, :silence_them], ["non.matching.remote"])
 
       remote_actor = remote_actor_json()
 
@@ -177,7 +177,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
   describe "proceed with outgoing federation when" do
 
     test "there's a local activity with instance-wide silenced host as recipient (in config)" do
-      Config.put([:boundaries, :silence], ["kawen.space"])
+      Config.put([:boundaries, :silence_them], ["kawen.space"])
       local_activity = local_activity_json_to(@remote_actor)
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
@@ -193,14 +193,14 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide silenced wildcard domain as recipient" do
-      Config.put([:boundaries, :silence], ["*kawen.space"])
+      Config.put([:boundaries, :silence_them], ["*kawen.space"])
       local_activity = local_activity_json_to(@remote_actor)
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced actor as recipient (in config)" do
-      Config.put([:boundaries, :silence], ["kawen.space/users/karen"])
+      Config.put([:boundaries, :silence_them], ["kawen.space/users/karen"])
       local_activity = local_activity_json_to(@remote_actor)
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
@@ -217,7 +217,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide silenced domain as recipient" do
-      Config.put([:boundaries, :silence], ["kawen.space"])
+      Config.put([:boundaries, :silence_them], ["kawen.space"])
       local_activity = local_activity_json_to(@remote_actor)
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
@@ -228,7 +228,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
   describe "do not filter out outgoing recipients when" do
 
     test "there's a local activity with instance-wide silenced host as recipient (in config)" do
-      Config.put([:boundaries, :silence], ["kawen.space"])
+      Config.put([:boundaries, :silence_them], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
@@ -248,7 +248,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide silenced wildcard domain as recipient" do
-      Config.put([:boundaries, :silence], ["*kawen.space"])
+      Config.put([:boundaries, :silence_them], ["*kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
@@ -257,7 +257,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide silenced actor as recipient (in config)" do
-      Config.put([:boundaries, :silence], ["kawen.space/users/karen"])
+      Config.put([:boundaries, :silence_them], ["kawen.space/users/karen"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
@@ -278,7 +278,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide silenced domain as recipient" do
-      Config.put([:boundaries, :silence], ["kawen.space"])
+      Config.put([:boundaries, :silence_them], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,

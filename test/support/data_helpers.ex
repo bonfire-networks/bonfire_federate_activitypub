@@ -3,7 +3,8 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   import Bonfire.Me.Fake
   alias Bonfire.Federate.ActivityPub.Simulate
 
-  @remote_actor "https://kawen.space/users/karen"
+  @remote_instance "https://kawen.space"
+  @remote_actor @remote_instance<>"/users/karen"
   @local_actor "alice"
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
@@ -38,6 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     context = "blabla"
 
     object = %{
+      "id" => @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
       "content" => "content",
       "type" => "Note"
     }
@@ -47,7 +49,10 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
       context: context,
       object: object,
       to: to,
-      local: false
+      local: false,
+      additional: %{
+        "id"=> @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
+      }
     }
   end
 

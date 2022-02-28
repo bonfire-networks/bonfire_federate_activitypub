@@ -16,8 +16,8 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
     Config.put(:boundaries,
       block: [],
-      silence: [],
-      ghost: []
+      silence_them: [],
+      ghost_them: []
     )
 
     # TODO: move this into fixtures

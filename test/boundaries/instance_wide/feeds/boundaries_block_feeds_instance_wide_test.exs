@@ -14,8 +14,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
 
     Config.put(:boundaries,
       block: [],
-      silence: [],
-      ghost: []
+      silence_them: [],
+      ghost_them: []
     )
 
     # TODO: move this into fixtures
