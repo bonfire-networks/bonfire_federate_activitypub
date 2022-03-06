@@ -49,12 +49,15 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     get_or_create(canonical_uri, id)
   end
 
-  def get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
-    if !String.starts_with?(canonical_uri, Bonfire.Common.URIs.base_url()) do # only create Peer for remote instances
+  defp get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
+    base_url = Bonfire.Common.URIs.base_url()
+
+    if not String.starts_with?(canonical_uri, base_url) do # only create Peer for remote instances
       do_get_or_create(canonical_uri, id)
     else
       warn("Skip creating a Peered for local URI: #{canonical_uri}")
-      nil
+      maybe_username = String.replace_leading(canonical_uri, base_url<>"/pub/actors/", "")
+      if not String.contains?(maybe_username, "/"), do: Bonfire.Me.Characters.by_username(maybe_username)
     end
   end
 
@@ -108,5 +111,8 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     Instances.is_blocked?(peer, block_type, opts) |> dump("instance blocked? #{inspect peer}")
   end
 
+  def is_blocked?(%{id: _} = character, block_type, opts) do # fallback to just check the instance if that's all we have
+    Bonfire.Boundaries.is_blocked?(character, block_type, opts) |> dump("character blocked? #{inspect character}")
+  end
 
 end
