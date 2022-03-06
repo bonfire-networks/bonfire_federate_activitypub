@@ -28,6 +28,30 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     assert post.post_content.html_body =~ ap_activity.object.data["content"]
   end
 
+  test "does not publish private Posts with no recipients" do
+    user = fake_user!()
+
+    attrs = %{post_content: %{html_body: "content"}}
+
+    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "mentions")
+
+    assert {:error, _} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => post.id}})
+  end
+
+  test "does not publish private Posts publicly" do
+    user = fake_user!()
+    recipient = fake_user!()
+
+    attrs = %{post_content: %{html_body: "@#{recipient.character.username} content"}}
+
+    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "mentions")
+
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => post.id}})
+    # debug(ap_activity)
+    assert post.post_content.html_body =~ ap_activity.object.data["content"]
+    assert @public_uri not in ap_activity.data["to"]
+  end
+
   test "Reply publishing works (if also @ mentioning the OP)" do
     attrs = %{
       post_content: %{summary: "summary", name: "name", html_body: "<p>epic html message</p>"}
@@ -128,7 +152,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     assert reply.replied.reply_to_id == post.id
   end
 
-  test "does not set public circle for objects missing AP public URI" do
+  test "does not set public circle for remote objects not addressed to AP public URI" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient = fake_user!()
     recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
