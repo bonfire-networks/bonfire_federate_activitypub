@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
+defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
   use Bonfire.Federate.ActivityPub.DataCase
   import Tesla.Mock
   alias ActivityPub.Config
@@ -19,40 +19,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
 
   end
 
-
-  describe "block incoming federation when" do
-
-    test "there's a remote activity from a per-user silenced instance" do
-      local_user = fake_user!(@local_actor)
-
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      # |> debug
-      ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
-      # |> debug
-
-      remote_activity = remote_activity_json_to(local_user)
-
-      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
-    end
-
-  end
-
-  describe "filter incoming recipients when" do
-
-    test "there's a remote activity from a per-user silenced instance" do
-      local_user = fake_user!(@local_actor)
-
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      # |> debug
-      ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
-      # |> debug
-
-      remote_activity = remote_activity_json_to([local_user, @public_uri])
-
-      assert {:ok, %{to: [@public_uri]}} = BoundariesMRF.filter(remote_activity, false)
-    end
-
-  end
 
   describe "reject when" do
 
@@ -99,18 +65,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
 
   describe "proceed with outgoing federation when" do
 
-    test "there's a local activity with per-user silenced host as recipient" do
-      local_user = fake_user!(@local_actor)
-
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
-
-      local_activity = local_activity_json(local_user, [@remote_actor])
-
-      assert BoundariesMRF.filter(local_activity, true) == {:ok, local_activity}
-    end
-
-
     test "there's a local activity with per-user silenced actor as recipient" do
       local_user = fake_user!(@local_actor)
 
@@ -126,19 +80,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
 
 
   describe "do not filter out outgoing recipients when" do
-
-    test "there's a local activity with per-user silenced host as recipient" do
-      local_user = fake_user!(@local_actor)
-
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
-
-      local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
-
-      assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
-      }
-    end
 
     test "there's a local activity with per-user silenced actor as recipient" do
       local_user = fake_user!(@local_actor)
