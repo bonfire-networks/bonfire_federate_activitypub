@@ -1,5 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.Receiver do
   import Where
+  use Arrows
   import Bonfire.Federate.ActivityPub.Utils, only: [log: 1]
   alias Bonfire.Search.Indexer
   alias Bonfire.Common.Utils
@@ -196,13 +197,27 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     when is_atom(module) and not is_nil(module) do
 
     ap_obj_id = object.data["id"]
+    pointer_id =
+      with published when is_binary(published) <- object.data["published"] || activity.data["published"],
+      {:ok, utc_date_published, _} <- DateTime.from_iso8601(published),
+      :lt <- DateTime.compare(utc_date_published, DateTime.now!("Etc/UTC")) do # only if published in the past
+        utc_date_published
+        |> dump()
+        |> DateTime.to_unix()
+        |> dump()
+        |> Pointers.ULID.generate()
+      else _ -> nil
+    end
+
+    Utils.date_from_pointer(pointer_id) |> dump()
+
+    log("AP - handle_activity_with: #{module} to Create #{ap_obj_id} as #{inspect pointer_id}")
     # dump(object)
-    log("AP - handle_activity_with: #{module} to Create #{ap_obj_id}")
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
         module,
         :ap_receive_activity,
-        [character, activity, object],
+        [character, activity, %{object | pointer_id: pointer_id}],
         &error/2
       ),
       {:ok, %Peered{}} <- Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id) do
@@ -212,7 +227,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
       object = ActivityPub.Object.normalize(object)
 
-      if object && (!Utils.e(object, :pointer_id, nil) or Utils.e(object, :pointer_id, nil) !=pointable_object_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
+      if object && (is_nil(object.pointer_id) or object.pointer_id !=pointable_object_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
 
       {:ok, pointable_object}
     else

@@ -41,7 +41,8 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     object = %{
       "id" => @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
       "content" => "content",
-      "type" => "Note"
+      "type" => "Note",
+        "published"=> "2015-02-10T15:00:00Z",
     }
 
     %{
@@ -52,6 +53,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
       local: false,
       additional: %{
         "id"=> @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
+        "published"=> "2015-02-10T15:10:00Z",
       }
     }
   end

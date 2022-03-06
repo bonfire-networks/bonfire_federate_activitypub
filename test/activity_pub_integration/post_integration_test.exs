@@ -116,6 +116,31 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     # debug(feed_entry)
   end
 
+  test "creates a Post for an incoming Note with the Note's published date" do
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    recipient = fake_user!()
+    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+
+    to = [
+      recipient_actor.ap_id,
+      @public_uri
+    ]
+
+    params = remote_activity_json(actor, to)
+
+    {:ok, activity} = ActivityPub.create(params)
+
+    assert actor.data["id"] == activity.data["actor"]
+    assert params.object["content"] == activity.object.data["content"]
+
+    assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert post.post_content.html_body =~ params.object["content"]
+
+    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert DateTime.to_iso8601(date_from_pointer(feed_entry.activity.object_id)) == params.object["published"]
+  end
+
   test "creates a reply for an incoming note with a reply" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient = fake_user!()
