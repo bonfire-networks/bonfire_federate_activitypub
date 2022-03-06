@@ -196,7 +196,8 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     when is_atom(module) and not is_nil(module) do
 
     ap_obj_id = object.data["id"]
-    log("AP - create - handle_activity_with: #{module} for #{ap_obj_id}")
+    # dump(object)
+    log("AP - handle_activity_with: #{module} to Create #{ap_obj_id}")
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
         module,
@@ -211,12 +212,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
       object = ActivityPub.Object.normalize(object)
 
-      if object && !Utils.e(object, :pointer_id, nil), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
+      if object && (!Utils.e(object, :pointer_id, nil) or Utils.e(object, :pointer_id, nil) !=pointable_object_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
 
       {:ok, pointable_object}
     else
       e ->
-        log(inspect e)
+        error(e)
         throw {:error, "AP - could not create activity for #{ap_obj_id}"}
     end
   end

@@ -5,10 +5,14 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
   import Tesla.Mock
 
+  @remote_instance "https://kawen.space"
+  @remote_actor @remote_instance<>"/users/karen"
+  @public_uri "https://www.w3.org/ns/activitystreams#Public"
+
   setup do
     mock(fn
-      %{method: :get, url: "https://kawen.space/users/karen"} ->
-        json(Simulate.actor_json("https://kawen.space/users/karen"))
+      %{method: :get, url: @remote_actor} ->
+        json(Simulate.actor_json(@remote_actor))
     end)
 
     :ok
@@ -29,9 +33,13 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
   test "can receive federated messages" do
     me = fake_user!()
     {:ok, local_actor} = ActivityPub.Actor.get_by_local_id(me.id)
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     context = "blabla"
-    object = %{"content" => "content", "type" => "ChatMessage"}
+    object = %{
+      "id" => @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
+      "content" => "content",
+      "type" => "ChatMessage"
+    }
     to = [local_actor.ap_id]
 
     params = %{

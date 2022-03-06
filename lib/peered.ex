@@ -52,6 +52,9 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   def get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
     if !String.starts_with?(canonical_uri, Bonfire.Common.URIs.base_url()) do # only create Peer for remote instances
       do_get_or_create(canonical_uri, id)
+    else
+      warn("Skip creating a Peered for local URI: #{canonical_uri}")
+      nil
     end
   end
 

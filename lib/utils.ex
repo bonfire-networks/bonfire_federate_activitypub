@@ -3,7 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   use Bonfire.Common.Utils
   alias ActivityPub.Actor
   alias Bonfire.Social.Threads
-
+  require Logger
   import Where
 
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
@@ -12,7 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def log(l) do
     if(Bonfire.Common.Config.get(:log_federation)) do
-      debug(inspect l)
+      Logger.info(inspect l)
     end
   end
 

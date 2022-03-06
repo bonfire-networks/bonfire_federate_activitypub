@@ -255,10 +255,19 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     actors
     |> Enum.map(&id_or_object_id/1)
-    |> filter_empty([])
-    |> Enum.filter(&( String.starts_with?(&1, ap_base_uri)))
     |> Enum.uniq()
-    |> Enum.map(&( ActivityPub.Actor.get_or_fetch_by_ap_id(&1) ~> e(:pointer_id, nil) ))
+    |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
+    # |> dump("before local_actor_ids")
+    |> Enum.map(&maybe_get_or_fetch_by_ap_id/1)
+    |> filter_empty([])
+  end
+
+  defp maybe_get_or_fetch_by_ap_id(ap_id) do
+    with {:ok, %{pointer_id: pointer_id}} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
+      pointer_id
+    else _ ->
+      nil
+    end
   end
 
   defp rejects_regex(block_types) do
