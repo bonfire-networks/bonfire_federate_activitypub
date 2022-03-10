@@ -34,15 +34,18 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_follower_local_ids(actor) do
+    # dump(actor)
     with {:ok, character} <- Characters.by_username(actor.username) do
-      Bonfire.Social.Follows.all_objects_by_subject(character)
+    # dump(character)
+      Bonfire.Social.Follows.all_subjects_by_object(character, skip_boundary_check: true)
+      # |> dump()
       |> Enum.map(& &1.id)
     end
   end
 
   def get_following_local_ids(actor) do
     with {:ok, character} <- Characters.by_username(actor.username) do
-      Bonfire.Social.Follows.all_subjects_by_object(character)
+      Bonfire.Social.Follows.all_objects_by_subject(character, skip_boundary_check: true) # FIXME: privacy
       |> Enum.map(& &1.id)
     end
   end
@@ -96,7 +99,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def update_local_actor(actor, params) do
 
-    with {:ok, character} = APUtils.get_character_by_ap_id(actor) do
+    with {:ok, character} <- APUtils.get_character_by_ap_id(actor) do
       keys = e(params, :keys, nil)
       params = params
       |> Map.put(:character, %{id: character.id, actor: %{signing_key: keys}})

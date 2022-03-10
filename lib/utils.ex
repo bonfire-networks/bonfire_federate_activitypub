@@ -141,15 +141,15 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     end
   end
 
-  def get_character_by_username(%{} = character), do: character
+  def get_character_by_username(%{} = character), do: {:ok, character}
 
   def get_character_by_id(id) when is_binary(id) do
-    with {:error, _e} <- Bonfire.Common.Pointers.get(id, skip_boundary_check: true) do
-      {:error, "not found"}
+    with %{} = user_etc <- Bonfire.Common.Pointers.get(id, skip_boundary_check: true) do
+      {:ok, user_etc}
     end
   end
 
-  def get_character_by_id(%{} = character), do: character
+  def get_character_by_id(%{} = character), do: {:ok, character}
 
   # def get_character_by_ap_id(%{ap_id: id}) do
   #   get_character_by_ap_id(id)
@@ -173,7 +173,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     get_character_by_ap_id(data)
   end
 
-  def get_character_by_ap_id(%{} = character), do: character
+  def get_character_by_ap_id(%{} = character), do: {:ok, character}
 
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
     # FIXME: this should not query the AP db
@@ -192,6 +192,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     with {:ok, character} <- get_character_by_ap_id(ap_id) do
       character
     else
+      %{} = character -> character
       _ -> nil
     end
   end

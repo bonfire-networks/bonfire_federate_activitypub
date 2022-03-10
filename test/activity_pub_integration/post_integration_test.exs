@@ -138,7 +138,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
-    assert date_from_pointer(feed_entry.activity.object_id) |> DateTime.from_unix!() |> DateTime.to_iso8601() == params.object["published"]
+    assert date_from_pointer(feed_entry.activity.object_id) |> dump |> DateTime.to_iso8601() == params.object["published"]
   end
 
   test "creates a reply for an incoming note with a reply" do

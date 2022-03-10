@@ -128,11 +128,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp block_or_filter_recipients(block_types, activity, local_actor_ids) do
     case filter_recipients(block_types, activity, local_actor_ids) do
+      %{"type" => type} when type in ["Update", "Delete", "Flag"] ->
+        debug("accept #{type} with no recipients")
+        {:ok, activity}
       %{to: []} ->
-        dump("reject activity because all actors were filtered")
+        dump("reject activity because all recipients were filtered")
         nil
       %{"to" => []} ->
-        dump("reject activity because all actors were filtered")
+        dump("reject activity because all recipients were filtered")
         nil
       activity ->
         {:ok, activity}
