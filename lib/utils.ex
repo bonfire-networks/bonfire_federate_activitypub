@@ -306,8 +306,11 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
     id = Bonfire.Common.URIs.base_url() <> ap_base_path <> "/actors/#{user_etc.character.username}"
 
-    icon = maybe_create_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
-    image = maybe_create_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
+    # icon = maybe_format_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
+    # image = maybe_format_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
+
+    icon = maybe_format_image_object_from_path(avatar_url(user_etc))
+    image = maybe_format_image_object_from_path(image_url(user_etc))
 
     local = if user_etc.peered, do: false, else: true
 
@@ -318,11 +321,12 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       "outbox" => "#{id}/outbox",
       "followers" => "#{id}/followers",
       "following" => "#{id}/following",
-      "preferredUsername" => user_etc.character.username,
-      "name" => user_etc.profile.name,
-      "summary" => Map.get(user_etc.profile, :summary),
+      "preferredUsername" => e(user_etc, :character, :username, nil),
+      "name" => e(user_etc, :profile, :name, nil),
+      "summary" => e(user_etc, :profile, :summary, nil),
       "icon" => icon,
       "image" => image,
+      "attachment" => maybe_attach_property_value(l("Website"), e(user_etc, :profile, :website, nil)),
       "endpoints" => %{
         "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
       }
@@ -490,14 +494,33 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     }
   end
 
-  def maybe_create_image_object_from_path(nil), do: nil
-
-  def maybe_create_image_object_from_path(url) do
+  def maybe_format_image_object_from_path("http"<>_ = url) do
     %{
       "type" => "Image",
-      "url" => Bonfire.Federate.ActivityPub.Adapter.base_url() <> url
+      "url" => url
     }
   end
+  def maybe_format_image_object_from_path(path) when is_binary(path) do
+    %{
+      "type" => "Image",
+      "url" => Bonfire.Federate.ActivityPub.Adapter.base_url() <> path
+    }
+  end
+  def maybe_format_image_object_from_path(_), do: nil
+
+  def maybe_attach_property_value(name, "http"<>_=url) when is_binary(url) do
+    [
+      %{
+        "name" => name,
+        "type" => "PropertyValue",
+        "value" =>
+          "<a rel=\"me\" href=\"#{url}\">#{url}</a>"
+      }
+    ]
+  end
+  def maybe_attach_property_value(name, url) when is_binary(url), do: maybe_attach_property_value(name, "http://"<>url)
+  def maybe_attach_property_value(_, _), do: nil
+
 
   def maybe_create_icon_object(nil, _actor), do: nil
 

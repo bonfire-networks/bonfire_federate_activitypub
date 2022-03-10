@@ -4,6 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   Context for `Bonfire.Data.ActivityPub.Peer`
   """
   use Arrows
+  import Where
   import Bonfire.Federate.ActivityPub
   import Ecto.Query
   alias Bonfire.Data.ActivityPub.Peer
@@ -50,7 +51,8 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
       {:ok, peer} ->
         {:ok, peer}
 
-      _ ->
+      none ->
+        error(none)
         create(%{ap_base_uri: instance_url, display_hostname: uri.host})
     end
   end

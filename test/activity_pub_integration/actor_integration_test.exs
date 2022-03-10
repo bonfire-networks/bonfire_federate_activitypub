@@ -1,7 +1,9 @@
 defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   use Bonfire.Federate.ActivityPub.ConnCase
   import Tesla.Mock
+  import Where
   alias Bonfire.Federate.ActivityPub.Utils
+  alias Bonfire.Common
 
   @remote_instance "https://kawen.space"
   @actor_name "karen@kawen.space"
@@ -26,7 +28,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     :ok
   end
 
-  test "fetch users from AP API" do
+  test "fetch user from AP API with AP ID" do
     user = fake_user!()
 
     _conn =
@@ -48,6 +50,41 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert conn["publicKey"]
   end
 
+  test "fetch user from AP API with friendly URL and Accept header" do
+    user = fake_user!()
+
+    assert build_conn()
+      |> put_req_header("accept", "application/activity+json")
+      |> get("/@#{user.character.username}")
+      |> redirected_to() =~ "/pub/actors/#{user.character.username}"
+
+    # again with URI encoded to check for a caching bug
+    assert build_conn()
+      |> put_req_header("accept", "application/activity+json")
+      |> get("/%40#{user.character.username}")
+      |> redirected_to() =~ "/pub/actors/#{user.character.username}"
+
+  end
+
+  test "serves user in AP API with profile fields" do
+    user = fake_user!()
+
+    conn =
+      build_conn()
+      |> get("/pub/actors/#{user.character.username}")
+      |> response(200)
+      |> Jason.decode!
+      # |> dump
+
+    assert conn["preferredUsername"] == user.character.username
+    assert conn["name"] == user.profile.name
+    assert conn["summary"] == user.profile.summary
+    assert conn["icon"]["url"] == Common.Utils.avatar_url(user)
+    assert conn["image"]["url"] == Common.Utils.image_url(user)
+    assert List.first(conn["attachment"])["value"] =~ user.profile.website
+    assert conn["publicKey"]
+  end
+
   test "remote actor creation" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     # debug(actor)
@@ -62,7 +99,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "can follow pointers to remote actors" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
-    assert {:ok, _} = Bonfire.Common.Pointers.one(user.id)
+    assert {:ok, _} = Common.Pointers.one(user.id)
   end
 
 

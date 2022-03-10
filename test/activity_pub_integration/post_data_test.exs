@@ -18,15 +18,14 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
   test "Post publishing works" do
     user = fake_user!()
-
     attrs = %{post_content: %{html_body: "content"}}
-
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => post.id}})
     # debug(ap_activity)
     assert post.post_content.html_body =~ ap_activity.object.data["content"]
   end
+
 
   test "does not publish private Posts with no recipients" do
     user = fake_user!()
