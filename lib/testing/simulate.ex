@@ -51,7 +51,23 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
         "Zakladatelka kawen.space, vývojářka Pleromy a MoodleNetu, kočička. Umím mňoukat v pěti jazycích a Super Metroid dohraju tak za hodinu. A dělám dobrý kari. <a class=\"hashtag\" data-tag=\"kawen\" href=\"https://kawen.space/tag/kawen\" rel=\"tag ugc\">#kawen</a>​",
       "tag" => [],
       "type" => "Person",
-      "url" => "https://kawen.space/users/karen"
+      "url" => "https://kawen.space/@karen"
+    }
+  end
+
+  def webfingered() do
+    %{
+      "aliases"=> [
+        "https://kawen.space/users/karen"
+      ],
+      "links"=> [
+        %{
+          "href"=> "https://kawen.space/users/karen",
+          "rel"=> "self",
+          "type"=> "application/activity+json"
+        },
+      ],
+      "subject"=> "acct:karen@kawen.space"
     }
   end
 end

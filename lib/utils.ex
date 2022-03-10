@@ -209,16 +209,18 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   defp get_or_fetch_and_create_by_userame(q) do
-    with {:ok, object} <- ActivityPub.Actor.get_or_fetch_by_username(q) do
-      Bonfire.Common.Pointers.get(object, skip_boundary_check: true)
+    log("AP - get_or_fetch_and_create_by_userame: "<> q)
+    case ActivityPub.Actor.get_or_fetch_by_username(q) do
+     {:ok, %{pointer_id: id}} when is_binary(id) -> Bonfire.Common.Pointers.get(id, skip_boundary_check: true) # TODO: privacy
+     {:ok, actor} -> get_character_by_ap_id(actor)
     end
   end
 
   defp get_or_fetch_and_create(q) when is_binary(q) do
     log("AP - get_or_fetch_and_create: "<> q)
-    with {:ok, object} <- ActivityPub.Fetcher.get_or_fetch_and_create(q) do
-      # IO.inspect(object: object)
-      Bonfire.Common.Pointers.get(object, skip_boundary_check: true) #|> IO.inspect
+    case ActivityPub.Fetcher.get_or_fetch_and_create(q) do
+     {:ok, %{pointer_id: id}} when is_binary(id) -> Bonfire.Common.Pointers.get(id, skip_boundary_check: true) # TODO: privacy
+     {:ok, actor} -> get_character_by_ap_id(actor)
     end
   end
 
