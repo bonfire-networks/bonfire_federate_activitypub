@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
+defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   use Bonfire.Federate.ActivityPub.DataCase
   import Tesla.Mock
   alias Bonfire.Social.Posts

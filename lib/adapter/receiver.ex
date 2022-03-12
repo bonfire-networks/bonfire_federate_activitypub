@@ -9,6 +9,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
   # the following constants are derived from config, so please make any changes/additions there
 
+  @creation_verbs ["Create"]
   @actor_types Bonfire.Common.Config.get([Bonfire.Federate.ActivityPub.Adapter, :actor_types], ["Person", "Group", "Application", "Service", "Organization"])
 
   def receive_activity(activity_id) when is_binary(activity_id) do
@@ -190,16 +191,15 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     receive_activity(%{data: %{"type" => "Create", "actor" => creator}}, object)
   end
 
-  # TODO: figure out when we need to save canonical url/update pointer
-  # This should not be done if the object is local, i. e. local actor
-  # as the object of a follow
-  defp handle_activity_with({:ok, module}, character, %{data: %{"type" => "Create"}} = activity, object)
-    when is_atom(module) and not is_nil(module) do
+  # for creation activities we need to take into account the date, and save canonical url/update pointer
+  # This should not be done if the object is local, i. e. local actor as the object of a follow
+  defp handle_activity_with({:ok, module}, character, %{data: %{"type" => verb}} = activity, object)
+    when is_atom(module) and not is_nil(module) and verb in @creation_verbs do
 
     ap_obj_id = object.data["id"]
     pointer_id =
       with published when is_binary(published) <- object.data["published"] || activity.data["published"],
-      {:ok, utc_date_published, _} <- DateTime.from_iso8601(published),
+      {:ok, utc_date_published, _} <- DateTime.from_iso8601(published) |> dump("date from AP"),
       :lt <- DateTime.compare(utc_date_published, DateTime.now!("Etc/UTC")) do # only if published in the past
         utc_date_published
         |> dump()
@@ -209,7 +209,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       else _ -> nil
     end
 
-    Utils.date_from_pointer(pointer_id) |> dump()
+    Utils.date_from_pointer(pointer_id) |> dump("date from pointer")
 
     log("AP - handle_activity_with: #{module} to Create #{ap_obj_id} as #{inspect pointer_id}")
     # dump(object)
@@ -218,7 +218,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         module,
         :ap_receive_activity,
         [character, activity, %{object | pointer_id: pointer_id}],
-        &error/2
+        &receive_error/2
       ),
       {:ok, %Peered{}} <- Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id) do
 
@@ -245,8 +245,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       module,
       :ap_receive_activity,
       [character, activity, object],
-      &error/2
+      &receive_error/2
     ) do
+
+      activity = ActivityPub.Object.normalize(activity)
+      ActivityPub.Object.update(activity |> dump, %{pointer_id: pointable_object_id})
+
       {:ok, pointable_object}
     end
   end

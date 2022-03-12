@@ -52,7 +52,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
         {:ok, peer}
 
       none ->
-        error(none)
+        error("instance unknown, create it now")
         create(%{ap_base_uri: instance_url, display_hostname: uri.host})
     end
   end

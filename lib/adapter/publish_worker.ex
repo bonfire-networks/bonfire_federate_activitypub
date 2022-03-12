@@ -57,7 +57,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   # end
 
   defp only_local(context, verb, commit_fn) do
-    if Bonfire.Federate.ActivityPub.Utils.check_local(context) do
+    if Bonfire.Federate.ActivityPub.Utils.is_local?(context) do
       commit_fn.(verb, context)
     else
       {:discard, :not_local}

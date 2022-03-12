@@ -136,7 +136,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def maybe_create_remote_actor(actor) do
 
-    case APUtils.get_character_by_ap_id(actor) |> dump do
+    case APUtils.get_character_by_ap_id(actor) do
 
       {:ok, character} ->
         log("AP - remote actor #{actor.ap_id} already exists: #{character.id}")

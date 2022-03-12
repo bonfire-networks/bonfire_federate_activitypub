@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Utils do
   use Bonfire.Common.Utils
+  import Bonfire.Federate.ActivityPub
   alias ActivityPub.Actor
   alias Bonfire.Social.Threads
   require Logger
@@ -20,32 +21,34 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     Bonfire.Federate.ActivityPub.Adapter.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
   end
 
-  def check_local(%{is_local: true}) do
+  def is_local?(%{is_local: true}) do
     # publish if explicitly known to be local
     true
   end
 
-  def check_local(%{character: %{peered: nil}}) do
+  def is_local?(%{character: %{peered: nil}}) do
     # publish local characters
     true
   end
 
-  def check_local(%{peered: nil}) do
+  def is_local?(%{peered: nil}) do
     # publish local characters
     true
   end
 
-  def check_local(%{created: %{peered: nil}}) do
+  def is_local?(%{created: %{peered: nil}}) do
     # publish if author (using created mixin) is local
     true
   end
 
-  def check_local(%{creator: %{peered: nil}}) do
+  def is_local?(%{creator: %{peered: nil}}) do
     # publish if author (in VF) is local
     true
   end
 
-  def check_local(context), do: false
+  def is_local?(id) when is_binary(id), do: Bonfire.Common.Pointers.one(id, skip_boundary_check: true) |> repo().maybe_preload([:peered, character: [:peered], created: [:peered]]) |> is_local?()
+
+  def is_local?(context), do: false
 
   def get_actor_username(%{preferred_username: u}) when is_binary(u),
     do: u
