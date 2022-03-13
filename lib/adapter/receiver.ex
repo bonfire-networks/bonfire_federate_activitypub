@@ -290,6 +290,6 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   def receive_error(error, attrs \\ nil) do
     error(attrs, "ActivityPub - Unable to process incoming federated activity - #{error}")
 
-    {:error, error}
+    {:error, {error, attrs}}
   end
 end
