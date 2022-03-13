@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
   test "show in feeds an incoming Note from a ghosted instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      ~> Bonfire.Boundaries.block(:ghost, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
 
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient, @public_uri])
@@ -54,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
   test "show in feeds an incoming Note with ghosted actor" do
     {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
-    Bonfire.Boundaries.block(user, :ghost, :instance_wide)
+    Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
 
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient, @public_uri])

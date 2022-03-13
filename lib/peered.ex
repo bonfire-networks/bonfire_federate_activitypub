@@ -94,7 +94,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     # check if either of instance or actor is blocked
     Instances.is_blocked?(peer, block_type, opts) |> dump("firstly, instance blocked? #{inspect peer}")
       ||
-    Bonfire.Boundaries.is_blocked?(peered, block_type, opts) |> dump("actor blocked? #{inspect peered}")
+    Bonfire.Boundaries.Blocks.is_blocked?(peered, block_type, opts) |> dump("actor blocked? #{inspect peered}")
   end
 
   def is_blocked?(uri, block_type, opts) when is_binary(uri) do
@@ -112,7 +112,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def is_blocked?(%{id: _} = character, block_type, opts) do # fallback to just check the instance if that's all we have
-    Bonfire.Boundaries.is_blocked?(character, block_type, opts) |> dump("character blocked? #{inspect character}")
+    Bonfire.Boundaries.Blocks.is_blocked?(character, block_type, opts) |> dump("character blocked? #{inspect character}")
   end
 
 end

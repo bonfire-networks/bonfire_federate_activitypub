@@ -27,7 +27,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       local_user = fake_user!(@local_actor)
 
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      ~> Bonfire.Boundaries.block(:ghost, current_user: local_user)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
 
       local_activity = local_activity_json(local_user, @remote_actor)
 
@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       local_user = fake_user!(@local_actor)
 
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      ~> Bonfire.Boundaries.block(:ghost, current_user: local_user)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
 
       local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
 
@@ -62,7 +62,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
       # |> debug
-      ~> Bonfire.Boundaries.block(:ghost, current_user: local_user)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
       # |> debug
 
       remote_activity = remote_activity_json_to([local_user])

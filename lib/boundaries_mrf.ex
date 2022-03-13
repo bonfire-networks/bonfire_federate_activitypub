@@ -40,7 +40,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   end
 
   defp maybe_check_and_filter(check_block_type, is_local?, local_author_ids, local_recipient_ids, activity) do
-    block_types = Boundaries.types_blocked(check_block_type)
+    block_types = Boundaries.Blocks.types_blocked(check_block_type)
 
     cond do
       is_follow?(activity) and :silence == check_block_type and is_local? ->

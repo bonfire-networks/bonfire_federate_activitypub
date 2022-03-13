@@ -77,7 +77,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Boundaries.block(:total, :instance_wide)
+      |> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
 
       refute match? {:ok, follow_activity}, ActivityPub.follow(remote_actor, local_actor, nil, false)
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
@@ -94,7 +94,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Boundaries.block(:total, :instance_wide)
+      |> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
 
       refute match? {:ok, follow_activity}, ActivityPub.follow(local_actor, remote_actor, nil, true)
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
@@ -112,7 +112,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
     test "there's a remote activity with instance-wide blocked host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
       # |> debug
-      ~> Bonfire.Boundaries.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
       # |> debug
 
       remote_activity = remote_activity_json()
@@ -138,7 +138,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
     test "there's a remote actor with instance-wide blocked host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      ~> Bonfire.Boundaries.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
 
       remote_actor = remote_actor_json()
 
@@ -172,7 +172,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
     test "there's a remote actor with instance-wide blocked actor (in DB/boundaries)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.block(user, :total, :instance_wide)
+      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 
       assert BoundariesMRF.filter(remote_actor.data, false) == {:reject, nil}
     end
@@ -191,7 +191,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
     test "there's a local activity with instance-wide blocked host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      ~> Bonfire.Boundaries.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
 
       local_activity = local_activity_json_to(@remote_actor)
 
@@ -215,7 +215,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
     test "there's a local activity with instance-wide blocked actor as recipient (in DB)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.block(user, :total, :instance_wide)
+      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 
       local_activity = local_activity_json_to(@remote_actor)
 
@@ -243,7 +243,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
     test "there's a local activity with instance-wide blocked host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
-      ~> Bonfire.Boundaries.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
 
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
@@ -273,7 +273,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
     test "there's a local activity with instance-wide blocked actor as recipient (in DB)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.block(user, :total, :instance_wide)
+      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 

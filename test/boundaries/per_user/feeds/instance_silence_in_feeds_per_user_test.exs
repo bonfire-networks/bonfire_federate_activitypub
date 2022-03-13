@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
+      ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
     receive_remote_activity_to([local_user, @public_uri])
 
@@ -48,7 +48,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     Bonfire.Social.Follows.follow(local_user, remote_user)
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
-    ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
+    ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
     receive_remote_activity_to([local_user, @public_uri])
 
@@ -60,7 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     local_user = fake_user!(@local_actor)
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
+      ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
     receive_remote_activity_to([local_user, @public_uri])
 
@@ -76,7 +76,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      ~> Bonfire.Boundaries.block(:silence, current_user: local_user)
+      ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, local_user)

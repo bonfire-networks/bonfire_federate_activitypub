@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   def is_blocked?(%Peer{} = peer, block_type, opts) do
-    Bonfire.Boundaries.is_blocked?(peer, block_type, opts)
+    Bonfire.Boundaries.Blocks.is_blocked?(peer, block_type, opts)
   end
 
 end

@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
   test "does not appear in feeds an incoming Note from a silenced instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       |> dump
-      ~> Bonfire.Boundaries.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to(recipient)
@@ -54,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
   test "does not appear in feeds an incoming Note with silenced actor" do
     {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
-    Bonfire.Boundaries.block(user, :silence, :instance_wide)
+    Bonfire.Boundaries.Blocks.block(user, :silence, :instance_wide)
 
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient])
@@ -71,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      ~> Bonfire.Boundaries.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)

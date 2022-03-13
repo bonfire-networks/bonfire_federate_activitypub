@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Boundaries.block(:ghost, current_user: local_user)
+      |> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
 
       refute match? {:ok, local_user}, ActivityPub.follow(remote_actor, local_actor, nil, false)
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
@@ -48,7 +48,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
 
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.block(user, :ghost, current_user: local_user)
+      Bonfire.Boundaries.Blocks.block(user, :ghost, current_user: local_user)
 
       local_activity = local_activity_json(local_user, @remote_actor)
 
@@ -64,7 +64,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
 
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.block(user, :ghost, current_user: local_user)
+      Bonfire.Boundaries.Blocks.block(user, :ghost, current_user: local_user)
 
       local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
 

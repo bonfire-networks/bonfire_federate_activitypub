@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
   test "does not show in feeds a Post for an incoming Note with blocked instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      ~> Bonfire.Boundaries.block(:total, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
 
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient, @public_uri])
@@ -54,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
   test "does not show in feeds a Post for an incoming Note with blocked actor" do
     {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
-    Bonfire.Boundaries.block(user, :total, :instance_wide)
+    Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient, @public_uri])
@@ -71,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
       # |> debug
-      ~> Bonfire.Boundaries.block(:total, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
