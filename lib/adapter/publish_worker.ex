@@ -36,9 +36,11 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
 
   defp do_perform(object, verb) do
     object
+    # preload common assocs needed by publisher
     |> Bonfire.Repo.maybe_preload(character: [:peered])
     |> Bonfire.Repo.maybe_preload(created: [:peered])
     |> Bonfire.Repo.maybe_preload(creator: [:peered])
+    |> Bonfire.Repo.maybe_preload(edge: [:object])
     |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 
