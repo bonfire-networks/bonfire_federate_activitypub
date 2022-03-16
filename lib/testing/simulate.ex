@@ -1,4 +1,9 @@
 defmodule Bonfire.Federate.ActivityPub.Simulate do
+
+  def fake_remote_user(actor_id \\ "https://kawen.space/users/karen") do
+    Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(actor_json(actor_id))
+  end
+
   # import Bonfire.Common.Simulation
   def actor_json("https://kawen.space/users/karen") do
     %{

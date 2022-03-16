@@ -216,6 +216,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     case ActivityPub.Actor.get_or_fetch_by_username(q) do
      {:ok, %{pointer_id: id}} when is_binary(id) -> Bonfire.Common.Pointers.get(id, skip_boundary_check: true) # TODO: privacy
      {:ok, actor} -> get_character_by_ap_id(actor)
+     _ -> nil
     end
   end
 

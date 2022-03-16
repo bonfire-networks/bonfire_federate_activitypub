@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     case APUtils.get_character_by_ap_id(actor) do
 
       {:ok, character} ->
-        log("AP - remote actor #{actor.ap_id} already exists: #{character.id}")
+        log("AP - remote actor #{e(actor, :ap_id, nil) || e(actor, "id", nil)} already exists: #{character.id}")
         {:ok, character} # already exists
 
       {:error, _} -> # new character, create it...
