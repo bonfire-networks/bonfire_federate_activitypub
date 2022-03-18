@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.Receiver do
   import Where
   use Arrows
-  import Bonfire.Federate.ActivityPub.Utils, only: [log: 1]
+  import Bonfire.Federate.ActivityPub.Utils, only: [log: 1, get_or_fetch_and_create_by_uri: 1]
   alias Bonfire.Search.Indexer
   alias Bonfire.Common.Utils
   alias Bonfire.Federate.ActivityPub.Adapter
@@ -13,7 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   @actor_types Bonfire.Common.Config.get([Bonfire.Federate.ActivityPub.Adapter, :actor_types], ["Person", "Group", "Application", "Service", "Organization"])
 
   def receive_activity(activity_id) when is_binary(activity_id) do
-    log("AP - load the activity data")
+    log("AP - load the activity data from ID")
     ActivityPub.Object.get_by_id(activity_id)
     |> receive_activity()
   end
@@ -30,7 +30,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
           }
         } = activity
       ) when is_binary(object_id) do
-    log("AP - load the object data")
+    log("AP - load the object data from ID")
     object = Bonfire.Federate.ActivityPub.Utils.get_object_or_actor_by_ap_id!(object_id)
 
     #IO.inspect(activity: activity)
@@ -212,12 +212,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     Utils.date_from_pointer(pointer_id) |> dump("date from pointer")
 
     log("AP - handle_activity_with: #{module} to Create #{ap_obj_id} as #{inspect pointer_id}")
-    # dump(object)
+    dump(object)
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
         module,
         :ap_receive_activity,
-        [character, activity, %{object | pointer_id: pointer_id}],
+        [character, activity, Map.merge(object, %{pointer_id: pointer_id})],
         &receive_error/2
       ),
       {:ok, %Peered{}} <- Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id) do
@@ -264,26 +264,26 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     {:error, :skip}
   end
 
-  def activity_character(%{"actor" => %{"id" => actor}}) do
-    activity_character(actor)
-  end
 
   def activity_character(%{"actor" => actor}) do
     activity_character(actor)
   end
-
+  def activity_character(%{actor: actor}) do
+    activity_character(actor)
+  end
   def activity_character(%{data: data}) do
     activity_character(data)
   end
-
+  def activity_character(%{"id" => actor}) do
+    activity_character(actor)
+  end
   def activity_character(actor) when is_binary(actor) do
-    log("AP - activity_character for #{actor}")
+    log("AP - get activity_character")
     # FIXME to handle actor types other than Person/User
-    with {:error, :not_found} <- Adapter.character_module("Person").by_ap_id(actor) do
+    with {:error, :not_found} <- get_or_fetch_and_create_by_uri(actor) do
       receive_error("AP - could not find local character for the actor", actor)
     end
   end
-
   def activity_character(actor), do: {:ok, nil}
 
 

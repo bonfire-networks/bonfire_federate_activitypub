@@ -140,45 +140,41 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     with {:ok, character} <- Bonfire.Me.Characters.by_username(username) do
       get_character_by_id(character.id) # FIXME? this results in two more queries
     else e ->
-      {:error, "not found"}
+      {:error, :not_found}
     end
   end
 
   def get_character_by_username(%{} = character), do: {:ok, character}
 
+
   def get_character_by_id(id) when is_binary(id) do
-    with %{} = user_etc <- Bonfire.Common.Pointers.get(id, skip_boundary_check: true) do
+    pointer_id = ulid(id)
+    if pointer_id do
+      with %{} = user_etc <- Bonfire.Common.Pointers.get(pointer_id, skip_boundary_check: true) do
       {:ok, user_etc}
+      end
     end
   end
 
-  def get_character_by_id(%{} = character), do: {:ok, character}
 
-  # def get_character_by_ap_id(%{ap_id: id}) do
-  #   get_character_by_ap_id(id)
+  # def get_character_by_ap_id(%{"preferredUsername" => username}) when is_binary(username) do
+  #   get_character_by_username(username) |> dump("preferredUsername: #{username}")
   # end
 
-  def get_character_by_id(other) do
-    error("get_character_by_id: dunno how to get character for #{inspect other}")
-    {:error, "not found"}
-  end
-
-  def get_character_by_ap_id(%{"id" => id}) do
-    get_character_by_ap_id(id)
-  end
-
-  def get_character_by_ap_id(%{username: username} = _actor)
-      when is_binary(username) do
-    get_character_by_username(username)
+  def get_character_by_ap_id(%{username: username}) when is_binary(username) do
+    get_character_by_username(username) |> dump("username: #{username}")
   end
 
   def get_character_by_ap_id(%{data: data}) do
-    get_character_by_ap_id(data)
+    get_character_by_ap_id(data) |> dump("data")
   end
 
-  def get_character_by_ap_id(%{} = character), do: {:ok, character}
+  def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) do
+    get_character_by_ap_id(ap_id) |> dump("id: #{ap_id}")
+  end
 
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
+    dump("ap_id: #{ap_id}")
     # FIXME: this should not query the AP db
     # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
     with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
@@ -186,10 +182,13 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     end
   end
 
+  def get_character_by_ap_id(%{} = character), do: {:ok, character}
+
   def get_character_by_ap_id(other) do
     error("get_character_by_ap_id: dunno how to get character for #{inspect other}")
-    {:error, "not found"}
+    {:error, :not_found}
   end
+
 
   def get_character_by_ap_id!(ap_id) do
     with {:ok, character} <- get_character_by_ap_id(ap_id) do
@@ -201,30 +200,35 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_by_url_ap_id_or_username("@"<>username), do: get_or_fetch_and_create_by_userame(username)
-  def get_by_url_ap_id_or_username("http:"<>_ = url), do: get_or_fetch_and_create(url)
-  def get_by_url_ap_id_or_username("https:"<>_ = url), do: get_or_fetch_and_create(url)
+  def get_by_url_ap_id_or_username("http:"<>_ = url), do: get_or_fetch_and_create_by_uri(url)
+  def get_by_url_ap_id_or_username("https:"<>_ = url), do: get_or_fetch_and_create_by_uri(url)
   def get_by_url_ap_id_or_username(string) when is_binary(string) do
     if validate_url(string) do
-      get_or_fetch_and_create(string)
+      get_or_fetch_and_create_by_uri(string)
     else
       get_or_fetch_and_create_by_userame(string)
     end
   end
 
-  defp get_or_fetch_and_create_by_userame(q) do
+  defp get_or_fetch_and_create_by_userame(q) when is_binary(q) do
     log("AP - get_or_fetch_and_create_by_userame: "<> q)
-    case ActivityPub.Actor.get_or_fetch_by_username(q) do
-     {:ok, %{pointer_id: id}} when is_binary(id) -> Bonfire.Common.Pointers.get(id, skip_boundary_check: true) # TODO: privacy
-     {:ok, actor} -> get_character_by_ap_id(actor)
-     _ -> nil
-    end
+    ActivityPub.Actor.get_or_fetch_by_username(q) ~> return_character()
   end
 
-  defp get_or_fetch_and_create(q) when is_binary(q) do
-    log("AP - get_or_fetch_and_create: "<> q)
-    case ActivityPub.Fetcher.get_or_fetch_and_create(q) do
-     {:ok, %{pointer_id: id}} when is_binary(id) -> Bonfire.Common.Pointers.get(id, skip_boundary_check: true) # TODO: privacy
-     {:ok, actor} -> get_character_by_ap_id(actor)
+  def get_or_fetch_and_create_by_uri(q) when is_binary(q) do
+    log("AP - get_or_fetch_and_create_by_uri: "<> q)
+    ActivityPub.Fetcher.get_or_fetch_and_create(q) ~> return_character()
+  end
+
+  defp return_character(fetched) do
+    dump(fetched)
+    case fetched do
+     %{pointer_id: id} when is_binary(id) ->
+        id
+        |> dump()
+        |> Bonfire.Common.Pointers.get(skip_boundary_check: true)
+        |> dump # TODO: privacy
+     %{} -> get_character_by_ap_id(fetched) |> dump
     end
   end
 

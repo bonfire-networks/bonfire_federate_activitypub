@@ -31,12 +31,9 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   def get_or_create("https://www.w3.org/ns/activitystreams#Public"), do: nil
-  def get_or_create(%{ap_id: canonical_uri}) do
-    get_or_create(canonical_uri)
-  end
-  def get_or_create(%{"id"=> canonical_uri}) do
-    get_or_create(canonical_uri)
-  end
+  def get_or_create(%{ap_id: canonical_uri}), do: get_or_create(canonical_uri)
+  def get_or_create(%{"id"=> canonical_uri}), do: get_or_create(canonical_uri)
+  def get_or_create(%{data: %{"id"=> canonical_uri}}), do: get_or_create(canonical_uri)
   def get_or_create(canonical_uri) when is_binary(canonical_uri) do
     if !String.starts_with?(canonical_uri, Bonfire.Common.URIs.base_url()) do # only create Peer for remote instances
       do_get_or_create(canonical_uri)

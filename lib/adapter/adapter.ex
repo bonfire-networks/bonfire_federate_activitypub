@@ -134,36 +134,51 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def maybe_create_remote_actor(actor) do
+  def maybe_create_remote_actor(actor) when not is_nil(actor) do
+    log("AP - maybe_create_remote_actor for #{e(actor, :ap_id, nil) || e(actor, "id", nil)}")
 
     case APUtils.get_character_by_ap_id(actor) do
 
       {:ok, character} ->
-        log("AP - remote actor #{e(actor, :ap_id, nil) || e(actor, "id", nil)} already exists: #{character.id}")
+        log("AP - remote actor already exists: #{character.id}")
         {:ok, character} # already exists
 
       {:error, _} -> # new character, create it...
 
-        create_remote_actor(actor)
+        do_create_remote_actor(actor) |> dump
 
     end
   end
 
-  defp create_remote_actor(actor) do
+  defp do_create_remote_actor(%{ap_id: ap_id}) when is_binary(ap_id), do: do_create_remote_actor(ap_id)
+  defp do_create_remote_actor(%{"id"=> ap_id}) when is_binary(ap_id), do: do_create_remote_actor(ap_id)
+  defp do_create_remote_actor(ap_id) when is_binary(ap_id) do
+   case ActivityPub.Object.get_by_ap_id(ap_id) do
+     %ActivityPub.Object{} = actor -> actor
+
+     _ ->
+      ActivityPub.Object.normalize(ap_id)
+      # |> dump(ap_id)
+      # |> e(:data, "id", nil)
+      # |> dump
+      # |> ActivityPub.Object.get_by_ap_id()
+   end
+   |> dump
+   |> do_create_remote_actor()
+  end
+  # defp do_create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_by_pointer_id(pointer_id) |> do_create_remote_actor()
+  defp do_create_remote_actor(%ActivityPub.Object{} = actor) do
     character_module = character_module(actor.data["type"])
 
-    log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
+    log("AP - do_create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
 
-    actor_object = ActivityPub.Object.get_by_ap_id(actor.ap_id)
-
-    icon_url = APUtils.maybe_fix_image_object(actor.data["icon"])
-    image_url = APUtils.maybe_fix_image_object(actor.data["image"])
+    username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
 
     with {:ok, user_etc} <- repo().transact_with(fn ->
-      with  {:ok, peer} =  Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),
+       with {:ok, peer} =  Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),
             {:ok, user_etc} <- maybe_apply(character_module, [:create_remote, :create], %{
               character: %{
-                username: actor.username
+                username: username
               },
               profile: %{
                 name: actor.data["name"],
@@ -171,18 +186,18 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
               },
               peered: %{
                 peer_id: peer.id,
-                canonical_uri: actor.ap_id
+                canonical_uri: actor.data["id"]
               }
             }),
-            {:ok, _object} <- ActivityPub.Object.update(actor_object, %{pointer_id: user_etc.id}) do
+            {:ok, _object} <- ActivityPub.Object.update(actor.id, %{pointer_id: user_etc.id}) |> dump do
         {:ok, user_etc}
       end
     end) do
       # debug(user_etc, "user created")
 
-      # after creating the user, in case of timeouts downloading the images
-      icon_id = APUtils.maybe_create_icon_object(icon_url, user_etc)
-      image_id = APUtils.maybe_create_image_object(image_url, user_etc) |> debug
+      # do this after the transaction, in case of timeouts downloading the images
+      icon_id = APUtils.maybe_create_icon_object(APUtils.maybe_fix_image_object(actor.data["icon"]), user_etc)
+      image_id = APUtils.maybe_create_image_object(APUtils.maybe_fix_image_object(actor.data["image"]), user_etc) #|> debug
 
       with {:ok, updated_user} <- maybe_apply(character_module, [:update_remote, :update],[user_etc, %{"profile" => %{"icon_id" => icon_id, "image_id" => image_id}}]) do
         {:ok, updated_user}
