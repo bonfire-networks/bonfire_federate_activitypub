@@ -31,23 +31,22 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "fetch user from AP API with AP ID" do
     user = fake_user!()
 
-    _conn =
+    # we are trying to check for a cacheing bug, so we do this twice
+    build_conn()
+    |> get("/pub/actors/#{user.character.username}")
+    |> response(200)
+    |> Jason.decode!
+
+    ret =
       build_conn()
       |> get("/pub/actors/#{user.character.username}")
       |> response(200)
       |> Jason.decode!
 
-    # Fetching twice to check for a caching bug
-    conn =
-      build_conn()
-      |> get("/pub/actors/#{user.character.username}")
-      |> response(200)
-      |> Jason.decode!
-
-    assert conn["preferredUsername"] == user.character.username
-    assert conn["name"] == user.profile.name
-    assert conn["summary"] == user.profile.summary
-    assert conn["publicKey"]
+    assert ret["preferredUsername"] == user.character.username
+    assert ret["name"] == user.profile.name
+    assert ret["summary"] == user.profile.summary
+    assert ret["publicKey"]
   end
 
   test "fetch user from AP API with friendly URL and Accept header" do
@@ -119,14 +118,23 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     {:ok, object1} = Utils.get_by_url_ap_id_or_username(@remote_actor_url)
     {:ok, object2} = Utils.get_by_url_ap_id_or_username(@remote_actor)
 
-    assert object1 == object2
+    # assert object1 == object2
+    assert object1.id == object2.id
+    assert object1.character.id == object2.character.id
+    assert object1.profile.id == object2.profile.id
+    assert is_nil(object1.actor)
+    assert is_nil(object2.actor)
   end
 
   test "fetches a same actor by AP ID and friendly URL" do
     {:ok, object1} = Utils.get_by_url_ap_id_or_username(@remote_actor)
     {:ok, object2} = Utils.get_by_url_ap_id_or_username(@remote_actor_url)
 
-    assert object2 == object2
+    assert object1.id == object2.id
+    assert object1.character.id == object2.character.id
+    assert object1.profile.id == object2.profile.id
+    assert is_nil(object1.actor)
+    assert is_nil(object2.actor)
   end
 
   test "fetches a same actor by webfinger, AP ID and friendly URL" do
@@ -136,8 +144,15 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     {:ok, object2} = Utils.get_by_url_ap_id_or_username(@remote_actor)
     {:ok, object3} = Utils.get_by_url_ap_id_or_username(@remote_actor_url)
 
-    assert object1 == object2
-    assert object2 == object3
+    assert object1.id == object2.id
+    assert object1.character.id == object2.character.id
+    assert object1.profile.id == object2.profile.id
+    assert object1.id == object3.id
+    assert object1.character.id == object3.character.id
+    assert object1.profile.id == object3.profile.id
+    assert is_nil(object1.actor)
+    assert is_nil(object2.actor)
+    assert is_nil(object3.actor)
   end
 
   test "fetches a same actor by AP ID and friendly URL and webfinger" do
@@ -147,7 +162,14 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
     {:ok, object3} = Utils.get_by_url_ap_id_or_username(@actor_name)
 
-    assert object1 == object2
-    assert object2 == object3
+    assert object1.id == object2.id
+    assert object1.character.id == object2.character.id
+    assert object1.profile.id == object2.profile.id
+    assert object1.id == object3.id
+    assert object1.character.id == object3.character.id
+    assert object1.profile.id == object3.profile.id
+    assert is_nil(object1.actor)
+    assert is_nil(object2.actor)
+    assert is_nil(object3.actor)
   end
 end

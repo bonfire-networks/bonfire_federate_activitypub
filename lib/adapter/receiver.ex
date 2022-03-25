@@ -202,9 +202,9 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       {:ok, utc_date_published, _} <- DateTime.from_iso8601(published) |> dump("date from AP"),
       :lt <- DateTime.compare(utc_date_published, DateTime.now!("Etc/UTC")) do # only if published in the past
         utc_date_published
-        |> dump()
-        |> DateTime.to_unix()
-        |> dump()
+        # |> dump("utc_date_published")
+        |> DateTime.to_unix(:millisecond)
+        # |> dump("to_unix")
         |> Pointers.ULID.generate()
       else _ -> nil
     end

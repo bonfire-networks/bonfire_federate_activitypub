@@ -48,7 +48,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
       # |> debug
 
       remote_activity = remote_activity_json_to([local_user, @public_uri])
-
+      # local_user should have been stripped
       assert {:ok, %{to: [@public_uri]}} = BoundariesMRF.filter(remote_activity, false)
     end
 

@@ -137,7 +137,12 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
-    assert date_from_pointer(feed_entry.activity.object_id) |> dump |> DateTime.to_iso8601() == params.object["published"]
+    date =
+      feed_entry.activity.object_id
+      |> date_from_pointer()
+      |> DateTime.to_iso8601()
+      |> String.replace(".000","") #it has sprouted a milliseconds field and won't print identically
+    assert date == params.object["published"]
   end
 
   test "creates a reply for an incoming note with a reply" do

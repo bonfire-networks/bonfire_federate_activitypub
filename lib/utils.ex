@@ -3,7 +3,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   use Bonfire.Common.Utils
   import Bonfire.Federate.ActivityPub
   alias ActivityPub.Actor
+  alias Bonfire.Data.ActivityPub.Peered
+  alias Bonfire.Me.Users
   alias Bonfire.Social.Threads
+  alias Ecto.Association.NotLoaded
   require Logger
   import Where
 
@@ -12,72 +15,52 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def public_uri(), do: @public_uri
 
   def log(l) do
-    if(Bonfire.Common.Config.get(:log_federation)) do
-      Logger.info(inspect l)
-    end
+    if Bonfire.Common.Config.get(:log_federation), do: Logger.info(inspect(l))
   end
 
   def ap_base_url() do
     Bonfire.Federate.ActivityPub.Adapter.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
   end
 
-  def is_local?(%{is_local: true}) do
-    # publish if explicitly known to be local
-    true
+  def is_local?(thing) do
+    if is_binary(thing) do
+      # TODO: This is a *lot* of preloads, presumably for legacy
+      # compatibility. We should definitely be smarter about this and
+      # we should probably update some of that legacy code to deal
+      # with how things have worked out.
+      Bonfire.Common.Pointers.one(thing, skip_boundary_check: true)
+      |> repo().maybe_preload([:peered, character: :peered, created: [:peered, creator: :peered]])
+    else
+      thing
+    end
+    |> case do
+        %{is_local: true} -> true
+        %{peered: %Peered{}} -> false
+        %{character: %{peered: %Peered{}}} -> false
+        %{creator: %{peered: %Peered{}}} -> false
+        %{created: %{peered: %Peered{}}} -> false
+        %{created: %{creator: %{peered: %Peered{}}}} -> false
+        thing when is_map(thing) ->
+          dump(thing, "declaring local")
+          true
+        _ -> false
+    end
   end
 
-  def is_local?(%{character: %{peered: nil}}) do
-    # publish local characters
-    true
-  end
+  def get_actor_username(%{preferred_username: u}) when is_binary(u), do: u
+  def get_actor_username(%{username: u}) when is_binary(u), do: u
+  def get_actor_username(%{character: %NotLoaded{}} = obj),
+    do: get_actor_username(Bonfire.Repo.maybe_preload(obj, :character))
+  def get_actor_username(%{character: c}), do: get_actor_username(c)
+  def get_actor_username(u) when is_binary(u), do: u
+  def get_actor_username(_), do: nil
 
-  def is_local?(%{peered: nil}) do
-    # publish local characters
-    true
-  end
-
-  def is_local?(%{created: %{peered: nil}}) do
-    # publish if author (using created mixin) is local
-    true
-  end
-
-  def is_local?(%{creator: %{peered: nil}}) do
-    # publish if author (in VF) is local
-    true
-  end
-
-  def is_local?(id) when is_binary(id), do: Bonfire.Common.Pointers.one(id, skip_boundary_check: true) |> repo().maybe_preload([:peered, character: [:peered], created: [:peered]]) |> is_local?()
-
-  def is_local?(context), do: false
-
-  def get_actor_username(%{preferred_username: u}) when is_binary(u),
-    do: u
-
-  def get_actor_username(%{username: u}) when is_binary(u),
-    do: u
-
-  def get_actor_username(%{character: %Ecto.Association.NotLoaded{}} = obj) do
-    get_actor_username(Bonfire.Repo.maybe_preload(obj, :character))
-  end
-
-  def get_actor_username(%{character: c}),
-    do: get_actor_username(c)
-
-  def get_actor_username(u) when is_binary(u),
-    do: u
-
-  def get_actor_username(_),
-    do: nil
-
-  def generate_actor_url(u) when is_binary(u) and u != "",
-    do: ap_base_url() <> "/actors/" <> u
+  def generate_actor_url(u) when is_binary(u) and u != "", do: ap_base_url() <> "/actors/" <> u
 
   def generate_actor_url(obj) do
-    with nil <- get_actor_username(obj) do
-      generate_object_ap_id(obj)
-    else
-      username ->
-        generate_actor_url(username)
+    case get_actor_username(obj) do
+      nil -> generate_object_ap_id(obj)
+      username -> generate_actor_url(username)
     end
   end
 
@@ -87,70 +70,35 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   #   get_actor_canonical_url(actor)
   # end
 
-  def get_actor_canonical_url(%{canonical_url: canonical_url}) when not is_nil(canonical_url) do
-    canonical_url
-  end
-
-  def get_actor_canonical_url(%{character: %{canonical_url: canonical_url}})
-      when not is_nil(canonical_url) do
-    canonical_url
-  end
-
-  def get_actor_canonical_url(%{character: %Ecto.Association.NotLoaded{}} = obj) do
+  def get_actor_canonical_url(%{canonical_url: url}) when not is_nil(url), do: url
+  def get_actor_canonical_url(%{character: %{canonical_url: url}}) when not is_nil(url), do: url
+  def get_actor_canonical_url(%{character: %NotLoaded{}} = obj) do
     get_actor_canonical_url(Map.get(Bonfire.Repo.maybe_preload(obj, :character), :character))
   end
-
-  def get_actor_canonical_url(actor) do
-    generate_actor_url(actor)
-  end
+  def get_actor_canonical_url(actor), do: generate_actor_url(actor)
 
   @doc "Generate canonical URL for local object"
-  def generate_object_ap_id(%{id: id}) do
-    generate_object_ap_id(id)
-  end
-
-  def generate_object_ap_id(url = "http://" <> _) do
-    url
-  end
-
-  def generate_object_ap_id(url = "https://" <> _) do
-    url
-  end
-
-  def generate_object_ap_id(id) when is_binary(id) or is_number(id) do
-    "#{ap_base_url()}/objects/#{id}"
-  end
-
-  def generate_object_ap_id(_) do
-    nil
-  end
+  def generate_object_ap_id(%{id: id}), do: generate_object_ap_id(id)
+  def generate_object_ap_id(url = "http://" <> _), do: url
+  def generate_object_ap_id(url = "https://" <> _), do: url
+  def generate_object_ap_id(id) when is_binary(id) or is_number(id), do: "#{ap_base_url()}/objects/#{id}"
+  def generate_object_ap_id(_), do: nil
 
   @doc "Get canonical URL for object"
-  def get_object_canonical_url(%{canonical_url: canonical_url}) when not is_nil(canonical_url) do
-    canonical_url
-  end
+  def get_object_canonical_url(%{canonical_url: url}) when not is_nil(url), do: url
+  def get_object_canonical_url(object), do: generate_object_ap_id(object)
 
-  def get_object_canonical_url(object) do
-    generate_object_ap_id(object)
-  end
-
+  def get_character_by_username(%{} = character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
   def get_character_by_username("@"<>username), do: get_character_by_username(username)
-
   def get_character_by_username(username) when is_binary(username) do
-    with {:ok, character} <- Bonfire.Me.Characters.by_username(username) do
-      get_character_by_id(character.id) # FIXME? this results in two more queries
-    else e ->
-      {:error, :not_found}
-    end
+    Users.by_username(username)
+    ~> get_character_by_username()
   end
 
-  def get_character_by_username(%{} = character), do: {:ok, character}
-
-
-  def get_character_by_id(id) when is_binary(id) do
+  def get_character_by_id(id, opts \\ [skip_boundary_check: true]) when is_binary(id) do
     pointer_id = ulid(id)
     if pointer_id do
-      with %{} = user_etc <- Bonfire.Common.Pointers.get(pointer_id, skip_boundary_check: true) do
+      with %{} = user_etc <- Bonfire.Common.Pointers.get(pointer_id, opts) do
       {:ok, user_etc}
       end
     end
@@ -162,72 +110,77 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   # end
 
   def get_character_by_ap_id(%{username: username}) when is_binary(username) do
-    get_character_by_username(username) |> dump("username: #{username}")
+    get_character_by_username(username)
+    # |> dump("username: #{username}")
   end
-
   def get_character_by_ap_id(%{data: data}) do
-    get_character_by_ap_id(data) |> dump("data")
+    get_character_by_ap_id(data)
+    # |> dump("data")
   end
-
   def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) do
-    get_character_by_ap_id(ap_id) |> dump("id: #{ap_id}")
+    get_character_by_ap_id(ap_id)
+    # |> dump("id: #{ap_id}")
   end
-
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
-    dump("ap_id: #{ap_id}")
+    # dump("ap_id: #{ap_id}")
     # FIXME: this should not query the AP db
     # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
     with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
       get_character_by_ap_id(actor)
     end
   end
-
-  def get_character_by_ap_id(%{} = character), do: {:ok, character}
-
+  def get_character_by_ap_id(%{} = character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
   def get_character_by_ap_id(other) do
     error("get_character_by_ap_id: dunno how to get character for #{inspect other}")
     {:error, :not_found}
   end
 
-
   def get_character_by_ap_id!(ap_id) do
-    with {:ok, character} <- get_character_by_ap_id(ap_id) do
-      character
-    else
-      %{} = character -> character
+    case get_character_by_ap_id(ap_id) do
+      {:ok, character} -> {:ok, character}
+      %{} = character -> {:ok, character}
       _ -> nil
     end
   end
 
-  def get_by_url_ap_id_or_username("@"<>username), do: get_or_fetch_and_create_by_userame(username)
+  def get_by_url_ap_id_or_username("@"<>username), do: get_or_fetch_and_create_by_username(username)
   def get_by_url_ap_id_or_username("http:"<>_ = url), do: get_or_fetch_and_create_by_uri(url)
   def get_by_url_ap_id_or_username("https:"<>_ = url), do: get_or_fetch_and_create_by_uri(url)
   def get_by_url_ap_id_or_username(string) when is_binary(string) do
     if validate_url(string) do
       get_or_fetch_and_create_by_uri(string)
     else
-      get_or_fetch_and_create_by_userame(string)
+      get_or_fetch_and_create_by_username(string)
     end
   end
 
-  defp get_or_fetch_and_create_by_userame(q) when is_binary(q) do
-    log("AP - get_or_fetch_and_create_by_userame: "<> q)
-    ActivityPub.Actor.get_or_fetch_by_username(q) ~> return_character()
+  defp get_or_fetch_and_create_by_username(q) when is_binary(q) do
+    log("AP - get_or_fetch_and_create_by_username: "<> q)
+    ActivityPub.Actor.get_or_fetch_by_username(q)
+    ~> return_character()
   end
 
   def get_or_fetch_and_create_by_uri(q) when is_binary(q) do
     log("AP - get_or_fetch_and_create_by_uri: "<> q)
-    ActivityPub.Fetcher.get_or_fetch_and_create(q) ~> return_character()
+    ActivityPub.Fetcher.get_or_fetch_and_create(q)
+    ~> return_character()
   end
 
-  defp return_character(fetched) do
-    dump(fetched)
+  # expects an ActivityPub.Actor. tries to load the associated object:
+  # * if pointer_id is present, use that
+  # * else use the id in the object
+  defp return_character(fetched, opts \\ [skip_boundary_check: true]) do # FIXME: privacy
+    # dump(fetched, "fetched")
     case fetched do
      %{pointer_id: id} when is_binary(id) ->
         id
-        |> dump()
-        |> Bonfire.Common.Pointers.get(skip_boundary_check: true)
-        |> dump # TODO: privacy
+        # |> dump("id")
+        |> Bonfire.Common.Pointers.get(opts)
+        # |> dump("got") 
+        ~> repo().preload([:actor, :character, :profile]) # actor_integration_test
+        |> {:ok, ...}
+        # |>
+     # nope? let's try and find them from their ap id
      %{} -> get_character_by_ap_id(fetched) |> dump
     end
   end

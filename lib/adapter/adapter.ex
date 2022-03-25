@@ -98,7 +98,6 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-
     with {:ok, character} <- APUtils.get_character_by_ap_id(actor) do
       keys = e(params, :keys, nil)
       params = params
