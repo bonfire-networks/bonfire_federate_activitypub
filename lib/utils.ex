@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Utils do
   use Bonfire.Common.Utils
+  alias Bonfire.Common.URIs
   import Bonfire.Federate.ActivityPub
   alias ActivityPub.Actor
   alias Bonfire.Data.ActivityPub.Peered
@@ -24,15 +25,15 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def is_local?(thing) do
     if is_binary(thing) do
-      # TODO: This is a *lot* of preloads, presumably for legacy
-      # compatibility. We should definitely be smarter about this and
-      # we should probably update some of that legacy code to deal
-      # with how things have worked out.
       Bonfire.Common.Pointers.one(thing, skip_boundary_check: true)
-      |> repo().maybe_preload([:peered, character: :peered, created: [:peered, creator: :peered]])
     else
       thing
     end
+    # NOTE: trying preloads seperately so the whole thing doesn't fail if a field doesn't exists on the thing (TODO: pattern matching for schema could avoid this)
+    |> repo().maybe_preload(:peered)
+    |> repo().maybe_preload(character: :peered)
+    |> repo().maybe_preload(creator: :peered)
+    |> repo().maybe_preload(created: [:peered, creator: :peered])
     |> case do
         %{is_local: true} -> true
         %{peered: %Peered{}} -> false
@@ -41,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
         %{created: %{peered: %Peered{}}} -> false
         %{created: %{creator: %{peered: %Peered{}}}} -> false
         thing when is_map(thing) ->
-          dump(thing, "declaring local")
+          # dump(thing, "declaring local")
           true
         _ -> false
     end
@@ -54,39 +55,6 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_actor_username(%{character: c}), do: get_actor_username(c)
   def get_actor_username(u) when is_binary(u), do: u
   def get_actor_username(_), do: nil
-
-  def generate_actor_url(u) when is_binary(u) and u != "", do: ap_base_url() <> "/actors/" <> u
-
-  def generate_actor_url(obj) do
-    case get_actor_username(obj) do
-      nil -> generate_object_ap_id(obj)
-      username -> generate_actor_url(username)
-    end
-  end
-
-  @doc "Get canonical URL if set, or generate one"
-
-  # def get_actor_canonical_url(%{actor: actor}) do
-  #   get_actor_canonical_url(actor)
-  # end
-
-  def get_actor_canonical_url(%{canonical_url: url}) when not is_nil(url), do: url
-  def get_actor_canonical_url(%{character: %{canonical_url: url}}) when not is_nil(url), do: url
-  def get_actor_canonical_url(%{character: %NotLoaded{}} = obj) do
-    get_actor_canonical_url(Map.get(Bonfire.Repo.maybe_preload(obj, :character), :character))
-  end
-  def get_actor_canonical_url(actor), do: generate_actor_url(actor)
-
-  @doc "Generate canonical URL for local object"
-  def generate_object_ap_id(%{id: id}), do: generate_object_ap_id(id)
-  def generate_object_ap_id(url = "http://" <> _), do: url
-  def generate_object_ap_id(url = "https://" <> _), do: url
-  def generate_object_ap_id(id) when is_binary(id) or is_number(id), do: "#{ap_base_url()}/objects/#{id}"
-  def generate_object_ap_id(_), do: nil
-
-  @doc "Get canonical URL for object"
-  def get_object_canonical_url(%{canonical_url: url}) when not is_nil(url), do: url
-  def get_object_canonical_url(object), do: generate_object_ap_id(object)
 
   def get_character_by_username(%{} = character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
   def get_character_by_username("@"<>username), do: get_character_by_username(username)
@@ -176,7 +144,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
         id
         # |> dump("id")
         |> Bonfire.Common.Pointers.get(opts)
-        # |> dump("got") 
+        # |> dump("got")
         ~> repo().preload([:actor, :character, :profile]) # actor_integration_test
         |> {:ok, ...}
         # |>
