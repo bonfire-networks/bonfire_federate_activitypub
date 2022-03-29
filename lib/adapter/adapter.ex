@@ -37,7 +37,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # dump(actor)
     with {:ok, character} <- Characters.by_username(actor.username) do
     # dump(character)
-      Bonfire.Social.Follows.all_subjects_by_object(character, skip_boundary_check: true)
+      Bonfire.Social.Follows.all_subjects_by_object(character)
       # |> dump()
       |> Enum.map(& &1.id)
     end
@@ -45,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_following_local_ids(actor) do
     with {:ok, character} <- Characters.by_username(actor.username) do
-      Bonfire.Social.Follows.all_objects_by_subject(character, skip_boundary_check: true) # FIXME: privacy
+      Bonfire.Social.Follows.all_objects_by_subject(character)
       |> Enum.map(& &1.id)
     end
   end
