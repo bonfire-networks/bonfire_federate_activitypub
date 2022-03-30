@@ -144,7 +144,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
       {:error, _} -> # new character, create it...
 
-        do_create_remote_actor(actor) |> dump
+        do_create_remote_actor(actor)
+        #|> dump
 
     end
   end
