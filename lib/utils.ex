@@ -145,11 +145,11 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
         # |> dump("id")
         |> Bonfire.Common.Pointers.get(opts)
         # |> dump("got")
-        ~> repo().preload([:actor, :character, :profile]) # actor_integration_test
+        ~> repo().maybe_preload([:actor, :character, :profile]) # actor_integration_test
         |> {:ok, ...}
         # |>
      # nope? let's try and find them from their ap id
-     %{} -> get_character_by_ap_id(fetched) |> dump
+     %{} -> get_character_by_ap_id(fetched) #|> dump
     end
   end
 
