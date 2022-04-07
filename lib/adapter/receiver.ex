@@ -232,7 +232,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       {:ok, pointable_object}
     else
       e ->
-        error(e)
+        error(Utils.error_msg(e))
         throw {:error, "AP - could not create activity for #{ap_obj_id}"}
     end
   end
