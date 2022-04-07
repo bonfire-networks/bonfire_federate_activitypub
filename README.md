@@ -5,9 +5,9 @@ An extension for [Bonfire](https://bonfire.cafe/) that handles:
 - Extensible/configurable tools for translating Bonfire data to/from ActivityStreams
 - Bonfire Adapter for the [ActivityPub federation library ](https://github.com/bonfire-networks/activity_pub)
 
-## Usage
+## Testing
 
-If you want to use the map LiveView component, you will need to `npm add leaflet --save --prefix assets/` in your app, and import
+There are unit tests both in this repo, and in the activity_pub lib, but they can't cover every possible federation case, so manual testing with e.g. `curl -H "Accept: application/activity+json" -v "http://localhost:4000/pub/actors/my_username" | jq '.'` and by trying out federation flows between instances of Bonfire and other ActivityPub implementation is a must. 
 
 ## Handy commands
 
