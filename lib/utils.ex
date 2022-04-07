@@ -258,7 +258,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       "attachment" => [
         maybe_attach_property_value(:website, e(user_etc, :profile, :website, nil)),
         maybe_attach_property_value(l("Location"), e(user_etc, :profile, :location, nil))
-      ],
+      ] |> filter_empty([]),
       "endpoints" => %{
         "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
       }
