@@ -112,7 +112,6 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     with data = actor_object.data,
          {:ok, character} <-
            APUtils.get_character_by_id(actor_object.pointer_id) do
-      # FIXME - support other types
       params = %{
         name: data["name"],
         summary: data["summary"],
@@ -128,9 +127,21 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
           )
       }
 
+      # FIXME - support other types
       Bonfire.Me.Users.update_remote(character, params)
       :ok
     end
+  end
+
+  @doc """
+  For updating an Actor in cache after a User/etc is updated
+  """
+  def update_local_actor_cache(character) do
+    with %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
+      ActivityPub.Actor.set_cache(actor)
+    end
+
+    {:ok, character}
   end
 
   def maybe_create_remote_actor(actor) when not is_nil(actor) do

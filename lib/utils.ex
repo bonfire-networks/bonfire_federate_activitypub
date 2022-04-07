@@ -255,7 +255,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       "summary" => e(user_etc, :profile, :summary, nil),
       "icon" => icon,
       "image" => image,
-      "attachment" => maybe_attach_property_value(l("Website"), e(user_etc, :profile, :website, nil)),
+      "attachment" => [
+        maybe_attach_property_value(:website, e(user_etc, :profile, :website, nil)),
+        maybe_attach_property_value(l("Location"), e(user_etc, :profile, :location, nil))
+      ],
       "endpoints" => %{
         "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
       }
@@ -437,19 +440,18 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
   def maybe_format_image_object_from_path(_), do: nil
 
-  def maybe_attach_property_value(name, "http"<>_=url) when is_binary(url) do
-    [
-      %{
-        "name" => name,
-        "type" => "PropertyValue",
-        "value" =>
-          "<a rel=\"me\" href=\"#{url}\">#{url}</a>"
-      }
-    ]
-  end
-  def maybe_attach_property_value(name, url) when is_binary(url), do: maybe_attach_property_value(name, "http://"<>url)
+  def maybe_attach_property_value(:website, "http"<>_=url) when is_binary(url), do: property_value(l("Website"), "<a rel=\"me\" href=\"#{url}\">#{url}</a>")
+  def maybe_attach_property_value(:website, url) when is_binary(url), do: maybe_attach_property_value(:website, "http://"<>url)
+  def maybe_attach_property_value(key, value) when is_binary(value), do: property_value(to_string(key), value)
   def maybe_attach_property_value(_, _), do: nil
 
+  defp property_value(name, value) do
+    %{
+      "name" => name,
+      "type" => "PropertyValue",
+      "value" => value
+    }
+  end
 
   def maybe_create_icon_object(nil, _actor), do: nil
 
