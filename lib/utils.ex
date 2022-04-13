@@ -90,11 +90,16 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     # |> dump("id: #{ap_id}")
   end
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
-    # dump("ap_id: #{ap_id}")
-    # FIXME: this should not query the AP db
-    # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-    with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
-      get_character_by_ap_id(actor)
+    local_instance = ap_base_url()
+    if !String.starts_with?(ap_id, local_instance) do # only create Peer for remote instances
+      # FIXME: this should not query the AP db
+      # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
+      with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
+        get_character_by_ap_id(actor)
+      end
+    else
+      String.trim_leading(ap_id, local_instance<>"/actors/")
+      |> get_character_by_username()
     end
   end
   def get_character_by_ap_id(%{} = character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
@@ -123,21 +128,35 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   defp get_or_fetch_and_create_by_username(q) when is_binary(q) do
-    log("AP - get_or_fetch_and_create_by_username: "<> q)
-    ActivityPub.Actor.get_or_fetch_by_username(q)
-    ~> return_character()
+    if String.contains?(q, "@") do
+      log("AP - get_or_fetch_by_username: "<> q)
+      ActivityPub.Actor.get_or_fetch_by_username(q)
+      ~> return_character()
+    else
+      log("AP - get_character_by_username: "<> q)
+      get_character_by_username(q)
+    end
   end
 
   def get_or_fetch_and_create_by_uri(q) when is_binary(q) do
-    log("AP - get_or_fetch_and_create_by_uri: "<> q)
-    ActivityPub.Fetcher.get_or_fetch_and_create(q)
-    ~> return_character()
+    # TODO: support objects, not just characters
+    if not String.starts_with?(q, ap_base_url()) do
+      log("AP - uri - get_or_fetch_and_create: "<> q)
+      ActivityPub.Fetcher.get_or_fetch_and_create(q)
+      ~> return_character()
+    else
+      log("AP - uri - get_character_by_ap_id: "<> q)
+      get_character_by_ap_id(q)
+    end
   end
 
   # expects an ActivityPub.Actor. tries to load the associated object:
   # * if pointer_id is present, use that
   # * else use the id in the object
-  defp return_character(fetched, opts \\ [skip_boundary_check: true]) do # FIXME: privacy
+  defp return_character(f, opts \\ [skip_boundary_check: true])
+  defp return_character({:ok, fetched}, opts), do: return_character(fetched, opts)
+
+  defp return_character(fetched, opts) do # FIXME: privacy
     # dump(fetched, "fetched")
     case fetched do
      %{pointer_id: id} when is_binary(id) ->
@@ -183,8 +202,9 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
     log("AP - get_object_or_actor_by_ap_id! : "<> ap_id)
     # FIXME?
-    ActivityPub.Object.get_cached_by_ap_id(ap_id) ||
-      get_or_fetch_actor_by_ap_id!(ap_id) || ap_id
+    ActivityPub.Object.get_cached_by_ap_id(ap_id)
+    || get_or_fetch_actor_by_ap_id!(ap_id)
+    || ap_id
   end
 
   def get_object_or_actor_by_ap_id!(ap_id) do
@@ -358,9 +378,9 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_object(object) do
-    case ActivityPub.Object.get_cached_by_pointer_id(object.id) do
+    case ActivityPub.Object.get_cached_by_pointer_id(ulid(object)) do
       nil ->
-        case ActivityPub.Actor.get_cached_by_local_id(object.id) do
+        case ActivityPub.Actor.get_cached_by_local_id(e(object, :id, nil)) do
           {:ok, actor} -> actor
           {:error, e} -> {:error, e}
         end

@@ -150,14 +150,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     case APUtils.get_character_by_ap_id(actor) do
 
       {:ok, character} ->
-        log("AP - remote actor already exists: #{character.id}")
+        log("AP - remote actor already exists, return it: #{character.id}")
         {:ok, character} # already exists
 
       {:error, _} -> # new character, create it...
 
         do_create_remote_actor(actor)
         #|> dump
-
     end
   end
 
@@ -174,7 +173,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       # |> dump
       # |> ActivityPub.Object.get_by_ap_id()
    end
-   |> dump
+  #  |> debug
    |> do_create_remote_actor()
   end
   # defp do_create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_by_pointer_id(pointer_id) |> do_create_remote_actor()
@@ -186,7 +185,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
 
     with {:ok, user_etc} <- repo().transact_with(fn ->
-       with {:ok, peer} =  Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),
+       with {:ok, peer} <- Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),
             {:ok, user_etc} <- maybe_apply(character_module, [:create_remote, :create], %{
               character: %{
                 username: username
@@ -199,8 +198,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
                 peer_id: peer.id,
                 canonical_uri: actor.data["id"]
               }
-            }),
-            {:ok, _object} <- ActivityPub.Object.update(actor.id, %{pointer_id: user_etc.id}) |> dump do
+            }) ,
+            {:ok, _object} <- ActivityPub.Object.update(actor.id, %{pointer_id: user_etc.id}) do
         {:ok, user_etc}
       end
     end) do
@@ -264,4 +263,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
+  def maybe_publish_object(object_id) when is_binary(object_id) do
+    Bonfire.Common.Pointers.get(object_id)
+    |> maybe_publish_object()
+  end
+  def maybe_publish_object(object) do
+    object
+    |> info()
+    |> Bonfire.Federate.ActivityPub.Publisher.publish("create", ...)
+  end
 end

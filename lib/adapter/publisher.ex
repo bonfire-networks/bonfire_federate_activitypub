@@ -63,8 +63,13 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   end
 
   def publish(verb, %{__struct__: object_type} = local_object) do
-    debug("Federate.ActivityPub - looking for module to handle verb '#{verb}' for object type #{object_type}")
-    Bonfire.Common.ContextModules.maybe_apply(object_type, :ap_publish_activity, [verb, local_object], &publish_error/2)
+    case Bonfire.Federate.ActivityPub.FederationModules.federation_module({verb, object_type}) do
+    {:ok, module} when is_atom(module) ->
+      info(module, "Federate.ActivityPub - delegating to module to handle verb '#{verb}' for object type #{object_type}")
+      Bonfire.Common.Utils.maybe_apply(module, :ap_publish_activity, [verb, local_object], &publish_error/2)
+    _ ->
+      publish_error("No FederationModules was defined for verb {#{inspect verb}, #{object_type}}", [verb, local_object])
+    end
   end
 
   def publish(verb, object) do

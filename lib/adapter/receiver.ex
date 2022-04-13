@@ -31,12 +31,10 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         } = activity
       ) when is_binary(object_id) do
     log("AP - load the object data from ID")
-    object = Bonfire.Federate.ActivityPub.Utils.get_object_or_actor_by_ap_id!(object_id)
-
-    #IO.inspect(activity: activity)
-    #IO.inspect(object: object)
-
-    receive_activity(activity, object)
+    case ActivityPub.Fetcher.get_or_fetch_and_create(object_id) do
+      {:ok, object} -> receive_activity(activity, object)
+      _ -> {:error, :not_found}
+    end
   end
 
   def receive_activity(
@@ -88,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       "AP Match#1 - with activity_type and object_type: #{activity_type} & #{object_type}"
     )
 
-    with {:ok, actor} <- activity_character(activity),
+    with {:ok, actor} <- activity_character(activity) |> info("receive actor"),
         {:error, _} <-
             handle_activity_with(
               Bonfire.Federate.ActivityPub.FederationModules.federation_module({activity_type, object_type}),
@@ -163,7 +161,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
   def receive_activity(activity, object) do
     log(
-      "AP Match#4 - receive_activity_fallback"
+      "AP no match - receive_activity_fallback"
     )
 
     receive_activity_fallback(activity, object)
@@ -186,6 +184,14 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   @doc """
   Create an object without an activity
   """
+  def receive_object(creator, object_uri) when is_binary(object_uri) do
+    log("AP - Create an object from AP ID")
+    %{
+      data: %{
+        "object" => object_uri
+      }
+    } |> receive_activity()
+  end
   def receive_object(creator, object) do
     log("AP - Create an object without an activity")
     receive_activity(%{data: %{"type" => "Create", "actor" => creator}}, object)
@@ -211,7 +217,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
     Utils.date_from_pointer(pointer_id) |> dump("date from pointer")
 
-    log("AP - handle_activity_with: #{module} to Create #{ap_obj_id} as #{inspect pointer_id}")
+    log("AP - handle_activity_with: #{module} to Create #{ap_obj_id} as #{inspect pointer_id} using #{module}")
     dump(object)
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
@@ -219,11 +225,13 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         :ap_receive_activity,
         [character, activity, Map.merge(object, %{pointer_id: pointer_id})],
         &receive_error/2
-      ),
-      {:ok, %Peered{}} <- Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id) do
+      ) do
 
       log("AP - created remote object as local pointable #{pointable_object_id} for #{ap_obj_id}")
       # IO.inspect(pointable_object)
+
+      # maybe save the URI
+      Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id)
 
       object = ActivityPub.Object.normalize(object)
 
@@ -232,8 +240,8 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       {:ok, pointable_object}
     else
       e ->
-        error(Utils.error_msg(e))
-        throw {:error, "AP - could not create activity for #{ap_obj_id}"}
+        error(Utils.error_msg(e), "Could not create activity for #{ap_obj_id}")
+        # throw({:error, "Could not process incoming activity"})
     end
   end
 
@@ -259,8 +267,10 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   #   receive_error("AP - could not find local character for the actor", activity)
   # end
 
-  defp handle_activity_with(_module, _actor, _activity, _object) do
-    log("AP - no module defined to handle_activity_with")
+  defp handle_activity_with(module, _actor, activity, object) do
+    error(module, "AP - no module defined to handle_activity_with")
+    error(activity, "AP - no module defined to handle_activity_with activity")
+    error(object, "AP - no module defined to handle_activity_with object")
     {:error, :skip}
   end
 
@@ -280,11 +290,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   def activity_character(actor) when is_binary(actor) do
     log("AP - get activity_character")
     # FIXME to handle actor types other than Person/User
-    with {:error, :not_found} <- get_or_fetch_and_create_by_uri(actor) do
-      receive_error("AP - could not find local character for the actor", actor)
+    with {:error, _} <- get_or_fetch_and_create_by_uri(actor) do
+      error(actor, "AP - could not find local character for the actor")
+      {:ok, nil}
     end
   end
-  def activity_character(actor), do: {:ok, nil}
+  def activity_character(_actor), do: {:ok, nil}
 
 
   def receive_error(error, attrs \\ nil) do

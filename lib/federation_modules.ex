@@ -42,9 +42,31 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   @spec federation_module(query :: query) :: {:ok, atom} | {:error, :not_found}
   @doc "Get a Federation Module identified by activity and/or object type, as string or {activity, object} tuple."
+  def federation_module({verb, type} = query) when is_atom(type) do
+    case Map.get(data(), query) do
+      nil ->
+        # fallback to context module
+        Bonfire.Common.ContextModules.context_module(type)
+
+      other -> {:ok, other}
+    end
+  end
+
+  def federation_module(query) when is_atom(query) do
+    case Map.get(data(), query) do
+      nil ->
+        # fallback to context module
+        Bonfire.Common.ContextModules.context_module(query)
+
+      other -> {:ok, other}
+    end
+  end
+
   def federation_module(query) when is_binary(query) or is_atom(query) or is_tuple(query) do
     case Map.get(data(), query) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       other -> {:ok, other}
     end
   end

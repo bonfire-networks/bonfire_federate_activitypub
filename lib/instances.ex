@@ -35,8 +35,13 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   def get_or_create(%{"id"=> canonical_uri}), do: get_or_create(canonical_uri)
   def get_or_create(%{data: %{"id"=> canonical_uri}}), do: get_or_create(canonical_uri)
   def get_or_create(canonical_uri) when is_binary(canonical_uri) do
-    if !String.starts_with?(canonical_uri, Bonfire.Common.URIs.base_url()) do # only create Peer for remote instances
+    local_instance = Bonfire.Common.URIs.base_url()
+    if !String.starts_with?(canonical_uri, local_instance) do # only create Peer for remote instances
       do_get_or_create(canonical_uri)
+    else
+      info(canonical_uri)
+      info(local_instance)
+      error("Local actor treated as remote")
     end
   end
 
@@ -49,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
         {:ok, peer}
 
       none ->
-        error("instance unknown, create it now")
+        debug(instance_url, "instance unknown, create it now")
         create(%{ap_base_uri: instance_url, display_hostname: uri.host})
     end
   end
