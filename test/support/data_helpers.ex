@@ -1,12 +1,10 @@
 defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   use Bonfire.Common.Utils
   import Bonfire.Me.Fake
-  alias Bonfire.Federate.ActivityPub.Simulate
 
   @remote_instance "https://kawen.space"
   @remote_actor @remote_instance<>"/users/karen"
   @local_actor "alice"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
   def local_activity_json_to(to \\ @remote_actor)
   def local_activity_json_to(to) when is_list(to) do
@@ -80,7 +78,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     recipient_actors = Enum.map(to, &recipient/1)
     params = remote_activity_json(actor, recipient_actors)
     with {:ok, activity} <- ActivityPub.create(params), do:
-      {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+      Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
   end
 
   defp recipient(%{id: _} = recipient) do
