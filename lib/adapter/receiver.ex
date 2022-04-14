@@ -30,8 +30,8 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
           }
         } = activity
       ) when is_binary(object_id) do
-    log("AP - load the object data from ID")
-    case ActivityPub.Fetcher.get_or_fetch_and_create(object_id) do
+    log("AP - load the object data from URI: #{object_id}")
+    case ActivityPub.Fetcher.fetch_object_from_id(object_id) do
       {:ok, object} -> receive_activity(activity, object)
       _ -> {:error, :not_found}
     end
@@ -86,24 +86,24 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       "AP Match#1 - with activity_type and object_type: #{activity_type} & #{object_type}"
     )
 
-    with {:ok, actor} <- activity_character(activity) |> info("receive actor"),
+    with {:ok, actor} <- activity_character(activity),
         {:error, _} <-
             handle_activity_with(
-              Bonfire.Federate.ActivityPub.FederationModules.federation_module({activity_type, object_type}),
+              Bonfire.Federate.ActivityPub.FederationModules.federation_module({activity_type, object_type}) |> info("AP attempt #1.1 - with activity_type and object_type"),
               actor,
               activity,
               object
             ),
         {:error, _} <-
             handle_activity_with(
-              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type),
+              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type) |> info("AP attempt #1.2 - with activity_type"),
               actor,
               activity,
               object
             ),
         {:error, _} <-
             handle_activity_with(
-              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type),
+              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type) |> info("AP attempt #1.3 - with object_type"),
               actor,
               activity,
               object
@@ -203,6 +203,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     when is_atom(module) and not is_nil(module) and verb in @creation_verbs do
 
     ap_obj_id = object.data["id"]
+
+    if Bonfire.Common.Pointers.exists?(ap_obj_id) do
+      error(ap_obj_id, "Already exists locally")
+      Bonfire.Common.Pointers.get(ap_obj_id)
+    else
+
     pointer_id =
       with published when is_binary(published) <- object.data["published"] || activity.data["published"],
       {:ok, utc_date_published, _} <- DateTime.from_iso8601(published) |> dump("date from AP"),
@@ -217,7 +223,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
     Utils.date_from_pointer(pointer_id) |> dump("date from pointer")
 
-    log("AP - handle_activity_with: #{module} to Create #{ap_obj_id} as #{inspect pointer_id} using #{module}")
+    log("AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect pointer_id} using #{module}")
     dump(object)
 
     with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
@@ -243,6 +249,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         error(Utils.error_msg(e), "Could not create activity for #{ap_obj_id}")
         # throw({:error, "Could not process incoming activity"})
     end
+    end
   end
 
   defp handle_activity_with({:ok, module}, character, activity, object)
@@ -267,10 +274,10 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   #   receive_error("AP - could not find local character for the actor", activity)
   # end
 
-  defp handle_activity_with(module, _actor, activity, object) do
-    error(module, "AP - no module defined to handle_activity_with")
-    error(activity, "AP - no module defined to handle_activity_with activity")
-    error(object, "AP - no module defined to handle_activity_with object")
+  defp handle_activity_with(_module, _actor, _activity, _object) do
+    debug("AP - no match in handle_activity_with")
+    # error(activity, "AP - no module defined to handle_activity_with activity")
+    # error(object, "AP - no module defined to handle_activity_with object")
     {:error, :skip}
   end
 

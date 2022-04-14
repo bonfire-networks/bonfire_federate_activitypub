@@ -263,11 +263,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def maybe_publish_object(object_id) when is_binary(object_id) do
-    Bonfire.Common.Pointers.get(object_id)
-    |> maybe_publish_object()
+  def maybe_publish_object(pointer_id) when is_binary(pointer_id) do
+    Bonfire.Common.Pointers.get(pointer_id)
+    ~> maybe_publish_object()
   end
-  def maybe_publish_object(object) do
+  def maybe_publish_object(%{} = object) do
     object
     |> info()
     |> Bonfire.Federate.ActivityPub.Publisher.publish("create", ...)

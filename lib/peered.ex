@@ -14,9 +14,13 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
 
   def get(id) when is_binary(id) do
     if Utils.is_ulid?(id) do
-      repo().single(from(p in Peered) |> where([p], p.id == ^id) |> proload(:peer))
+      repo().single(from(p in Peered)
+      |> where([p], p.id == ^id)
+      |> proload(:peer))
     else
-      repo().single(from(p in Peered) |> where([p], p.canonical_uri == ^id) |> proload(:peer))
+      repo().single(from(p in Peered)
+      |> where([p], p.canonical_uri == ^id)
+      |> proload(:peer))
     end
   end
   def get(%Peered{} = peered) do
