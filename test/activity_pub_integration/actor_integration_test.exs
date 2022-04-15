@@ -20,6 +20,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
         json(Simulate.actor_json(@remote_actor))
       %{method: :get, url: @webfinger} ->
         json(Simulate.webfingered())
+      %{method: :get, url: "http://kawen.space/.well-known/webfinger?resource=acct:karen@kawen.space"} ->
+        json(Simulate.webfingered())
       other ->
         IO.inspect(other, label: "mock not configured")
         nil
@@ -67,6 +69,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
   test "serves user in AP API with profile fields" do
     user = fake_user!()
+    |> info()
 
     conn =
       build_conn()

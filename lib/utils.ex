@@ -56,19 +56,22 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_actor_username(u) when is_binary(u), do: u
   def get_actor_username(_), do: nil
 
-  def get_character_by_username(%{} = character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
+  def get_character_by_username({:ok, c}), do: get_character_by_username(c)
+  def get_character_by_username(character) when is_struct(character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
   def get_character_by_username("@"<>username), do: get_character_by_username(username)
   def get_character_by_username(username) when is_binary(username) do
-    Users.by_username(username)
-    ~> get_character_by_username()
+    with {:error, :not_found} <- Users.by_username(username) do
+      Bonfire.Common.Pointers.get(username) # if not a user, try other character types
+    end
+    |> get_character_by_username()
   end
+  def get_character_by_username(other), do: error(other, "Could not get_character_by_username")
 
   def get_character_by_id(id, opts \\ [skip_boundary_check: true]) when is_binary(id) do
     pointer_id = ulid(id)
     if pointer_id do
-      with %{} = user_etc <- Bonfire.Common.Pointers.get(pointer_id, opts) do
-      {:ok, user_etc}
-      end
+      Bonfire.Common.Pointers.get(pointer_id, opts)
+      |> get_character_by_username()
     end
   end
 

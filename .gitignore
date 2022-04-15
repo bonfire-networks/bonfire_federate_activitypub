@@ -45,3 +45,4 @@ deps.path
 /forks
 
 .\#*
+.elixir_ls
