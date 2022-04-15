@@ -69,7 +69,6 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
   test "serves user in AP API with profile fields" do
     user = fake_user!()
-    |> info()
 
     conn =
       build_conn()
@@ -91,6 +90,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     # debug(actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
+    # |> dump()
     assert actor.data["summary"] == user.profile.summary
     assert actor.data["name"] == user.profile.name
     # debug(user)
