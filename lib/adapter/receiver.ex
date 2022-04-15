@@ -226,14 +226,14 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     log("AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect pointer_id} using #{module}")
     dump(object)
 
-    with {:ok, %{id: pointable_object_id} = pointable_object} <- Utils.maybe_apply(
+    with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <- Utils.maybe_apply(
         module,
         :ap_receive_activity,
         [character, activity, Map.merge(object, %{pointer_id: pointer_id})],
         &receive_error/2
       ) do
 
-      log("AP - created remote object as local pointable #{pointable_object_id} for #{ap_obj_id}")
+      log("AP - created remote object as local #{inspect type} #{pointable_object_id} for #{ap_obj_id}")
       # IO.inspect(pointable_object)
 
       # maybe save the URI
