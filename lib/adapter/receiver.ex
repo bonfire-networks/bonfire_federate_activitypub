@@ -211,20 +211,20 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
 
     pointer_id =
       with published when is_binary(published) <- object.data["published"] || activity.data["published"],
-      {:ok, utc_date_published, _} <- DateTime.from_iso8601(published) |> dump("date from AP"),
+      {:ok, utc_date_published, _} <- DateTime.from_iso8601(published) |> info("date from AP"),
       :lt <- DateTime.compare(utc_date_published, DateTime.now!("Etc/UTC")) do # only if published in the past
         utc_date_published
-        # |> dump("utc_date_published")
+        # |> info("utc_date_published")
         |> DateTime.to_unix(:millisecond)
-        # |> dump("to_unix")
+        # |> info("to_unix")
         |> Pointers.ULID.generate()
       else _ -> nil
     end
 
-    Utils.date_from_pointer(pointer_id) |> dump("date from pointer")
+    Utils.date_from_pointer(pointer_id) |> info("date from pointer")
 
     log("AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect pointer_id} using #{module}")
-    dump(object)
+    info(object)
 
     with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <- Utils.maybe_apply(
         module,

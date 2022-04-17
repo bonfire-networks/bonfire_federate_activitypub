@@ -68,7 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
     local_actor_ids(to)
-    |> dump("local_actor_ids")
+    |> info("local_actor_ids")
     |> remote_activity_json(actor.ap_id, ...)
   end
 

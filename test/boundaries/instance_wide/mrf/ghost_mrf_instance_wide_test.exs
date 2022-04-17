@@ -48,7 +48,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
 
       refute match? {:ok, follow_activity}, ActivityPub.follow(remote_actor, local_actor, nil, false)
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
-      refute Bonfire.Social.Follows.following?(remote_user, local_user) #|> dump()
+      refute Bonfire.Social.Follows.following?(remote_user, local_user) #|> info()
     end
 
   end

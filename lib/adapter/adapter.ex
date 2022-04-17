@@ -34,11 +34,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_follower_local_ids(actor) do
-    # dump(actor)
+    # info(actor)
     with {:ok, character} <- Characters.by_username(actor.username) do
-    # dump(character)
+    # info(character)
       Bonfire.Social.Follows.all_subjects_by_object(character)
-      # |> dump()
+      # |> info()
       |> Enum.map(& &1.id)
     end
   end
@@ -168,7 +168,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
      _ ->
       ActivityPub.Object.normalize(ap_id)
-      # |> dump(ap_id)
+      # |> info(ap_id)
       # |> e(:data, "id", nil)
       # |> dump
       # |> ActivityPub.Object.get_by_ap_id()

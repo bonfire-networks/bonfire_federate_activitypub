@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
         %{created: %{peered: %Peered{}}} -> false
         %{created: %{creator: %{peered: %Peered{}}}} -> false
         thing when is_map(thing) ->
-          # dump(thing, "declaring local")
+          # info(thing, "declaring local")
           true
         _ -> false
     end
@@ -77,20 +77,20 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
 
   # def get_character_by_ap_id(%{"preferredUsername" => username}) when is_binary(username) do
-  #   get_character_by_username(username) |> dump("preferredUsername: #{username}")
+  #   get_character_by_username(username) |> info("preferredUsername: #{username}")
   # end
 
   def get_character_by_ap_id(%{username: username}) when is_binary(username) do
     get_character_by_username(username)
-    # |> dump("username: #{username}")
+    # |> info("username: #{username}")
   end
   def get_character_by_ap_id(%{data: data}) do
     get_character_by_ap_id(data)
-    # |> dump("data")
+    # |> info("data")
   end
   def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) do
     get_character_by_ap_id(ap_id)
-    # |> dump("id: #{ap_id}")
+    # |> info("id: #{ap_id}")
   end
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
     local_instance = ap_base_url()
@@ -160,13 +160,13 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   defp return_character({:ok, fetched}, opts), do: return_character(fetched, opts)
 
   defp return_character(fetched, opts) do # FIXME: privacy
-    # dump(fetched, "fetched")
+    # info(fetched, "fetched")
     case fetched do
      %{pointer_id: id} when is_binary(id) ->
         id
-        # |> dump("id")
+        # |> info("id")
         |> Bonfire.Common.Pointers.get(opts)
-        # |> dump("got")
+        # |> info("got")
         ~> repo().maybe_preload([:actor, :character, :profile]) # actor_integration_test
         |> {:ok, ...}
         # |>
