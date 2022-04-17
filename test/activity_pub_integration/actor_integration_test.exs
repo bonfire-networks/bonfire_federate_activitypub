@@ -23,7 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
       %{method: :get, url: "http://kawen.space/.well-known/webfinger?resource=acct:karen@kawen.space"} ->
         json(Simulate.webfingered())
       other ->
-        IO.inspect(other, label: "mock not configured")
+        error(other, "mock not configured")
         nil
     end)
 
@@ -75,7 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
       |> get("/pub/actors/#{user.character.username}")
       |> response(200)
       |> Jason.decode!
-      # |> dump
+      # |> debug
 
     assert conn["preferredUsername"] == user.character.username
     assert conn["name"] == user.profile.name
@@ -90,7 +90,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     # debug(actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
-    # |> dump()
+    # |> debug()
     assert actor.data["summary"] == user.profile.summary
     assert actor.data["name"] == user.profile.name
     # debug(user)
