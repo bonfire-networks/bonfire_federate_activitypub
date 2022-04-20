@@ -4,6 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
 
   @remote_instance "https://kawen.space"
   @remote_actor @remote_instance<>"/users/karen"
+  @remote_username "karen@kawen.space"
   @local_actor "alice"
 
   def local_activity_json_to(to \\ @remote_actor)
@@ -33,15 +34,15 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     activity_json(@remote_actor)
   end
 
-  def remote_activity_json(actor, to) do
+  def remote_activity_json(actor, to, extra \\ %{}) do
     context = "blabla"
 
-    object = %{
+    object = Map.merge(%{
       "id" => @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
       "content" => "content",
       "type" => "Note",
-        "published"=> "2015-02-10T15:00:00Z",
-    }
+      "published"=> "2015-02-10T15:00:00Z",
+    }, extra)
 
     %{
       actor: actor,
@@ -55,6 +56,17 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
       }
     }
   end
+
+  def remote_PM_json(actor, to) do
+    remote_activity_json(actor, [to.ap_id], %{"tag"=> [
+            %{
+                "href"=> to.ap_id,
+                "name"=> to.username,
+                "type"=> "Mention"
+            }
+        ]})
+  end
+
 
   def local_actor_ids(to) when is_list(to), do: Enum.map(to, &local_actor_ids/1)
   def local_actor_ids(nil), do: fake_user!(@local_actor) |> local_actor_ids()

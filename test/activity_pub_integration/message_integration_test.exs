@@ -30,7 +30,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     assert activity.object.data["content"] =~ msg
   end
 
-  test "can receive federated messages" do
+  test "can receive federated ChatMessage" do
     me = fake_user!()
     {:ok, local_actor} = ActivityPub.Actor.get_by_local_id(me.id)
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
@@ -51,6 +51,26 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
     {:ok, activity} = ActivityPub.create(params)
 
-    assert {:ok, _message} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert {:ok, %Bonfire.Data.Social.Message{} = message} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+  end
+
+  test "creates a Message for an incoming private Note with @ mention" do
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    recipient = fake_user!()
+    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+
+    params = remote_PM_json(actor, recipient_actor)
+    |> info("json!")
+
+    {:ok, activity} = ActivityPub.create(params)
+
+    assert actor.data["id"] == activity.data["actor"]
+    assert params.object["content"] == activity.object.data["content"]
+
+    assert {:ok, %Bonfire.Data.Social.Message{} = message} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert message.post_content.html_body =~ params.object["content"]
+
+    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
   end
 end
