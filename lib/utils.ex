@@ -275,7 +275,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       "following" => "#{id}/following",
       "preferredUsername" => e(user_etc, :character, :username, nil),
       "name" => e(user_etc, :profile, :name, nil),
-      "summary" => e(user_etc, :profile, :summary, nil),
+      "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
       "icon" => icon,
       "image" => image,
       "attachment" => [
