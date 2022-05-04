@@ -30,6 +30,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
   end
 
 
+  @tag :fixme
   test "show in feeds an incoming Note with no ghosting" do
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to(recipient)

@@ -26,10 +26,10 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
       import Bonfire.UI.Common.Testing.Helpers
 
       import Phoenix.LiveViewTest
-      import Bonfire.Federate.ActivityPub.ConnCase
+      # import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers
 
-      import Bonfire.Me.Fake
+
       alias Bonfire.Federate.ActivityPub.Simulate
 
       # The default endpoint for testing

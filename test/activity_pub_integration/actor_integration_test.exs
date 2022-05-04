@@ -46,8 +46,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
       |> Jason.decode!
 
     assert ret["preferredUsername"] == user.character.username
-    assert ret["name"] == user.profile.name
-    assert ret["summary"] == user.profile.summary
+    assert ret["name"] =~ user.profile.name
+    assert ret["summary"] =~ user.profile.summary
     assert ret["publicKey"]
   end
 
@@ -78,10 +78,10 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
       # |> debug
 
     assert conn["preferredUsername"] == user.character.username
-    assert conn["name"] == user.profile.name
-    assert conn["summary"] == user.profile.summary
+    assert conn["name"] =~ user.profile.name
+    assert conn["summary"] =~ user.profile.summary
     assert conn["icon"]["url"] == Common.Utils.avatar_url(user)
-    assert conn["image"]["url"] == Common.Utils.image_url(user)
+    assert conn["image"]["url"] =~ Common.Utils.image_url(user)
     assert List.first(conn["attachment"])["value"] =~ user.profile.website
     assert conn["publicKey"]
   end
@@ -91,8 +91,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     # debug(actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     # |> debug()
-    assert actor.data["summary"] == user.profile.summary
-    assert actor.data["name"] == user.profile.name
+    assert Bonfire.Common.Utils.text_only(actor.data["summary"]) =~ Bonfire.Common.Utils.text_only(user.profile.summary)
+    assert actor.data["name"] =~ user.profile.name
     # debug(user)
     assert user.profile.icon_id
     assert user.profile.image_id

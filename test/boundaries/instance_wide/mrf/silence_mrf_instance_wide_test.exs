@@ -42,6 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
     end
 
+    @tag :todo
     test "there's a remote activity with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
       # |> debug
@@ -69,6 +70,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
     end
 
+    @tag :fixme
     test "there's a remote actor with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
       ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
@@ -107,6 +109,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
   describe "reject when" do
 
+    @tag :fixme
     test "I try to follow someone on an instance-wide silenced instance" do
       local_user = fake_user!()
       {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
@@ -128,6 +131,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
   describe "accept when" do
 
+    @tag :fixme
     test "someone from an instance-wide silenced instance attempts to follow" do
       local_user = fake_user!()
       {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
@@ -233,7 +237,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
@@ -244,7 +248,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
@@ -253,7 +257,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]},
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]},
       }
     end
 
@@ -262,7 +266,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
@@ -274,7 +278,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 
@@ -283,7 +287,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
   end

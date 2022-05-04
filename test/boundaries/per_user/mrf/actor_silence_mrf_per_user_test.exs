@@ -44,6 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
 
   describe "accept when" do
 
+    @tag :fixme
     test "someone from an per-user silenced instance attempts to follow" do
       local_user = fake_user!(@local_actor)
 
@@ -92,7 +93,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
       local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@remote_actor, @public_uri]}
       }
     end
 

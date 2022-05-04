@@ -23,7 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => post.id}})
     # debug(ap_activity)
-    assert post.post_content.html_body =~ ap_activity.object.data["content"]
+    assert ap_activity.object.data["content"] =~ post.post_content.html_body
   end
 
 
@@ -39,15 +39,15 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
   test "does not publish private Posts publicly" do
     user = fake_user!()
-    recipient = fake_user!()
+    to = fake_user!()
 
-    attrs = %{post_content: %{html_body: "@#{recipient.character.username} content"}}
+    attrs = %{post_content: %{html_body: "note to @#{to.character.username} "}}
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "mentions")
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => post.id}})
     # debug(ap_activity)
-    assert post.post_content.html_body =~ ap_activity.object.data["content"]
+    assert Bonfire.Common.Text.maybe_markdown_to_html(post.post_content.html_body) =~ ap_activity.object.data["content"]
     assert @public_uri not in ap_activity.data["to"]
   end
 

@@ -30,6 +30,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
   end
 
 
+  @tag :fixme
   test "show in feeds an incoming Note with no silencing" do
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to(recipient)
@@ -63,7 +64,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
   end
 
-  @tag :TODO
+  @tag :todo
   test "hides a Post in feeds from a remote instance that was silenced later" do
 
     recipient = fake_user!(@local_actor)

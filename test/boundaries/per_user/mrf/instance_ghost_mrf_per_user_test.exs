@@ -39,6 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
   describe "filter outgoing recipients when" do
 
+    @tag :todo
     test "there's a local activity with per-user ghosted instance as recipient" do
       local_user = fake_user!(@local_actor)
 
@@ -48,7 +49,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
       }
     end
 

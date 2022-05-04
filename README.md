@@ -7,7 +7,7 @@ An extension for [Bonfire](https://bonfire.cafe/) that handles:
 
 ## Testing
 
-There are unit tests both in this repo, and in the activity_pub lib, but they can't cover every possible federation case, so manual testing with e.g. `curl -H "Accept: application/activity+json" -v "http://localhost:4000/pub/actors/my_username" | jq '.'` and by trying out federation flows between instances of Bonfire and other ActivityPub implementation is a must. 
+There are unit tests both in this repo, and in the activity_pub lib, but they can't cover every possible federation case, so manual testing with e.g. `curl -H "Accept: application/activity+json" -v "http://localhost:4001/pub/actors/my_username" | jq '.'` and by trying out federation flows between instances of Bonfire and other ActivityPub implementation is a must. 
 
 ## Handy commands
 

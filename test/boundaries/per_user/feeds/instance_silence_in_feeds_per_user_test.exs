@@ -18,7 +18,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
   end
 
 
-  test "shows in feeds an incoming Note with no per-user silencing" do
+  @tag :fixme
+  test "shows in fediverse feed an incoming Note with no per-user silencing" do
     local_user = fake_user!(@local_actor)
     receive_remote_activity_to(local_user)
 
@@ -39,6 +40,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     assert %{edges: []} = Bonfire.Social.FeedActivities.my_feed(local_user)
   end
 
+  @tag :fixme
   test "does not show in my_feed an incoming Note from a per-user silenced instance (from an actor that I am already following)" do
     local_user = fake_user!(@local_actor)
 
@@ -55,7 +57,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     assert %{edges: []} = Bonfire.Social.FeedActivities.my_feed(local_user)
   end
 
-  @tag :TODO
+  @tag :todo
   test "does not show in any feeds a Post for an incoming Note from a per-user silenced instance" do
     local_user = fake_user!(@local_actor)
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
@@ -68,7 +70,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, local_user)
   end
 
-  @tag :TODO
+  @tag :todo
   test "hides a Post in feeds from a remote instance that was per-user silenced later" do
 
     local_user = fake_user!(@local_actor)

@@ -232,15 +232,17 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
   describe "filter recipients when" do
 
+    @tag :todo
     test "there's a local activity with instance-wide blocked host as recipient (in config)" do
       Config.put([:boundaries, :block], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
       }
     end
 
+    @tag :todo
     test "there's a local activity with instance-wide blocked host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
       ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
@@ -248,28 +250,31 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
       }
     end
 
+    @tag :todo
     test "there's a local activity with instance-wide blocked wildcard domain as recipient" do
       Config.put([:boundaries, :block], ["*kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@public_uri]},
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]},
       }
     end
 
+    @tag :todo
     test "there's a local activity with instance-wide blocked actor as recipient (in config)" do
       Config.put([:boundaries, :block], ["kawen.space/users/karen"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
       }
     end
 
+    @tag :todo
     test "there's a local activity with instance-wide blocked actor as recipient (in DB)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
@@ -278,16 +283,17 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
       }
     end
 
+    @tag :todo
     test "there's a local activity with instance-wide blocked domain as recipient" do
       Config.put([:boundaries, :block], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4000/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
       }
     end
   end

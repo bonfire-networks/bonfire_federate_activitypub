@@ -30,6 +30,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
   end
 
 
+  @tag :fixme
   test "show in feeds a Post for an incoming Note with no blocking" do
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to(recipient)
@@ -63,7 +64,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
   end
 
-  @tag :TODO
+  @tag :todo
   test "hides a Post in feed from a remote instance that was blocked later" do
 
     recipient = fake_user!(@local_actor)

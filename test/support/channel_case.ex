@@ -22,7 +22,7 @@ defmodule Bonfire.Federate.ActivityPub.ChannelCase do
       # Import conveniences for testing with channels
       import Phoenix.ChannelTest
       import Bonfire.Federate.ActivityPub.ChannelCase
-      import Bonfire.Me.Fake
+
 
       alias Bonfire.Federate.ActivityPub.Simulate
 
