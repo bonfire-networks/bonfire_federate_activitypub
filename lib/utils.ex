@@ -51,7 +51,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_actor_username(%{preferred_username: u}) when is_binary(u), do: u
   def get_actor_username(%{username: u}) when is_binary(u), do: u
   def get_actor_username(%{character: %NotLoaded{}} = obj),
-    do: get_actor_username(Bonfire.Repo.maybe_preload(obj, :character))
+    do: get_actor_username(Bonfire.Common.Repo.maybe_preload(obj, :character))
   def get_actor_username(%{character: c}), do: get_actor_username(c)
   def get_actor_username(u) when is_binary(u), do: u
   def get_actor_username(_), do: nil
@@ -254,7 +254,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def format_actor(%{} = user_etc, type \\ "Person") do
-    user_etc = Bonfire.Repo.preload(user_etc, [profile: [:image, :icon], character: [:actor], peered: []]) #|> IO.inspect()
+    user_etc = Bonfire.Common.Repo.preload(user_etc, [profile: [:image, :icon], character: [:actor], peered: []]) #|> IO.inspect()
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
     id = Bonfire.Common.URIs.base_url() <> ap_base_path <> "/actors/#{user_etc.character.username}"
 

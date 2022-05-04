@@ -22,6 +22,9 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
+
+      import Bonfire.UI.Common.Testing.Helpers
+
       import Phoenix.LiveViewTest
       import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers

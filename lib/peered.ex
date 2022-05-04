@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   use Arrows
   use Bonfire.Common.Utils
   import Bonfire.Federate.ActivityPub, except: [repo: 0]
-  use Bonfire.Repo
+  use Bonfire.Common.Repo
   import Where
   alias Bonfire.Data.ActivityPub.Peer
   alias Bonfire.Data.ActivityPub.Peered
