@@ -238,7 +238,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
       }
     end
 
@@ -250,7 +250,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
       }
     end
 
@@ -260,7 +260,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]},
+        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]},
       }
     end
 
@@ -270,7 +270,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
       }
     end
 
@@ -283,7 +283,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
       }
     end
 
@@ -293,7 +293,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
       assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: "http://localhost:4001/pub/actors/" <> @local_actor, to: [@public_uri]}
+        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
       }
     end
   end
