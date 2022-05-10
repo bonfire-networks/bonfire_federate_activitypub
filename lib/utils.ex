@@ -57,13 +57,15 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_actor_username(_), do: nil
 
   def get_character_by_username({:ok, c}), do: get_character_by_username(c)
-  def get_character_by_username(character) when is_struct(character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
+  def get_character_by_username(character) when is_struct(character), do: {:ok, repo().maybe_preload(character, [:actor, :character, :profile])}
   def get_character_by_username("@"<>username), do: get_character_by_username(username)
   def get_character_by_username(username) when is_binary(username) do
     with {:error, :not_found} <- Users.by_username(username) do
       Bonfire.Common.Pointers.get(username) # if not a user, try other character types
     end
     |> get_character_by_username()
+    # Bonfire.Common.Pointers.get(username, [skip_boundary_check: true])
+    # ~> get_character_by_username()
   end
   def get_character_by_username(other), do: error(other, "Could not get_character_by_username")
 

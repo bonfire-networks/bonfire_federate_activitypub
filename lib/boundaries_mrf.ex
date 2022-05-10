@@ -11,22 +11,22 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   @impl true
   def filter(activity, is_local?) do
-    debug(activity, "to filter")
+    info(activity, "to filter")
 
     authors = all_actors(activity)
     recipients = all_recipients(activity)
 
     local_author_ids = authors
     |> local_actor_ids()
-    |> debug("local_author_ids")
+    |> info("local_author_ids")
 
     local_recipient_ids = recipients
     |> local_actor_ids()
-    |> debug("local_recipient_ids")
+    |> info("local_recipient_ids")
 
     # num_local_authors = length(local_author_ids)
     is_local? #= (num_local_authors && num_local_authors == length(authors))
-    |> debug("is_local?")
+    |> info("is_local?")
 
     with {:ok, activity} <- maybe_check_and_filter(:ghost, is_local?, local_author_ids, local_recipient_ids, activity),
          {:ok, activity} <- maybe_check_and_filter(:silence, is_local?, local_author_ids, local_recipient_ids, activity) do
@@ -44,39 +44,39 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     cond do
       is_follow?(activity) and :silence == check_block_type and is_local? ->
-        debug("reject following silenced remote actors")
+        info("reject following silenced remote actors")
 
         block_or_filter_recipients(block_types, activity, local_author_ids)
 
       is_follow?(activity) and :silence == check_block_type and !is_local? ->
-        debug("accept follows from silenced remote actors")
+        info("accept follows from silenced remote actors")
 
         {:ok, activity}
 
       is_follow?(activity) and :ghost == check_block_type and !is_local? ->
-        debug("reject follows from ghosted remote actors")
+        info("reject follows from ghosted remote actors")
 
         if !activity_blocked?(block_types, local_recipient_ids, activity), do:
           {:ok, activity}
 
       :silence == check_block_type and is_local? ->
-        debug("do nothing with silencing on outgoing local activities")
+        info("do nothing with silencing on outgoing local activities")
 
         {:ok, activity}
 
       :silence == check_block_type and !is_local? ->
-        debug("check for silenced actor/instances & filter recipients of incoming remote activities")
+        info("check for silenced actor/instances & filter recipients of incoming remote activities")
         # FIXME!
         if !activity_blocked?(block_types, [], activity), do:
           block_or_filter_recipients(block_types, activity, local_recipient_ids)
 
       :ghost == check_block_type and is_local? ->
-        debug("filter ghosted recipients of outgoing local activities")
+        info("filter ghosted recipients of outgoing local activities")
 
         block_or_filter_recipients(block_types, activity, local_author_ids)
 
       :ghost == check_block_type and !is_local? ->
-        debug("do nothing with ghosting on incoming remote activities")
+        info("do nothing with ghosting on incoming remote activities")
 
         {:ok, activity}
 
@@ -88,12 +88,16 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp activity_blocked?(block_types, local_actor_ids, activity) do
     rejects = rejects_regex(block_types)
-    |> debug("MRF instance_wide blocks from config")
+    |> info("MRF instance_wide blocks from config")
 
-    object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(e(activity, "actor", nil))) |> debug("activity's actor?")
-    || object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(e(activity, "object", "attributedTo", nil))) |> debug("object's actor?")
-    || object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(activity)) |> debug("activity's instance?")
-    || object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(e(activity, "object", nil))) |> debug("object's instance?")
+    object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(e(activity, "actor", nil)))
+    |> info("activity's actor?")
+    || object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(e(activity, "object", "attributedTo", nil)))
+    |> info("object's actor?")
+    || object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(activity))
+    |> info("activity's instance?")
+    || object_blocked?(block_types, local_actor_ids, rejects, id_or_object_id(e(activity, "object", nil)))
+    |> info("object's instance?")
   end
 
   defp object_blocked?(block_types, local_author_ids, rejects, canonical_uri) when is_binary(canonical_uri) do
@@ -119,7 +123,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     # debug(block_types, "block_types")
     # debug(actor_uri, "actor_uri")
-    debug(local_author_ids, "local_author_ids")
+    info(local_author_ids, "local_author_ids")
 
     MRF.subdomain_match?(rejects, clean_url)
     # || Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
@@ -129,13 +133,13 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp block_or_filter_recipients(block_types, activity, local_actor_ids) do
     case filter_recipients(block_types, activity, local_actor_ids) do
       %{"type" => type} when type in ["Update", "Delete", "Flag"] ->
-        debug("accept #{type} with no recipients")
+        info("accept #{type} with no recipients")
         {:ok, activity}
       %{to: []} ->
-        debug("reject activity because all recipients were filtered")
+        info("reject activity because all recipients were filtered")
         nil
       %{"to" => []} ->
-        debug("reject activity because all recipients were filtered")
+        info("reject activity because all recipients were filtered")
         nil
       filtered ->
         if filtered !=activity, do: debug("filtered")
@@ -145,7 +149,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp filter_recipients(block_types, activity, local_actor_ids) do
     rejects = rejects_regex(block_types)
-    |> debug("MRF actor filter from config")
+    |> info("MRF actor filter from config")
 
     activity
     |> filter_recipients_field(:to, block_types, rejects, local_actor_ids)
@@ -185,10 +189,13 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     actor_uri = URI.parse(actor)
     # |> debug("uri")
     clean_actor_uri = "#{actor_uri.host}#{actor_uri.path}"
-    MRF.subdomain_match?(rejects, actor_uri.host) |> debug("filter #{actor_uri.host} blocked #{inspect block_types} instance in config?")
-    || MRF.subdomain_match?(rejects, clean_actor_uri) |> debug("filter #{clean_actor_uri} blocked #{inspect block_types} actor in config?")
+    MRF.subdomain_match?(rejects, actor_uri.host)
+    |> info("filter #{actor_uri.host} blocked #{inspect block_types} instance in config?")
+    || MRF.subdomain_match?(rejects, clean_actor_uri)
+    |> info("filter #{clean_actor_uri} blocked #{inspect block_types} actor in config?")
   #  || Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
-    || Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, block_types, user_ids: local_actor_ids) |> debug("filter #{actor_uri} blocked #{inspect block_types} actor or instance in DB, either instance-wide or by specified local_actor_ids?")
+    || Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, block_types, user_ids: local_actor_ids)
+    |> info("filter #{actor_uri} blocked #{inspect block_types} actor or instance in DB, either instance-wide or by specified local_actor_ids?")
   end
 
   def all_actors(activity) do

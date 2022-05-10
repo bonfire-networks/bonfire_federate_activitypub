@@ -35,6 +35,9 @@ defmodule Bonfire.Federate.ActivityPub.ChannelCase do
 
     import Bonfire.Common.Config, only: [repo: 0]
 
+    Cachex.clear(:ap_actor_cache)
+    Cachex.clear(:ap_object_cache)
+
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
     :ok

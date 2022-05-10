@@ -13,7 +13,10 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
-    end)
+
+      %{method: :get, url: "http://localhost:4001/pub/actors/"<>username} ->
+        json(ActivityPubWeb.ActorView.actor_json(username))
+      end)
 
     :ok
   end
@@ -22,7 +25,9 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     follower = fake_user!()
     {:ok, ap_followed} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     {:ok, followed} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+    # info(followed)
     {:ok, follow} = Follows.follow(follower, followed)
+    info(follow)
 
     assert {:ok, _follow_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => follow.id}})
 

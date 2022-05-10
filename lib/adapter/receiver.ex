@@ -31,8 +31,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         } = activity
       ) when is_binary(object_id) do
     log("AP - load the object data from URI: #{object_id}")
+    # info(activity, "activity")
     case ActivityPub.Fetcher.fetch_object_from_id(object_id) do
-      {:ok, object} -> receive_activity(activity, object)
+      {:ok, object} ->
+        info(object, "fetched object")
+        receive_activity(activity, object)
+        |> info("received...")
       _ -> {:error, :not_found}
     end
   end
@@ -209,46 +213,46 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       Bonfire.Common.Pointers.get(ap_obj_id)
     else
 
-    pointer_id =
+      pointer_id =
       with published when is_binary(published) <- object.data["published"] || activity.data["published"],
-      {:ok, utc_date_published, _} <- DateTime.from_iso8601(published) |> info("date from AP"),
-      :lt <- DateTime.compare(utc_date_published, DateTime.now!("Etc/UTC")) do # only if published in the past
-        utc_date_published
-        # |> info("utc_date_published")
-        |> DateTime.to_unix(:millisecond)
-        # |> info("to_unix")
-        |> Pointers.ULID.generate()
-      else _ -> nil
-    end
+        {:ok, utc_date_published, _} <- DateTime.from_iso8601(published) |> info("date from AP"),
+        :lt <- DateTime.compare(utc_date_published, DateTime.now!("Etc/UTC")) do # only if published in the past
+          utc_date_published
+          # |> info("utc_date_published")
+          |> DateTime.to_unix(:millisecond)
+          # |> info("to_unix")
+          |> Pointers.ULID.generate()
+        else _ -> nil
+      end
 
-    Utils.date_from_pointer(pointer_id) |> info("date from pointer")
+      Utils.date_from_pointer(pointer_id) |> info("date from pointer")
 
-    log("AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect pointer_id} using #{module}")
-    info(object)
+      log("AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect pointer_id} using #{module}")
+      info(object)
 
-    with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <- Utils.maybe_apply(
-        module,
-        :ap_receive_activity,
-        [character, activity, Map.merge(object, %{pointer_id: pointer_id})],
-        &receive_error/2
-      ) do
+      with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <- Utils.maybe_apply(
+          module,
+          :ap_receive_activity,
+          [character, activity, Map.merge(object, %{pointer_id: pointer_id})],
+          &receive_error/2
+        ) do
 
-      log("AP - created remote object as local #{inspect type} #{pointable_object_id} for #{ap_obj_id}")
-      # IO.inspect(pointable_object)
+        log("AP - created remote object as local #{inspect type} #{pointable_object_id} for #{ap_obj_id}")
+        # IO.inspect(pointable_object)
 
-      # maybe save the URI
-      Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id)
+        # maybe save the URI
+        Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointable_object_id, ap_obj_id)
 
-      object = ActivityPub.Object.normalize(object)
+        object = ActivityPub.Object.normalize(object)
 
-      if object && (is_nil(object.pointer_id) or object.pointer_id !=pointable_object_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
+        if object && (is_nil(object.pointer_id) or object.pointer_id !=pointable_object_id), do: ActivityPub.Object.update(object, %{pointer_id: pointable_object_id})
 
-      {:ok, pointable_object}
-    else
-      e ->
-        error(Utils.error_msg(e), "Could not create activity for #{ap_obj_id}")
-        # throw({:error, "Could not process incoming activity"})
-    end
+        {:ok, pointable_object}
+      else
+        e ->
+          error(Utils.error_msg(e), "Could not create activity for #{ap_obj_id}")
+          # throw({:error, "Could not process incoming activity"})
+      end
     end
   end
 
@@ -264,7 +268,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     ) do
 
       activity = ActivityPub.Object.normalize(activity)
-      ActivityPub.Object.update(activity |> dump, %{pointer_id: pointable_object_id})
+      ActivityPub.Object.update(activity, %{pointer_id: pointable_object_id})
 
       {:ok, pointable_object}
     end
