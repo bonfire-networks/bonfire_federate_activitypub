@@ -14,8 +14,12 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
 
-      %{method: :get, url: "http://localhost:4001/pub/actors/"<>username} ->
-        json(ActivityPubWeb.ActorView.actor_json(username))
+      %{method: :get, url: url} ->
+        url
+        |> String.split("/pub/actors/")
+        |> List.last
+        |> ActivityPubWeb.ActorView.actor_json()
+        |> json()
       end)
 
     :ok
