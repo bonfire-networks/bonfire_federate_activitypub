@@ -81,7 +81,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert conn["name"] =~ user.profile.name
     assert conn["summary"] =~ user.profile.summary
     assert conn["icon"]["url"] == Common.Utils.avatar_url(user)
-    assert conn["image"]["url"] =~ Common.Utils.image_url(user)
+    assert conn["image"]["url"] =~ Common.Utils.banner_url(user)
     assert List.first(conn["attachment"])["value"] =~ user.profile.website
     assert conn["publicKey"]
   end
