@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
 
   test "does not appear in feeds an incoming Note from a silenced instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
-      |> dump
+      # |> dump
       ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
     recipient = fake_user!(@local_actor)
