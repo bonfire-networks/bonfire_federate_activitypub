@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
 
   @remote_instance "https://kawen.space"
   @remote_actor @remote_instance<>"/users/karen"
-  @remote_username "karen@kawen.space"
+  # @remote_username "karen@kawen.space"
   @local_actor "alice"
 
   def local_activity_json_to(to \\ @remote_actor)

@@ -33,7 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.ChannelCase do
 
   setup tags do
 
-    import Bonfire.Common.Config, only: [repo: 0]
+    # import Bonfire.Common.Config, only: [repo: 0]
 
     Cachex.clear(:ap_actor_cache)
     Cachex.clear(:ap_object_cache)
