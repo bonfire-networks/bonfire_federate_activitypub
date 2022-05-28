@@ -47,7 +47,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => post.id}})
     # debug(ap_activity)
-    assert Bonfire.Common.Text.maybe_markdown_to_html(post.post_content.html_body) =~ ap_activity.object.data["content"]
+    assert post.post_content.html_body =~ ap_activity.object.data["content"]
     assert @public_uri not in ap_activity.data["to"]
   end
 
