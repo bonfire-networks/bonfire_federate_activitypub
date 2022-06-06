@@ -301,6 +301,72 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     }
   end
 
+  def create_remote_actor(%{ap_id: ap_id}) when is_binary(ap_id), do: create_remote_actor(ap_id)
+  def create_remote_actor(%{"id"=> ap_id}) when is_binary(ap_id), do: create_remote_actor(ap_id)
+  def create_remote_actor(ap_id) when is_binary(ap_id) do
+   case ActivityPub.Object.get_by_ap_id(ap_id) do
+     %ActivityPub.Object{} = actor -> actor
+
+     _ ->
+      ActivityPub.Object.normalize(ap_id)
+      # |> info(ap_id)
+      # |> e(:data, "id", nil)
+      # |> dump
+      # |> ActivityPub.Object.get_by_ap_id()
+   end
+  #  |> debug
+   |> create_remote_actor()
+  end
+  # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_by_pointer_id(pointer_id) |> create_remote_actor()
+  def create_remote_actor(%ActivityPub.Object{} = actor) do
+    character_module = character_module(actor.data["type"])
+
+    log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
+
+    username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
+
+    with {:ok, user_etc} <- repo().transact_with(fn ->
+       with {:ok, peer} <- Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),
+            {:ok, user_etc} <- maybe_apply(character_module, [:create_remote, :create], %{
+              character: %{
+                username: username
+              },
+              profile: %{
+                name: actor.data["name"],
+                summary: actor.data["summary"]
+              },
+              peered: %{
+                peer_id: peer.id,
+                canonical_uri: actor.data["id"]
+              }
+            }) ,
+            {:ok, _object} <- ActivityPub.Object.update(actor.id, %{pointer_id: user_etc.id}) do
+        {:ok, user_etc}
+      end
+    end) do
+      # debug(user_etc, "user created")
+
+      # do this after the transaction, in case of timeouts downloading the images
+      icon_id = maybe_create_icon_object(maybe_fix_image_object(actor.data["icon"]), user_etc)
+      image_id = maybe_create_image_object(maybe_fix_image_object(actor.data["image"]), user_etc) #|> debug
+
+      with {:ok, updated_user} <- maybe_apply(character_module, [:update_remote, :update],[user_etc, %{"profile" => %{"icon_id" => icon_id, "image_id" => image_id}}]) do
+        {:ok, updated_user}
+      else _ ->
+        {:ok, user_etc}
+      end
+    end
+  end
+
+  def character_module(type) do
+    with {:ok, module} <- Bonfire.Federate.ActivityPub.FederationModules.federation_module(type) do
+      module
+    else e ->
+      log("AP - federation module not found (#{inspect e}) for type '#{type}', falling back to Users")
+      Bonfire.Me.Users # fallback
+    end
+  end
+
   def determine_recipients(actor, comment) do
     determine_recipients(actor, comment, [public_uri()], [actor.data["followers"]])
   end
