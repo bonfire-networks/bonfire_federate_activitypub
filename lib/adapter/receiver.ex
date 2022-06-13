@@ -10,7 +10,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
   # the following constants are derived from config, so please make any changes/additions there
 
   @creation_verbs ["Create"]
-  @actor_types Bonfire.Common.Config.get([Bonfire.Federate.ActivityPub.Adapter, :actor_types], ["Person", "Group", "Application", "Service", "Organization"])
+  @actor_types Application.compile_env(:bonfire, :actor_AP_types, ["Person", "Group", "Application", "Service", "Organization"])
 
   def receive_activity(activity_id) when is_binary(activity_id) do
     log("AP - load the activity data from ID")

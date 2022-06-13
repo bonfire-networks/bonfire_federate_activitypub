@@ -3,7 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.Test.ConnHelpers do
   alias Phoenix.{ConnTest, Controller}
   alias Plug.{Conn, Session}
 
-  @endpoint Bonfire.Common.Config.get!(:endpoint_module)
+  @endpoint Application.compile_env!(:bonfire, :endpoint_module)
 
   def conn(), do: ConnTest.build_conn()
 

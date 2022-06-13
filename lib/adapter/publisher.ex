@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   # TODO: move specialised publish funcs to context modules (or make them extensible for extra types)
 
   # defines default types that can be federated as AP Actors (overriden by config)
-  @types_characters Bonfire.Common.Config.get([Bonfire.Instance, :types_characters], [
+  @types_characters Application.compile_env(:bonfire, :types_character_schemas, [
                       Bonfire.Data.Identity.User,
                       # CommonsPub.Communities.Community,
                       # CommonsPub.Collections.Collection,

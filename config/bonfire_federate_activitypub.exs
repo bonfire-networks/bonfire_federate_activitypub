@@ -9,8 +9,7 @@ config :bonfire,
     ],
   log_federation: true # enable/disable logging of federation logic
 
-config :bonfire, Adapter,
-  actor_types: actor_types
+config :bonfire, actor_AP_types: actor_types
 
 # config :bonfire, Bonfire.Instance,
   # hostname: hostname,
