@@ -23,7 +23,6 @@ defmodule Bonfire.Federate.ActivityPub.ChannelCase do
       import Phoenix.ChannelTest
       import Bonfire.Federate.ActivityPub.ChannelCase
 
-
       alias Bonfire.Federate.ActivityPub.Simulate
 
       # The default endpoint for testing

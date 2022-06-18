@@ -286,7 +286,8 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       ] |> filter_empty([]),
       "endpoints" => %{
         "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
-      }
+      },
+      "discoverable" => Bonfire.Me.Settings.get([Bonfire.Me.Users, :discoverable], true, current_user: user_etc) # whether user should appear in directories and search engines
     }
 
     %Actor{
@@ -345,6 +346,8 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       end
     end) do
       # debug(user_etc, "user created")
+
+      Bonfire.Me.Settings.put([Bonfire.Me.Users, :discoverable], actor.data["discoverable"], current_user: user_etc) # save remote discoverability flag as a user setting
 
       # do this after the transaction, in case of timeouts downloading the images
       icon_id = maybe_create_icon_object(maybe_fix_image_object(actor.data["icon"]), user_etc)

@@ -70,6 +70,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "serves user in AP API with profile fields" do
     user = fake_user!()
 
+    Bonfire.Me.Settings.put([Bonfire.Me.Users, :discoverable], false, current_user: user)
+
     conn =
       build_conn()
       |> get("/pub/actors/#{user.character.username}")
@@ -80,10 +82,15 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert conn["preferredUsername"] == user.character.username
     assert conn["name"] =~ user.profile.name
     assert conn["summary"] =~ user.profile.summary
+
     assert conn["icon"]["url"] == Common.Utils.avatar_url(user)
     assert conn["image"]["url"] =~ Common.Utils.banner_url(user)
+
     assert List.first(conn["attachment"])["value"] =~ user.profile.website
+
     assert conn["publicKey"]
+
+    assert conn["discoverable"] == false
   end
 
   test "remote actor creation" do
@@ -96,6 +103,13 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     # debug(user)
     assert user.profile.icon_id
     assert user.profile.image_id
+  end
+
+  test "remote actor discoverability flag is preserved" do
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
+    assert actor.data["discoverable"] == false
+    assert actor.data["discoverable"] == Bonfire.Me.Settings.get([Bonfire.Me.Users, :discoverable], nil, current_user: user)
   end
 
   test "can follow pointers to remote actors" do
