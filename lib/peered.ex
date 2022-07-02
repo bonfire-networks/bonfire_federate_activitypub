@@ -80,7 +80,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def create(id, peer, canonical_uri) do
-    repo().upsert(
+    repo().insert_or_ignore(
       %Peered{
         id: id,
         peer: peer,
