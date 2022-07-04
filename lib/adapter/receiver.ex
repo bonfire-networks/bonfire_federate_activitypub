@@ -306,7 +306,16 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
       {:ok, nil}
     end
   end
-  def activity_character(_actor), do: {:ok, nil}
+  def activity_character(%{"object" => object}) do
+    activity_character(object)
+  end
+  def activity_character(%{"attributedTo" => actor}) do
+    activity_character(actor)
+  end
+  def activity_character(actor) do
+    error(actor, "AP - could not find an actor in the activity or object")
+    {:ok, nil}
+  end
 
 
   def receive_error(error, attrs \\ nil) do
