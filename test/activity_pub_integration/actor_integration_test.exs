@@ -98,7 +98,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     # debug(actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     # |> debug()
-    assert Bonfire.Common.Utils.text_only(actor.data["summary"]) =~ Bonfire.Common.Utils.text_only(user.profile.summary)
+    assert Bonfire.Common.Text.text_only(actor.data["summary"]) =~ Bonfire.Common.Text.text_only(user.profile.summary)
     assert actor.data["name"] =~ user.profile.name
     # debug(user)
     assert user.profile.icon_id
