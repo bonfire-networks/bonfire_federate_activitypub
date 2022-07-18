@@ -60,8 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
     recipient = fake_user!(@local_actor)
     receive_remote_activity_to([recipient, @public_uri])
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(:activity_pub, recipient)
   end
 
 end
