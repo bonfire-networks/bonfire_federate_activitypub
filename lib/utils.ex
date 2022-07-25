@@ -454,7 +454,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_object(object) do
     case ActivityPub.Object.get_cached_by_pointer_id(ulid(object)) do
       nil ->
-        case ActivityPub.Actor.get_cached_by_local_id(e(object, :id, nil)) do
+        case ActivityPub.Actor.get_cached_by_local_id(ulid(object)) do
           {:ok, actor} -> actor
           {:error, e} -> {:error, e}
         end
