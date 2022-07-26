@@ -107,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       |> get_character_by_username()
     end
   end
-  def get_character_by_ap_id(%{} = character), do: {:ok, repo().preload(character, [:actor, :character, :profile])}
+  def get_character_by_ap_id(%{} = character), do: {:ok, repo().maybe_preload(character, [:actor, :character, :profile])}
   def get_character_by_ap_id(other) do
     error("get_character_by_ap_id: dunno how to get character for #{inspect other}")
     {:error, :not_found}
