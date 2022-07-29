@@ -13,7 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
       app_name: Bonfire.Application.name(),
       app_version: Bonfire.Application.version(),
       open_registrations: Bonfire.Me.Accounts.instance_is_invite_only?(),
-      user_count: Bonfire.Me.Users.count(),
+      user_count: Bonfire.Me.Users.maybe_count(),
       node_name: Config.get([:ui, :theme, :instance_name], nil),
       node_description: Config.get([:ui, :theme, :instance_description], nil),
       federating: instance[:federating],
