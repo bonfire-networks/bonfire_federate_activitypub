@@ -281,8 +281,11 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   end
 
   defp rejects_regex(block_types) do
-    (block_types ++ [:block])
-    |> Enum.flat_map(&ActivityPub.Config.get([:boundaries, &1]))
+    ( filter_empty(block_types, []) ++ [:block] )
+    |> debug
+    |> Enum.map(&ActivityPub.Config.get([:boundaries, &1]))
+    |> filter_empty([])
+    |> debug
     |> MRF.subdomains_regex()
   end
 end
