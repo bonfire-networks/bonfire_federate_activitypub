@@ -15,7 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Federate.ActivityPub.APReceiverWorker
 
   import Bonfire.Federate.ActivityPub
-  import Where
+  import Untangle
 
   @behaviour ActivityPub.Adapter
 

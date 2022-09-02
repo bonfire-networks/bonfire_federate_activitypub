@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Publisher do
-  import Where
+  import Untangle
   alias Bonfire.Federate.ActivityPub.Utils
 
   # TODO: move specialised publish funcs to context modules (or make them extensible for extra types)

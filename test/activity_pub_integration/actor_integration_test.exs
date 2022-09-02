@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   use Bonfire.Federate.ActivityPub.ConnCase
   import Tesla.Mock
-  import Where
+  import Untangle
   alias Bonfire.Federate.ActivityPub.Utils
   alias Bonfire.Common
 

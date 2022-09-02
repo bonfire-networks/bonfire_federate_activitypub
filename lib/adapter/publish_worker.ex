@@ -12,7 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   federated and not to the ID of the object context, if present.
   """
 
-  import Where
+  import Untangle
 
   @doc """
   Enqueues a number of jobs provided a verb and a list of string IDs.

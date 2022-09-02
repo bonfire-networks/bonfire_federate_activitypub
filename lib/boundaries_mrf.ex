@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   use Arrows
   alias ActivityPub.MRF
   alias Bonfire.Boundaries
-  import Where
+  import Untangle
   @behaviour MRF
 
   @public_uri "https://www.w3.org/ns/activitystreams#Public"

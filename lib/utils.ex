@@ -9,7 +9,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   alias Bonfire.Social.Threads
   alias Ecto.Association.NotLoaded
   require Logger
-  import Where
+  import Untangle
 
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 

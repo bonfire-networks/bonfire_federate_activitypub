@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Receiver do
-  import Where
+  import Untangle
   use Arrows
   import Bonfire.Federate.ActivityPub.Utils, only: [log: 1, get_or_fetch_and_create_by_uri: 1]
   alias Bonfire.Search.Indexer

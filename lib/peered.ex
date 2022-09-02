@@ -7,7 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   use Bonfire.Common.Utils
   import Bonfire.Federate.ActivityPub, except: [repo: 0]
   use Bonfire.Common.Repo
-  import Where
+  import Untangle
   alias Bonfire.Data.ActivityPub.Peer
   alias Bonfire.Data.ActivityPub.Peered
   alias Bonfire.Federate.ActivityPub.Instances

@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
   use Bonfire.Federate.ActivityPub.ConnCase
   import Tesla.Mock
-  import Where
+  import Untangle
   alias Bonfire.Social.Posts
 
   @remote_instance "https://kawen.space"

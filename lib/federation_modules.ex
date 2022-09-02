@@ -19,7 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   local garbage collection.
   """
 
-  import Where
+  import Untangle
   alias Bonfire.Common.Utils
 
   use GenServer, restart: :transient

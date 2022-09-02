@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   Context for `Bonfire.Data.ActivityPub.Peer`
   """
   use Arrows
-  import Where
+  import Untangle
   import Bonfire.Federate.ActivityPub
   import Ecto.Query
   alias Bonfire.Data.ActivityPub.Peer
