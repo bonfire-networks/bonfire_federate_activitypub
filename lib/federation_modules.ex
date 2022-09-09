@@ -33,7 +33,12 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   @doc "Populates the global cache with federation_module data via introspection."
   def start_link(_), do: GenServer.start_link(__MODULE__, [])
 
-  def data(), do: :persistent_term.get(__MODULE__) #, data_init())
+  def data() do
+    :persistent_term.get(__MODULE__)
+  rescue e in ArgumentError ->
+    debug("Gathering a list of federation modules...")
+    populate()
+  end
 
   defp data_init() do
     error "The FederationModules service was not started. Please add it to your Application."
