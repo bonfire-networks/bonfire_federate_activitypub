@@ -18,7 +18,6 @@ defmodule Bonfire.Federate.ActivityPub.DataCase do
 
   using do
     quote do
-
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
@@ -28,12 +27,10 @@ defmodule Bonfire.Federate.ActivityPub.DataCase do
       import Bonfire.UI.Common.Testing.Helpers
       import Bonfire.Federate.ActivityPub.DataHelpers
       alias Bonfire.Federate.ActivityPub.Simulate
-
     end
   end
 
   setup tags do
-
     # import Bonfire.Common.Config, only: [repo: 0]
 
     Cachex.clear(:ap_actor_cache)

@@ -1,5 +1,4 @@
 defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
-
   def config_module, do: true
 
   def config do
@@ -14,9 +13,9 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
         :bonfire_classify,
         :bonfire_geolocate,
         :bonfire_quantify
-        ],
-      log_federation: true, # enable/disable logging of federation logic
+      ],
+      # enable/disable logging of federation logic
+      log_federation: true,
       federation_fallback_module: Bonfire.Social.APActivities
-
   end
 end

@@ -31,7 +31,6 @@ defmodule Bonfire.Federate.ActivityPub.Migrations do
         else: unquote(map(:down))
     end
   end
+
   defmacro migrate_activity_pub(dir), do: map(dir)
-
-
 end

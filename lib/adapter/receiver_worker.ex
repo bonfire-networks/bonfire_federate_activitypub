@@ -10,7 +10,9 @@ defmodule Bonfire.Federate.ActivityPub.APReceiverWorker do
     Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
   end
 
-  def perform(%{args: %{"op" => "handle_activity", "activity_id" => activity_id}}) do
+  def perform(%{
+        args: %{"op" => "handle_activity", "activity_id" => activity_id}
+      }) do
     Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity_id)
   end
 end

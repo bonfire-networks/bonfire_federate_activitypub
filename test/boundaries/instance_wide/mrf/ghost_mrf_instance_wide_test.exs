@@ -31,14 +31,13 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
     end)
   end
 
-
   describe "reject when" do
-
     test "someone from an instance-wide ghosted instance attempts to follow" do
       local_user = fake_user!()
       {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
 
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+
       {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 
       remote_user
@@ -46,15 +45,18 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
       # |> debug
       |> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
 
-      refute match? {:ok, follow_activity}, ActivityPub.follow(remote_actor, local_actor, nil, false)
-      # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
-      refute Bonfire.Social.Follows.following?(remote_user, local_user) #|> info()
-    end
+      refute match?(
+               {:ok, follow_activity},
+               ActivityPub.follow(remote_actor, local_actor, nil, false)
+             )
 
+      # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+      # |> info()
+      refute Bonfire.Social.Follows.following?(remote_user, local_user)
+    end
   end
 
   describe "do not federate when all recipients are filtered out because" do
-
     test "there's a local activity with instance-wide ghosted host as recipient (in config)" do
       Config.put([:boundaries, :ghost_them], ["kawen.space"])
       local_activity = local_activity_json_to(@remote_actor)
@@ -87,6 +89,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
 
     test "there's a local activity with instance-wide ghosted actor as recipient (in DB)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
 
@@ -104,15 +107,19 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
   end
 
   describe "filter outgoing recipients when" do
-
     @tag :todo
     test "there's a local activity with instance-wide ghosted host as recipient (in config)" do
       Config.put([:boundaries, :ghost_them], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
-      }
+      assert BoundariesMRF.filter(local_activity, true) ==
+               {:ok,
+                %{
+                  actor:
+                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                      "/actors/" <> @local_actor,
+                  to: [@public_uri]
+                }}
     end
 
     @tag :todo
@@ -122,9 +129,14 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
 
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
-      }
+      assert BoundariesMRF.filter(local_activity, true) ==
+               {:ok,
+                %{
+                  actor:
+                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                      "/actors/" <> @local_actor,
+                  to: [@public_uri]
+                }}
     end
 
     @tag :todo
@@ -132,9 +144,14 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
       Config.put([:boundaries, :ghost_them], ["*kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]},
-      }
+      assert BoundariesMRF.filter(local_activity, true) ==
+               {:ok,
+                %{
+                  actor:
+                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                      "/actors/" <> @local_actor,
+                  to: [@public_uri]
+                }}
     end
 
     @tag :todo
@@ -142,22 +159,33 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
       Config.put([:boundaries, :ghost_them], ["kawen.space/users/karen"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
-      }
+      assert BoundariesMRF.filter(local_activity, true) ==
+               {:ok,
+                %{
+                  actor:
+                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                      "/actors/" <> @local_actor,
+                  to: [@public_uri]
+                }}
     end
 
     @tag :todo
     test "there's a local activity with instance-wide ghosted actor as recipient (in DB)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
 
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
-      }
+      assert BoundariesMRF.filter(local_activity, true) ==
+               {:ok,
+                %{
+                  actor:
+                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                      "/actors/" <> @local_actor,
+                  to: [@public_uri]
+                }}
     end
 
     @tag :todo
@@ -165,15 +193,18 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
       Config.put([:boundaries, :ghost_them], ["kawen.space"])
       local_activity = local_activity_json_to([@remote_actor, @public_uri])
 
-      assert BoundariesMRF.filter(local_activity, true) == {:ok,
-        %{actor: Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>"/actors/"<> @local_actor, to: [@public_uri]}
-      }
+      assert BoundariesMRF.filter(local_activity, true) ==
+               {:ok,
+                %{
+                  actor:
+                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                      "/actors/" <> @local_actor,
+                  to: [@public_uri]
+                }}
     end
   end
 
-
   describe "proceed with outgoing federation when" do
-
     test "there's no matching local activity" do
       Config.put([:boundaries, :ghost_them], ["non.matching.remote"])
       local_activity = local_activity_json_to(@remote_actor)
@@ -183,24 +214,26 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
   end
 
   describe "accept incoming federation when" do
-
     test "there's a remote activity with instance-wide ghosted host (in config)" do
       Config.put([:boundaries, :ghost_them], ["kawen.space"])
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:ok, remote_activity}
+      assert BoundariesMRF.filter(remote_activity, false) ==
+               {:ok, remote_activity}
     end
 
     test "there's a remote activity with instance-wide ghosted host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
       # |> debug
       ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
+
       # |> debug
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:ok, remote_activity}
+      assert BoundariesMRF.filter(remote_activity, false) ==
+               {:ok, remote_activity}
     end
 
     test "there's a remote activity with instance-wide ghosted wildcard domain" do
@@ -208,7 +241,8 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:ok, remote_activity}
+      assert BoundariesMRF.filter(remote_activity, false) ==
+               {:ok, remote_activity}
     end
 
     test "there's a remote actor with instance-wide ghosted host (in config)" do
@@ -254,11 +288,12 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
 
     test "there's a remote actor with instance-wide ghosted actor (in DB/boundaries)" do
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
 
-      assert BoundariesMRF.filter(remote_actor.data, false) == {:ok, remote_actor.data}
+      assert BoundariesMRF.filter(remote_actor.data, false) ==
+               {:ok, remote_actor.data}
     end
   end
-
 end

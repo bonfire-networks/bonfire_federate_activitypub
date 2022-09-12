@@ -36,7 +36,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_follower_local_ids(actor) do
     # info(actor)
     with {:ok, character} <- Characters.by_username(actor.username) do
-    # info(character)
+      # info(character)
       Bonfire.Social.Follows.all_subjects_by_object(character)
       # |> info()
       |> Enum.map(& &1.id)
@@ -55,8 +55,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # |> maybe_apply(:get_actor_by_id, [id])
 
     with {:ok, character} <- APUtils.get_character_by_id(id),
-    %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
-      {:ok, actor} # TODO: use federation_module instead of context_module?
+         %ActivityPub.Actor{} = actor <-
+           Bonfire.Common.ContextModules.maybe_apply(
+             character,
+             :format_actor,
+             character
+           ) do
+      # TODO: use federation_module instead of context_module?
+      {:ok, actor}
     end
   end
 
@@ -66,13 +72,20 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # |> maybe_apply(:get_actor_by_username, [username])
 
     with {:ok, character} <- APUtils.get_character_by_username(username),
-    %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
-      {:ok, actor} # TODO: use federation_module instead of context_module?
+         %ActivityPub.Actor{} = actor <-
+           Bonfire.Common.ContextModules.maybe_apply(
+             character,
+             :format_actor,
+             character
+           ) do
+      # TODO: use federation_module instead of context_module?
+      {:ok, actor}
     end
   end
 
   def get_actor_by_ap_id(ap_id) do
-    with {:ok, %{username: username}} <- ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
+    with {:ok, %{username: username}} <-
+           ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
       get_actor_by_username(username)
     end
   end
@@ -100,10 +113,16 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def update_local_actor(actor, params) do
     with {:ok, character} <- APUtils.get_character_by_ap_id(actor) do
       keys = e(params, :keys, nil)
-      params = params
-      |> Map.put(:character, %{id: character.id, actor: %{signing_key: keys}})
+
+      params = Map.put(params, :character, %{id: character.id, actor: %{signing_key: keys}})
+
       # debug("update_local_actor: #{inspect character} with #{inspect params}")
-      Bonfire.Common.ContextModules.maybe_apply(character, :update_local_actor, [character, params]) # FIXME use federation_module?
+      # FIXME use federation_module?
+      Bonfire.Common.ContextModules.maybe_apply(
+        character,
+        :update_local_actor,
+        [character, params]
+      )
     end
   end
 
@@ -137,7 +156,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   For updating an Actor in cache after a User/etc is updated
   """
   def update_local_actor_cache(character) do
-    with %ActivityPub.Actor{} = actor <- Bonfire.Common.ContextModules.maybe_apply(character, :format_actor, character) do
+    with %ActivityPub.Actor{} = actor <-
+           Bonfire.Common.ContextModules.maybe_apply(
+             character,
+             :format_actor,
+             character
+           ) do
       ActivityPub.Actor.set_cache(actor)
     end
 
@@ -148,15 +172,16 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     log("AP - maybe_create_remote_actor for #{e(actor, :ap_id, nil) || e(actor, "id", nil)}")
 
     case APUtils.get_character_by_ap_id(actor) do
-
       {:ok, character} ->
         log("AP - remote actor already exists, return it: #{character.id}")
-        {:ok, character} # already exists
+        # already exists
+        {:ok, character}
 
-      {:error, _} -> # new character, create it...
-
+      # new character, create it...
+      {:error, _} ->
         APUtils.create_remote_actor(actor)
-        #|> dump
+
+        # |> debug
     end
   end
 
@@ -171,11 +196,16 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def get_redirect_url(%{username: username}) when is_binary(username), do: get_redirect_url(username) |> debug
-  def get_redirect_url(%{pointer_id: id}) when is_binary(id), do: get_redirect_url(id) |> debug
-  def get_redirect_url(%{data: %{"id"=>id}}) when is_binary(id), do: get_redirect_url(id) |> debug
+  def get_redirect_url(%{username: username}) when is_binary(username),
+    do: get_redirect_url(username) |> debug()
 
-  def get_redirect_url(%{} = object), do: URIs.path(object) |> debug
+  def get_redirect_url(%{pointer_id: id}) when is_binary(id),
+    do: get_redirect_url(id) |> debug()
+
+  def get_redirect_url(%{data: %{"id" => id}}) when is_binary(id),
+    do: get_redirect_url(id) |> debug()
+
+  def get_redirect_url(%{} = object), do: URIs.path(object) |> debug()
 
   def get_redirect_url(other) do
     error(other, "Param not recognised")
@@ -201,6 +231,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     Bonfire.Common.Pointers.get(pointer_id)
     ~> maybe_publish_object()
   end
+
   def maybe_publish_object(%{} = object) do
     object
     |> info()

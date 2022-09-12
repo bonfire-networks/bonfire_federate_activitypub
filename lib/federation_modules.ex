@@ -35,13 +35,15 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   def data() do
     :persistent_term.get(__MODULE__)
-  rescue e in ArgumentError ->
-    debug("Gathering a list of federation modules...")
-    populate()
+  rescue
+    e in ArgumentError ->
+      debug("Gathering a list of federation modules...")
+      populate()
   end
 
   defp data_init() do
-    error "The FederationModules service was not started. Please add it to your Application."
+    error("The FederationModules service was not started. Please add it to your Application.")
+
     populate()
   end
 
@@ -53,7 +55,8 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
         # fallback to context module
         Bonfire.Common.ContextModules.context_module(type)
 
-      other -> {:ok, other}
+      other ->
+        {:ok, other}
     end
   end
 
@@ -63,16 +66,19 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
         # fallback to context module
         Bonfire.Common.ContextModules.context_module(query)
 
-      other -> {:ok, other}
+      other ->
+        {:ok, other}
     end
   end
 
-  def federation_module(query) when is_binary(query) or is_atom(query) or is_tuple(query) do
+  def federation_module(query)
+      when is_binary(query) or is_atom(query) or is_tuple(query) do
     case Map.get(data(), query) do
       nil ->
         {:error, :not_found}
 
-      other -> {:ok, other}
+      other ->
+        {:ok, other}
     end
   end
 
@@ -87,15 +93,20 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   def maybe_federation_module(query) do
+    # fallback
     with {:ok, module} <- federation_module(query) do
       module
-    else _ -> # fallback
-      nil
+    else
+      _ ->
+        nil
     end
   end
 
   def federation_function_error(error, _args) do
-    warn(error, "FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2)")
+    warn(
+      error,
+      "FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2)"
+    )
 
     nil
   end
@@ -117,7 +128,8 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
       |> Enum.filter(&declares_federation_module?/1)
       # |> debug(limit: :infinity)
       |> Enum.reduce(%{}, &index/2)
-      # |> IO.inspect
+
+    # |> IO.inspect
     :persistent_term.put(__MODULE__, indexed)
     indexed
   end
@@ -127,17 +139,22 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   defp app_modules(_, mods), do: mods
 
   # called by populate/0
-  defp search_path(), do: Application.fetch_env!(:bonfire, :federation_search_path)
+  defp search_path(),
+    do: Application.fetch_env!(:bonfire, :federation_search_path)
 
   # called by populate/0
-  defp declares_federation_module?(module), do: Code.ensure_loaded?(module) and function_exported?(module, :federation_module, 0)
+  defp declares_federation_module?(module),
+    do:
+      Code.ensure_loaded?(module) and
+        function_exported?(module, :federation_module, 0)
 
   # called by populate/0
   defp index(mod, acc), do: index(acc, mod, mod.federation_module())
 
   # called by index/2
-  defp index(acc, declaring_module, handle_federation) when is_list(handle_federation) do
-    Enum.map(handle_federation, &({&1, declaring_module}))
+  defp index(acc, declaring_module, handle_federation)
+       when is_list(handle_federation) do
+    Enum.map(handle_federation, &{&1, declaring_module})
     |> Enum.into(%{})
     |> Map.merge(acc)
   end
@@ -145,6 +162,4 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   defp index(acc, declaring_module, handle_federation) do
     Map.merge(%{handle_federation => declaring_module}, acc)
   end
-
-
 end

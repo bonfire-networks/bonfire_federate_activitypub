@@ -29,7 +29,6 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
       # import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers
 
-
       alias Bonfire.Federate.ActivityPub.Simulate
 
       # The default endpoint for testing
@@ -38,7 +37,6 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
   end
 
   setup tags do
-
     # import Bonfire.Common.Config, only: [repo: 0]
 
     Cachex.clear(:ap_actor_cache)
@@ -48,5 +46,4 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
 
     {:ok, []}
   end
-
 end

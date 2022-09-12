@@ -26,7 +26,10 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     {:ok, like} = Likes.like(user, post)
 
-    assert {:ok, _, _} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => like.id}})
+    assert {:ok, _, _} =
+             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
+               args: %{"op" => "create", "context_id" => like.id}
+             })
   end
 
   test "like receiving works" do
@@ -39,6 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+
     {:ok, ap_like, _} = ActivityPub.like(actor, ap_activity.object)
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_like)
@@ -54,6 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+
     {:ok, ap_like, _} = ActivityPub.like(actor, ap_activity.object)
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_like)

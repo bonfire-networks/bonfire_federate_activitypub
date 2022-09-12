@@ -1,7 +1,10 @@
 defmodule Bonfire.Federate.ActivityPub.Test.ConnHelpers do
   require Phoenix.ConnTest
-  alias Phoenix.{ConnTest, Controller}
-  alias Plug.{Conn, Session}
+  alias Phoenix.ConnTest
+  alias Phoenix.Controller
+
+  alias Plug.Conn
+  alias Plug.Session
 
   @endpoint Application.compile_env!(:bonfire, :endpoint_module)
 
@@ -33,7 +36,8 @@ defmodule Bonfire.Federate.ActivityPub.Test.ConnHelpers do
 
   def user_conn(conn \\ json_conn(), user), do: with_user(conn, user)
 
-  def token_conn(conn \\ json_conn(), token), do: with_authorization(conn, token)
+  def token_conn(conn \\ json_conn(), token),
+    do: with_authorization(conn, token)
 
   @default_opts [
     store: :cookie,
@@ -73,7 +77,9 @@ defmodule Bonfire.Federate.ActivityPub.Test.ConnHelpers do
   @doc false
   def uncamel(atom) when is_atom(atom), do: atom
   def uncamel("__typeName"), do: :typename
-  def uncamel(bin) when is_binary(bin), do: String.to_existing_atom(Recase.to_snake(bin))
+
+  def uncamel(bin) when is_binary(bin),
+    do: String.to_existing_atom(Recase.to_snake(bin))
 
   def extract_files(%{variables: vars} = query) do
     case extract_file_vars(vars) do

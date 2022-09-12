@@ -44,6 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+
     {:ok, ap_boost, _} = ActivityPub.announce(actor, ap_activity.object)
 
     assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_boost)
@@ -59,6 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+
     {:ok, ap_boost, _} = ActivityPub.announce(actor, ap_activity.object)
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_boost)
@@ -88,6 +90,6 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   #     }
   #   }
 
-  #   assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_boost) |> repo().maybe_preload(:caretaker, activity: [:subject]) |> dump
+  #   assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_boost) |> repo().maybe_preload(:caretaker, activity: [:subject]) |> debug
   # end
 end

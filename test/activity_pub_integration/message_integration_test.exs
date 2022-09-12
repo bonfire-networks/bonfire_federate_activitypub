@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
   import Tesla.Mock
 
   @remote_instance "https://kawen.space"
-  @remote_actor @remote_instance<>"/users/karen"
+  @remote_actor @remote_instance <> "/users/karen"
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
   setup do
@@ -35,11 +35,13 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     {:ok, local_actor} = ActivityPub.Actor.get_by_local_id(me.id)
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     context = "blabla"
+
     object = %{
-      "id" => @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
+      "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
       "content" => "content",
       "type" => "ChatMessage"
     }
+
     to = [local_actor.ap_id]
 
     params = %{
@@ -51,7 +53,8 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
     {:ok, activity} = ActivityPub.create(params)
 
-    assert {:ok, %Bonfire.Data.Social.Message{} = message} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert {:ok, %Bonfire.Data.Social.Message{} = message} =
+             Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
   end
 
   test "creates a Message for an incoming private Note with @ mention" do
@@ -59,15 +62,18 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     recipient = fake_user!()
     recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
 
-    params = remote_PM_json(actor, recipient_actor)
-    |> info("json!")
+    params =
+      remote_PM_json(actor, recipient_actor)
+      |> info("json!")
 
     {:ok, activity} = ActivityPub.create(params)
 
     assert actor.data["id"] == activity.data["actor"]
     assert params.object["content"] == activity.object.data["content"]
 
-    assert {:ok, %Bonfire.Data.Social.Message{} = message} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert {:ok, %Bonfire.Data.Social.Message{} = message} =
+             Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+
     assert message.post_content.html_body =~ params.object["content"]
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)

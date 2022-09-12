@@ -23,6 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
     {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
 
     assert {:ok, activity} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(data)
+
     assert activity.__struct__ == Bonfire.Data.Social.APActivity
     assert is_map(activity.json["object"])
     assert activity.json["object"]["type"] == "Video"
@@ -50,6 +51,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
     {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
 
     assert {:ok, activity} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(data)
+
     assert is_map(activity.json["object"])
     assert activity.json["type"] == "EmojiReact"
   end

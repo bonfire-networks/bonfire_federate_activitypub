@@ -3,15 +3,17 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   import Bonfire.Me.Fake
 
   @remote_instance "https://kawen.space"
-  @remote_actor @remote_instance<>"/users/karen"
+  @remote_actor @remote_instance <> "/users/karen"
   # @remote_username "karen@kawen.space"
   @local_actor "alice"
 
   def local_activity_json_to(to \\ @remote_actor)
+
   def local_activity_json_to(to) when is_list(to) do
     local_user = fake_user!(@local_actor)
     local_activity_json(local_user, to)
   end
+
   def local_activity_json_to(to) do
     local_activity_json_to([to])
   end
@@ -21,7 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
 
     %{
       actor: local_actor.ap_id,
-      to: to,
+      to: to
       # local: true
     }
   end
@@ -37,12 +39,16 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   def remote_activity_json(actor, to, extra \\ %{}) do
     context = "blabla"
 
-    object = Map.merge(%{
-      "id" => @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
-      "content" => "content",
-      "type" => "Note",
-      "published"=> "2015-02-10T15:00:00Z",
-    }, extra)
+    object =
+      Map.merge(
+        %{
+          "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
+          "content" => "content",
+          "type" => "Note",
+          "published" => "2015-02-10T15:00:00Z"
+        },
+        extra
+      )
 
     %{
       actor: actor,
@@ -51,32 +57,36 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
       to: to,
       local: false,
       additional: %{
-        "id"=> @remote_instance<>"/pub/"<>Pointers.ULID.autogenerate(),
-        "published"=> "2015-02-10T15:10:00Z",
+        "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
+        "published" => "2015-02-10T15:10:00Z"
       }
     }
   end
 
   def remote_PM_json(actor, to) do
-    remote_activity_json(actor, [to.ap_id], %{"tag"=> [
-            %{
-                "href"=> to.ap_id,
-                "name"=> to.username,
-                "type"=> "Mention"
-            }
-        ]})
+    remote_activity_json(actor, [to.ap_id], %{
+      "tag" => [
+        %{
+          "href" => to.ap_id,
+          "name" => to.username,
+          "type" => "Mention"
+        }
+      ]
+    })
   end
-
 
   def local_actor_ids(to) when is_list(to), do: Enum.map(to, &local_actor_ids/1)
   def local_actor_ids(nil), do: fake_user!(@local_actor) |> local_actor_ids()
-  def local_actor_ids(%Bonfire.Data.Identity.User{id: id}), do: ActivityPub.Adapter.get_actor_by_id(id) ~> local_actor_ids()
+
+  def local_actor_ids(%Bonfire.Data.Identity.User{id: id}),
+    do: ActivityPub.Adapter.get_actor_by_id(id) ~> local_actor_ids()
+
   def local_actor_ids(%{ap_id: ap_id}), do: ap_id
   def local_actor_ids(ap_id) when is_binary(ap_id), do: ap_id
 
   def remote_activity_json_to(to \\ nil)
-  def remote_activity_json_to(to) do
 
+  def remote_activity_json_to(to) do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
     local_actor_ids(to)
@@ -84,21 +94,26 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     |> remote_activity_json(actor.ap_id, ...)
   end
 
-  def receive_remote_activity_to(to) when not is_list(to), do: receive_remote_activity_to([to])
+  def receive_remote_activity_to(to) when not is_list(to),
+    do: receive_remote_activity_to([to])
+
   def receive_remote_activity_to(to) do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient_actors = Enum.map(to, &recipient/1)
     params = remote_activity_json(actor, recipient_actors)
-    with {:ok, activity} <- ActivityPub.create(params), do:
-      Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+
+    with {:ok, activity} <- ActivityPub.create(params),
+         do: Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
   end
 
   defp recipient(%{id: _} = recipient) do
     ActivityPub.Actor.get_by_local_id!(recipient.id).ap_id
   end
+
   defp recipient(%{ap_id: actor}) do
     actor
   end
+
   defp recipient(actor) do
     actor
   end
@@ -115,6 +130,4 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     user
   end
-
-
 end

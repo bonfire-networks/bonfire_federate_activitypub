@@ -7,7 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
   @remote_instance "https://kawen.space"
   @actor_name "karen@kawen.space"
-  @remote_actor @remote_instance<>"/users/karen"
+  @remote_actor @remote_instance <> "/users/karen"
 
   setup do
     mock(fn
@@ -17,10 +17,10 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       %{method: :get, url: url} ->
         url
         |> String.split("/pub/actors/")
-        |> List.last
+        |> List.last()
         |> ActivityPubWeb.ActorView.actor_json()
         |> json()
-      end)
+    end)
 
     :ok
   end
@@ -33,7 +33,10 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     {:ok, follow} = Follows.follow(follower, followed)
     info(follow)
 
-    assert {:ok, _follow_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => follow.id}})
+    assert {:ok, _follow_activity} =
+             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
+               args: %{"op" => "create", "context_id" => follow.id}
+             })
 
     assert Bonfire.Social.Follows.requested?(follower, followed)
     refute Bonfire.Social.Follows.following?(follower, followed)
@@ -48,17 +51,23 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     {:ok, follow} = Follows.follow(follower, followed)
 
-    assert {:ok, follow_activity} = Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{args: %{"op" => "create", "context_id" => follow.id}})
+    assert {:ok, follow_activity} =
+             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
+               args: %{"op" => "create", "context_id" => follow.id}
+             })
 
     assert Bonfire.Social.Follows.requested?(follower, followed)
 
-    {:ok, accept} = ActivityPub.accept(%{
-      actor: ap_followed,
-      to: [ap_follower.data],
-      object: follow_activity.data,
-      local: false
-    })
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(accept) #|> dump
+    {:ok, accept} =
+      ActivityPub.accept(%{
+        actor: ap_followed,
+        to: [ap_follower.data],
+        object: follow_activity.data,
+        local: false
+      })
+
+    # |> debug
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(accept)
 
     assert Bonfire.Social.Follows.following?(follower, followed)
   end
@@ -74,7 +83,9 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
 
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity) #|> dump
+    # |> debug
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+
     assert Bonfire.Social.Follows.requested?(follower, followed)
   end
 
@@ -89,12 +100,16 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
 
-    assert {:ok, request} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity) #|> info("requested AP")
+    # |> info("requested AP")
+    assert {:ok, request} =
+             Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+
     # info(ulid(request), "request ID")
 
     assert Bonfire.Social.Follows.requested?(follower, followed)
 
     assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
+
     # assert not is_nil(request.accepted_at)
     assert Bonfire.Social.Follows.following?(follower, followed)
   end
@@ -110,12 +125,14 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
 
-    assert {:ok, request} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity) |> info("request")
+    assert {:ok, request} =
+             Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+             |> info("request")
 
     assert {:ok, request} = Bonfire.Social.Follows.ignore(request, current_user: followed)
+
     assert not is_nil(request.ignored_at)
   end
-
 
   # test "incoming follow works" do # FIXME: need to change the boundaries to allow following without request
   #   followed = fake_user!()
@@ -128,7 +145,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
   #   {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
 
-  #   assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity) |> dump
+  #   assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity) |> debug
   #   assert Bonfire.Social.Follows.following?(follower, followed)
   # end
 
@@ -139,12 +156,16 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     {:ok, ap_followed} = ActivityPub.Adapter.get_actor_by_id(followed.id)
     {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
 
-    assert {:ok, request} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity) #|> info("requested AP")
+    # |> info("requested AP")
+    assert {:ok, request} =
+             Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+
     # info(ulid(request), "request ID")
 
     assert Bonfire.Social.Follows.requested?(follower, followed)
 
     assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
+
     # assert not is_nil(request.accepted_at)
     assert Bonfire.Social.Follows.following?(follower, followed)
 

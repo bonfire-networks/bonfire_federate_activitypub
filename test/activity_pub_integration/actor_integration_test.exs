@@ -7,21 +7,29 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
   @remote_instance "https://kawen.space"
   @actor_name "karen@kawen.space"
-  @remote_actor @remote_instance<>"/users/karen"
-  @remote_actor_url @remote_instance<>"/@karen"
-  @webfinger @remote_instance<>"/.well-known/webfinger?resource=acct:"<>@actor_name
+  @remote_actor @remote_instance <> "/users/karen"
+  @remote_actor_url @remote_instance <> "/@karen"
+  @webfinger @remote_instance <>
+               "/.well-known/webfinger?resource=acct:" <> @actor_name
 
   # TODO: move this into fixtures
   setup do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
+
       %{method: :get, url: @remote_actor_url} ->
         json(Simulate.actor_json(@remote_actor))
+
       %{method: :get, url: @webfinger} ->
         json(Simulate.webfingered())
-      %{method: :get, url: "http://kawen.space/.well-known/webfinger?resource=acct:karen@kawen.space"} ->
+
+      %{
+        method: :get,
+        url: "http://kawen.space/.well-known/webfinger?resource=acct:karen@kawen.space"
+      } ->
         json(Simulate.webfingered())
+
       other ->
         error(other, "mock not configured")
         nil
@@ -37,13 +45,13 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     build_conn()
     |> get("/pub/actors/#{user.character.username}")
     |> response(200)
-    |> Jason.decode!
+    |> Jason.decode!()
 
     ret =
       build_conn()
       |> get("/pub/actors/#{user.character.username}")
       |> response(200)
-      |> Jason.decode!
+      |> Jason.decode!()
 
     assert ret["preferredUsername"] == user.character.username
     assert ret["name"] =~ user.profile.name
@@ -55,16 +63,15 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     user = fake_user!()
 
     assert build_conn()
-      |> put_req_header("accept", "application/activity+json")
-      |> get("/@#{user.character.username}")
-      |> redirected_to() =~ "/pub/actors/#{user.character.username}"
+           |> put_req_header("accept", "application/activity+json")
+           |> get("/@#{user.character.username}")
+           |> redirected_to() =~ "/pub/actors/#{user.character.username}"
 
     # again with URI encoded to check for a caching bug
     assert build_conn()
-      |> put_req_header("accept", "application/activity+json")
-      |> get("/%40#{user.character.username}")
-      |> redirected_to() =~ "/pub/actors/#{user.character.username}"
-
+           |> put_req_header("accept", "application/activity+json")
+           |> get("/%40#{user.character.username}")
+           |> redirected_to() =~ "/pub/actors/#{user.character.username}"
   end
 
   test "serves user in AP API with profile fields" do
@@ -76,8 +83,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
       build_conn()
       |> get("/pub/actors/#{user.character.username}")
       |> response(200)
-      |> Jason.decode!
-      # |> debug
+      |> Jason.decode!()
+
+    # |> debug
 
     assert conn["preferredUsername"] == user.character.username
     assert conn["name"] =~ user.profile.name
@@ -98,7 +106,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     # debug(actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     # |> debug()
-    assert Bonfire.Common.Text.text_only(actor.data["summary"]) =~ Bonfire.Common.Text.text_only(user.profile.summary)
+    assert Bonfire.Common.Text.text_only(actor.data["summary"]) =~
+             Bonfire.Common.Text.text_only(user.profile.summary)
+
     assert actor.data["name"] =~ user.profile.name
     # debug(user)
     assert user.profile.icon_id
@@ -109,7 +119,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     assert actor.data["discoverable"] == false
-    assert actor.data["discoverable"] == Bonfire.Me.Settings.get([Bonfire.Me.Users, :discoverable], nil, current_user: user)
+
+    assert actor.data["discoverable"] ==
+             Bonfire.Me.Settings.get([Bonfire.Me.Users, :discoverable], nil, current_user: user)
   end
 
   test "can follow pointers to remote actors" do
@@ -117,7 +129,6 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     assert {:ok, _} = Common.Pointers.one(user.id)
   end
-
 
   test "fetches an actor by AP ID" do
     {:ok, object} = Utils.get_by_url_ap_id_or_username(@remote_actor)
@@ -155,7 +166,6 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   end
 
   test "fetches a same actor by webfinger, AP ID and friendly URL" do
-
     {:ok, object1} = Utils.get_by_url_ap_id_or_username(@actor_name)
 
     {:ok, object2} = Utils.get_by_url_ap_id_or_username(@remote_actor)
@@ -173,7 +183,6 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   end
 
   test "fetches a same actor by AP ID and friendly URL and webfinger" do
-
     {:ok, object1} = Utils.get_by_url_ap_id_or_username(@remote_actor)
     {:ok, object2} = Utils.get_by_url_ap_id_or_username(@remote_actor_url)
 

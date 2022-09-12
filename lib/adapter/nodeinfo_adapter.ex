@@ -20,5 +20,4 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
       app_repository: Bonfire.Application.repository()
     }
   end
-
 end

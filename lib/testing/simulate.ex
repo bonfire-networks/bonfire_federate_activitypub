@@ -1,5 +1,4 @@
 defmodule Bonfire.Federate.ActivityPub.Simulate do
-
   def fake_remote_user(actor_id \\ "https://kawen.space/users/karen") do
     Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(actor_json(actor_id))
   end
@@ -62,17 +61,17 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
 
   def webfingered() do
     %{
-      "aliases"=> [
+      "aliases" => [
         "https://kawen.space/users/karen"
       ],
-      "links"=> [
+      "links" => [
         %{
-          "href"=> "https://kawen.space/users/karen",
-          "rel"=> "self",
-          "type"=> "application/activity+json"
-        },
+          "href" => "https://kawen.space/users/karen",
+          "rel" => "self",
+          "type" => "application/activity+json"
+        }
       ],
-      "subject"=> "acct:karen@kawen.space"
+      "subject" => "acct:karen@kawen.space"
     }
   end
 end
