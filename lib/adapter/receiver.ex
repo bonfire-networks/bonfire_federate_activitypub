@@ -185,7 +185,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     if Application.get_env(:bonfire, :federation_fallback_module) do
       log("AP - handling activity with fallback")
       module = Application.get_env(:bonfire, :federation_fallback_module)
-      module.create(activity, object, actor)
+      module.create(actor, activity, object)
     else
       error = "ActivityPub - ignored incoming activity - unhandled activity or object type"
 
