@@ -4,5 +4,5 @@ jason = "~> 1.0"
 telemetry_metrics = "~> 0.4"
 telemetry_poller = "~> 0.4"
 # specific for this extension:
-oban = "~> 2.8.0"
+oban = "~> 2.13.3"
 untangle = "~> 0.1"
