@@ -56,7 +56,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
     with {:ok, character} <- APUtils.get_character_by_id(id),
          %ActivityPub.Actor{} = actor <-
-           Bonfire.Common.ContextModules.maybe_apply(
+           Bonfire.Common.ContextModule.maybe_apply(
              character,
              :format_actor,
              character
@@ -73,7 +73,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
     with {:ok, character} <- APUtils.get_character_by_username(username),
          %ActivityPub.Actor{} = actor <-
-           Bonfire.Common.ContextModules.maybe_apply(
+           Bonfire.Common.ContextModule.maybe_apply(
              character,
              :format_actor,
              character
@@ -118,7 +118,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
       # debug("update_local_actor: #{inspect character} with #{inspect params}")
       # FIXME use federation_module?
-      Bonfire.Common.ContextModules.maybe_apply(
+      Bonfire.Common.ContextModule.maybe_apply(
         character,
         :update_local_actor,
         [character, params]
@@ -157,7 +157,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   """
   def update_local_actor_cache(character) do
     with %ActivityPub.Actor{} = actor <-
-           Bonfire.Common.ContextModules.maybe_apply(
+           Bonfire.Common.ContextModule.maybe_apply(
              character,
              :format_actor,
              character

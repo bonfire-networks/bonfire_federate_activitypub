@@ -308,7 +308,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def character_to_actor(character) do
     with %ActivityPub.Actor{} = actor <-
-           Bonfire.Common.ContextModules.maybe_apply(
+           Bonfire.Common.ContextModule.maybe_apply(
              character,
              :format_actor,
              character

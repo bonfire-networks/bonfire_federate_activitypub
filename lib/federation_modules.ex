@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.FederationModules do
+  # TODO refactor for Bonfire.Common.ExtensionBehaviour
   @moduledoc """
   A Global cache of known federation modules to be queried by activity and/or object type.
 
@@ -53,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     case Map.get(data(), query) do
       nil ->
         # fallback to context module
-        Bonfire.Common.ContextModules.context_module(type)
+        Bonfire.Common.ContextModule.context_module(type)
 
       other ->
         {:ok, other}
@@ -64,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     case Map.get(data(), query) do
       nil ->
         # fallback to context module
-        Bonfire.Common.ContextModules.context_module(query)
+        Bonfire.Common.ContextModule.context_module(query)
 
       other ->
         {:ok, other}
