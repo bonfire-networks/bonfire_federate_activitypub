@@ -4,7 +4,7 @@
 defmodule Bonfire.Federate.ActivityPub do
   alias Bonfire.Common.Config
 
-  def repo, do: Config.get!(:repo_module)
+  def repo, do: Config.repo()
 
   def is_admin?(user) do
     if is_map(user) and Map.get(user, :instance_admin) do

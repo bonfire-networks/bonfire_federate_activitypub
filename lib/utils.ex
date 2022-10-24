@@ -16,7 +16,8 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def public_uri(), do: @public_uri
 
   def log(l) do
-    if Bonfire.Common.Config.get(:log_federation), do: Logger.info(inspect(l))
+    # if Bonfire.Common.Config.get(:log_federation), do:
+    Logger.info(inspect(l))
   end
 
   def ap_base_url() do
@@ -67,7 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_actor_username(%{username: u}) when is_binary(u), do: u
 
   def get_actor_username(%{character: %NotLoaded{}} = obj),
-    do: get_actor_username(Bonfire.Common.Repo.maybe_preload(obj, :character))
+    do: get_actor_username(repo().maybe_preload(obj, :character))
 
   def get_actor_username(%{character: c}), do: get_actor_username(c)
   def get_actor_username(u) when is_binary(u), do: u
@@ -83,17 +84,17 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_character_by_username(username) when is_binary(username) do
     with {:error, :not_found} <- Users.by_username(username) do
-      # if not a user, try other character types
+      info(username, "not a user, check for any other character types")
       Bonfire.Common.Pointers.get(username)
     end
-    |> get_character_by_username()
+    ~> get_character_by_username()
 
     # Bonfire.Common.Pointers.get(username, [skip_boundary_check: true])
     # ~> get_character_by_username()
   end
 
   def get_character_by_username(other),
-    do: error(other, "Could not get_character_by_username")
+    do: error(other, "Could not find character")
 
   def get_character_by_id(id, opts \\ [skip_boundary_check: true])
       when is_binary(id) do
@@ -101,7 +102,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
     if pointer_id do
       Bonfire.Common.Pointers.get(pointer_id, opts)
-      |> get_character_by_username()
+      ~> get_character_by_username()
     end
   end
 
@@ -128,9 +129,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
-    local_instance = ap_base_url()
+    local_instance = ap_base_url() |> info
     # only create Peer for remote instances
-    if !String.starts_with?(ap_id, local_instance) do
+    if not String.starts_with?(ap_id, local_instance) do
+      info(ap_id, "assume remote character")
       # FIXME: this should not query the AP db
       # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
       with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
@@ -138,6 +140,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       end
     else
       String.trim_leading(ap_id, local_instance <> "/actors/")
+      |> info("assume local character")
       |> get_character_by_username()
     end
   end
@@ -191,12 +194,17 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_or_fetch_and_create_by_uri(q) when is_binary(q) do
     # TODO: support objects, not just characters
     if not String.starts_with?(q, ap_base_url()) do
-      log("AP - uri - get_or_fetch_and_create: " <> q)
+      log("AP - uri - get_or_fetch_and_create: assume local : " <> q)
 
-      ActivityPub.Fetcher.get_or_fetch_and_create(q)
-      ~> return_character()
+      # TODO: cleanup
+      case ActivityPub.Fetcher.get_or_fetch_and_create_tuple(q) |> info() do
+        {%{} = character, _actor} -> {:ok, character}
+        {{:ok, character}, _actor} -> {:ok, character}
+        {:ok, actor} -> {:ok, return_character(actor)}
+        e -> error(e)
+      end
     else
-      log("AP - uri - get_character_by_ap_id: " <> q)
+      log("AP - uri - get_character_by_ap_id: assume remote : " <> q)
       get_character_by_ap_id(q)
     end
   end
@@ -224,8 +232,18 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       # |>
       # nope? let's try and find them from their ap id
       # |> debug
-      %{} ->
+
+      %ActivityPub.Actor{} ->
         get_character_by_ap_id(fetched)
+
+      %ActivityPub.Object{} ->
+        get_character_by_ap_id(fetched)
+
+      %{id: _} ->
+        {:ok, fetched}
+
+      {:ok, %{id: _}} ->
+        fetched
     end
   end
 
@@ -262,7 +280,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
     log("AP - get_object_or_actor_by_ap_id! : " <> ap_id)
     # FIXME?
-    ActivityPub.Object.get_cached_by_ap_id(ap_id) ||
+    ok_or(ActivityPub.Object.get_cached_by_ap_id(ap_id)) ||
       get_or_fetch_actor_by_ap_id!(ap_id) ||
       ap_id
   end
@@ -324,7 +342,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def format_actor(%{} = user_etc, type \\ "Person") do
     # |> IO.inspect()
     user_etc =
-      Bonfire.Common.Repo.preload(user_etc,
+      repo().preload(user_etc,
         profile: [:image, :icon],
         character: [:actor],
         peered: []
@@ -390,36 +408,13 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     }
   end
 
-  def create_remote_actor(%{ap_id: ap_id}) when is_binary(ap_id),
-    do: create_remote_actor(ap_id)
-
-  def create_remote_actor(%{"id" => ap_id}) when is_binary(ap_id),
-    do: create_remote_actor(ap_id)
-
-  def create_remote_actor(ap_id) when is_binary(ap_id) do
-    case ActivityPub.Object.get_by_ap_id(ap_id) do
-      %ActivityPub.Object{} = actor ->
-        actor
-
-      _ ->
-        ActivityPub.Object.normalize(ap_id)
-
-        # |> info(ap_id)
-        # |> e(:data, "id", nil)
-        # |> debug
-        # |> ActivityPub.Object.get_by_ap_id()
-    end
-    #  |> debug
-    |> create_remote_actor()
-  end
-
-  # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_by_pointer_id(pointer_id) |> create_remote_actor()
-  def create_remote_actor(%ActivityPub.Object{} = actor) do
+  def create_remote_actor(%ActivityPub.Actor{} = actor) do
     character_module = character_module(actor.data["type"])
 
     log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
 
-    username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
+    # username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
+    username = actor.username
 
     with {:ok, user_etc} <-
            repo().transact_with(fn ->
@@ -481,6 +476,33 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       end
     end
   end
+
+  def create_remote_actor(%{ap_id: ap_id}) when is_binary(ap_id),
+    do: create_remote_actor(ap_id)
+
+  def create_remote_actor(%{"id" => ap_id}) when is_binary(ap_id),
+    do: create_remote_actor(ap_id)
+
+  def create_remote_actor(ap_id) when is_binary(ap_id) do
+    case ActivityPub.Object.get_by_ap_id(ap_id) do
+      %ActivityPub.Object{} = actor ->
+        actor
+
+      _ ->
+        ActivityPub.Object.normalize(ap_id)
+
+        # |> info(ap_id)
+        # |> e(:data, "id", nil)
+        # |> debug
+        # |> ActivityPub.Object.get_by_ap_id()
+    end
+    #  |> debug
+    |> create_remote_actor()
+  end
+
+  # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_by_pointer_id(pointer_id) |> create_remote_actor()
+  def create_remote_actor(%ActivityPub.Object{} = object),
+    do: ActivityPub.Actor.format_remote_actor(object) |> create_remote_actor()
 
   def character_module(type) do
     with {:ok, module} <-
@@ -601,16 +623,16 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_pointer_id_by_ap_id(ap_id) do
     case ActivityPub.Object.get_cached_by_ap_id(ap_id) do
-      nil ->
+      {:ok, object} ->
+        object.pointer_id
+
+      _ ->
         # Might be a local actor
         with {:ok, actor} <- ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
           actor.pointer_id
         else
           _ -> nil
         end
-
-      %ActivityPub.Object{} = object ->
-        object.pointer_id
     end
   end
 
@@ -697,7 +719,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     maybe_upload(Bonfire.Files.IconUploader, url, actor)
   end
 
-  defp maybe_upload(adapter, url, actor) do
+  defp maybe_upload(adapter, url, %{} = actor) do
     debug(url)
 
     with {:ok, %{id: id}} <-

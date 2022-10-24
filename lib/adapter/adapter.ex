@@ -67,6 +67,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_username(username) do
+    info(self(), username)
+
     # TODO: Make more generic (currently assumes the actor is person)
     # APUtils.character_module("Person")
     # |> maybe_apply(:get_actor_by_username, [username])
@@ -127,29 +129,49 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   # TODO: refactor & move to Me context(s)?
-  def update_remote_actor(actor_object) do
-    with data = actor_object.data,
-         {:ok, character} <-
-           APUtils.get_character_by_id(actor_object.pointer_id) do
-      params = %{
-        name: data["name"],
-        summary: data["summary"],
-        icon_id:
-          APUtils.maybe_create_icon_object(
-            APUtils.maybe_fix_image_object(data["icon"]),
-            character
-          ),
-        image_id:
-          APUtils.maybe_create_image_object(
-            APUtils.maybe_fix_image_object(data["image"]),
-            character
-          )
-      }
 
-      # FIXME - support other types
-      Bonfire.Me.Users.update_remote(character, params)
-      :ok
-    end
+  def update_remote_actor(%{pointer_id: pointer_id} = actor) when is_binary(pointer_id) do
+    APUtils.get_character_by_id(pointer_id)
+    |> info()
+    |> update_remote_actor(actor)
+  end
+
+  def update_remote_actor(actor) do
+    APUtils.get_character_by_ap_id(actor)
+    |> info()
+    |> update_remote_actor(actor)
+  end
+
+  def update_remote_actor(%{} = character, %{data: data}),
+    do: update_remote_actor(character, data)
+
+  def update_remote_actor(%{} = character, data) do
+    params = %{
+      name: data["name"],
+      summary: data["summary"],
+      icon_id:
+        APUtils.maybe_create_icon_object(
+          APUtils.maybe_fix_image_object(data["icon"]),
+          character
+        ),
+      image_id:
+        APUtils.maybe_create_image_object(
+          APUtils.maybe_fix_image_object(data["image"]),
+          character
+        )
+    }
+
+    # FIXME - support other types
+    Bonfire.Me.Users.update_remote(character, params)
+    :ok
+  end
+
+  def update_remote_actor({:ok, character}, actor) do
+    update_remote_actor(character, actor)
+  end
+
+  def update_remote_actor({:error, :not_found}, actor) do
+    maybe_create_remote_actor(actor)
   end
 
   @doc """

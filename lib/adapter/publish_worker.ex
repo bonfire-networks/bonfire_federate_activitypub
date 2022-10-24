@@ -13,6 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   """
 
   import Untangle
+  import Bonfire.Federate.ActivityPub
 
   @doc """
   Enqueues a number of jobs provided a verb and a list of string IDs.
@@ -36,11 +37,11 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
 
   defp do_perform(object, verb) do
     object
-    # preload common assocs needed by publisher
-    |> Bonfire.Common.Repo.maybe_preload(character: [:peered])
-    |> Bonfire.Common.Repo.maybe_preload(created: [:peered])
-    |> Bonfire.Common.Repo.maybe_preload(creator: [:peered])
-    |> Bonfire.Common.Repo.maybe_preload(edge: [:object])
+    # preload common assocs needed by publisher, seperately in case any assocs don't exists
+    |> repo().maybe_preload(character: [:peered])
+    |> repo().maybe_preload(created: [:peered])
+    |> repo().maybe_preload(creator: [:peered])
+    |> repo().maybe_preload(edge: [:object])
     |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 

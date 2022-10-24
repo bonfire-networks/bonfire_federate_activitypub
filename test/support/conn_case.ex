@@ -29,7 +29,10 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
       # import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers
 
+      use Bonfire.Common.Utils
+
       alias Bonfire.Federate.ActivityPub.Simulate
+      alias Bonfire.Common.Config
 
       # The default endpoint for testing
       @endpoint Application.compile_env!(:bonfire, :endpoint_module)
