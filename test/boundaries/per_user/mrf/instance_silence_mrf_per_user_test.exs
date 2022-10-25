@@ -5,7 +5,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Data.ActivityPub.Peered
 
-  @remote_actor "https://kawen.space/users/karen"
+  @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
@@ -22,7 +22,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
     test "there's a remote activity from a per-user silenced instance" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
+      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       # |> debug
       ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
     test "there's a remote activity from a per-user silenced instance" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
+      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       # |> debug
       ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
@@ -55,7 +55,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
     test "there's a local activity with per-user silenced host as recipient" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
+      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
       local_activity = local_activity_json(local_user, [@remote_actor])
@@ -68,7 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
     test "there's a local activity with per-user silenced host as recipient" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
+      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
       local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])

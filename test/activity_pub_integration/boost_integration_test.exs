@@ -10,8 +10,8 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
   setup do
     mock(fn
-      %{method: :get, url: "https://kawen.space/users/karen"} ->
-        json(Simulate.actor_json("https://kawen.space/users/karen"))
+      %{method: :get, url: "https://mocked.local/users/karen"} ->
+        json(Simulate.actor_json("https://mocked.local/users/karen"))
     end)
 
     :ok
@@ -19,6 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
   test "boost publishing works" do
     user = fake_user!()
+    booster = fake_user!()
 
     attrs = %{post_content: %{html_body: "content"}}
 
@@ -26,7 +27,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
-    {:ok, boost} = Boosts.boost(user, post)
+    {:ok, boost} = Boosts.boost(booster, post)
 
     assert {:ok, _, _} =
              Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
@@ -43,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_boost, _} = ActivityPub.announce(actor, ap_activity.object)
 
@@ -59,7 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_boost, _} = ActivityPub.announce(actor, ap_activity.object)
 
@@ -74,15 +75,15 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   #   ap_boost = %{
   #     data: %{
   #       "object" => %{
-  #         "actor" => "https://kawen.space/users/karen",
+  #         "actor" => "https://mocked.local/users/karen",
   #         "cc" => ["https://www.w3.org/ns/activitystreams#Public"],
   #         "context" => nil,
-  #         "id" => "https://kawen.space/users/karen/statuses/108585154815961343/activity",
+  #         "id" => "https://mocked.local/users/karen/statuses/108585154815961343/activity",
   #         "object" => "https://misskey.bubbletea.dev/notes/9296rwt5fk",
   #         "published" => "2022-07-03T19:52:57.212971Z",
   #         "summary" => nil,
   #         "to" => [
-  #           "https://kawen.space/users/karen/followers",
+  #           "https://mocked.local/users/karen/followers",
   #           "https://misskey.bubbletea.dev/users/8r0vwokp46"
   #         ],
   #         "type" => "Announce"

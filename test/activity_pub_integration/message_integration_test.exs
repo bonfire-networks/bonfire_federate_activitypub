@@ -5,7 +5,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
   import Tesla.Mock
 
-  @remote_instance "https://kawen.space"
+  @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 

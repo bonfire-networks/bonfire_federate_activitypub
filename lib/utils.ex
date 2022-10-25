@@ -8,6 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   alias Bonfire.Me.Users
   alias Bonfire.Social.Threads
   alias Ecto.Association.NotLoaded
+  alias Bonfire.Federate.ActivityPub.Adapter
   require Logger
   import Untangle
 
@@ -21,7 +22,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def ap_base_url() do
-    Bonfire.Federate.ActivityPub.Adapter.base_url() <>
+    Adapter.base_url() <>
       System.get_env("AP_BASE_PATH", "/pub")
   end
 
@@ -193,18 +194,22 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def get_or_fetch_and_create_by_uri(q) when is_binary(q) do
     # TODO: support objects, not just characters
-    if not String.starts_with?(q, ap_base_url()) do
-      log("AP - uri - get_or_fetch_and_create: assume local : " <> q)
+    if not String.starts_with?(
+         q |> info(),
+         ap_base_url() |> info()
+       ) do
+      log("AP - uri - get_or_fetch_and_create: assume remote : " <> q)
 
       # TODO: cleanup
       case ActivityPub.Fetcher.get_or_fetch_and_create_tuple(q) |> info() do
-        {%{} = character, _actor} -> {:ok, character}
-        {{:ok, character}, _actor} -> {:ok, character}
+        {%{} = object, _actor} -> {:ok, object}
+        {{:ok, object}, _actor} -> {:ok, object}
         {:ok, actor} -> {:ok, return_character(actor)}
+        {nil, object} -> {:ok, object}
         e -> error(e)
       end
     else
-      log("AP - uri - get_character_by_ap_id: assume remote : " <> q)
+      log("AP - uri - get_character_by_ap_id: assume local : " <> q)
       get_character_by_ap_id(q)
     end
   end
@@ -393,7 +398,9 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       },
       # whether user should appear in directories and search engines
       "discoverable" =>
-        Bonfire.Me.Settings.get([Bonfire.Me.Users, :discoverable], true, current_user: user_etc)
+        !Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], false,
+          current_user: user_etc
+        )
     }
 
     %Actor{
@@ -444,11 +451,13 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       # debug(user_etc, "user created")
 
       # save remote discoverability flag as a user setting
-      Bonfire.Me.Settings.put(
-        [Bonfire.Me.Users, :discoverable],
-        actor.data["discoverable"],
-        current_user: user_etc
-      )
+      if actor.data["discoverable"] in ["false", false, "no"],
+        do:
+          Bonfire.Me.Settings.put(
+            [Bonfire.Me.Users, :undiscoverable],
+            true,
+            current_user: user_etc
+          )
 
       # do this after the transaction, in case of timeouts downloading the images
       icon_id =
@@ -572,7 +581,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     reply_to_id = Map.get(comment, :reply_to_id)
 
     if reply_to_id do
-      case ActivityPub.Object.get_cached_by_pointer_id(reply_to_id) do
+      case ActivityPub.Object.get_cached_by_pointer_id!(reply_to_id) do
         nil ->
           nil
 
@@ -585,7 +594,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_object_ap_id(%{id: id}) do
-    case ActivityPub.Object.get_cached_by_pointer_id(id) do
+    case ActivityPub.Object.get_cached_by_pointer_id!(id) do
       nil ->
         case ActivityPub.Actor.get_cached_by_local_id(id) do
           {:ok, actor} -> actor.ap_id
@@ -609,7 +618,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_object(object) do
-    case ActivityPub.Object.get_cached_by_pointer_id(ulid(object)) do
+    case ActivityPub.Object.get_cached_by_pointer_id!(ulid(object)) |> info() do
       nil ->
         case ActivityPub.Actor.get_cached_by_local_id(ulid(object)) do
           {:ok, actor} -> actor

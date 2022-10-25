@@ -6,8 +6,8 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
   setup do
     mock(fn
-      %{method: :get, url: "https://kawen.space/users/karen"} ->
-        json(Simulate.actor_json("https://kawen.space/users/karen"))
+      %{method: :get, url: "https://mocked.local/users/karen"} ->
+        json(Simulate.actor_json("https://mocked.local/users/karen"))
     end)
 
     :ok
@@ -31,7 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
   end
 
   test "pleroma emoji react" do
-    ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     user = fake_user!()
 

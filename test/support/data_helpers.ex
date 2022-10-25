@@ -2,9 +2,9 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   use Bonfire.Common.Utils
   import Bonfire.Me.Fake
 
-  @remote_instance "https://kawen.space"
+  @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
-  # @remote_username "karen@kawen.space"
+  # @remote_username "karen@mocked.local"
   @local_actor "alice"
 
   def local_activity_json_to(to \\ @remote_actor)

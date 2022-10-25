@@ -31,6 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       "activity_id" => activity.id,
       "activity" => activity.data
     })
+    |> info()
   end
 
   def get_follower_local_ids(actor) do

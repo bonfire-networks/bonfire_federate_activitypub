@@ -3,7 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   import Tesla.Mock
   alias Bonfire.Social.Posts
 
-  @remote_instance "https://kawen.space"
+  @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 

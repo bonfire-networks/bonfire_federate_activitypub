@@ -5,8 +5,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   alias Bonfire.Federate.ActivityPub.Utils
   alias Bonfire.Common
 
-  @remote_instance "https://kawen.space"
-  @actor_name "karen@kawen.space"
+  @remote_instance "https://mocked.local"
+  @actor_name "karen@mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
   @remote_actor_url @remote_instance <> "/@karen"
   @webfinger @remote_instance <>
@@ -26,7 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
       %{
         method: :get,
-        url: "http://kawen.space/.well-known/webfinger?resource=acct:karen@kawen.space"
+        url: "http://mocked.local/.well-known/webfinger?resource=acct:karen@mocked.local"
       } ->
         json(Simulate.webfingered())
 
@@ -77,7 +77,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "serves user in AP API with profile fields" do
     user = fake_user!()
 
-    Bonfire.Me.Settings.put([Bonfire.Me.Users, :discoverable], false, current_user: user)
+    Bonfire.Me.Settings.put([Bonfire.Me.Users, :undiscoverable], true, current_user: user)
 
     conn =
       build_conn()
@@ -120,8 +120,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     assert actor.data["discoverable"] == false
 
-    assert actor.data["discoverable"] ==
-             Bonfire.Me.Settings.get([Bonfire.Me.Users, :discoverable], nil, current_user: user)
+    assert Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], false, current_user: user) ==
+             true
   end
 
   test "can follow pointers to remote actors" do
@@ -150,8 +150,6 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert object1.id == object2.id
     assert object1.character.id == object2.character.id
     assert object1.profile.id == object2.profile.id
-    assert is_nil(object1.actor)
-    assert is_nil(object2.actor)
   end
 
   test "fetches a same actor by AP ID and friendly URL" do
@@ -161,13 +159,10 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert object1.id == object2.id
     assert object1.character.id == object2.character.id
     assert object1.profile.id == object2.profile.id
-    assert is_nil(object1.actor)
-    assert is_nil(object2.actor)
   end
 
   test "fetches a same actor by webfinger, AP ID and friendly URL" do
     {:ok, object1} = Utils.get_by_url_ap_id_or_username(@actor_name)
-
     {:ok, object2} = Utils.get_by_url_ap_id_or_username(@remote_actor)
     {:ok, object3} = Utils.get_by_url_ap_id_or_username(@remote_actor_url)
 
@@ -177,15 +172,11 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert object1.id == object3.id
     assert object1.character.id == object3.character.id
     assert object1.profile.id == object3.profile.id
-    assert is_nil(object1.actor)
-    assert is_nil(object2.actor)
-    assert is_nil(object3.actor)
   end
 
   test "fetches a same actor by AP ID and friendly URL and webfinger" do
     {:ok, object1} = Utils.get_by_url_ap_id_or_username(@remote_actor)
     {:ok, object2} = Utils.get_by_url_ap_id_or_username(@remote_actor_url)
-
     {:ok, object3} = Utils.get_by_url_ap_id_or_username(@actor_name)
 
     assert object1.id == object2.id
@@ -194,8 +185,5 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert object1.id == object3.id
     assert object1.character.id == object3.character.id
     assert object1.profile.id == object3.profile.id
-    assert is_nil(object1.actor)
-    assert is_nil(object2.actor)
-    assert is_nil(object3.actor)
   end
 end

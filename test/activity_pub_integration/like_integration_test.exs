@@ -8,8 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
   setup do
     mock(fn
-      %{method: :get, url: "https://kawen.space/users/karen"} ->
-        json(Simulate.actor_json("https://kawen.space/users/karen"))
+      %{method: :get, url: "https://mocked.local/users/karen"} ->
+        json(Simulate.actor_json("https://mocked.local/users/karen"))
     end)
 
     :ok
@@ -17,6 +17,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
   test "like publishing works" do
     user = fake_user!()
+    liker = fake_user!()
 
     attrs = %{post_content: %{html_body: "content"}}
 
@@ -24,7 +25,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
-    {:ok, like} = Likes.like(user, post)
+    {:ok, like} = Likes.like(liker, post)
 
     assert {:ok, _, _} =
              Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
@@ -41,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_like, _} = ActivityPub.like(actor, ap_activity.object)
 
@@ -57,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
 
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://kawen.space/users/karen")
+    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_like, _} = ActivityPub.like(actor, ap_activity.object)
 

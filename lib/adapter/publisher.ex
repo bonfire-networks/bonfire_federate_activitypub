@@ -62,8 +62,8 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
 
   # delete anything else
   def publish("delete", %{__struct__: type} = thing) do
-    with %ActivityPub.Object{} = object <-
-           ActivityPub.Object.get_cached_by_pointer_id(thing.id) do
+    with %{} = object <-
+           ActivityPub.Object.get_cached_by_pointer_id!(thing.id) do
       ActivityPub.delete(object)
     else
       e -> {:error, e}

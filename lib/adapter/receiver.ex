@@ -253,7 +253,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         "AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect(pointer_id)} using #{module}"
       )
 
-      info(object)
+      # info(object)
 
       with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
              Utils.maybe_apply(
@@ -279,12 +279,12 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
         )
 
         object = ActivityPub.Object.normalize(object)
-
+        # FIXME
         if object &&
              (is_nil(object.pointer_id) or
                 object.pointer_id != pointable_object_id),
            do:
-             ActivityPub.Object.update(object, %{
+             ActivityPub.Object.update(object.id, %{
                pointer_id: pointable_object_id
              })
 

@@ -22,19 +22,19 @@
             "Emoji": "toot:Emoji"
         }
     ],
-    "id": "https://pixelfed.social/p/dajbelshaw/371584017931323759",
+    "id": "https://pixelfed.local/p/dajbelshaw/371584017931323759",
     "type": "Note",
     "summary": null,
     "content": "At the end of last year I sat down with a bunch of magazines and created this A3-sized collage. It was a cathartic exercise, so I'm considering doing it again this year.",
     "inReplyTo": null,
     "published": "2021-12-01T09:02:13+00:00",
-    "url": "https://pixelfed.social/p/dajbelshaw/371584017931323759",
-    "attributedTo": "https://pixelfed.social/users/dajbelshaw",
+    "url": "https://pixelfed.local/p/dajbelshaw/371584017931323759",
+    "attributedTo": "https://pixelfed.local/users/dajbelshaw",
     "to": [
         "https://www.w3.org/ns/activitystreams#Public"
     ],
     "cc": [
-        "https://pixelfed.social/users/dajbelshaw/followers"
+        "https://pixelfed.local/users/dajbelshaw/followers"
     ],
     "sensitive": false,
     "attachment": [

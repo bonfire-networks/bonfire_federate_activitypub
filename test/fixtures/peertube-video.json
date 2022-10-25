@@ -1,10 +1,10 @@
 {
     "type": "Create",
-    "id": "https://kawen.space/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/activity",
-    "actor": "https://kawen.space/users/karen",
+    "id": "https://mocked.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/activity",
+    "actor": "https://mocked.local/users/karen",
     "object": {
       "type": "Video",
-      "id": "https://kawen.space/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6",
+      "id": "https://mocked.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6",
       "name": "Vu du 20/02/21 : \"Planète Mars 2050\"",
       "duration": "PT385S",
       "uuid": "abece3c3-b9c6-47f4-8040-f3eed8c602e6",
@@ -45,14 +45,14 @@
       "icon": [
         {
           "type": "Image",
-          "url": "https://peertube.stream/static/thumbnails/abece3c3-b9c6-47f4-8040-f3eed8c602e6.jpg",
+          "url": "https://peertube.local/static/thumbnails/abece3c3-b9c6-47f4-8040-f3eed8c602e6.jpg",
           "mediaType": "image/jpeg",
           "width": 223,
           "height": 122
         },
         {
           "type": "Image",
-          "url": "https://peertube.stream/lazy-static/previews/abece3c3-b9c6-47f4-8040-f3eed8c602e6.jpg",
+          "url": "https://peertube.local/lazy-static/previews/abece3c3-b9c6-47f4-8040-f3eed8c602e6.jpg",
           "mediaType": "image/jpeg",
           "width": 850,
           "height": 480
@@ -62,12 +62,12 @@
         {
           "type": "Link",
           "mediaType": "text/html",
-          "href": "https://peertube.stream/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6"
+          "href": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6"
         },
         {
           "type": "Link",
           "mediaType": "application/x-mpegURL",
-          "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/master.m3u8",
+          "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/master.m3u8",
           "tag": [
             {
               "type": "Infohash",
@@ -97,12 +97,12 @@
               "type": "Link",
               "name": "sha256",
               "mediaType": "application/json",
-              "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/segments-sha256.json"
+              "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/segments-sha256.json"
             },
             {
               "type": "Link",
               "mediaType": "video/mp4",
-              "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-fragmented.mp4",
+              "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-fragmented.mp4",
               "height": 1080,
               "size": 57888169,
               "fps": 25
@@ -114,14 +114,14 @@
                 "video/mp4"
               ],
               "mediaType": "application/json",
-              "href": "https://peertube.stream/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570040",
+              "href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570040",
               "height": 1080,
               "fps": 25
             },
             {
               "type": "Link",
               "mediaType": "application/x-bittorrent",
-              "href": "https://peertube.stream/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-hls.torrent",
+              "href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-hls.torrent",
               "height": 1080
             },
             {
@@ -133,7 +133,7 @@
             {
               "type": "Link",
               "mediaType": "video/mp4",
-              "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-720-fragmented.mp4",
+              "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-720-fragmented.mp4",
               "height": 720,
               "size": 45165123,
               "fps": 25
@@ -145,14 +145,14 @@
                 "video/mp4"
               ],
               "mediaType": "application/json",
-              "href": "https://peertube.stream/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570056",
+              "href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570056",
               "height": 720,
               "fps": 25
             },
             {
               "type": "Link",
               "mediaType": "application/x-bittorrent",
-              "href": "https://peertube.stream/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-720-hls.torrent",
+              "href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-720-hls.torrent",
               "height": 720
             },
             {
@@ -164,7 +164,7 @@
             {
               "type": "Link",
               "mediaType": "video/mp4",
-              "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-480-fragmented.mp4",
+              "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-480-fragmented.mp4",
               "height": 480,
               "size": 29618534,
               "fps": 25
@@ -176,14 +176,14 @@
                 "video/mp4"
               ],
               "mediaType": "application/json",
-              "href": "https://peertube.stream/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570042",
+              "href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570042",
               "height": 480,
               "fps": 25
             },
             {
               "type": "Link",
               "mediaType": "application/x-bittorrent",
-              "href": "https://peertube.stream/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-480-hls.torrent",
+              "href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-480-hls.torrent",
               "height": 480
             },
             {
@@ -195,7 +195,7 @@
             {
               "type": "Link",
               "mediaType": "video/mp4",
-              "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-360-fragmented.mp4",
+              "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-360-fragmented.mp4",
               "height": 360,
               "size": 21771466,
               "fps": 25
@@ -207,14 +207,14 @@
                 "video/mp4"
               ],
               "mediaType": "application/json",
-              "href": "https://peertube.stream/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570043",
+              "href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570043",
               "height": 360,
               "fps": 25
             },
             {
               "type": "Link",
               "mediaType": "application/x-bittorrent",
-              "href": "https://peertube.stream/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-360-hls.torrent",
+              "href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-360-hls.torrent",
               "height": 360
             },
             {
@@ -226,7 +226,7 @@
             {
               "type": "Link",
               "mediaType": "video/mp4",
-              "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-240-fragmented.mp4",
+              "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-240-fragmented.mp4",
               "height": 240,
               "size": 14856165,
               "fps": 25
@@ -238,14 +238,14 @@
                 "video/mp4"
               ],
               "mediaType": "application/json",
-              "href": "https://peertube.stream/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570057",
+              "href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570057",
               "height": 240,
               "fps": 25
             },
             {
               "type": "Link",
               "mediaType": "application/x-bittorrent",
-              "href": "https://peertube.stream/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-240-hls.torrent",
+              "href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-240-hls.torrent",
               "height": 240
             },
             {
@@ -257,7 +257,7 @@
             {
               "type": "Link",
               "mediaType": "video/mp4",
-              "href": "https://peertube.stream/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-0-fragmented.mp4",
+              "href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-0-fragmented.mp4",
               "height": 0,
               "size": 6248765,
               "fps": 0
@@ -269,14 +269,14 @@
                 "video/mp4"
               ],
               "mediaType": "application/json",
-              "href": "https://peertube.stream/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570041",
+              "href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570041",
               "height": 0,
               "fps": 0
             },
             {
               "type": "Link",
               "mediaType": "application/x-bittorrent",
-              "href": "https://peertube.stream/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-0-hls.torrent",
+              "href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-0-hls.torrent",
               "height": 0
             },
             {
@@ -288,32 +288,32 @@
           ]
         }
       ],
-      "likes": "https://peertube.stream/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/likes",
-      "dislikes": "https://peertube.stream/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/dislikes",
-      "shares": "https://peertube.stream/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/announces",
-      "comments": "https://peertube.stream/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/comments",
+      "likes": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/likes",
+      "dislikes": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/dislikes",
+      "shares": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/announces",
+      "comments": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/comments",
       "attributedTo": [
         {
           "type": "Person",
-          "id": "https://peertube.stream/accounts/createurs"
+          "id": "https://peertube.local/accounts/createurs"
         },
         {
           "type": "Group",
-          "id": "https://peertube.stream/video-channels/vu"
+          "id": "https://peertube.local/video-channels/vu"
         }
       ],
       "to": [
         "https://www.w3.org/ns/activitystreams#Public"
       ],
       "cc": [
-        "https://peertube.stream/accounts/createurs/followers"
+        "https://peertube.local/accounts/createurs/followers"
       ]
     },
     "to": [
       "https://www.w3.org/ns/activitystreams#Public"
     ],
     "cc": [
-      "https://peertube.stream/accounts/createurs/followers"
+      "https://peertube.local/accounts/createurs/followers"
     ],
     "@context": [
       "https://www.w3.org/ns/activitystreams",

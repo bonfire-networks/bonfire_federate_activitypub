@@ -5,7 +5,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Data.ActivityPub.Peered
 
-  @remote_actor "https://kawen.space/users/karen"
+  @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
   @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
@@ -21,7 +21,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     test "there's a local activity with per-user ghosted instance as recipient" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
+      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
 
       local_activity = local_activity_json(local_user, @remote_actor)
@@ -35,7 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     test "there's a local activity with per-user ghosted instance as recipient" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
+      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
 
       local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
@@ -55,7 +55,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     test "there's a remote activity with per-user ghosted instance " do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://kawen.space")
+      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       # |> debug
       ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
 

@@ -5,8 +5,8 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
   import Tesla.Mock
 
-  @remote_instance "https://kawen.space"
-  @actor_name "karen@kawen.space"
+  @remote_instance "https://mocked.local"
+  @actor_name "karen@mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 
   setup do

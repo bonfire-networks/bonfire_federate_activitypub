@@ -8,18 +8,62 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
   alias Bonfire.Social.Follows
   alias Bonfire.Federate.ActivityPub.Utils, as: IntegrationUtils
 
+  setup_all do
+    {remote_user, remote_actor_url} =
+      TestInstanceRepo.apply(fn ->
+        # repo().delete_all(ActivityPub.Object)
+        remote_user = fake_user!("B Remote #{Pointers.ULID.generate()}")
+        {remote_user, Bonfire.Me.Characters.character_url(remote_user)}
+      end)
+
+    [
+      remote_user: remote_user,
+      remote_actor_url: remote_actor_url
+    ]
+  end
+
   @tag :test_instance
-  test "outgoing follow makes requests" do
+  test "can fetch public post from AP API with AP ID and with friendly URL and Accept header",
+       _context do
+    user = fake_user!("poster #{Pointers.ULID.generate()}")
+    attrs = %{post_content: %{html_body: "test content"}}
+
+    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+    canonical_url =
+      Bonfire.Common.URIs.canonical_url(post)
+      |> info("canonical_url")
+
+    friendly_url =
+      (Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(post))
+      |> info("friendly_url")
+
+    post =
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, object} = IntegrationUtils.get_by_url_ap_id_or_username(canonical_url)
+
+        assert object.data["content"] =~ attrs.post_content.html_body
+
+        assert {:ok, object} = IntegrationUtils.get_by_url_ap_id_or_username(friendly_url)
+
+        assert object.data["content"] =~ attrs.post_content.html_body
+      end)
+  end
+
+  @tag :test_instance
+  test "outgoing follow makes requests", context do
     local_follower = fake_user!("A Follower #{Pointers.ULID.generate()}")
     follower_ap_id = Bonfire.Me.Characters.character_url(local_follower)
     info(follower_ap_id, "follower_ap_id")
 
-    {remote_followed, followed_ap_id} =
-      TestInstanceRepo.apply(fn ->
-        repo().delete_all(ActivityPub.Object)
-        remote_followed = fake_user!("B Followed #{Pointers.ULID.generate()}")
-        {remote_followed, Bonfire.Me.Characters.character_url(remote_followed)}
-      end)
+    remote_followed = context[:remote_user]
+    followed_ap_id = context[:remote_actor_url]
+    # {remote_followed, followed_ap_id} =
+    #   TestInstanceRepo.apply(fn ->
+    #     # repo().delete_all(ActivityPub.Object)
+    #     remote_followed = fake_user!("B Followed #{Pointers.ULID.generate()}")
+    #     {remote_followed, Bonfire.Me.Characters.character_url(remote_followed)}
+    #   end)
 
     info(followed_ap_id, "followed_ap_id")
 
@@ -52,64 +96,5 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
         refute Bonfire.Social.Follows.following?(remote_follower, remote_followed)
         assert Bonfire.Social.Follows.requested?(remote_follower, remote_followed)
       end)
-  end
-
-  @tag :skip
-  test "fetch post from AP API with Pointer ID" do
-    user = fake_user!()
-    attrs = %{post_content: %{html_body: "content"}}
-
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
-
-    assert {:ok, ap_activity} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => post.id}
-             })
-
-    obj =
-      build_conn()
-      |> get("/pub/objects/#{post.id}")
-      |> response(200)
-      # |> debug
-      |> Jason.decode!()
-
-    assert obj["content"] =~ attrs.post_content.html_body
-  end
-
-  @tag :skip
-  test "fetch post from AP API with AP ID" do
-    user = fake_user!()
-    attrs = %{post_content: %{html_body: "content"}}
-
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
-
-    # |> debug
-    assert {:ok, ap_activity} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => post.id}
-             })
-
-    id = ap_activity.object.data["id"]
-
-    obj =
-      build_conn()
-      |> get(id)
-      |> response(200)
-      |> Jason.decode!()
-
-    assert obj["content"] =~ attrs.post_content.html_body
-  end
-
-  @tag :skip
-  test "fetch post from AP API with friendly URL and Accept header" do
-    user = fake_user!()
-    attrs = %{post_content: %{html_body: "content"}}
-
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
-
-    assert build_conn()
-           |> put_req_header("accept", "application/activity+json")
-           |> get("/post/#{post.id}")
-           |> redirected_to() =~ "/pub/objects/#{post.id}"
   end
 end
