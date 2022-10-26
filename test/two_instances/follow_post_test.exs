@@ -8,20 +8,23 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
   alias Bonfire.Social.Follows
   alias Bonfire.Federate.ActivityPub.Utils, as: IntegrationUtils
 
-  setup_all do
+  def fake_remote!() do
     TestInstanceRepo.apply(fn ->
       # repo().delete_all(ActivityPub.Object)
       remote_user = fake_user!("B Remote #{Pointers.ULID.generate()}")
 
       [
-        remote_user: remote_user,
-        remote_user_info: [
-          username: Bonfire.Me.Characters.display_username(remote_user, true),
-          canonical_url: Bonfire.Me.Characters.character_url(remote_user),
-          friendly_url: Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(remote_user)
-        ]
+        user: remote_user,
+        username: Bonfire.Me.Characters.display_username(remote_user, true),
+        canonical_url: Bonfire.Me.Characters.character_url(remote_user),
+        friendly_url: Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(remote_user)
       ]
     end)
+  end
+  setup_all do
+    [
+      remote: fake_remote!()
+    ]
   end
 
   @tag :test_instance
@@ -42,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
 
     post =
       TestInstanceRepo.apply(fn ->
-        # FIXME? should we be getting a Post here rather than an Object?
+        # FIXME? should we be receiving a Post here rather than an Object?
         assert {:ok, object} = IntegrationUtils.get_by_url_ap_id_or_username(canonical_url)
 
         assert object.data["content"] =~ attrs.post_content.html_body
@@ -55,69 +58,71 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
 
   @tag :test_instance
   test "can lookup from AP API with username, AP ID and with friendly URL",
-       context do
+       _context do
     # TODO: lookup 3 separate users to be sure
-    info(context[:remote_user_info][:username])
 
+    remote = fake_remote!()
     assert {:ok, object} =
-             IntegrationUtils.get_by_url_ap_id_or_username(context[:remote_user_info][:username])
+             IntegrationUtils.get_by_url_ap_id_or_username(remote[:username])
 
-    assert object.profile.name == context[:remote_user].profile.name
+    assert object.profile.name == remote[:user].profile.name
 
-    assert {:ok, object} =
-             IntegrationUtils.get_by_url_ap_id_or_username(
-               context[:remote_user_info][:canonical_url]
-             )
-
-    assert object.profile.name == context[:remote_user].profile.name
-
+    remote = fake_remote!()
     assert {:ok, object} =
              IntegrationUtils.get_by_url_ap_id_or_username(
-               context[:remote_user_info][:friendly_url]
+               remote[:canonical_url]
              )
 
-    assert object.profile.name == context[:remote_user].profile.name
+    assert object.profile.name == remote[:user].profile.name
+
+    remote = fake_remote!()
+    assert {:ok, object} =
+             IntegrationUtils.get_by_url_ap_id_or_username(
+               remote[:friendly_url]
+             )
+
+    assert object.profile.name == remote[:user].profile.name
   end
 
   @tag :test_instance
-  test "outgoing follow makes requests", context do
+  test "remote follow makes a request, which user can accept and then it turns into a follow", context do
     local_follower = fake_user!("A Follower #{Pointers.ULID.generate()}")
     follower_ap_id = Bonfire.Me.Characters.character_url(local_follower)
     info(follower_ap_id, "follower_ap_id")
 
-    remote_followed = context[:remote_user]
-    followed_ap_id = context[:remote_user_info][:canonical_url]
-    # {remote_followed, followed_ap_id} =
-    #   TestInstanceRepo.apply(fn ->
-    #     # repo().delete_all(ActivityPub.Object)
-    #     remote_followed = fake_user!("B Followed #{Pointers.ULID.generate()}")
-    #     {remote_followed, Bonfire.Me.Characters.character_url(remote_followed)}
-    #   end)
+    remote_followed = context[:remote][:user]
+    followed_ap_id = context[:remote][:canonical_url]
 
     info(followed_ap_id, "followed_ap_id")
 
     assert {:ok, local_followed} = IntegrationUtils.get_or_fetch_and_create_by_uri(followed_ap_id)
-    info(local_followed.character.username, "local_followed remote username")
 
     refute ulid(remote_followed) == ulid(local_followed)
 
     assert {:ok, request} = Follows.follow(local_follower, local_followed)
-    info(request)
+    info(request, "the request")
 
     assert Bonfire.Social.Follows.requested?(local_follower, local_followed)
     refute Bonfire.Social.Follows.following?(local_follower, local_followed)
 
     TestInstanceRepo.apply(fn ->
-      info(follower_ap_id, "follower_ap_id")
+      info("check that the follow worked on the remote side")
 
       assert {:ok, remote_follower} =
                IntegrationUtils.get_or_fetch_and_create_by_uri(follower_ap_id)
 
-      info(remote_follower.character.username, "remote_follower username")
-      # dump(ActivityPub.Object.all())
-      {:ok, _} = Bonfire.Me.Users.by_username(remote_follower.character.username)
       refute Bonfire.Social.Follows.following?(remote_follower, remote_followed)
       assert Bonfire.Social.Follows.requested?(remote_follower, remote_followed)
+
+      info("now accept the request")
+      assert {:ok, follow} = Bonfire.Social.Follows.accept_from(remote_follower, current_user: remote_followed)
+
+      assert Bonfire.Social.Follows.following?(remote_follower, remote_followed)
+      refute Bonfire.Social.Follows.requested?(remote_follower, remote_followed)
     end)
+
+    info("check that the accept was federated back to the follower")
+    assert Bonfire.Social.Follows.following?(local_follower, local_followed)
+    refute Bonfire.Social.Follows.requested?(local_follower, local_followed)
   end
 end

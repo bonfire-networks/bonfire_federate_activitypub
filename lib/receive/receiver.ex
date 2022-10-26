@@ -214,7 +214,7 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
     receive_activity(%{data: %{"type" => "Create", "actor" => creator}}, object)
   end
 
-  # for creation activities we need to take into account the date, and save canonical url/update pointer
+  # for activities that create new objects we need to take into account the date, and save canonical url/update pointer
   # This should not be done if the object is local, i. e. local actor as the object of a follow
   defp handle_activity_with(
          {:ok, module},
@@ -278,13 +278,13 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
           ap_obj_id
         )
 
-        object = ActivityPub.Object.normalize(object)
+        # object = ActivityPub.Object.normalize(object)
         # FIXME
         if object &&
              (is_nil(object.pointer_id) or
                 object.pointer_id != pointable_object_id),
            do:
-             ActivityPub.Object.update(object.id, %{
+             ActivityPub.Object.update_existing(object.id, %{
                pointer_id: pointable_object_id
              })
 
@@ -312,8 +312,10 @@ defmodule Bonfire.Federate.ActivityPub.Receiver do
              [character, activity, object],
              &receive_error/2
            ) do
-      activity = ActivityPub.Object.normalize(activity)
-      ActivityPub.Object.update(activity, %{pointer_id: pointable_object_id})
+      # activity = ActivityPub.Object.normalize(activity)
+      # ActivityPub.Object.update_existing(activity, %{pointer_id: pointable_object_id})
+      # object = ActivityPub.Object.normalize(object)
+      ActivityPub.Object.update_existing(Utils.id(activity) || Utils.id(object), %{pointer_id: pointable_object_id})
 
       {:ok, pointable_object}
     end

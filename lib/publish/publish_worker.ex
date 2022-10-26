@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   use ActivityPub.Workers.WorkerHelper, queue: "ap_publish", max_attempts: 1
+  use Arrows
 
   @moduledoc """
   Module for publishing ActivityPub activities.
@@ -14,6 +15,27 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
 
   import Untangle
   import Bonfire.Federate.ActivityPub
+  alias Bonfire.Common.Utils
+  alias Bonfire.Federate.ActivityPub.Utils, as: APUtils
+
+  def maybe_enqueue(verb, thing, subject) do
+    if APUtils.is_local?(subject) do
+      enqueue(
+        verb,
+        %{
+          "context_id" => thing,
+          "user_id" => Utils.ulid(subject)
+        },
+        unique: [period: 5]
+      )
+
+      :ok
+
+    else
+      info("Skip (re)federating out '#{verb}' activity of object '#{Utils.ulid(thing)}' by a remote actor")
+      :skip
+    end
+  end
 
   @doc """
   Enqueues a number of jobs provided a verb and a list of string IDs.
@@ -42,7 +64,9 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
     |> repo().maybe_preload(created: [:peered])
     |> repo().maybe_preload(creator: [:peered])
     |> repo().maybe_preload(edge: [:object])
-    |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
+    |> Bonfire.Federate.ActivityPub.Publisher.publish(verb, ...)
+    # NOTE: we check this before putting things in the queue instead
+    # |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
 
   # defp only_local(
@@ -59,11 +83,12 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
   #   end
   # end
 
-  defp only_local(context, verb, commit_fn) do
-    if Bonfire.Federate.ActivityPub.Utils.is_local?(context) do
-      commit_fn.(verb, context)
-    else
-      {:discard, :not_local}
-    end
-  end
+  # defp only_local(context, verb, commit_fn) do
+  #   if Bonfire.Federate.ActivityPub.Utils.is_local?(context) do
+  #     commit_fn.(verb, context)
+  #   else
+  #     warn("Skip (re)federating out this #{verb} of a remote object")
+  #     {:discard, :not_local}
+  #   end
+  # end
 end

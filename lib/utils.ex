@@ -63,6 +63,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       _ ->
         false
     end
+    |> info()
   end
 
   def get_actor_username(%{preferred_username: u}) when is_binary(u), do: u
@@ -285,7 +286,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
     log("AP - get_object_or_actor_by_ap_id! : " <> ap_id)
     # FIXME?
-    ok_or(ActivityPub.Object.get_cached_by_ap_id(ap_id)) ||
+    ok_unwrap(ActivityPub.Object.get_cached_by_ap_id(ap_id)) ||
       get_or_fetch_actor_by_ap_id!(ap_id) ||
       ap_id
   end
@@ -442,7 +443,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
                       }
                     }),
                   {:ok, _object} <-
-                    ActivityPub.Object.update(actor.id, %{
+                    ActivityPub.Object.update_existing(actor.id, %{
                       pointer_id: user_etc.id
                     }) do
                {:ok, user_etc}

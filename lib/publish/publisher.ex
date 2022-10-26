@@ -3,8 +3,6 @@ defmodule Bonfire.Federate.ActivityPub.Publisher do
   import Untangle
   alias Bonfire.Federate.ActivityPub.Utils
 
-  # TODO: move specialised publish funcs to context modules (or make them extensible for extra types)
-
   # defines default types that can be federated as AP Actors (overriden by config)
   @types_characters Application.compile_env(
                       :bonfire,
