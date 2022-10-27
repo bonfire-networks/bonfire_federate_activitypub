@@ -101,7 +101,7 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
     refute Bonfire.Social.Follows.following?(local_follower, local_followed)
 
     TestInstanceRepo.apply(fn ->
-      info("check that the follow worked on the remote side")
+      info("check that the request was received on the remote side")
 
       assert {:ok, remote_follower} =
                IntegrationUtils.get_or_fetch_and_create_by_uri(follower_ap_id)
