@@ -21,6 +21,7 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
       ]
     end)
   end
+
   setup_all do
     [
       remote: fake_remote!()
@@ -62,30 +63,24 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
     # TODO: lookup 3 separate users to be sure
 
     remote = fake_remote!()
-    assert {:ok, object} =
-             IntegrationUtils.get_by_url_ap_id_or_username(remote[:username])
+    assert {:ok, object} = IntegrationUtils.get_by_url_ap_id_or_username(remote[:username])
 
     assert object.profile.name == remote[:user].profile.name
 
     remote = fake_remote!()
-    assert {:ok, object} =
-             IntegrationUtils.get_by_url_ap_id_or_username(
-               remote[:canonical_url]
-             )
+    assert {:ok, object} = IntegrationUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
 
     assert object.profile.name == remote[:user].profile.name
 
     remote = fake_remote!()
-    assert {:ok, object} =
-             IntegrationUtils.get_by_url_ap_id_or_username(
-               remote[:friendly_url]
-             )
+    assert {:ok, object} = IntegrationUtils.get_by_url_ap_id_or_username(remote[:friendly_url])
 
     assert object.profile.name == remote[:user].profile.name
   end
 
   @tag :test_instance
-  test "remote follow makes a request, which user can accept and then it turns into a follow", context do
+  test "remote follow makes a request, which user can accept and then it turns into a follow",
+       context do
     local_follower = fake_user!("A Follower #{Pointers.ULID.generate()}")
     follower_ap_id = Bonfire.Me.Characters.character_url(local_follower)
     info(follower_ap_id, "follower_ap_id")
@@ -115,7 +110,9 @@ defmodule Bonfire.Federate.ActivityPub.TwoInstances.FollowPostTest do
       assert Bonfire.Social.Follows.requested?(remote_follower, remote_followed)
 
       info("now accept the request")
-      assert {:ok, follow} = Bonfire.Social.Follows.accept_from(remote_follower, current_user: remote_followed)
+
+      assert {:ok, follow} =
+               Bonfire.Social.Follows.accept_from(remote_follower, current_user: remote_followed)
 
       assert Bonfire.Social.Follows.following?(remote_follower, remote_followed)
       refute Bonfire.Social.Follows.requested?(remote_follower, remote_followed)

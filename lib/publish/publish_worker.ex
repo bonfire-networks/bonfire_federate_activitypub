@@ -30,9 +30,11 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
       )
 
       :ok
-
     else
-      info("Skip (re)federating out '#{verb}' activity of object '#{Utils.ulid(thing)}' by a remote actor")
+      info(
+        "Skip (re)federating out '#{verb}' activity of object '#{Utils.ulid(thing)}' by a remote actor"
+      )
+
       :skip
     end
   end
@@ -65,6 +67,7 @@ defmodule Bonfire.Federate.ActivityPub.APPublishWorker do
     |> repo().maybe_preload(creator: [:peered])
     |> repo().maybe_preload(edge: [:object])
     |> Bonfire.Federate.ActivityPub.Publisher.publish(verb, ...)
+
     # NOTE: we check this before putting things in the queue instead
     # |> only_local(verb, &Bonfire.Federate.ActivityPub.Publisher.publish/2)
   end
