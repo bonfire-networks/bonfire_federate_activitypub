@@ -124,7 +124,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
                ActivityPub.follow(local_actor, remote_actor, nil, true)
              )
 
-      # assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+      # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
       refute Bonfire.Social.Follows.following?(local_user, remote_user)
     end
   end
@@ -146,7 +146,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       assert {:ok, follow_activity} = ActivityPub.follow(remote_actor, local_actor, nil, false)
 
-      assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(follow_activity)
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
       assert Bonfire.Social.Follows.requested?(remote_user, local_user)
       # assert Bonfire.Social.Follows.following?(remote_user, local_user)

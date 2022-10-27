@@ -22,7 +22,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
     {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
 
-    assert {:ok, activity} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(data)
+    assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
     assert activity.__struct__ == Bonfire.Data.Social.APActivity
     assert is_map(activity.json["object"])
@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     data =
       "../fixtures/pleroma-emojireact.json"
@@ -50,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
     {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
 
-    assert {:ok, activity} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(data)
+    assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
     assert is_map(activity.json["object"])
     assert activity.json["type"] == "EmojiReact"

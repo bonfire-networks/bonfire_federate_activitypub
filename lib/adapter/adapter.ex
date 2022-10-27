@@ -12,7 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Common.Pointers
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
-  alias Bonfire.Federate.ActivityPub.APReceiverWorker
+  alias Bonfire.Federate.ActivityPub.Incoming
 
   import Bonfire.Federate.ActivityPub
   import Untangle
@@ -24,10 +24,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   @doc """
-  Queue-up incoming activities to be processed by `Bonfire.Federate.ActivityPub.APReceiverWorker`
+  Queue-up incoming activities to be processed by `Bonfire.Federate.ActivityPub.Incoming.Worker`
   """
   def handle_activity(activity) do
-    APReceiverWorker.enqueue("handle_activity", %{
+    Incoming.Worker.enqueue("handle_activity", %{
       "activity_id" => activity.id,
       "activity" => activity.data
     })
@@ -55,7 +55,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # APUtils.character_module("Person") # FIXME
     # |> maybe_apply(:get_actor_by_id, [id])
 
-    with {:ok, character} <- APUtils.get_character_by_id(id),
+    with {:ok, character} <- APUtils.get_character_by_id(id) |> info(),
          %ActivityPub.Actor{} = actor <-
            Bonfire.Common.ContextModule.maybe_apply(
              character,
@@ -134,7 +134,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def update_remote_actor(%{pointer_id: pointer_id} = actor) when is_binary(pointer_id) do
     APUtils.get_character_by_id(pointer_id)
     |> info()
-    |> update_remote_actor(actor)
+    ~> update_remote_actor(actor)
   end
 
   def update_remote_actor(actor) do
@@ -257,7 +257,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def maybe_publish_object(%{} = object) do
     object
-    |> info()
-    |> Bonfire.Federate.ActivityPub.Publisher.publish("create", ...)
+    # |> info()
+    |> Bonfire.Federate.ActivityPub.Outgoing.maybe_federate(:create, ...)
   end
 end

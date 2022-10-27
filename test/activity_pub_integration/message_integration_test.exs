@@ -18,6 +18,24 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     :ok
   end
 
+  test "messages get queued to federate" do
+    me = fake_user!()
+    messaged = fake_user!()
+
+    msg = "hey you have an epic text message"
+    attrs = %{to_circles: [messaged.id], post_content: %{html_body: msg}}
+
+    assert {:ok, message} = Messages.send(me, attrs)
+
+    ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(message)
+    assert %{__struct__: ActivityPub.Object} = ap_activity
+
+    Oban.Testing.assert_enqueued(repo(),
+      worker: ActivityPub.Workers.PublisherWorker,
+      args: %{"op" => "publish", "activity_id" => ap_activity.id}
+    )
+  end
+
   test "can federate message" do
     me = fake_user!()
     messaged = fake_user!()
@@ -25,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     attrs = %{to_circles: [messaged.id], post_content: %{html_body: msg}}
     assert {:ok, message} = Messages.send(me, attrs)
 
-    {:ok, activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", message)
+    {:ok, activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(message)
 
     assert activity.object.data["content"] =~ msg
   end
@@ -54,7 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     {:ok, activity} = ActivityPub.create(params)
 
     assert {:ok, %Bonfire.Data.Social.Message{} = message} =
-             Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
   end
 
   test "creates a Message for an incoming private Note with @ mention" do
@@ -72,11 +90,12 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     assert params.object["content"] == activity.object.data["content"]
 
     assert {:ok, %Bonfire.Data.Social.Message{} = message} =
-             Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
     assert message.post_content.html_body =~ params.object["content"]
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert [] = Enum.filter(feed, &(&1.activity.object_id == ulid(message)))
   end
 end

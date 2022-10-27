@@ -103,7 +103,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     params = remote_activity_json(actor, recipient_actors)
 
     with {:ok, activity} <- ActivityPub.create(params),
-         do: Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+         do: Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
   end
 
   defp recipient(%{id: _} = recipient) do

@@ -17,6 +17,36 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
     :ok
   end
 
+  test "boosts get queued to federate" do
+    me = fake_user!()
+    post_creator = fake_user!()
+
+    attrs = %{
+      post_content: %{
+        summary: "summary",
+        name: "name",
+        html_body: "<p>epic html message</p>"
+      }
+    }
+
+    assert {:ok, boosted} =
+             Posts.publish(
+               current_user: post_creator,
+               post_attrs: attrs,
+               boundary: "public"
+             )
+
+    assert {:ok, boost} = Boosts.boost(me, boosted)
+
+    ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(boost)
+    assert %{__struct__: ActivityPub.Object} = ap_activity
+
+    Oban.Testing.assert_enqueued(repo(),
+      worker: ActivityPub.Workers.PublisherWorker,
+      args: %{"op" => "publish", "activity_id" => ap_activity.id}
+    )
+  end
+
   test "boost publishing works" do
     user = fake_user!()
     booster = fake_user!()
@@ -25,14 +55,11 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     {:ok, boost} = Boosts.boost(booster, post)
 
-    assert {:ok, _, _} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => boost.id}
-             })
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(boost)
   end
 
   test "boost receiving works" do
@@ -42,13 +69,13 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_boost, _} = ActivityPub.announce(actor, ap_activity.object)
 
-    assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_boost)
+    assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
   end
 
   test "unboost receiving works" do
@@ -58,17 +85,17 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_boost, _} = ActivityPub.announce(actor, ap_activity.object)
 
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_boost)
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
 
     {:ok, ap_unboost, _} = ActivityPub.unannounce(actor, ap_activity.object)
 
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_unboost)
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_unboost)
   end
 
   # test "boost receiving works, using a raw object" do
@@ -91,6 +118,6 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   #     }
   #   }
 
-  #   assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_boost) |> repo().maybe_preload(:caretaker, activity: [:subject]) |> debug
+  #   assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost) |> repo().maybe_preload(:caretaker, activity: [:subject]) |> debug
   # end
 end

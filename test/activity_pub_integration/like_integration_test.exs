@@ -15,6 +15,36 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
     :ok
   end
 
+  test "likes get queued to federate" do
+    me = fake_user!()
+    post_creator = fake_user!()
+
+    attrs = %{
+      post_content: %{
+        summary: "summary",
+        name: "name",
+        html_body: "<p>epic html message</p>"
+      }
+    }
+
+    assert {:ok, post} =
+             Posts.publish(
+               current_user: post_creator,
+               post_attrs: attrs,
+               boundary: "public"
+             )
+
+    assert {:ok, like} = Likes.like(me, post)
+
+    ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(like)
+    assert %{__struct__: ActivityPub.Object} = ap_activity
+
+    Oban.Testing.assert_enqueued(repo(),
+      worker: ActivityPub.Workers.PublisherWorker,
+      args: %{"op" => "publish", "activity_id" => ap_activity.id}
+    )
+  end
+
   test "like publishing works" do
     user = fake_user!()
     liker = fake_user!()
@@ -23,14 +53,11 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     {:ok, like} = Likes.like(liker, post)
 
-    assert {:ok, _, _} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => like.id}
-             })
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(like)
   end
 
   test "like receiving works" do
@@ -40,13 +67,13 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_like, _} = ActivityPub.like(actor, ap_activity.object)
 
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_like)
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_like)
   end
 
   test "unlike receiving works" do
@@ -56,16 +83,16 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
     {:ok, ap_like, _} = ActivityPub.like(actor, ap_activity.object)
 
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_like)
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_like)
 
     {:ok, ap_unlike, _, _} = ActivityPub.unlike(actor, ap_activity.object)
 
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(ap_unlike)
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_unlike)
   end
 end

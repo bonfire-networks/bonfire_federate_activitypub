@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Receiver do
+defmodule Bonfire.Federate.ActivityPub.Incoming do
   import Untangle
   use Arrows
 

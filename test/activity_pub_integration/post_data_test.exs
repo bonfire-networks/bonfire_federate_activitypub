@@ -16,16 +16,40 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     :ok
   end
 
+  test "posts get queued to federate" do
+    attrs = %{
+      post_content: %{
+        summary: "summary",
+        name: "name",
+        html_body: "<p>epic html message</p>"
+      }
+    }
+
+    user = fake_user!()
+
+    assert {:ok, post} =
+             Posts.publish(
+               current_user: user,
+               post_attrs: attrs,
+               boundary: "public"
+             )
+
+    ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(post)
+    assert %{__struct__: ActivityPub.Object} = ap_activity
+
+    Oban.Testing.assert_enqueued(repo(),
+      worker: ActivityPub.Workers.PublisherWorker,
+      args: %{"op" => "publish", "activity_id" => ap_activity.id}
+    )
+  end
+
   test "Post publishing works" do
     user = fake_user!()
     attrs = %{post_content: %{html_body: "content"}}
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => post.id}
-             })
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     # debug(ap_activity)
     assert ap_activity.object.data["content"] =~ post.post_content.html_body
@@ -38,10 +62,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "mentions")
 
-    assert {:error, _} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => post.id}
-             })
+    assert_raise(FunctionClauseError, fn ->
+      Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+    end)
   end
 
   test "does not publish private Posts publicly" do
@@ -52,10 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "mentions")
 
-    assert {:ok, ap_activity} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => post.id}
-             })
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     # debug(ap_activity)
     assert post.post_content.html_body =~ ap_activity.object.data["content"]
@@ -82,8 +102,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
                boundary: "public"
              )
 
-    assert {:ok, original_activity} =
-             Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, original_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     attrs_reply = %{
       post_content: %{
@@ -101,11 +120,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
                boundary: "public"
              )
 
-    assert {:ok, ap_activity} =
-             Bonfire.Federate.ActivityPub.Publisher.publish(
-               "create",
-               post_reply
-             )
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post_reply)
 
     assert ap_activity.object.data["inReplyTo"] ==
              original_activity.object.data["id"]
@@ -127,7 +142,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
                boundary: "mentions"
              )
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Publisher.publish("create", post)
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     assert ap_user.ap_id in ap_activity.data["to"]
   end
@@ -149,13 +164,14 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert actor.data["id"] == activity.data["actor"]
     assert params.object["content"] == activity.object.data["content"]
 
-    assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
     assert post.post_content.html_body =~ params.object["content"]
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
-    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(feed_id, recipient) |> info()
+    assert [_] = Enum.filter(feed, &(&1.activity.object_id == ulid(post)))
 
     # debug(feed_entry)
   end
@@ -177,13 +193,14 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert actor.data["id"] == activity.data["actor"]
     assert params.object["content"] == activity.object.data["content"]
 
-    assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
     assert post.post_content.html_body =~ params.object["content"]
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
-    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert [feed_entry] = Enum.filter(feed, &(&1.activity.object_id == ulid(post))) |> info()
 
     date =
       feed_entry.activity.object_id
@@ -209,7 +226,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     {:ok, activity} = ActivityPub.create(params)
 
-    assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
     reply_object = %{
       "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
@@ -227,7 +244,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     {:ok, reply_activity} = ActivityPub.create(reply_params)
 
-    assert {:ok, reply} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(reply_activity)
+    assert {:ok, reply} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(reply_activity)
 
     assert reply.replied.reply_to_id == post.id
   end
@@ -248,7 +265,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert actor.data["id"] == activity.data["actor"]
     assert params.object["content"] == activity.object.data["content"]
 
-    assert {:ok, post} = Bonfire.Federate.ActivityPub.Receiver.receive_activity(activity)
+    assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
     assert Bonfire.Boundaries.Circles.circles()[:guest] not in Bonfire.Social.FeedActivities.feeds_for_activity(
              post.activity

@@ -23,10 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => post.id}
-             })
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     obj =
       build_conn()
@@ -44,11 +41,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    # |> debug
-    assert {:ok, ap_activity} =
-             Bonfire.Federate.ActivityPub.APPublishWorker.perform(%{
-               args: %{"op" => "create", "context_id" => post.id}
-             })
+    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     id = ap_activity.object.data["id"]
 

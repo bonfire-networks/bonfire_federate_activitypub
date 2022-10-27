@@ -99,6 +99,12 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     do: error(other, "Could not find character")
 
   def get_character_by_id(id, opts \\ [skip_boundary_check: true])
+
+  def get_character_by_id(%{id: _} = c, _opts) do
+    {:ok, c}
+  end
+
+  def get_character_by_id(id, opts)
       when is_binary(id) do
     pointer_id = ulid(id)
 
@@ -376,7 +382,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       "followers" => "#{id}/followers",
       "following" => "#{id}/following",
       "preferredUsername" => e(user_etc, :character, :username, nil),
-      "name" => e(user_etc, :profile, :name, nil),
+      "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
       "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
       "icon" => icon,
       "image" => image,
@@ -434,7 +440,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
                         username: username
                       },
                       profile: %{
-                        name: actor.data["name"],
+                        name: actor.data["name"] || username,
                         summary: actor.data["summary"]
                       },
                       peered: %{

@@ -27,6 +27,7 @@ defmodule Bonfire.Federate.ActivityPub.DataCase do
       import Bonfire.UI.Common.Testing.Helpers
       import Bonfire.Federate.ActivityPub.DataHelpers
       alias Bonfire.Federate.ActivityPub.Simulate
+      import Bonfire.Federate.ActivityPub
     end
   end
 
