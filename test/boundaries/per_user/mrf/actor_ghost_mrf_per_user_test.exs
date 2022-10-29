@@ -33,7 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
 
       refute match?(
                {:ok, local_user},
-               ActivityPub.follow(remote_actor, local_actor, nil, false)
+               ActivityPub.follow(%{actor: remote_actor, object: local_actor, local: false})
              )
 
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
@@ -71,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}

@@ -35,7 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     Oban.Testing.assert_enqueued(repo(),
       worker: ActivityPub.Workers.PublisherWorker,
-      args: %{"op" => "publish", "activity_id" => ap_activity.id}
+      args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
     )
   end
 
@@ -89,7 +89,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
     # info(ulid(follower), "follower ID")
 
-    {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
+    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
     # |> debug
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
@@ -106,7 +106,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
     # info(ulid(follower), "follower ID")
 
-    {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
+    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
     # |> info("requested AP")
     assert {:ok, request} =
@@ -131,7 +131,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
     info(ulid(follower), "follower ID")
 
-    {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
+    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
     assert {:ok, request} =
              Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
@@ -151,7 +151,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
   #   {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
   #   info(ulid(follower), "follower ID")
 
-  #   {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
+  # {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
   #   assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity) |> debug
   #   assert Bonfire.Social.Follows.following?(follower, followed)
@@ -162,7 +162,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
     {:ok, ap_followed} = ActivityPub.Adapter.get_actor_by_id(followed.id)
-    {:ok, follow_activity} = ActivityPub.follow(ap_follower, ap_followed)
+    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
     # |> info("requested AP")
     assert {:ok, request} =
@@ -177,7 +177,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     # assert not is_nil(request.accepted_at)
     assert Bonfire.Social.Follows.following?(follower, followed)
 
-    {:ok, unfollow_activity} = ActivityPub.unfollow(ap_follower, ap_followed)
+    {:ok, unfollow_activity} = ActivityPub.unfollow(%{actor: ap_follower, object: ap_followed})
 
     Bonfire.Federate.ActivityPub.Incoming.receive_activity(unfollow_activity)
     refute Bonfire.Social.Follows.following?(follower, followed)

@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     Oban.Testing.assert_enqueued(repo(),
       worker: ActivityPub.Workers.PublisherWorker,
-      args: %{"op" => "publish", "activity_id" => ap_activity.id}
+      args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
     )
   end
 
@@ -92,7 +92,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     }
 
     user = fake_user!()
-    ap_user = ActivityPub.Actor.get_by_local_id!(user.id)
+    ap_user = ActivityPub.Actor.get_cached!(pointer: user.id)
     replier = fake_user!()
 
     assert {:ok, post} =
@@ -131,7 +131,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   test "mention publishing works" do
     me = fake_user!()
     mentioned = fake_user!()
-    ap_user = ActivityPub.Actor.get_by_local_id!(mentioned.id)
+    ap_user = ActivityPub.Actor.get_cached!(pointer: mentioned.id)
     msg = "hey @#{mentioned.character.username} you have an epic text message"
     attrs = %{post_content: %{html_body: msg}}
 
@@ -150,7 +150,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   test "creates a Post for an incoming Note" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient = fake_user!()
-    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+    recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
     to = [
       recipient_actor.ap_id,
@@ -168,10 +168,12 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     assert post.post_content.html_body =~ params.object["content"]
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+    feed_id =
+      Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+      |> info("feeeed")
 
-    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(feed_id, recipient) |> info()
-    assert [_] = Enum.filter(feed, &(&1.activity.object_id == ulid(post)))
+    assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
+           |> info()
 
     # debug(feed_entry)
   end
@@ -179,7 +181,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   test "creates a Post for an incoming Note with the Note's published date" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient = fake_user!()
-    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+    recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
     to = [
       recipient_actor.ap_id,
@@ -199,8 +201,8 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
-    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
-    assert [feed_entry] = Enum.filter(feed, &(&1.activity.object_id == ulid(post))) |> info()
+    assert %{edges: [feed_entry]} =
+             Bonfire.Social.FeedActivities.feed_with_object(feed_id, post, current_user: recipient)
 
     date =
       feed_entry.activity.object_id
@@ -215,7 +217,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   test "creates a reply for an incoming note with a reply" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient = fake_user!()
-    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+    recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
     to = [
       recipient_actor.ap_id,
@@ -252,7 +254,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   test "does not set public circle for remote objects not addressed to AP public URI" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient = fake_user!()
-    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+    recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
     to = [
       recipient_actor.ap_id

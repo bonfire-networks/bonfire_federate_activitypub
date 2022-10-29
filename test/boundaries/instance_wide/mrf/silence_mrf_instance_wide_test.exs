@@ -114,14 +114,15 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 
-      remote_user
-      |> e(:character, :peered, :peer_id, nil)
-      # |> debug
-      |> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+      {:ok, block} =
+        remote_user
+        |> e(:character, :peered, :peer_id, nil)
+        # |> debug
+        |> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
       refute match?(
                {:ok, follow_activity},
-               ActivityPub.follow(local_actor, remote_actor, nil, true)
+               ActivityPub.follow(%{actor: local_actor, object: remote_actor, local: true})
              )
 
       # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
@@ -144,7 +145,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       # |> debug
       |> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
-      assert {:ok, follow_activity} = ActivityPub.follow(remote_actor, local_actor, nil, false)
+      assert {:ok, follow_activity} =
+               ActivityPub.follow(%{actor: remote_actor, object: local_actor, local: false})
 
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
@@ -240,7 +242,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@remote_actor, @public_uri]
                 }}
@@ -256,7 +258,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@remote_actor, @public_uri]
                 }}
@@ -270,7 +272,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@remote_actor, @public_uri]
                 }}
@@ -284,7 +286,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@remote_actor, @public_uri]
                 }}
@@ -302,7 +304,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@remote_actor, @public_uri]
                 }}
@@ -316,7 +318,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@remote_actor, @public_uri]
                 }}

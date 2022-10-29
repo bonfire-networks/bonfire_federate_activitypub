@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
     Oban.Testing.assert_enqueued(repo(),
       worker: ActivityPub.Workers.PublisherWorker,
-      args: %{"op" => "publish", "activity_id" => ap_activity.id}
+      args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
     )
   end
 
@@ -50,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
   test "can receive federated ChatMessage" do
     me = fake_user!()
-    {:ok, local_actor} = ActivityPub.Actor.get_by_local_id(me.id)
+    {:ok, local_actor} = ActivityPub.Actor.get_cached(pointer: me.id)
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     context = "blabla"
 
@@ -78,7 +78,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
   test "creates a Message for an incoming private Note with @ mention" do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     recipient = fake_user!()
-    recipient_actor = ActivityPub.Actor.get_by_local_id!(recipient.id)
+    recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
     params =
       remote_PM_json(actor, recipient_actor)
@@ -95,7 +95,8 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     assert message.post_content.html_body =~ params.object["content"]
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
-    assert [] = Enum.filter(feed, &(&1.activity.object_id == ulid(message)))
+
+    refute =
+      Bonfire.Social.FeedActivities.feed_contains?(feed_id, message, current_user: recipient)
   end
 end

@@ -46,10 +46,11 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
              local_recipient_ids,
              activity
            ) do
+      info("Boundary check done!")
       {:ok, activity}
     else
       e ->
-        error(e)
+        warn(e, "Activity rejected by Boundaries")
         {:reject, nil}
     end
   end
@@ -195,7 +196,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp block_or_filter_recipients(block_types, activity, local_actor_ids) do
     case filter_recipients(block_types, activity, local_actor_ids) do
       %{"type" => type} when type in ["Update", "Delete", "Flag"] ->
-        info("accept #{type} with no recipients")
+        info("accept '#{type}' activity with no recipients")
         {:ok, activity}
 
       %{to: []} ->
@@ -207,7 +208,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         nil
 
       filtered ->
-        if filtered != activity, do: debug("filtered")
+        if filtered != activity,
+          do: info(filtered, "activity has been filtered"),
+          else: info("no blocks apply")
+
         {:ok, filtered}
     end
   end
@@ -347,6 +351,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp id_or_object_id(objects) when is_list(objects) do
     Enum.map(objects, &id_or_object_id/1)
+  end
+
+  defp id_or_object_id(nil) do
+    nil
   end
 
   defp id_or_object_id(other) do

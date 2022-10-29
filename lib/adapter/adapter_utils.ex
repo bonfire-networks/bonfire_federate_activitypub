@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-defmodule Bonfire.Federate.ActivityPub.Utils do
+defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   use Bonfire.Common.Utils
   alias Bonfire.Common.URIs
   import Bonfire.Federate.ActivityPub
@@ -114,26 +114,10 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     end
   end
 
-  # def get_character_by_ap_id(%{"preferredUsername" => username}) when is_binary(username) do
-  #   get_character_by_username(username) |> info("preferredUsername: #{username}")
-  # end
-
-  def get_character_by_ap_id(%{username: username}) when is_binary(username) do
-    get_character_by_username(username)
-
-    # |> info("username: #{username}")
-  end
-
-  def get_character_by_ap_id(%{data: data}) do
-    get_character_by_ap_id(data)
-
-    # |> info("data")
-  end
-
-  def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) do
-    get_character_by_ap_id(ap_id)
-
-    # |> info("id: #{ap_id}")
+  def get_local_character_by_ap_id(ap_id, local_instance \\ nil) when is_binary(ap_id) do
+    String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
+    |> info("assume local character")
+    |> get_character_by_username()
   end
 
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
@@ -143,23 +127,53 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
       info(ap_id, "assume remote character")
       # FIXME: this should not query the AP db
       # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-      with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
-        get_character_by_ap_id(actor)
+      case ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id, false)
+           |> info("got_fetched_by_ap_id") do
+        {:ok, %{pointer_id: pointer_id}} when is_binary(pointer_id) ->
+          get_character_by_id(pointer_id)
+
+        {:ok, %{username: username} = actor} when is_binary(username) ->
+          get_character_by_username(ActivityPub.Actor.format_username(actor))
+
+        e ->
+          error(e, "Could not fetch the actor")
       end
     else
-      String.trim_leading(ap_id, local_instance <> "/actors/")
-      |> info("assume local character")
-      |> get_character_by_username()
+      get_local_character_by_ap_id(ap_id, local_instance)
     end
   end
 
-  def get_character_by_ap_id(%{} = character),
+  def get_character_by_ap_id(%{pointer_id: pointer_id}) when is_binary(pointer_id) do
+    get_character_by_id(pointer_id)
+  end
+
+  def get_character_by_ap_id(%{ap_id: ap_id}) when is_binary(ap_id) do
+    get_character_by_ap_id(ap_id)
+  end
+
+  def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) when is_binary(ap_id) do
+    get_character_by_ap_id(ap_id)
+  end
+
+  def get_character_by_ap_id(%{data: %{"id" => ap_id} = _data}) do
+    get_character_by_ap_id(ap_id)
+  end
+
+  def get_character_by_ap_id(%{username: username} = actor) when is_binary(username) do
+    get_character_by_username(ActivityPub.Actor.format_username(actor))
+  end
+
+  # def get_character_by_ap_id(%{username: username}) when is_binary(username) do
+  #   get_character_by_username(username)
+  # end
+  # def get_character_by_ap_id(%{"preferredUsername" => username}) when is_binary(username) do
+  #   get_character_by_username(username) |> info("preferredUsername: #{username}")
+  # end
+  def get_character_by_ap_id(%{} = character) when is_struct(character),
     do: {:ok, repo().maybe_preload(character, [:actor, :character, :profile])}
 
   def get_character_by_ap_id(other) do
-    error("get_character_by_ap_id: dunno how to get character for #{inspect(other)}")
-
-    {:error, :not_found}
+    error(other, "Invalid parameters when looking up an actor")
   end
 
   def get_character_by_ap_id!(ap_id) do
@@ -269,32 +283,11 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     end
   end
 
-  def get_or_fetch_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
-    log("AP - get_or_fetch_actor_by_ap_id! : " <> ap_id)
-
-    with {:ok, actor} <- ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
-      actor
-    else
-      _ -> nil
-    end
-  end
-
-  def get_cached_actor_by_local_id!(ap_id) when is_binary(ap_id) do
-    log("AP - get_cached_actor_by_local_id! : " <> ap_id)
-
-    with {:ok, actor} <- ActivityPub.Actor.get_cached_by_local_id(ap_id) do
-      actor
-    else
-      _ -> nil
-    end
-  end
-
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
     log("AP - get_object_or_actor_by_ap_id! : " <> ap_id)
     # FIXME?
-    ok_unwrap(ActivityPub.Object.get_cached_by_ap_id(ap_id)) ||
-      get_or_fetch_actor_by_ap_id!(ap_id) ||
-      ap_id
+    ok_unwrap(ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id: ap_id)) ||
+      ActivityPub.Object.get_cached!(ap_id: ap_id) || ap_id
   end
 
   def get_object_or_actor_by_ap_id!(ap_id) do
@@ -306,7 +299,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     log("AP - get_creator_ap_id! : " <> creator_id)
 
     with {:ok, %{ap_id: ap_id}} <-
-           ActivityPub.Actor.get_cached_by_local_id(creator_id) do
+           ActivityPub.Actor.get_cached(pointer: creator_id) do
       ap_id
     else
       _ -> nil
@@ -327,7 +320,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     log("AP - get_context_ap_id! : " <> context_id)
 
     with {:ok, %{ap_id: ap_id}} <-
-           ActivityPub.Actor.get_cached_by_local_id(context_id) do
+           ActivityPub.Actor.get_cached(pointer: context_id) do
       ap_id
     else
       _ -> nil
@@ -344,7 +337,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
              character
            ) do
       # TODO: use federation_module instead of context_module?
-      {:ok, actor}
+      actor
     else
       _ ->
         format_actor(character)
@@ -500,23 +493,18 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     do: create_remote_actor(ap_id)
 
   def create_remote_actor(ap_id) when is_binary(ap_id) do
-    case ActivityPub.Object.get_by_ap_id(ap_id) do
-      %ActivityPub.Object{} = actor ->
-        actor
+    case ActivityPub.Object.get_cached!(ap_id: ap_id) do
+      %ActivityPub.Object{} = object ->
+        object
 
       _ ->
         ActivityPub.Object.normalize(ap_id)
-
-        # |> info(ap_id)
-        # |> e(:data, "id", nil)
-        # |> debug
-        # |> ActivityPub.Object.get_by_ap_id()
     end
     #  |> debug
     |> create_remote_actor()
   end
 
-  # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_by_pointer_id(pointer_id) |> create_remote_actor()
+  # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_cached!(pointer: pointer_id) |> create_remote_actor()
   def create_remote_actor(%ActivityPub.Object{} = object),
     do: ActivityPub.Actor.format_remote_actor(object) |> create_remote_actor()
 
@@ -543,7 +531,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def determine_recipients(actor, comment, parent) do
     if(is_map(parent) and Map.has_key?(parent, :id)) do
-      case ActivityPub.Actor.get_cached_by_local_id(parent.id) do
+      case ActivityPub.Actor.get_cached(pointer: parent.id) do
         {:ok, parent_actor} ->
           determine_recipients(
             actor,
@@ -564,22 +552,22 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
 
   def determine_recipients(actor, comment, to, cc) do
     # this doesn't feel very robust
-    to =
-      unless is_nil(get_in_reply_to(comment)) do
-        # FIXME: replace with correct call
-        participants =
-          Threads.list_comments_in_thread(comment.thread)
-          |> Enum.map(fn comment -> comment.creator_id end)
-          |> Enum.map(&ActivityPub.Actor.get_by_local_id!/1)
-          |> Enum.filter(fn actor -> actor end)
-          |> Enum.map(fn actor -> actor.ap_id end)
+    # to =
+    #   unless is_nil(get_in_reply_to(comment)) do
+    #     # FIXME: replace with correct call
+    #     participants =
+    #       Threads.list_comments_in_thread(comment.thread)
+    #       |> Enum.map(fn comment -> comment.creator_id end)
+    #       |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1))
+    #       |> Enum.filter(fn actor -> actor end)
+    #       |> Enum.map(fn actor -> actor.ap_id end)
 
-        (participants ++ to)
-        |> Enum.dedup()
-        |> List.delete(Map.get(Actor.get_by_local_id!(actor.id), :ap_id))
-      else
-        to
-      end
+    #     (participants ++ to)
+    #     |> Enum.dedup()
+    #     |> List.delete(Map.get(Actor.get_cached!(pointer: actor.id), :ap_id))
+    #   else
+    #     to
+    #   end
 
     {to, cc}
   end
@@ -588,7 +576,7 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
     reply_to_id = Map.get(comment, :reply_to_id)
 
     if reply_to_id do
-      case ActivityPub.Object.get_cached_by_pointer_id!(reply_to_id) do
+      case ActivityPub.Object.get_cached!(pointer: reply_to_id) do
         nil ->
           nil
 
@@ -601,15 +589,18 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_object_ap_id(%{id: id}) do
-    case ActivityPub.Object.get_cached_by_pointer_id!(id) do
-      nil ->
-        case ActivityPub.Actor.get_cached_by_local_id(id) do
-          {:ok, actor} -> actor.ap_id
-          {:error, e} -> {:error, e}
-        end
+    case ActivityPub.Actor.get_cached!(pointer: id) do
+      %{ap_id: id} ->
+        id
 
-      object ->
-        object.data["id"]
+      %{data: %{"id" => id}} ->
+        id
+
+      _ ->
+        case ActivityPub.Object.get_cached!(pointer: id) do
+          %{data: %{"id" => id}} -> id
+          e -> error(e)
+        end
     end
   end
 
@@ -625,9 +616,9 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_object(object) do
-    case ActivityPub.Object.get_cached_by_pointer_id!(ulid(object)) |> info() do
+    case ActivityPub.Object.get_cached!(pointer: ulid(object)) |> info() do
       nil ->
-        case ActivityPub.Actor.get_cached_by_local_id(ulid(object)) do
+        case ActivityPub.Actor.get_cached(pointer: ulid(object)) do
           {:ok, actor} -> actor
           {:error, e} -> {:error, e}
         end
@@ -638,13 +629,13 @@ defmodule Bonfire.Federate.ActivityPub.Utils do
   end
 
   def get_pointer_id_by_ap_id(ap_id) do
-    case ActivityPub.Object.get_cached_by_ap_id(ap_id) do
+    case ActivityPub.Object.get_cached(ap_id: ap_id) do
       {:ok, object} ->
         object.pointer_id
 
       _ ->
         # Might be a local actor
-        with {:ok, actor} <- ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
+        with {:ok, actor} <- ActivityPub.Actor.get_cached(ap_id: ap_id) do
           actor.pointer_id
         else
           _ -> nil

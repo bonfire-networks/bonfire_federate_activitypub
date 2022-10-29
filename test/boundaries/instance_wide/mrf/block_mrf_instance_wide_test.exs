@@ -82,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       refute match?(
                {:ok, follow_activity},
-               ActivityPub.follow(remote_actor, local_actor, nil, false)
+               ActivityPub.follow(%{actor: remote_actor, object: local_actor, local: false})
              )
 
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
@@ -104,7 +104,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       refute match?(
                {:ok, follow_activity},
-               ActivityPub.follow(local_actor, remote_actor, nil, true)
+               ActivityPub.follow(%{actor: local_actor, object: remote_actor, local: true})
              )
 
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
@@ -250,7 +250,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}
@@ -267,7 +267,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}
@@ -282,7 +282,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}
@@ -297,7 +297,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}
@@ -316,7 +316,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}
@@ -331,7 +331,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}

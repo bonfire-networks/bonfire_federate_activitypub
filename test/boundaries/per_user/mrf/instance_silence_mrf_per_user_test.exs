@@ -77,7 +77,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@remote_actor, @public_uri]
                 }}

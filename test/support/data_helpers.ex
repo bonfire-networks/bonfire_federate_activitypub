@@ -107,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   end
 
   defp recipient(%{id: _} = recipient) do
-    ActivityPub.Actor.get_by_local_id!(recipient.id).ap_id
+    ActivityPub.Actor.get_cached!(pointer: recipient.id).ap_id
   end
 
   defp recipient(%{ap_id: actor}) do

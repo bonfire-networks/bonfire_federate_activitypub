@@ -2,7 +2,7 @@
 defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Untangle
   import Bonfire.Federate.ActivityPub
-  alias Bonfire.Federate.ActivityPub.Utils, as: APUtils
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Common.Utils
 
   # defines default types that can be federated as AP Actors (overriden by config)
@@ -20,11 +20,15 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   def maybe_federate(subject \\ nil, verb, thing) do
     verb = verb || :create
 
-    if (is_nil(subject) and APUtils.is_local?(thing)) or APUtils.is_local?(subject) do
+    thing_local? = AdapterUtils.is_local?(thing)
+    subject_local? = AdapterUtils.is_local?(subject)
+
+    if (is_nil(subject) and thing_local?) or subject_local? do
       prepare_and_queue(subject, verb, thing)
     else
       info(
-        "Skip (re)federating out '#{verb}' activity by remote actor '#{Utils.ulid(subject)}', or remote object '#{Utils.ulid(thing)}'"
+        thing,
+        "Skip (re)federating out '#{verb}' activity by remote actor '#{Utils.ulid(subject)}'=#{subject_local?}, or remote object '#{Utils.ulid(thing)}'=#{thing_local?}"
       )
 
       :ignored
@@ -36,11 +40,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp prepare_and_queue(_subject, :update, %{__struct__: type, id: id})
        when type in @types_characters do
     # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
-    with {:ok, actor} <- ActivityPub.Actor.get_by_local_id(id),
+    with {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: id),
          actor_object <-
            ActivityPubWeb.ActorView.render("actor.json", %{actor: actor}),
          params <- %{
-           to: [APUtils.public_uri()],
+           to: [AdapterUtils.public_uri()],
            cc: [actor.data["followers"]],
            object: actor_object,
            actor: actor,
@@ -56,7 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
   defp prepare_and_queue(_subject, :delete, %Bonfire.Data.Identity.User{} = user) do
     # is this broken?
-    with actor <- APUtils.character_to_actor(user) do
+    with actor <- AdapterUtils.character_to_actor(user) do
       ActivityPub.Actor.set_cache(actor)
       ActivityPub.delete(actor)
     end
@@ -67,8 +71,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # Works for Collections, Communities (not User or MN.ActivityPub.Actor)
 
     with {:ok, creator} <-
-           ActivityPub.Actor.get_by_local_id(character.creator_id),
-         actor <- APUtils.character_to_actor(character) do
+           ActivityPub.Actor.get_cached(pointer: character.creator_id),
+         actor <- AdapterUtils.character_to_actor(character) do
       ActivityPub.Actor.invalidate_cache(actor)
       ActivityPub.delete(actor, true, creator.ap_id)
     end
@@ -77,7 +81,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   # delete anything else
   defp prepare_and_queue(_subject, :delete, %{__struct__: type} = thing) do
     with %{} = object <-
-           ActivityPub.Object.get_cached_by_pointer_id!(thing.id) do
+           ActivityPub.Object.get_cached!(pointer: thing.id) do
       ActivityPub.delete(object)
     else
       e -> preparation_error("Error while attempting to federate the delete", e)
@@ -169,7 +173,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
     case Oban.Testing.perform_job(
            ActivityPub.Workers.PublisherWorker,
-           %{"op" => "publish", "activity_id" => Utils.id(activity)},
+           %{"op" => "publish", "activity_id" => Utils.id(activity), "repo" => repo()},
            repo: repo()
          ) do
       :ok -> {:ok, activity}

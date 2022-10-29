@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
                {:ok,
                 %{
                   actor:
-                    Bonfire.Federate.ActivityPub.Utils.ap_base_url() <>
+                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
                   to: [@public_uri]
                 }}

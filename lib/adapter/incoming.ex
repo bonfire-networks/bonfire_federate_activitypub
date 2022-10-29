@@ -1,10 +1,9 @@
 defmodule Bonfire.Federate.ActivityPub.Incoming do
   import Untangle
   use Arrows
-
-  import Bonfire.Federate.ActivityPub.Utils,
-    only: [log: 1, get_or_fetch_and_create_by_uri: 1]
-
+  import Bonfire.Federate.ActivityPub
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
+  import AdapterUtils, only: [log: 1]
   alias Bonfire.Search.Indexer
   alias Bonfire.Common.Utils
   alias Bonfire.Federate.ActivityPub.Adapter
@@ -24,12 +23,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   def receive_activity(activity_id) when is_binary(activity_id) do
     info("AP - load the activity data from ID")
 
-    ActivityPub.Object.get_by_id(activity_id)
+    ActivityPub.Object.get_cached!(id: activity_id)
     |> receive_activity()
   end
 
   def receive_activity(activity) when not is_map_key(activity, :data) do
-    info("AP - case when the worker gives us an activity")
+    info(activity, "AP - case when the worker gives us activity data")
     receive_activity(%{data: activity})
   end
 
@@ -41,14 +40,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         } = activity
       )
       when is_binary(object_id) do
-    info("AP - load the object data from URI: #{object_id}")
+    info("AP - load the #{activity.data["id"]} activity's object data from URI: #{object_id}")
     # info(activity, "activity")
     case ActivityPub.Fetcher.fetch_object_from_id(object_id) do
       {:ok, object} ->
         info(object, "fetched object")
 
         receive_activity(activity, object)
-        |> info("received...")
+        |> info("received activity on #{repo()}...")
 
       _ ->
         {:error, :not_found}
@@ -83,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when object_type in @actor_types do
     info("AP Match#0 - update actor")
 
-    with {:ok, actor} <- ActivityPub.Actor.get_cached_by_ap_id(ap_id),
+    with {:ok, actor} <- ActivityPub.Actor.get_cached(ap_id: ap_id),
          {:ok, actor} <-
            Bonfire.Federate.ActivityPub.Adapter.update_remote_actor(actor) do
       # Indexer.maybe_index_object(actor)
@@ -301,6 +300,26 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     end
   end
 
+  defp handle_activity_with(
+         {:ok, module},
+         character,
+         %{data: %{"type" => verb}} = activity,
+         object
+       )
+       when is_atom(module) and not is_nil(module) and verb in ["Accept", "Reject"] do
+    info("AP - handle_activity related to another activity module: #{module}")
+
+    with {:ok, %{id: pointable_object_id} = pointable_object} <-
+           Utils.maybe_apply(
+             module,
+             :ap_receive_activity,
+             [character, activity, object],
+             &receive_error/2
+           ) do
+      {:ok, pointable_object}
+    end
+  end
+
   defp handle_activity_with({:ok, module}, character, activity, object)
        when is_atom(module) and not is_nil(module) do
     info("AP - handle_activity_with module: #{module}")
@@ -349,7 +368,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   def activity_character(actor) when is_binary(actor) do
     info(actor, "AP - receive - get activity_character")
     # FIXME to handle actor types other than Person/User
-    with {:error, e} <- get_or_fetch_and_create_by_uri(actor) |> info do
+    with {:error, e} <- AdapterUtils.get_or_fetch_and_create_by_uri(actor) |> info do
       error(e, "AP - could not find local character for the actor")
       {:ok, nil}
     end

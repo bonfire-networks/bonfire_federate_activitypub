@@ -4,8 +4,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   Adapter functions delegated from the `ActivityPub` Library
   """
 
-  alias Bonfire.Federate.ActivityPub.Utils, as: APUtils
-  import APUtils, only: [log: 1]
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
+  import AdapterUtils, only: [log: 1]
 
   use Bonfire.Common.Utils
 
@@ -24,13 +24,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   @doc """
-  Queue-up incoming activities to be processed by `Bonfire.Federate.ActivityPub.Incoming.Worker`
+  Process incoming activities
   """
   def handle_activity(activity) do
-    Incoming.Worker.enqueue("handle_activity", %{
-      "activity_id" => activity.id,
-      "activity" => activity.data
-    })
+    # Incoming.Worker.enqueue("handle_activity", %{
+    #   "activity_id" => activity.id
+    #   # "activity" => activity
+    # })
+    Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
     |> info()
   end
 
@@ -52,44 +53,25 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_id(id) do
-    # APUtils.character_module("Person") # FIXME
-    # |> maybe_apply(:get_actor_by_id, [id])
-
-    with {:ok, character} <- APUtils.get_character_by_id(id) |> info(),
-         %ActivityPub.Actor{} = actor <-
-           Bonfire.Common.ContextModule.maybe_apply(
-             character,
-             :format_actor,
-             character
-           ) do
-      # TODO: use federation_module instead of context_module?
+    with {:ok, character} <- AdapterUtils.get_character_by_id(id) |> info(),
+         true <- AdapterUtils.is_local?(character),
+         %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
       {:ok, actor}
     end
   end
 
   def get_actor_by_username(username) do
-    info(self(), username)
-
-    # TODO: Make more generic (currently assumes the actor is person)
-    # APUtils.character_module("Person")
-    # |> maybe_apply(:get_actor_by_username, [username])
-
-    with {:ok, character} <- APUtils.get_character_by_username(username),
-         %ActivityPub.Actor{} = actor <-
-           Bonfire.Common.ContextModule.maybe_apply(
-             character,
-             :format_actor,
-             character
-           ) do
-      # TODO: use federation_module instead of context_module?
+    with {:ok, character} <- AdapterUtils.get_character_by_username(username),
+         %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
       {:ok, actor}
     end
   end
 
   def get_actor_by_ap_id(ap_id) do
-    with {:ok, %{username: username}} <-
-           ActivityPub.Actor.get_cached_by_ap_id(ap_id) do
-      get_actor_by_username(username)
+    # TODO: Make more generic (currently assumes the actor is user)
+    with {:ok, character} <- AdapterUtils.get_local_character_by_ap_id(ap_id),
+         %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
+      {:ok, actor}
     end
   end
 
@@ -102,7 +84,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def redirect_to_actor(username) do
     if System.get_env("LIVEVIEW_ENABLED", "true") == "true" do
-      case APUtils.get_character_by_username(username) do
+      case AdapterUtils.get_character_by_username(username) do
         {:ok, character} ->
           url = Bonfire.Me.Characters.character_url(character)
           if !String.contains?(url, "/404"), do: url
@@ -114,7 +96,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    with {:ok, character} <- APUtils.get_character_by_ap_id(actor) do
+    with {:ok, character} <- AdapterUtils.get_character_by_ap_id(actor) do
       keys = e(params, :keys, nil)
 
       params = Map.put(params, :character, %{id: character.id, actor: %{signing_key: keys}})
@@ -132,13 +114,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   # TODO: refactor & move to Me context(s)?
 
   def update_remote_actor(%{pointer_id: pointer_id} = actor) when is_binary(pointer_id) do
-    APUtils.get_character_by_id(pointer_id)
+    AdapterUtils.get_character_by_id(pointer_id)
     |> info()
     ~> update_remote_actor(actor)
   end
 
   def update_remote_actor(actor) do
-    APUtils.get_character_by_ap_id(actor)
+    AdapterUtils.get_character_by_ap_id(actor)
     |> info()
     |> update_remote_actor(actor)
   end
@@ -147,22 +129,24 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     do: update_remote_actor(character, data)
 
   def update_remote_actor(%{} = character, data) do
-    params = %{
-      name: data["name"],
-      summary: data["summary"],
-      icon_id:
-        APUtils.maybe_create_icon_object(
-          APUtils.maybe_fix_image_object(data["icon"]),
-          character
-        ),
-      image_id:
-        APUtils.maybe_create_image_object(
-          APUtils.maybe_fix_image_object(data["image"]),
-          character
-        )
-    }
+    params =
+      %{
+        name: data["name"],
+        summary: data["summary"],
+        icon_id:
+          AdapterUtils.maybe_create_icon_object(
+            AdapterUtils.maybe_fix_image_object(data["icon"]),
+            character
+          ),
+        image_id:
+          AdapterUtils.maybe_create_image_object(
+            AdapterUtils.maybe_fix_image_object(data["image"]),
+            character
+          )
+      }
+      |> info()
 
-    # FIXME - support other types
+    # TODO - support other types
     Bonfire.Me.Users.update_remote(character, params)
     :ok
   end
@@ -171,7 +155,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     update_remote_actor(character, actor)
   end
 
-  def update_remote_actor({:error, :not_found}, actor) do
+  def update_remote_actor(other, actor) do
+    info(other, "could not find the character to update, gonna try to create instead")
     maybe_create_remote_actor(actor)
   end
 
@@ -179,12 +164,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   For updating an Actor in cache after a User/etc is updated
   """
   def update_local_actor_cache(character) do
-    with %ActivityPub.Actor{} = actor <-
-           Bonfire.Common.ContextModule.maybe_apply(
-             character,
-             :format_actor,
-             character
-           ) do
+    with %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
       ActivityPub.Actor.set_cache(actor)
     end
 
@@ -194,15 +174,15 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_create_remote_actor(actor) when not is_nil(actor) do
     log("AP - maybe_create_remote_actor for #{e(actor, :ap_id, nil) || e(actor, "id", nil)}")
 
-    case APUtils.get_character_by_ap_id(actor) do
+    case AdapterUtils.get_character_by_ap_id(actor) do
       {:ok, character} ->
         log("AP - remote actor already exists, return it: #{character.id}")
         # already exists
         {:ok, character}
 
-      # new character, create it...
-      {:error, _} ->
-        APUtils.create_remote_actor(actor)
+      e ->
+        warn(e, "seems like a new character? create it...")
+        AdapterUtils.create_remote_actor(actor)
 
         # |> debug
     end
@@ -243,7 +223,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         path
 
       _ ->
-        case APUtils.get_character_by_username(username) do
+        case AdapterUtils.get_character_by_username(username) do
           {:ok, user_etc} -> URIs.path(user_etc)
           {:error, _} -> "/404"
         end
