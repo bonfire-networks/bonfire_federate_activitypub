@@ -267,6 +267,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp filter_actors(actors, block_types, rejects, local_actor_ids) do
     (actors || [])
+    |> Enum.reject(&is_nil/1)
     |> Enum.reject(&filter_actor(&1, block_types, rejects, local_actor_ids))
   end
 
