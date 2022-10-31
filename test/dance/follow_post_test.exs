@@ -1,5 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
+  @moduletag :test_instance
+
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
 
