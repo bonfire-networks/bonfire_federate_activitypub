@@ -27,8 +27,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     |> receive_activity()
   end
 
-  def receive_activity(activity) when not is_map_key(activity, :data) do
-    info(activity, "AP - case when the worker gives us activity data")
+  def receive_activity(%{"id" => _} = activity) when not is_map_key(activity, :data) do
+    info(activity, "AP - case when the worker gives us activity or object JSON data")
     receive_activity(%{data: activity})
   end
 
@@ -86,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
          {:ok, actor} <-
            Bonfire.Federate.ActivityPub.Adapter.update_remote_actor(actor) do
       # Indexer.maybe_index_object(actor)
-      :ok
+      {:ok, actor}
     end
   end
 
@@ -227,7 +227,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     if Bonfire.Common.Pointers.exists?(ap_obj_id) do
       error(ap_obj_id, "Already exists locally")
-      Bonfire.Common.Pointers.get(ap_obj_id)
+      Bonfire.Common.Pointers.get(ap_obj_id, skip_boundary_check: true)
     else
       pointer_id =
         with published when is_binary(published) <-
@@ -266,7 +266,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
                &receive_error/2
              ) do
         info(
-          "AP - created remote object as local #{inspect(type)} #{pointable_object_id} for #{ap_obj_id}"
+          "AP - created remote object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_obj_id}"
         )
 
         # IO.inspect(pointable_object)
@@ -286,6 +286,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              ActivityPub.Object.update_existing(object.id, %{
                pointer_id: pointable_object_id
              })
+             |> info("pointer_id update")
 
         {:ok, pointable_object}
       else
@@ -353,19 +354,19 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     {:error, :skip}
   end
 
-  def activity_character(%{"actor" => actor}) do
+  defp activity_character(%{"actor" => actor}) do
     activity_character(actor)
   end
 
-  def activity_character(%{data: %{} = data}) do
+  defp activity_character(%{data: %{} = data}) do
     activity_character(data)
   end
 
-  def activity_character(%{"id" => actor}) when is_binary(actor) do
+  defp activity_character(%{"id" => actor}) when is_binary(actor) do
     activity_character(actor)
   end
 
-  def activity_character(actor) when is_binary(actor) do
+  defp activity_character(actor) when is_binary(actor) do
     info(actor, "AP - receive - get activity_character")
     # FIXME to handle actor types other than Person/User
     with {:error, e} <- AdapterUtils.get_or_fetch_and_create_by_uri(actor) |> info do
@@ -374,19 +375,19 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     end
   end
 
-  def activity_character(%{"object" => object}) do
+  defp activity_character(%{"object" => object}) do
     activity_character(object)
   end
 
-  def activity_character(%{"attributedTo" => actor}) do
+  defp activity_character(%{"attributedTo" => actor}) do
     activity_character(actor)
   end
 
-  def activity_character(%{actor: actor}) do
+  defp activity_character(%{actor: actor}) do
     activity_character(actor)
   end
 
-  def activity_character(actor) do
+  defp activity_character(actor) do
     error(actor, "AP - could not find an actor in the activity or object")
     {:ok, nil}
   end

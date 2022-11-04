@@ -91,6 +91,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
     assert {:ok, %Bonfire.Data.Social.Message{} = message} =
              Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+             |> repo().maybe_preload(:post_content)
 
     assert message.post_content.html_body =~ params.object["content"]
 

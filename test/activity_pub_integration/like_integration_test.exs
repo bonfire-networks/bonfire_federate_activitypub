@@ -71,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
-    {:ok, ap_like, _} = ActivityPub.like(%{actor: actor, object: ap_activity.object})
+    {:ok, ap_like} = ActivityPub.like(%{actor: actor, object: ap_activity.object})
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_like)
   end
@@ -87,11 +87,11 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
-    {:ok, ap_like, _} = ActivityPub.like(%{actor: actor, object: ap_activity.object})
+    {:ok, ap_like} = ActivityPub.like(%{actor: actor, object: ap_activity.object})
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_like)
 
-    {:ok, ap_unlike, _, _} = ActivityPub.unlike(%{actor: actor, object: ap_activity.object})
+    {:ok, ap_unlike} = ActivityPub.unlike(%{actor: actor, object: ap_activity.object})
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_unlike)
   end

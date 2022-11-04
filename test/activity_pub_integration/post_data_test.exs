@@ -164,7 +164,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert actor.data["id"] == activity.data["actor"]
     assert params.object["content"] == activity.object.data["content"]
 
-    assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+    assert {:ok, post} =
+             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+             |> repo().maybe_preload(:post_content)
 
     assert post.post_content.html_body =~ params.object["content"]
 
@@ -195,7 +197,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert actor.data["id"] == activity.data["actor"]
     assert params.object["content"] == activity.object.data["content"]
 
-    assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+    assert {:ok, post} =
+             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+             |> repo().maybe_preload(:post_content)
 
     assert post.post_content.html_body =~ params.object["content"]
 

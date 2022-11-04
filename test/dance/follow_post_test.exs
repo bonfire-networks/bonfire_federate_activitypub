@@ -11,80 +11,70 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
   alias Bonfire.Social.Posts
   alias Bonfire.Social.Follows
 
-  def fake_remote!() do
-    TestInstanceRepo.apply(fn ->
-      # repo().delete_all(ActivityPub.Object)
-      remote_user = fake_user!("B Remote #{Pointers.ULID.generate()}")
+  def a_fake_user!(name) do
+    # repo().delete_all(ActivityPub.Object)
+    user = fake_user!("#{name} #{Pointers.ULID.generate()}")
 
-      [
-        user: remote_user,
-        username: Bonfire.Me.Characters.display_username(remote_user, true),
-        canonical_url: Bonfire.Me.Characters.character_url(remote_user),
-        friendly_url: Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(remote_user)
-      ]
-    end)
+    [
+      user: user,
+      username: Bonfire.Me.Characters.display_username(user, true),
+      canonical_url: Bonfire.Me.Characters.character_url(user),
+      friendly_url: Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(user)
+    ]
   end
 
-  setup_all do
+  def fake_remote!() do
+    TestInstanceRepo.apply(fn -> a_fake_user!("Remote") end)
+  end
+
+  setup_all tags do
+    Bonfire.Common.Test.Interactive.setup_test_repo(tags)
+
     [
+      local: a_fake_user!("Local"),
       remote: fake_remote!()
     ]
   end
 
   @tag :test_instance
   test "can fetch public post from AP API with AP ID and with friendly URL and Accept header",
-       _context do
-    user = fake_user!("poster #{Pointers.ULID.generate()}")
-    attrs = %{post_content: %{html_body: "test content"}}
+       context do
+    user = context[:local][:user]
 
+    Logger.metadata(action: "create local post 1")
+    attrs = %{post_content: %{html_body: "test content one"}}
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
     canonical_url =
       Bonfire.Common.URIs.canonical_url(post)
       |> info("canonical_url")
 
+    Logger.metadata(action: "create local post 2")
+    attrs2 = %{post_content: %{html_body: "test content two"}}
+    {:ok, post2} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
     friendly_url =
-      (Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(post))
+      (Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(post2))
       |> info("friendly_url")
 
     post =
       TestInstanceRepo.apply(fn ->
-        # FIXME? should we be receiving a Post here rather than an Object?
+        Logger.metadata(action: "fetch post 1 by canonical_url")
         assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
-
         assert object.data["content"] =~ attrs.post_content.html_body
+        # FIXME? should we be receiving a Post here rather than an Object?
+        assert object.post_content.html_body =~ attrs.post_content.html_body
 
+        Logger.metadata(action: "fetch post 2 by friendly_url")
         assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(friendly_url)
-
-        assert object.data["content"] =~ attrs.post_content.html_body
+        assert object.data["content"] =~ attrs2.post_content.html_body
       end)
   end
 
   @tag :test_instance
-  test "can lookup from AP API with username, AP ID and with friendly URL",
-       _context do
-    # lookup 3 separate users to be sure
-
-    remote = fake_remote!()
-    assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:username])
-
-    assert object.profile.name == remote[:user].profile.name
-
-    remote = fake_remote!()
-    assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
-
-    assert object.profile.name == remote[:user].profile.name
-
-    remote = fake_remote!()
-    assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:friendly_url])
-
-    assert object.profile.name == remote[:user].profile.name
-  end
-
-  @tag :test_instance
-  test "remote follow makes a request, which user can accept and then it turns into a follow",
+  test "remote follow makes a request, which user can accept, which it turns into a follow, and a post federates back to the follower",
        context do
-    local_follower = fake_user!("A Follower #{Pointers.ULID.generate()}")
+    local_follower = context[:local][:user]
     follower_ap_id = Bonfire.Me.Characters.character_url(local_follower)
     info(follower_ap_id, "follower_ap_id")
 
@@ -143,5 +133,26 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
     refute Follows.requested?(local_follower, followed_on_local)
 
     # Logger.metadata(action: info("TODO: check that the post was federated and is in feed"))
+  end
+
+  @tag :test_instance
+  test "can lookup from AP API with username, AP ID and with friendly URL",
+       _context do
+    # lookup 3 separate users to be sure
+
+    remote = fake_remote!()
+    assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:username])
+
+    assert object.profile.name == remote[:user].profile.name
+
+    remote = fake_remote!()
+    assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+
+    assert object.profile.name == remote[:user].profile.name
+
+    remote = fake_remote!()
+    assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:friendly_url])
+
+    assert object.profile.name == remote[:user].profile.name
   end
 end

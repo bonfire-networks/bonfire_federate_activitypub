@@ -222,11 +222,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       log("AP - uri - get_or_fetch_and_create: assume remote : " <> q)
 
       # TODO: cleanup
-      case ActivityPub.Fetcher.get_or_fetch_and_create_tuple(q) |> info() do
-        {%{} = object, _actor} -> {:ok, object}
-        {{:ok, object}, _actor} -> {:ok, object}
-        {:ok, actor} -> {:ok, return_character(actor)}
-        {nil, object} -> {:ok, object}
+      case ActivityPub.Fetcher.get_or_fetch_and_create(q) |> info() do
+        {:ok, %{pointer: %{id: _} = pointable} = _ap_object} -> {:ok, pointable}
+        {:ok, %{pointer_id: pointer_id} = _ap_object} -> return_character(pointer_id)
+        {:ok, %ActivityPub.Actor{} = actor} -> return_character(actor)
+        # {{:ok, object}, _actor} -> {:ok, object}
+        {:ok, object} -> {:ok, object}
         e -> error(e)
       end
     else
@@ -247,18 +248,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   defp return_character(fetched, opts) do
     # info(fetched, "fetched")
     case fetched do
+      %{pointer: %{id: _} = character} ->
+        {:ok, character}
+
       %{pointer_id: id} when is_binary(id) ->
-        # |> info("id")
-        Bonfire.Common.Pointers.get(id, opts)
-        # |> info("got")
-        # actor_integration_test
-        ~> repo().maybe_preload([:actor, :character, :profile])
-        |> {:ok, ...}
+        return_pointer(id, opts)
 
-      # |>
+      _ when is_binary(fetched) ->
+        return_pointer(fetched, opts)
+
       # nope? let's try and find them from their ap id
-      # |> debug
-
       %ActivityPub.Actor{} ->
         get_character_by_ap_id(fetched)
 
@@ -267,10 +266,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       %{id: _} ->
         {:ok, fetched}
-
-      {:ok, %{id: _}} ->
-        fetched
     end
+  end
+
+  def return_pointer(id, opts) do
+    Bonfire.Common.Pointers.get(ulid(id), opts)
+    # |> info("got")
+    # actor_integration_test
+    |> repo().maybe_preload([:actor, :character, :profile])
+    |> repo().maybe_preload([:post_content])
+
+    # |>
+    # nope? let's try and find them from their ap id
+    # |> debug
   end
 
   def validate_url(str) do

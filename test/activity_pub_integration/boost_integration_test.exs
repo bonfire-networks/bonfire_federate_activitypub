@@ -73,7 +73,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
-    {:ok, ap_boost, _} = ActivityPub.announce(%{actor: actor, object: ap_activity.object})
+    {:ok, ap_boost} = ActivityPub.announce(%{actor: actor, object: ap_activity.object})
 
     assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
   end
@@ -89,11 +89,11 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
-    {:ok, ap_boost, _} = ActivityPub.announce(%{actor: actor, object: ap_activity.object})
+    {:ok, ap_boost} = ActivityPub.announce(%{actor: actor, object: ap_activity.object})
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
 
-    {:ok, ap_unboost, _} = ActivityPub.unannounce(%{actor: actor, object: ap_activity.object})
+    {:ok, ap_unboost} = ActivityPub.unannounce(%{actor: actor, object: ap_activity.object})
 
     assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_unboost)
   end

@@ -148,7 +148,6 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
     # TODO - support other types
     Bonfire.Me.Users.update_remote(character, params)
-    :ok
   end
 
   def update_remote_actor({:ok, character}, actor) do
@@ -176,7 +175,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
     case AdapterUtils.get_character_by_ap_id(actor) do
       {:ok, character} ->
-        log("AP - remote actor already exists, return it: #{character.id}")
+        log("AP - remote actor already exists, return it: #{ulid(character)}")
         # already exists
         {:ok, character}
 

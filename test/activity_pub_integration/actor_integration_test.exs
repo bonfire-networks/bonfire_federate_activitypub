@@ -163,7 +163,10 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
   test "fetches a same actor by webfinger, AP ID and friendly URL" do
     {:ok, object1} = AdapterUtils.get_by_url_ap_id_or_username(@actor_name)
-    {:ok, object2} = AdapterUtils.get_by_url_ap_id_or_username(@remote_actor)
+
+    {:ok, object2} =
+      AdapterUtils.get_by_url_ap_id_or_username(@remote_actor) |> info(@remote_actor)
+
     {:ok, object3} = AdapterUtils.get_by_url_ap_id_or_username(@remote_actor_url)
 
     assert object1.id == object2.id

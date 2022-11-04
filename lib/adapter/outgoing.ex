@@ -176,6 +176,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
            %{"op" => "publish", "activity_id" => Utils.id(activity), "repo" => repo()},
            repo: repo()
          ) do
+      {:ok, activity} -> {:ok, activity}
       :ok -> {:ok, activity}
     end
 
