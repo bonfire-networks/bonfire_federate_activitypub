@@ -126,7 +126,9 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def is_blocked?(uri, block_type, opts) when is_binary(uri) do
-    get_or_create(uri)
+    uri
+    |> debug()
+    |> get_or_create()
     # ~> debug
     ~> is_blocked?(block_type, opts)
   end

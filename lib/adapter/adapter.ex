@@ -41,14 +41,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       # info(character)
       Bonfire.Social.Follows.all_subjects_by_object(character)
       # |> info()
-      |> Enum.map(& &1.id)
+      |> Enum.map(&ulid(&1))
     end
   end
 
   def get_following_local_ids(actor) do
     with {:ok, character} <- Characters.by_username(actor.username) do
       Bonfire.Social.Follows.all_objects_by_subject(character)
-      |> Enum.map(& &1.id)
+      |> Enum.map(&ulid(&1))
     end
   end
 

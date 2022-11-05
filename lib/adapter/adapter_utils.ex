@@ -338,6 +338,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_context_ap_id(_), do: nil
 
   def character_to_actor(character) do
+    info(character, "character")
+
     with %ActivityPub.Actor{} = actor <-
            Bonfire.Common.ContextModule.maybe_apply(
              character,
@@ -347,13 +349,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # TODO: use federation_module instead of context_module?
       actor
     else
-      _ ->
+      e ->
+        warn(e, "falling back")
         format_actor(character)
     end
   end
 
   def format_actor(%{} = user_etc, type \\ "Person") do
-    # |> IO.inspect()
     user_etc =
       repo().preload(user_etc,
         profile: [:image, :icon],
@@ -494,6 +496,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  def create_remote_actor(%ActivityPub.Actor{} = actor), do: create_remote_actor(actor)
+
   def create_remote_actor(%{ap_id: ap_id}) when is_binary(ap_id),
     do: create_remote_actor(ap_id)
 
@@ -620,19 +624,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     with {:error, e} <- get_object_ap_id(object) do
       log("AP - get_object_ap_id!/1 - #{e}")
       nil
-    end
-  end
-
-  def get_object(object) do
-    case ActivityPub.Object.get_cached!(pointer: ulid(object)) |> info() do
-      nil ->
-        case ActivityPub.Actor.get_cached(pointer: ulid(object)) do
-          {:ok, actor} -> actor
-          {:error, e} -> {:error, e}
-        end
-
-      object ->
-        object
     end
   end
 

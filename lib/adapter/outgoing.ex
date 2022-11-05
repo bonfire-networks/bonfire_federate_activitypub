@@ -13,7 +13,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
                         Bonfire.Data.Identity.User,
                         # CommonsPub.Communities.Community,
                         # CommonsPub.Collections.Collection,
-                        Bonfire.Data.Identity.Character
+                        Bonfire.Data.Identity.Character,
+                        Bonfire.Classify.Category
                       ]
                     )
 
@@ -66,15 +67,13 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  defp prepare_and_queue(_subject, :delete, %{__struct__: type} = character)
+  defp prepare_and_queue(subject, :delete, %{__struct__: type} = character)
        when type in @types_characters do
-    # Works for Collections, Communities (not User or MN.ActivityPub.Actor)
+    # For Topics, Groups, and other non-user actors
 
-    with {:ok, creator} <-
-           ActivityPub.Actor.get_cached(pointer: character.creator_id),
-         actor <- AdapterUtils.character_to_actor(character) do
+    with actor <- AdapterUtils.character_to_actor(character) do
       ActivityPub.Actor.invalidate_cache(actor)
-      ActivityPub.delete(actor, true, creator.ap_id)
+      ActivityPub.delete(actor, true, subject)
     end
   end
 

@@ -146,7 +146,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     {:ok, object1} = AdapterUtils.get_by_url_ap_id_or_username(@remote_actor_url)
     {:ok, object2} = AdapterUtils.get_by_url_ap_id_or_username(@remote_actor)
 
-    # assert object1 == object2
+    # assert object1.data == object2.data
     assert object1.id == object2.id
     assert object1.character.id == object2.character.id
     assert object1.profile.id == object2.profile.id

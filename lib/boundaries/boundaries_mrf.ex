@@ -376,6 +376,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   end
 
   defp local_actor_ids(actors) do
+    # TODO: cleaner:
     ap_base_uri = ActivityPubWeb.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
 
     # |> debug("ap_base_uri")
@@ -385,13 +386,13 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     |> Enum.uniq()
     |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
     # |> debug("before local_actor_ids")
-    |> Enum.map(&maybe_get_or_fetch_by_ap_id/1)
+    |> Enum.map(&maybe_pointer_id_for_ap_id/1)
     |> filter_empty([])
   end
 
-  defp maybe_get_or_fetch_by_ap_id(ap_id) do
+  defp maybe_pointer_id_for_ap_id(ap_id) do
     with {:ok, %{pointer_id: pointer_id}} <-
-           ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id) do
+           ActivityPub.Actor.get_cached(ap_id: ap_id) do
       pointer_id
     else
       _ ->
