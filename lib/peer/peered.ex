@@ -58,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def get_canonical_uri(obj_or_id),
-    do: obj_or_id |> get() |> Utils.e(:canonical_uri, nil)
+    do: get(obj_or_id) |> Utils.e(:canonical_uri, nil)
 
   def save_canonical_uri(%{id: id}, canonical_uri),
     do: save_canonical_uri(id, canonical_uri)
