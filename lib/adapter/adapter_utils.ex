@@ -365,9 +365,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
-    id =
-      Bonfire.Common.URIs.base_url() <>
-        ap_base_path <> "/actors/#{user_etc.character.username}"
+    id = Bonfire.Common.URIs.maybe_generate_canonical_url(user_etc)
 
     # icon = maybe_format_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
     # image = maybe_format_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
@@ -416,11 +414,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     %Actor{
       id: user_etc.id,
       data: data,
-      keys: Bonfire.Common.Utils.maybe_get(user_etc.character.actor, :signing_key),
+      keys: e(user_etc, :character, :actor, :signing_key, nil),
       local: local,
       ap_id: id,
       pointer_id: user_etc.id,
-      username: user_etc.character.username,
+      username: e(user_etc, :character, :username, nil),
       deactivated: false
     }
   end
