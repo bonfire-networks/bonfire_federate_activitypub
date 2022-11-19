@@ -140,12 +140,12 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   # fallback to just check the instance if that's all we have
   def is_blocked?(%Peer{} = peer, block_type, opts) do
     Instances.is_blocked?(peer, block_type, opts)
-    |> info("instance blocked? #{inspect(peer)}")
+    |> info("instance blocked? ")
   end
 
   # fallback to just check the instance if that's all we have
   def is_blocked?(%{id: _} = character, block_type, opts) do
     Bonfire.Boundaries.Blocks.is_blocked?(character, block_type, opts)
-    |> info("character blocked? #{inspect(character)}")
+    |> info("character blocked? ")
   end
 end

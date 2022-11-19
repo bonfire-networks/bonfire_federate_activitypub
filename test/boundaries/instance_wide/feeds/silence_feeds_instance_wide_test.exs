@@ -32,11 +32,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
   @tag :fixme
   test "show in feeds an incoming Note with no silencing" do
     recipient = fake_user!(@local_actor)
-    receive_remote_activity_to(recipient)
+    {:ok, post} = receive_remote_activity_to(recipient)
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    # |> debug()
-    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
   end
 
   test "does not appear in feeds an incoming Note from a silenced instance" do
@@ -45,10 +43,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
     ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
     recipient = fake_user!(@local_actor)
-    receive_remote_activity_to(recipient)
+    {:ok, post} = receive_remote_activity_to(recipient)
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
   end
 
   test "does not appear in feeds an incoming Note with silenced actor" do
@@ -57,22 +54,20 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
     Bonfire.Boundaries.Blocks.block(user, :silence, :instance_wide)
 
     recipient = fake_user!(@local_actor)
-    receive_remote_activity_to([recipient])
+    {:ok, post} = receive_remote_activity_to([recipient])
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
   end
 
   @tag :todo
   test "hides a Post in feeds from a remote instance that was silenced later" do
     recipient = fake_user!(@local_actor)
-    receive_remote_activity_to([recipient])
+    {:ok, post} = receive_remote_activity_to([recipient])
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     # |> debug
     ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, recipient)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
   end
 end

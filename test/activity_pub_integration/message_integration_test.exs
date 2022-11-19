@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
-  use Bonfire.Federate.ActivityPub.DataCase
+  use Bonfire.Federate.ActivityPub.DataCase, async: false
 
   alias Bonfire.Social.Messages
 

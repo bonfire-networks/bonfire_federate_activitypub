@@ -223,12 +223,21 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       # TODO: cleanup
       case ActivityPub.Fetcher.get_or_fetch_and_create(q) |> info() do
-        {:ok, %{pointer: %{id: _} = pointable} = _ap_object} -> {:ok, pointable}
-        {:ok, %{pointer_id: pointer_id} = _ap_object} -> return_character(pointer_id)
-        {:ok, %ActivityPub.Actor{} = actor} -> return_character(actor)
+        {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
+          {:ok, pointable}
+
+        {:ok, %{pointer_id: pointer_id} = _ap_object} when is_binary(pointer_id) ->
+          return_character(pointer_id)
+
+        {:ok, %ActivityPub.Actor{} = actor} ->
+          return_character(actor)
+
         # {{:ok, object}, _actor} -> {:ok, object}
-        {:ok, object} -> {:ok, object}
-        e -> error(e)
+        {:ok, object} ->
+          {:ok, object}
+
+        e ->
+          error(e)
       end
     else
       log("AP - uri - get_character_by_ap_id: assume local : " <> q)
@@ -266,6 +275,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       %{id: _} ->
         {:ok, fetched}
+
+      other ->
+        other
     end
   end
 
@@ -431,7 +443,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     # username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
     username = actor.username
 
-    with {:ok, user_etc} <-
+    with {:error, :not_found} <- get_character_by_username(username),
+         {:ok, user_etc} <-
            repo().transact_with(fn ->
              with {:ok, peer} <-
                     Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),

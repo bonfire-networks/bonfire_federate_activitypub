@@ -20,11 +20,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
   @tag :fixme
   test "shows in fediverse feed an incoming Note with no per-user silencing" do
     local_user = fake_user!(@local_actor)
-    receive_remote_activity_to(local_user)
+    {:ok, post} = receive_remote_activity_to(local_user)
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     # |> debug()
-    assert %{edges: [feed_entry]} = Bonfire.Social.FeedActivities.feed(feed_id, local_user)
+    assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, local_user)
   end
 
   test "does not show in my_feed an incoming Note from a per-user silenced instance (from an actor I am not following)" do
@@ -34,9 +34,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     # |> debug
     ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
-    receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
 
-    assert %{edges: []} = Bonfire.Social.FeedActivities.my_feed(local_user)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
 
   @tag :fixme
@@ -52,9 +52,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
-    receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
 
-    assert %{edges: []} = Bonfire.Social.FeedActivities.my_feed(local_user)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
 
   @tag :todo
@@ -65,24 +65,20 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     # |> debug
     ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
-    receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, local_user)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pup, post, local_user)
   end
 
   @tag :todo
   test "hides a Post in feeds from a remote instance that was per-user silenced later" do
     local_user = fake_user!(@local_actor)
-    receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     # |> debug
     ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, local_user)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, local_user)
   end
 end
