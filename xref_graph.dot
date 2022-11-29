@@ -1,0 +1,36 @@
+digraph "xref graph" {
+  "lib/adapter/adapter.ex"
+  "lib/adapter/adapter.ex" -> "lib/adapter/adapter_utils.ex" [label="(export)"]
+  "lib/adapter/adapter_utils.ex" -> "lib/adapter/adapter.ex"
+  "lib/adapter/adapter_utils.ex" -> "lib/federation_modules.ex"
+  "lib/adapter/adapter_utils.ex" -> "lib/integration.ex" [label="(export)"]
+  "lib/adapter/adapter_utils.ex" -> "lib/peer/instances.ex"
+  "lib/peer/instances.ex" -> "lib/integration.ex" [label="(export)"]
+  "lib/adapter/adapter.ex" -> "lib/adapter/incoming.ex"
+  "lib/adapter/incoming.ex" -> "lib/adapter/adapter.ex"
+  "lib/adapter/incoming.ex" -> "lib/adapter/adapter_utils.ex" [label="(export)"]
+  "lib/adapter/incoming.ex" -> "lib/federation_modules.ex"
+  "lib/adapter/incoming.ex" -> "lib/integration.ex" [label="(export)"]
+  "lib/adapter/incoming.ex" -> "lib/peer/peered.ex"
+  "lib/peer/peered.ex" -> "lib/integration.ex" [label="(export)"]
+  "lib/peer/peered.ex" -> "lib/peer/instances.ex"
+  "lib/adapter/adapter.ex" -> "lib/adapter/outgoing.ex"
+  "lib/adapter/outgoing.ex" -> "lib/adapter/adapter_utils.ex"
+  "lib/adapter/outgoing.ex" -> "lib/federation_modules.ex"
+  "lib/adapter/outgoing.ex" -> "lib/integration.ex" [label="(export)"]
+  "lib/adapter/adapter.ex" -> "lib/integration.ex" [label="(export)"]
+  "lib/adapter/adapter_utils.ex"
+  "lib/adapter/incoming.ex"
+  "lib/adapter/nodeinfo_adapter.ex"
+  "lib/adapter/outgoing.ex"
+  "lib/boundaries/boundaries_mrf.ex"
+  "lib/boundaries/boundaries_mrf.ex" -> "lib/peer/peered.ex"
+  "lib/federation_modules.ex"
+  "lib/integration.ex"
+  "lib/migrations.ex"
+  "lib/peer/instances.ex"
+  "lib/peer/peered.ex"
+  "lib/runtime_config.ex"
+  "lib/testing/simulate.ex"
+  "lib/testing/simulate.ex" -> "lib/adapter/adapter.ex"
+}
