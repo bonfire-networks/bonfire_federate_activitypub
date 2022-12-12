@@ -19,12 +19,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
     # context |> info("context")
 
     post1_attrs = %{
-      post_content: %{html_body: "#{context[:remote][:username]} test federated at mention"}
+      post_content: %{html_body: "#{context[:remote][:username]} try out federated at mention"}
     }
-    post2_attrs = %{post_content: %{html_body: "test federated reply only"}}
+
+    post2_attrs = %{post_content: %{html_body: "try out federated reply only"}}
+
     post3_attrs = %{
       post_content: %{
-        html_body: "#{context[:local][:username]} test federated reply with mention"
+        html_body: "#{context[:local][:username]} try out federated reply with mention"
       }
     }
 
@@ -50,7 +52,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
     TestInstanceRepo.apply(fn ->
       assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
       post1remote = List.first(feed).activity.object
-      assert post1remote.post_content.html_body =~ "test federated at mention"
+      assert post1remote.post_content.html_body =~ "try out federated at mention"
 
       Logger.metadata(action: info("make a reply on remote"))
 
@@ -70,6 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
           boundary: "mentions"
         )
     end)
+
     ## back to primary instance
 
     Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
@@ -86,6 +89,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
     )
 
     post3remote = List.first(feed).activity.object
-    assert post3remote.post_content.html_body =~ "test federated reply with mention"
+    assert post3remote.post_content.html_body =~ "try out federated reply with mention"
   end
 end
