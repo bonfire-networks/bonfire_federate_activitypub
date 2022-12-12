@@ -18,6 +18,16 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
   test "mention", context do
     # context |> info("context")
 
+    post1_attrs = %{
+      post_content: %{html_body: "#{context[:remote][:username]} test federated at mention"}
+    }
+    post2_attrs = %{post_content: %{html_body: "test federated reply only"}}
+    post3_attrs = %{
+      post_content: %{
+        html_body: "#{context[:local][:username]} test federated reply with mention"
+      }
+    }
+
     local_user = context[:local][:user]
     # |> info("local_user")
     local_ap_id =
@@ -33,21 +43,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
 
     remote_user = context[:remote][:user]
 
-    post1_attrs = %{
-      post_content: %{html_body: "#{context[:remote][:username]} test federated at mention"}
-    }
-
-    post2_attrs = %{post_content: %{html_body: "test federated reply only"}}
-
-    post3_attrs = %{
-      post_content: %{
-        html_body: "#{context[:local][:username]} test federated reply with mention"
-      }
-    }
-
     {:ok, post1} =
-      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
+      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "mentions")
 
+    ## work on test instance
     TestInstanceRepo.apply(fn ->
       assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
       post1remote = List.first(feed).activity.object
@@ -59,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
         Posts.publish(
           current_user: remote_user,
           post_attrs: post2_attrs |> Map.put(:reply_to_id, ulid(post1remote)),
-          boundary: "public"
+          boundary: "mentions"
         )
 
       Logger.metadata(action: info("make a reply with mention on remote"))
@@ -68,9 +67,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
         Posts.publish(
           current_user: remote_user,
           post_attrs: post3_attrs |> Map.put(:reply_to_id, ulid(post1remote)),
-          boundary: "public"
+          boundary: "mentions"
         )
     end)
+    ## back to primary instance
 
     Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
 
