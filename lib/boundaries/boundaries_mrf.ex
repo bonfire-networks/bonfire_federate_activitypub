@@ -402,10 +402,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp rejects_regex(block_types) do
     (filter_empty(block_types, []) ++ [:block])
-    |> debug()
+    # |> info()
     |> Enum.map(&ActivityPub.Config.get([:boundaries, &1]))
     |> filter_empty([])
-    |> debug()
+    # |> info()
     |> MRF.subdomains_regex()
   end
 end

@@ -120,8 +120,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     assert actor.data["discoverable"] == false
 
-    assert Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], false, current_user: user) ==
-             true
+    assert true ==
+             Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], nil, current_user: user)
   end
 
   test "can follow pointers to remote actors" do

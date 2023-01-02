@@ -157,12 +157,15 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
   #   assert Bonfire.Social.Follows.following?(follower, followed)
   # end
 
-  test "incoming unfollow works" do
-    followed = fake_user!()
+  test "incoming follow / accept / unfollow works" do
     {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+
+    followed = fake_user!()
     {:ok, ap_followed} = ActivityPub.Adapter.get_actor_by_id(followed.id)
-    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
+
+    {:ok, follow_activity} =
+      ActivityPub.follow(%{actor: ap_follower, object: ap_followed, local: false})
 
     # |> info("requested AP")
     assert {:ok, request} =
@@ -177,7 +180,9 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     # assert not is_nil(request.accepted_at)
     assert Bonfire.Social.Follows.following?(follower, followed)
 
-    {:ok, unfollow_activity} = ActivityPub.unfollow(%{actor: ap_follower, object: ap_followed})
+    {:ok, unfollow_activity} =
+      ActivityPub.unfollow(%{actor: ap_follower, object: ap_followed, local: false})
+      |> info("unfollow_activity")
 
     Bonfire.Federate.ActivityPub.Incoming.receive_activity(unfollow_activity)
     refute Bonfire.Social.Follows.following?(follower, followed)

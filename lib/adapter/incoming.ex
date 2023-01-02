@@ -335,9 +335,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       # activity = ActivityPub.Object.normalize(activity)
       # ActivityPub.Object.update_existing(activity, %{pointer_id: pointable_object_id})
       # object = ActivityPub.Object.normalize(object)
-      ActivityPub.Object.update_existing(Utils.id(activity) || Utils.id(object), %{
-        pointer_id: pointable_object_id
-      })
+
+      id = Utils.ulid(pointable_object_id)
+
+      if id do
+        ActivityPub.Object.update_existing(Utils.id(activity) || Utils.id(object), %{
+          pointer_id: id
+        })
+      end
 
       {:ok, pointable_object}
     end

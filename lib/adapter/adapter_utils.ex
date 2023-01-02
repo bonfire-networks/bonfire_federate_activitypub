@@ -418,9 +418,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       },
       # whether user should appear in directories and search engines
       "discoverable" =>
-        !Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], false,
-          current_user: user_etc
-        )
+        Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], nil, current_user: user_etc) !=
+          true
     }
 
     %Actor{

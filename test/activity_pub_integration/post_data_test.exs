@@ -2,6 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   use Bonfire.Federate.ActivityPub.DataCase
   import Tesla.Mock
   alias Bonfire.Social.Posts
+  alias Bonfire.Common.Text
 
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
@@ -78,7 +79,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
     # debug(ap_activity)
-    assert post.post_content.html_body =~ ap_activity.object.data["content"]
+    assert Text.maybe_markdown_to_html(post.post_content.html_body) =~
+             ap_activity.object.data["content"]
+
     assert @public_uri not in ap_activity.data["to"]
   end
 
