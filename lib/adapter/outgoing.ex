@@ -4,6 +4,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Common.Utils
+  alias Bonfire.Common
+  alias Common.Types
 
   # defines default types that can be federated as AP Actors (overriden by config)
   @types_characters Application.compile_env(
@@ -29,7 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     else
       info(
         thing,
-        "Skip (re)federating out '#{verb}' activity by remote actor '#{Utils.ulid(subject)}'=#{subject_local?}, or remote object '#{Utils.ulid(thing)}'=#{thing_local?}"
+        "Skip (re)federating out '#{verb}' activity by remote actor '#{Types.ulid(subject)}'=#{subject_local?}, or remote object '#{Types.ulid(thing)}'=#{thing_local?}"
       )
 
       :ignored

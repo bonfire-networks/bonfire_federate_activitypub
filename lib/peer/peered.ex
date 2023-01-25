@@ -13,7 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   alias Bonfire.Federate.ActivityPub.Instances
 
   def get(id) when is_binary(id) do
-    if Utils.is_ulid?(id) do
+    if Types.is_ulid?(id) do
       repo().single(
         from(p in Peered)
         |> where([p], p.id == ^id)
@@ -107,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     repo().insert_or_ignore(%Peered{
       id: id,
       peer: peer,
-      peer_id: Utils.ulid(peer),
+      peer_id: Types.ulid(peer),
       canonical_uri: canonical_uri
     })
   end

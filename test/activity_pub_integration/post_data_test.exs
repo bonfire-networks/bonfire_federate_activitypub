@@ -213,7 +213,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     date =
       feed_entry.activity.object_id
-      |> date_from_pointer()
+      |> DatesTimes.date_from_pointer()
       |> DateTime.to_iso8601()
       # it has sprouted a milliseconds field and won't print identically
       |> String.replace(".000", "")

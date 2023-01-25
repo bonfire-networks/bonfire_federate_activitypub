@@ -1,11 +1,11 @@
 defmodule Bonfire.Federate.ActivityPub.Incoming do
   import Untangle
   use Arrows
+  use Bonfire.Common.Utils
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   import AdapterUtils, only: [log: 1]
   alias Bonfire.Search.Indexer
-  alias Bonfire.Common.Utils
   alias Bonfire.Federate.ActivityPub.Adapter
   alias Bonfire.Data.ActivityPub.Peered
 
@@ -246,7 +246,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           _ -> nil
         end
 
-      # Utils.date_from_pointer(pointer_id) |> info("date from pointer")
+      # DatesTimes.date_from_pointer(pointer_id) |> info("date from pointer")
 
       info(
         "AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect(pointer_id)} using #{module}"
@@ -292,7 +292,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       else
         e ->
           error(
-            Utils.error_msg(e),
+            Errors.error_msg(e),
             "Could not create activity for #{ap_obj_id}"
           )
 
@@ -336,7 +336,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       # ActivityPub.Object.update_existing(activity, %{pointer_id: pointable_object_id})
       # object = ActivityPub.Object.normalize(object)
 
-      id = Utils.ulid(pointable_object_id)
+      id = Types.ulid(pointable_object_id)
 
       if id do
         ActivityPub.Object.update_existing(Utils.id(activity) || Utils.id(object), %{

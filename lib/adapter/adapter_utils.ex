@@ -382,8 +382,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     # icon = maybe_format_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
     # image = maybe_format_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
 
-    icon = maybe_format_image_object_from_path(avatar_url(user_etc))
-    image = maybe_format_image_object_from_path(banner_url(user_etc))
+    icon = maybe_format_image_object_from_path(Media.avatar_url(user_etc))
+    image = maybe_format_image_object_from_path(Media.banner_url(user_etc))
 
     local = if user_etc.peered, do: false, else: true
 
