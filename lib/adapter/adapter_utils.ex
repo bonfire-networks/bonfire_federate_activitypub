@@ -216,13 +216,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_or_fetch_and_create_by_uri(q) when is_binary(q) do
     # TODO: support objects, not just characters
     if not String.starts_with?(
-         q |> info(),
-         ap_base_url() |> info()
+         q |> debug(),
+         ap_base_url() |> debug()
        ) do
       log("AP - uri - get_or_fetch_and_create: assume remote : " <> q)
 
       # TODO: cleanup
-      case ActivityPub.Fetcher.get_or_fetch_and_create(q) |> info() do
+      case ActivityPub.Fetcher.get_or_fetch_and_create(q) |> debug() do
         {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
           {:ok, pointable}
 
@@ -231,6 +231,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
         {:ok, %ActivityPub.Actor{} = actor} ->
           return_character(actor)
+
+        {:ok, %ActivityPub.Object{} = object} ->
+          return_character(object)
 
         # {{:ok, object}, _actor} -> {:ok, object}
         {:ok, object} ->
