@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     #   # "activity" => activity
     # })
     Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
-    |> info()
+    |> debug("receive done")
   end
 
   def get_follower_local_ids(actor) do

@@ -63,7 +63,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       _ ->
         false
     end
-    |> info()
+    |> debug(ulid(thing))
   end
 
   def get_actor_username(%{preferred_username: u}) when is_binary(u), do: u
@@ -143,6 +143,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  def get_character_by_ap_id(%{pointer: %{id: _} = pointer}) do
+    {:ok, pointer}
+  end
+
   def get_character_by_ap_id(%{pointer_id: pointer_id}) when is_binary(pointer_id) do
     get_character_by_id(pointer_id)
   end
@@ -176,13 +180,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     error(other, "Invalid parameters when looking up an actor")
   end
 
-  def get_character_by_ap_id!(ap_id) do
-    case get_character_by_ap_id(ap_id) do
-      {:ok, character} -> {:ok, character}
-      %{} = character -> {:ok, character}
-      _ -> nil
-    end
-  end
+  # def get_character_by_ap_id!(ap_id) do
+  #   case get_character_by_ap_id(ap_id) do
+  #     {:ok, character} -> character
+  #     %{} = character -> character
+  #     _ -> nil
+  #   end
+  # end
 
   def get_by_url_ap_id_or_username("@" <> username),
     do: get_or_fetch_and_create_by_username(username)
@@ -219,20 +223,22 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
          q |> debug(),
          ap_base_url() |> debug()
        ) do
-      log("AP - uri - get_or_fetch_and_create: assume remote : " <> q)
+      log("AP - get_or_fetch_and_create_by_uri - assume remote with URI : " <> q)
 
       # TODO: cleanup
-      case ActivityPub.Fetcher.get_or_fetch_and_create(q) |> debug() do
+      case ActivityPub.Fetcher.fetch_object_from_id(q) |> debug("fetch_object_from_id result") do
         {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
           {:ok, pointable}
 
         {:ok, %{pointer_id: pointer_id} = _ap_object} when is_binary(pointer_id) ->
+          # FIXME? for non-actors
           return_character(pointer_id)
 
         {:ok, %ActivityPub.Actor{} = actor} ->
           return_character(actor)
 
         {:ok, %ActivityPub.Object{} = object} ->
+          # FIXME? for non-actors
           return_character(object)
 
         # {{:ok, object}, _actor} -> {:ok, object}
@@ -353,24 +359,51 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_context_ap_id(_), do: nil
 
   def character_to_actor(character) do
-    info(character, "character")
+    # debug(character, "character")
 
-    with %ActivityPub.Actor{} = actor <-
+    character_module(character)
+    |> maybe_apply_or(:format_actor, character)
+
+    # with %ActivityPub.Actor{} = actor <-
+    #        Bonfire.Common.ContextModule.maybe_apply(
+    #          character,
+    #          :format_actor,
+    #          character
+    #        ) do
+    #   # TODO: use federation_module instead of context_module?
+    #   actor
+    # else
+    #   e ->
+    #     warn(e, "falling back on generic function")
+    #     format_actor(character)
+    # end
+  end
+
+  # TODO: put in generic place, maybe as part of maybe_apply
+  def maybe_apply_or(module, fun, args, fallback_fn \\ nil) do
+    with {:error, e} <-
            Bonfire.Common.ContextModule.maybe_apply(
-             character,
-             :format_actor,
-             character
+             module,
+             fun,
+             args
            ) do
-      # TODO: use federation_module instead of context_module?
-      actor
-    else
-      e ->
-        warn(e, "falling back")
-        format_actor(character)
+      warn(e, "falling back on generic function")
+
+      case fallback_fn || fun do
+        fun when is_function(fun) -> apply(fun, List.wrap(args))
+        {mod, fun} -> apply(mod, fun, List.wrap(args))
+        fun when is_atom(fun) -> apply(__MODULE__, fun, List.wrap(args))
+      end
     end
   end
 
-  def format_actor(%{} = user_etc, type \\ "Person") do
+  def format_actor(user_etc, type \\ "Person")
+
+  def format_actor(%struct{}, type)
+      when struct == Bonfire.Data.AccessControl.Circle or type == "Circle",
+      do: nil
+
+  def format_actor(%{} = user_etc, type) do
     user_etc =
       repo().preload(user_etc,
         profile: [:image, :icon],
@@ -451,19 +484,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              with {:ok, peer} <-
                     Bonfire.Federate.ActivityPub.Instances.get_or_create(actor),
                   {:ok, user_etc} <-
-                    maybe_apply(character_module, [:create_remote, :create], %{
-                      character: %{
-                        username: username
+                    maybe_apply_or(
+                      character_module,
+                      [:create_remote, :create],
+                      %{
+                        character: %{
+                          username: username
+                        },
+                        profile: %{
+                          name: actor.data["name"] || username,
+                          summary: actor.data["summary"]
+                        },
+                        peered: %{
+                          peer_id: peer.id,
+                          canonical_uri: actor.data["id"]
+                        }
                       },
-                      profile: %{
-                        name: actor.data["name"] || username,
-                        summary: actor.data["summary"]
-                      },
-                      peered: %{
-                        peer_id: peer.id,
-                        canonical_uri: actor.data["id"]
-                      }
-                    }),
+                      # FIXME: should not depend on Users for fallback
+                      &Bonfire.Me.Users.create_remote/1
+                    ),
                   {:ok, _object} <-
                     ActivityPub.Object.update_existing(actor.id, %{
                       pointer_id: user_etc.id
@@ -533,18 +572,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def create_remote_actor(%ActivityPub.Object{} = object),
     do: ActivityPub.Actor.format_remote_actor(object) |> create_remote_actor()
 
+  def character_module(%{__struct__: type}), do: character_module(type)
+
   def character_module(type) do
     with {:ok, module} <-
            Bonfire.Federate.ActivityPub.FederationModules.federation_module(type) do
       module
     else
       e ->
-        log(
-          "AP - federation module not found (#{inspect(e)}) for type '#{type}', falling back to Users"
-        )
+        log("AP - federation module not found (#{inspect(e)}) for type `#{type}`")
 
-        # fallback
-        Bonfire.Me.Users
+        # fallback?
+        # Bonfire.Me.Users
+        nil
     end
   end
 

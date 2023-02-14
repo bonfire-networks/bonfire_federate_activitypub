@@ -46,12 +46,20 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
              local_recipient_ids,
              activity
            ) do
-      info("Boundary check done!")
       {:ok, activity}
+      |> debug("Boundary check OK!")
     else
+      {:reject, e} ->
+        warn(e, "Activity rejected by Boundaries")
+        {:reject, e}
+
+      {:error, e} ->
+        warn(e, "Activity rejected by Boundaries")
+        {:reject, e}
+
       e ->
         warn(e, "Activity rejected by Boundaries")
-        {:reject, nil}
+        {:reject, e}
     end
   end
 
@@ -111,15 +119,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         {:ok, activity}
 
       true ->
-        error("no cond matched")
-        nil
+        error("no filter cond matched")
     end
   end
 
   defp activity_blocked?(block_types, local_actor_ids, activity) do
     rejects =
       rejects_regex(block_types)
-      |> info("MRF instance_wide blocks from config")
+      |> debug("MRF instance_wide blocks from config")
 
     object_blocked?(
       block_types,
@@ -127,28 +134,28 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       rejects,
       id_or_object_id(e(activity, "actor", nil))
     )
-    |> info("activity's actor?") ||
+    |> debug("activity's actor?") ||
       object_blocked?(
         block_types,
         local_actor_ids,
         rejects,
         id_or_object_id(e(activity, "object", "attributedTo", nil))
       )
-      |> info("object's actor?") ||
+      |> debug("object's actor?") ||
       object_blocked?(
         block_types,
         local_actor_ids,
         rejects,
         id_or_object_id(activity)
       )
-      |> info("activity's instance?") ||
+      |> debug("activity's instance?") ||
       object_blocked?(
         block_types,
         local_actor_ids,
         rejects,
         id_or_object_id(e(activity, "object", nil))
       )
-      |> info("object's instance?")
+      |> debug("object's instance?")
   end
 
   defp object_blocked?(block_types, local_author_ids, rejects, canonical_uri)
@@ -161,8 +168,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       actor_or_instance_blocked?(block_types, local_author_ids, uri, rejects)
   end
 
-  defp object_blocked?(_, _, _, _) do
-    debug("no URI")
+  defp object_blocked?(_, _, _, canonical_uri) do
+    warn(canonical_uri, "no valid URI")
     nil
   end
 
@@ -199,20 +206,17 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         info("accept '#{type}' activity with no recipients")
         {:ok, activity}
 
-      %{to: []} ->
-        info("reject activity because all recipients were filtered")
-        nil
-
-      %{"to" => []} ->
-        info("reject activity because all recipients were filtered")
-        nil
-
       filtered ->
         if filtered != activity,
-          do: info(filtered, "activity has been filtered"),
-          else: info("no blocks apply")
+          do: debug(filtered, "activity has been filtered"),
+          else: debug("no blocks apply")
 
-        {:ok, filtered}
+        if e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
+             e(filtered, :bcc, nil) || e(filtered, :audience, nil) do
+          {:ok, filtered}
+        else
+          {:reject, "Do not federate because all recipients were filtered"}
+        end
     end
   end
 
@@ -237,7 +241,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          local_actor_ids
        ) do
     case activity[field] do
-      recipients when is_list(recipients) ->
+      recipients when is_list(recipients) and recipients != [] ->
         Map.put(
           activity,
           field,
@@ -268,6 +272,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp filter_actors(actors, block_types, rejects, local_actor_ids) do
     (actors || [])
     |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
     |> Enum.reject(&filter_actor(&1, block_types, rejects, local_actor_ids))
   end
 
@@ -317,11 +322,12 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     # for actors themselves
     (actors || [activity])
     # |> debug
-    |> Enum.map(&id_or_object_id/1)
+    # |> Enum.map(&id_or_object_id/1)
     # |> debug
     |> filter_empty([])
     # |> debug
-    |> Enum.uniq()
+    # |> Enum.uniq()
+    |> Enum.uniq_by(&id_or_object_id/1)
     |> debug()
   end
 

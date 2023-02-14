@@ -87,18 +87,21 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   defp do_get_or_create(canonical_uri, id \\ nil)
        when is_binary(canonical_uri) do
     case get(canonical_uri) do
-      # found an existing Actor or other Peered object
       {:ok, peered} ->
+        debug("found an existing Actor or other Peered object")
         {:ok, peered}
 
       _ ->
-        # first we need an instance / Peer
+        debug("first we need an Instance / Peer")
+
         with {:ok, peer} <- Instances.get_or_create(canonical_uri) do
-          if id,
-            # create a Peered linked to the ID of the User or Object
-            do: create(id, peer, canonical_uri),
-            # just return the instance
-            else: {:ok, peer}
+          if id do
+            debug("now create a Peered linked to the ID of the User or Object")
+            create(id, peer, canonical_uri)
+          else
+            debug("just return the Instance / Peer")
+            {:ok, peer}
+          end
         end
     end
   end
@@ -120,16 +123,16 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     peer = Map.get(peered, :peer)
     # check if either of instance or actor is blocked
     Instances.is_blocked?(peer, block_type, opts)
-    |> info("firstly, instance blocked? #{inspect(peer)}") ||
+    |> debug("firstly, check if instance blocked? #{inspect(peer)}") ||
       Bonfire.Boundaries.Blocks.is_blocked?(peered, block_type, opts)
-      |> info("actor blocked? #{inspect(peered)}")
+      |> debug("now check if actor blocked? #{inspect(peered)}")
   end
 
   def is_blocked?(uri, block_type, opts) when is_binary(uri) do
     uri
-    |> debug()
+    |> debug("uri")
     |> get_or_create()
-    # ~> debug
+    |> debug("after get_or_create")
     ~> is_blocked?(block_type, opts)
   end
 

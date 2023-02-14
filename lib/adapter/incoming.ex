@@ -34,6 +34,16 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   def receive_activity(
         %{
+          object: %{id: _} = object
+        } = activity
+      ) do
+    info("AP - case when the Object comes to us preloaded with the activity")
+
+    receive_activity(activity, object)
+  end
+
+  def receive_activity(
+        %{
           data: %{
             "object" => object_id
           }
@@ -42,12 +52,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(object_id) do
     info("AP - load the #{activity.data["id"]} activity's object data from URI: #{object_id}")
     # info(activity, "activity")
-    case ActivityPub.Fetcher.fetch_object_from_id(object_id) do
+    case ActivityPub.Fetcher.fetch_ap_object_from_id(object_id) do
       {:ok, object} ->
-        info(object, "fetched object")
+        debug(object, "fetched object")
 
         receive_activity(activity, object)
-        |> info("received activity on #{repo()}...")
+        |> debug("received activity on #{repo()}...")
 
       _ ->
         {:error, :not_found}
@@ -63,14 +73,23 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       ) do
     info("AP - case #1 when the object comes to us embeded in the activity")
 
-    # IO.inspect(activity: activity)
-    # IO.inspect(object: object)
-
     receive_activity(activity, object)
   end
 
+  def receive_activity(
+        %{
+          data: %{
+            "id" => _
+          }
+        } = activity
+      ) do
+    info("AP - case #2 when the activity has no `object` (like with Question)")
+
+    receive_activity(activity, nil)
+  end
+
   def receive_activity(activity, object) when not is_map_key(object, :data) do
-    info("AP - case #2 when the object comes to us embeded in the activity")
+    info("AP - case #3 when the object comes to us embeded in the activity")
     receive_activity(activity, %{data: object})
   end
 
@@ -339,7 +358,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       id = Types.ulid(pointable_object_id)
 
       if id do
-        ActivityPub.Object.update_existing(Utils.id(activity) || Utils.id(object), %{
+        ActivityPub.Object.update_existing(Enums.id(activity) || Enums.id(object), %{
           pointer_id: id
         })
       end

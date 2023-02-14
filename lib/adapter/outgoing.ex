@@ -3,8 +3,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Untangle
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
-  alias Bonfire.Common.Utils
   alias Bonfire.Common
+  alias Bonfire.Common.Utils
+  alias Common.Enums
   alias Common.Types
 
   # defines default types that can be federated as AP Actors (overriden by config)
@@ -24,7 +25,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     verb = verb || :create
 
     thing_local? = AdapterUtils.is_local?(thing)
-    subject_local? = AdapterUtils.is_local?(subject)
+
+    subject_local? =
+      if Enums.id(thing) == Enums.id(subject),
+        do: thing_local?,
+        else: AdapterUtils.is_local?(subject)
 
     if (is_nil(subject) and thing_local?) or subject_local? do
       prepare_and_queue(subject, verb, thing)
@@ -174,7 +179,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
     case Oban.Testing.perform_job(
            ActivityPub.Workers.PublisherWorker,
-           %{"op" => "publish", "activity_id" => Utils.id(activity), "repo" => repo()},
+           %{"op" => "publish", "activity_id" => Enums.id(activity), "repo" => repo()},
            repo: repo()
          ) do
       {:ok, activity} -> {:ok, activity}
