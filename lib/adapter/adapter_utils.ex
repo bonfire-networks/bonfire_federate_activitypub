@@ -308,7 +308,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     case uri do
       %URI{scheme: nil} -> false
       %URI{host: nil} -> false
-      uri -> true
+      _uri -> true
     end
   end
 
