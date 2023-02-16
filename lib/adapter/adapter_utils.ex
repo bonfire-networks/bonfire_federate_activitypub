@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   use Bonfire.Common.Utils
-  alias Bonfire.Common.URIs
+  # alias Bonfire.Common.URIs
   import Bonfire.Federate.ActivityPub
   alias ActivityPub.Actor
   alias Bonfire.Data.ActivityPub.Peered
   alias Bonfire.Me.Users
-  alias Bonfire.Social.Threads
+  # alias Bonfire.Social.Threads
   alias Ecto.Association.NotLoaded
   alias Bonfire.Federate.ActivityPub.Adapter
   require Logger

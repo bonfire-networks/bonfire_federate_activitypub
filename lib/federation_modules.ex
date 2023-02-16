@@ -21,7 +21,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   """
 
   import Untangle
-  alias Bonfire.Common.Utils
+  # alias Bonfire.Common.Utils
 
   use GenServer, restart: :transient
 
@@ -42,15 +42,15 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
       populate()
   end
 
-  defp data_init() do
-    error("The FederationModules service was not started. Please add it to your Application.")
+  # defp data_init() do
+  #   error("The FederationModules service was not started. Please add it to your Application.")
 
-    populate()
-  end
+  #   populate()
+  # end
 
   @spec federation_module(query :: query) :: {:ok, atom} | {:error, :not_found}
   @doc "Get a Federation Module identified by activity and/or object type, as string or {activity, object} tuple."
-  def federation_module({verb, type} = query) when is_atom(type) do
+  def federation_module({_verb, type} = query) when is_atom(type) do
     case Map.get(data(), query) do
       nil ->
         # fallback to context module

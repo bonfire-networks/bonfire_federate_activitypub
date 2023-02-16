@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Common
-  alias Bonfire.Common.Utils
+  # alias Bonfire.Common.Utils
   alias Common.Enums
   alias Common.Types
 
@@ -85,7 +85,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   # delete anything else
-  defp prepare_and_queue(_subject, :delete, %{__struct__: type} = thing) do
+  defp prepare_and_queue(_subject, :delete, %{__struct__: _type} = thing) do
     with %{} = object <-
            ActivityPub.Object.get_cached!(pointer: thing.id) do
       ActivityPub.delete(object)

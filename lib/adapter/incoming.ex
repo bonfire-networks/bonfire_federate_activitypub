@@ -5,9 +5,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   import AdapterUtils, only: [log: 1]
-  alias Bonfire.Search.Indexer
-  alias Bonfire.Federate.ActivityPub.Adapter
-  alias Bonfire.Data.ActivityPub.Peered
+  # alias Bonfire.Search.Indexer
+  # alias Bonfire.Federate.ActivityPub.Adapter
+  # alias Bonfire.Data.ActivityPub.Peered
 
   # the following constants are derived from config, so please make any changes/additions there
 

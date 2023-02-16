@@ -9,12 +9,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   use Bonfire.Common.Utils
 
-  alias Bonfire.Common.Pointers
+  # alias Bonfire.Common.Pointers
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
-  alias Bonfire.Federate.ActivityPub.Incoming
+  # alias Bonfire.Federate.ActivityPub.Incoming
 
-  import Bonfire.Federate.ActivityPub
+  # import Bonfire.Federate.ActivityPub
   import Untangle
 
   @behaviour ActivityPub.Adapter
