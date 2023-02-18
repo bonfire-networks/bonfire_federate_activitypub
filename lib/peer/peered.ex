@@ -5,7 +5,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   """
   use Arrows
   use Bonfire.Common.Utils
-  import Bonfire.Federate.ActivityPub, except: [repo: 0]
+  # import Bonfire.Federate.ActivityPub, except: [repo: 0]
   use Bonfire.Common.Repo
   import Untangle
   alias Bonfire.Data.ActivityPub.Peer
@@ -84,7 +84,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     end
   end
 
-  defp do_get_or_create(canonical_uri, id \\ nil)
+  defp do_get_or_create(canonical_uri, id)
        when is_binary(canonical_uri) do
     case get(canonical_uri) do
       {:ok, peered} ->

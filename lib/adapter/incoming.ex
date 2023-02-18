@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   use Bonfire.Common.Utils
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
-  import AdapterUtils, only: [log: 1]
+  # import AdapterUtils, only: [log: 1]
   # alias Bonfire.Search.Indexer
   # alias Bonfire.Federate.ActivityPub.Adapter
   # alias Bonfire.Data.ActivityPub.Peered
@@ -217,7 +217,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   @doc """
   Create an object without an activity
   """
-  def receive_object(creator, object_uri) when is_binary(object_uri) do
+  def receive_object(_creator, object_uri) when is_binary(object_uri) do
     info("AP - Create an object from AP ID")
 
     receive_activity(%{
@@ -329,7 +329,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
        when is_atom(module) and not is_nil(module) and verb in ["Accept", "Reject"] do
     info("AP - handle_activity related to another activity module: #{module}")
 
-    with {:ok, %{id: pointable_object_id} = pointable_object} <-
+    with {:ok, %{id: _pointable_object_id} = pointable_object} <-
            Utils.maybe_apply(
              module,
              :ap_receive_activity,

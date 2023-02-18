@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  defp prepare_and_queue(subject \\ nil, verb, thing)
+  defp prepare_and_queue(subject, verb, thing)
 
   defp prepare_and_queue(_subject, :update, %{__struct__: type, id: id})
        when type in @types_characters do

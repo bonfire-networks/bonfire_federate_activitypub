@@ -37,7 +37,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   def data() do
     :persistent_term.get(__MODULE__)
   rescue
-    e in ArgumentError ->
+    _e in ArgumentError ->
       debug("Gathering a list of federation modules...")
       populate()
   end

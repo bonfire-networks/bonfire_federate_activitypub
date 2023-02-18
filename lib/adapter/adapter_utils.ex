@@ -618,7 +618,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def determine_recipients(actor, comment, to, cc) do
+  def determine_recipients(_actor, _comment, to, cc) do
     # this doesn't feel very robust
     # to =
     #   unless is_nil(get_in_reply_to(comment)) do
@@ -724,25 +724,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def maybe_fix_image_object(%{"url" => url}), do: url
   def maybe_fix_image_object(_), do: nil
 
-  def maybe_create_image_object(nil, _actor), do: nil
+  # def maybe_create_image_object(nil), do: nil
 
-  def maybe_create_image_object(url, actor) do
-    maybe_upload(Bonfire.Files.ImageUploader, url, actor)
-  end
+  # def maybe_create_image_object(url) do
+  #   %{
+  #     "type" => "Image",
+  #     "url" => url
+  #   }
+  # end
 
   def maybe_create_banner_object(nil, _actor), do: nil
 
-  def maybe_create_image_object(url, actor) do
-    maybe_upload(Bonfire.Files.BannerUploader, url, actor)
+  def maybe_create_banner_object(url, actor) do
+    maybe_upload(Bonfire.Files.ImageUploader, url, actor)
   end
 
-  def maybe_create_image_object(nil), do: nil
+  def maybe_create_image_object(nil, _actor), do: nil
 
-  def maybe_create_image_object(url) do
-    %{
-      "type" => "Image",
-      "url" => url
-    }
+  def maybe_create_image_object(url, actor) do
+    maybe_upload(Bonfire.Files.BannerUploader, url, actor)
   end
 
   def maybe_format_image_object_from_path("http" <> _ = url) do
