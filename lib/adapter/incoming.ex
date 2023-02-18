@@ -393,7 +393,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   defp activity_character(actor) when is_binary(actor) do
     info(actor, "AP - receive - get activity_character")
     # FIXME to handle actor types other than Person/User
-    with {:error, e} <- AdapterUtils.get_or_fetch_and_create_by_uri(actor) |> info do
+    with {:error, e} <-
+           AdapterUtils.get_or_fetch_and_create_by_uri(actor, fetch_collection: false) |> info do
       error(e, "AP - could not find local character for the actor")
       {:ok, nil}
     end

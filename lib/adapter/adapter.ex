@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
             character
           ),
         image_id:
-          AdapterUtils.maybe_create_image_object(
+          AdapterUtils.maybe_create_banner_object(
             AdapterUtils.maybe_fix_image_object(data["image"]),
             character
           )

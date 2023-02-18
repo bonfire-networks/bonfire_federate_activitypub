@@ -188,28 +188,30 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   #   end
   # end
 
-  def get_by_url_ap_id_or_username("@" <> username),
-    do: get_or_fetch_and_create_by_username(username)
+  def get_by_url_ap_id_or_username(q, opts \\ [])
 
-  def get_by_url_ap_id_or_username("http:" <> _ = url),
-    do: get_or_fetch_and_create_by_uri(url)
+  def get_by_url_ap_id_or_username("@" <> username, opts),
+    do: get_or_fetch_and_create_by_username(username, opts)
 
-  def get_by_url_ap_id_or_username("https:" <> _ = url),
-    do: get_or_fetch_and_create_by_uri(url)
+  def get_by_url_ap_id_or_username("http:" <> _ = url, opts),
+    do: get_or_fetch_and_create_by_uri(url, opts)
 
-  def get_by_url_ap_id_or_username(string) when is_binary(string) do
+  def get_by_url_ap_id_or_username("https:" <> _ = url, opts),
+    do: get_or_fetch_and_create_by_uri(url, opts)
+
+  def get_by_url_ap_id_or_username(string, opts) when is_binary(string) do
     if validate_url(string) do
-      get_or_fetch_and_create_by_uri(string)
+      get_or_fetch_and_create_by_uri(string, opts)
     else
-      get_or_fetch_and_create_by_username(string)
+      get_or_fetch_and_create_by_username(string, opts)
     end
   end
 
-  defp get_or_fetch_and_create_by_username(q) when is_binary(q) do
+  defp get_or_fetch_and_create_by_username(q, opts) when is_binary(q) do
     if String.contains?(q, "@") do
       log("AP - get_or_fetch_by_username: " <> q)
 
-      ActivityPub.Actor.get_or_fetch_by_username(q)
+      ActivityPub.Actor.get_or_fetch_by_username(q, opts)
       ~> return_character()
     else
       log("AP - get_character_by_username: " <> q)
@@ -217,7 +219,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def get_or_fetch_and_create_by_uri(q) when is_binary(q) do
+  def get_or_fetch_and_create_by_uri(q, opts \\ []) when is_binary(q) do
     # TODO: support objects, not just characters
     if not String.starts_with?(
          q |> debug(),
@@ -226,7 +228,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       log("AP - get_or_fetch_and_create_by_uri - assume remote with URI : " <> q)
 
       # TODO: cleanup
-      case ActivityPub.Fetcher.fetch_object_from_id(q) |> debug("fetch_object_from_id result") do
+      case ActivityPub.Fetcher.fetch_object_from_id(q, opts)
+           |> debug("fetch_object_from_id result") do
         {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
           {:ok, pointable}
 
@@ -529,7 +532,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         )
 
       # |> debug
-      image_id =
+      banner_id =
         maybe_create_image_object(
           maybe_fix_image_object(actor.data["image"]),
           user_etc
@@ -538,7 +541,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       with {:ok, updated_user} <-
              maybe_apply(character_module, [:update_remote, :update], [
                user_etc,
-               %{"profile" => %{"icon_id" => icon_id, "image_id" => image_id}}
+               %{"profile" => %{"icon_id" => icon_id, "image_id" => banner_id}}
              ]) do
         {:ok, updated_user}
       else
@@ -727,6 +730,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     maybe_upload(Bonfire.Files.ImageUploader, url, actor)
   end
 
+  def maybe_create_banner_object(nil, _actor), do: nil
+
+  def maybe_create_image_object(url, actor) do
+    maybe_upload(Bonfire.Files.BannerUploader, url, actor)
+  end
+
   def maybe_create_image_object(nil), do: nil
 
   def maybe_create_image_object(url) do
@@ -782,7 +791,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     debug(url)
 
     with {:ok, %{id: id}} <-
-           Bonfire.Files.upload(Bonfire.Files.IconUploader, actor, url, %{}) do
+           Bonfire.Files.upload(adapter || Bonfire.Files.ImageUploader, actor, url, %{},
+             skip_fetching_remote: true
+           ) do
       id
     else
       _ ->
