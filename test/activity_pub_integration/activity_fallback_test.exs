@@ -20,7 +20,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       |> File.read!()
       |> Jason.decode!()
 
-    {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
+    {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
     assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
@@ -48,7 +48,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       |> Jason.decode!()
       |> Map.put("object", ap_activity.data["object"])
 
-    {:ok, data} = ActivityPubWeb.Transmogrifier.handle_incoming(data)
+    {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
     assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 

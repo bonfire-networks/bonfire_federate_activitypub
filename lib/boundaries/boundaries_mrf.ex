@@ -2,12 +2,12 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   @moduledoc "Filter activities depending on their origin instance, actor, or other criteria"
   use Bonfire.Common.Utils
   use Arrows
+  require ActivityPub.Config
+  import Untangle
   alias ActivityPub.MRF
   alias Bonfire.Boundaries
-  import Untangle
-  @behaviour MRF
 
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
+  @behaviour MRF
 
   @impl true
   def filter(activity, is_local?) do
@@ -276,7 +276,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     |> Enum.reject(&filter_actor(&1, block_types, rejects, local_actor_ids))
   end
 
-  defp filter_actor(@public_uri, _block_types, _rejects, _local_actor_ids) do
+  defp filter_actor(uri, _block_types, _rejects, _local_actor_ids)
+       when ActivityPub.Config.is_in(uri, :public_uris) do
     false
   end
 
@@ -383,7 +384,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp local_actor_ids(actors) do
     # TODO: cleaner:
-    ap_base_uri = ActivityPubWeb.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
+    ap_base_uri = ActivityPub.Web.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
 
     # |> debug("ap_base_uri")
 

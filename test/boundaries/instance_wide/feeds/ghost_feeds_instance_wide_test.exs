@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
   alias Bonfire.Data.ActivityPub.Peered
 
   @remote_actor "https://mocked.local/users/karen"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
+
   @local_actor "alice"
 
   setup do
@@ -45,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
     ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
 
     recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([recipient, @public_uri])
+    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
     assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post,
              current_user: recipient
@@ -58,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
     Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
 
     recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([recipient, @public_uri])
+    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
     assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post,
              current_user: recipient

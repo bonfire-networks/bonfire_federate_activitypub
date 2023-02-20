@@ -12,9 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   require Logger
   import Untangle
 
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
-
-  def public_uri(), do: @public_uri
+  def public_uri(), do: ActivityPub.Config.public_uri()
 
   def log(l) do
     # if Bonfire.Common.Config.get(:log_federation), do:
@@ -228,7 +226,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       log("AP - get_or_fetch_and_create_by_uri - assume remote with URI : " <> q)
 
       # TODO: cleanup
-      case ActivityPub.Fetcher.fetch_object_from_id(q, opts)
+      case ActivityPub.Federator.Fetcher.fetch_object_from_id(q, opts)
            |> debug("fetch_object_from_id result") do
         {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
           {:ok, pointable}

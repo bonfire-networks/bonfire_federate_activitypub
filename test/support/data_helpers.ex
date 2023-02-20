@@ -19,7 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   end
 
   def local_activity_json(local_user, to) do
-    {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+    {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
     %{
       actor: local_actor.ap_id,
@@ -79,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
   def local_actor_ids(nil), do: fake_user!(@local_actor) |> local_actor_ids()
 
   def local_actor_ids(%Bonfire.Data.Identity.User{id: id}),
-    do: ActivityPub.Adapter.get_actor_by_id(id) ~> local_actor_ids()
+    do: ActivityPub.Federator.Adapter.get_actor_by_id(id) ~> local_actor_ids()
 
   def local_actor_ids(%{ap_id: ap_id}), do: ap_id
   def local_actor_ids(ap_id) when is_binary(ap_id), do: ap_id

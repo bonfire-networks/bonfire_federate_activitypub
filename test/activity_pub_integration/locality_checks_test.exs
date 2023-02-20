@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.LocalityChecksTest do
   alias Bonfire.Social.Boosts
   alias Bonfire.Social.Messages
 
-  alias ActivityPub.Workers.PublisherWorker
+  alias ActivityPub.Federator.Workers.PublisherWorker
 
   # Maybe move this to adapter tests?
   describe "locality checks" do

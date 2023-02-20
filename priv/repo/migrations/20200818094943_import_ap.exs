@@ -1,4 +1,5 @@
-defmodule Bonfire.Federate.ActivityPub.Repo.Migrations.ImportAP do
+defmodule Bonfire.Federate.ActivityPub.Repo.Migrations.ImportAP  do
+  @moduledoc false
   use Ecto.Migration
 
   import Bonfire.Federate.ActivityPub.Migrations

@@ -7,7 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
   alias Bonfire.Data.ActivityPub.Peered
 
   @remote_actor "https://mocked.local/users/karen"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
+
   @local_actor "alice"
 
   setup do
@@ -34,7 +34,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
 
     Bonfire.Boundaries.Blocks.block(remote_user, :silence, current_user: local_user)
 
-    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
@@ -49,7 +49,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
 
     Bonfire.Boundaries.Blocks.block(remote_user, :silence, current_user: local_user)
 
-    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
@@ -66,7 +66,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     # debug_user_acls(local_user, "remote_user")
 
     {:ok, post} =
-      receive_remote_activity_to([local_user, @public_uri])
+      receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
       ~> debug()
       |> debug_object_acls()
 
@@ -85,7 +85,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
 
-    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
     Bonfire.Boundaries.Blocks.block(user, :silence, current_user: local_user)
 

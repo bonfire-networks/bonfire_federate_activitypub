@@ -7,7 +7,6 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
   @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
   setup do
     # TODO: move this into fixtures
@@ -38,7 +37,8 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
 
-      local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
+      local_activity =
+        local_activity_json(local_user, [@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -46,7 +46,7 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@public_uri]
+                  to: [ActivityPub.Config.public_uri()]
                 }}
     end
   end

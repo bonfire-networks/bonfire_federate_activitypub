@@ -7,7 +7,6 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
   setup do
     mock(fn
@@ -31,7 +30,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     assert %{__struct__: ActivityPub.Object} = ap_activity
 
     Oban.Testing.assert_enqueued(repo(),
-      worker: ActivityPub.Workers.PublisherWorker,
+      worker: ActivityPub.Federator.Workers.PublisherWorker,
       args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
     )
   end

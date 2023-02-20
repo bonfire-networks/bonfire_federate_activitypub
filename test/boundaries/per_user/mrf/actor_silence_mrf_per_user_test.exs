@@ -7,7 +7,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
 
   @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
   setup do
     # TODO: move this into fixtures
@@ -21,7 +20,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
     test "I try to follow someone on an per-user silenced instance" do
       local_user = fake_user!(@local_actor)
 
-      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+      {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
@@ -48,7 +47,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
     test "someone from an per-user silenced instance attempts to follow" do
       local_user = fake_user!(@local_actor)
 
-      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+      {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
@@ -93,7 +92,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :silence, current_user: local_user)
 
-      local_activity = local_activity_json(local_user, [@remote_actor, @public_uri])
+      local_activity =
+        local_activity_json(local_user, [@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -101,7 +101,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@remote_actor, @public_uri]
+                  to: [@remote_actor, ActivityPub.Config.public_uri()]
                 }}
     end
   end

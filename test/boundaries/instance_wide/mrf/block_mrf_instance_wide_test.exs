@@ -7,7 +7,6 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
   @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
   setup do
     orig = Config.get!(:boundaries)
@@ -69,7 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
   describe "block when" do
     test "attempting to follow from an instance-wide blocked instance" do
       local_user = fake_user!()
-      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+      {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
@@ -91,7 +90,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
     test "attempting to follow someone on an instance-wide blocked instance" do
       local_user = fake_user!()
-      {:ok, local_actor} = ActivityPub.Adapter.get_actor_by_id(local_user.id)
+      {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
       {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
 
@@ -244,7 +243,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
     @tag :todo
     test "there's a local activity with instance-wide blocked host as recipient (in config)" do
       Config.put([:boundaries, :block], ["mocked.local"])
-      local_activity = local_activity_json_to([@remote_actor, @public_uri])
+      local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -252,7 +251,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@public_uri]
+                  to: [ActivityPub.Config.public_uri()]
                 }}
     end
 
@@ -261,7 +260,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
 
-      local_activity = local_activity_json_to([@remote_actor, @public_uri])
+      local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -269,14 +268,14 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@public_uri]
+                  to: [ActivityPub.Config.public_uri()]
                 }}
     end
 
     @tag :todo
     test "there's a local activity with instance-wide blocked wildcard domain as recipient" do
       Config.put([:boundaries, :block], ["*mocked.local"])
-      local_activity = local_activity_json_to([@remote_actor, @public_uri])
+      local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -284,14 +283,14 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@public_uri]
+                  to: [ActivityPub.Config.public_uri()]
                 }}
     end
 
     @tag :todo
     test "there's a local activity with instance-wide blocked actor as recipient (in config)" do
       Config.put([:boundaries, :block], ["mocked.local/users/karen"])
-      local_activity = local_activity_json_to([@remote_actor, @public_uri])
+      local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -299,7 +298,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@public_uri]
+                  to: [ActivityPub.Config.public_uri()]
                 }}
     end
 
@@ -310,7 +309,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 
-      local_activity = local_activity_json_to([@remote_actor, @public_uri])
+      local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -318,14 +317,14 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@public_uri]
+                  to: [ActivityPub.Config.public_uri()]
                 }}
     end
 
     @tag :todo
     test "there's a local activity with instance-wide blocked domain as recipient" do
       Config.put([:boundaries, :block], ["mocked.local"])
-      local_activity = local_activity_json_to([@remote_actor, @public_uri])
+      local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
@@ -333,7 +332,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [@public_uri]
+                  to: [ActivityPub.Config.public_uri()]
                 }}
     end
   end

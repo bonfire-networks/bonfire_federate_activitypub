@@ -6,7 +6,6 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
 
   setup do
     mock(fn
@@ -39,7 +38,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert %{__struct__: ActivityPub.Object} = ap_activity
 
     Oban.Testing.assert_enqueued(repo(),
-      worker: ActivityPub.Workers.PublisherWorker,
+      worker: ActivityPub.Federator.Workers.PublisherWorker,
       args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
     )
   end
@@ -82,7 +81,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     assert Text.maybe_markdown_to_html(post.post_content.html_body) =~
              ap_activity.object.data["content"]
 
-    assert @public_uri not in ap_activity.data["to"]
+    assert ActivityPub.Config.public_uri() not in ap_activity.data["to"]
   end
 
   test "Reply publishing works (if also @ mentioning the OP)" do
@@ -157,7 +156,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     to = [
       recipient_actor.ap_id,
-      @public_uri
+      ActivityPub.Config.public_uri()
     ]
 
     params = remote_activity_json(actor, to)
@@ -190,7 +189,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     to = [
       recipient_actor.ap_id,
-      @public_uri
+      ActivityPub.Config.public_uri()
     ]
 
     params = remote_activity_json(actor, to)
@@ -228,7 +227,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
     to = [
       recipient_actor.ap_id,
-      @public_uri
+      ActivityPub.Config.public_uri()
     ]
 
     params = remote_activity_json(actor, to)

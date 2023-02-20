@@ -17,7 +17,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   # import Bonfire.Federate.ActivityPub
   import Untangle
 
-  @behaviour ActivityPub.Adapter
+  @behaviour ActivityPub.Federator.Adapter
 
   def base_url() do
     Bonfire.Common.URIs.base_url()

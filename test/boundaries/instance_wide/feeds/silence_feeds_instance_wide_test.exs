@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
   alias Bonfire.Data.ActivityPub.Peered
 
   @remote_actor "https://mocked.local/users/karen"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
+
   @local_actor "alice"
 
   setup do

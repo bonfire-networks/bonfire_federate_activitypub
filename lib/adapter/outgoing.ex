@@ -50,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
     with {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: id),
          actor_object <-
-           ActivityPubWeb.ActorView.render("actor.json", %{actor: actor}),
+           ActivityPub.Web.ActorView.render("actor.json", %{actor: actor}),
          params <- %{
            to: [AdapterUtils.public_uri()],
            cc: [actor.data["followers"]],
@@ -175,10 +175,10 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   def push_now!(activity) do
     activity = ap_activity!(activity)
 
-    # ActivityPubWeb.Federator.perform(:publish, ap_activity!(activity))
+    # ActivityPub.Federator.perform(:publish, ap_activity!(activity))
 
     case Oban.Testing.perform_job(
-           ActivityPub.Workers.PublisherWorker,
+           ActivityPub.Federator.Workers.PublisherWorker,
            %{"op" => "publish", "activity_id" => Enums.id(activity), "repo" => repo()},
            repo: repo()
          ) do

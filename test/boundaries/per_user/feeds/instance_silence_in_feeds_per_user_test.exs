@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
   alias Bonfire.Data.ActivityPub.Peered
 
   @remote_actor "https://mocked.local/users/karen"
-  @public_uri "https://www.w3.org/ns/activitystreams#Public"
+
   @local_actor "alice"
 
   setup do
@@ -34,7 +34,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     # |> debug
     ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
-    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
@@ -52,7 +52,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
-    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     # |> debug
     ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
 
-    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pup, post, local_user)
   end
@@ -73,7 +73,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
   @tag :todo
   test "hides a Post in feeds from a remote instance that was per-user silenced later" do
     local_user = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([local_user, @public_uri])
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     # |> debug
