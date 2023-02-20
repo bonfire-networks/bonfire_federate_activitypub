@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
   alias Bonfire.Social.Posts
 
-  setup do
+  setup_all do
     mock(fn
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))

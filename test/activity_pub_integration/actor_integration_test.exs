@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
-  use Bonfire.Federate.ActivityPub.ConnCase
+  use Bonfire.Federate.ActivityPub.ConnCase, async: false
   import Tesla.Mock
   import Untangle
   alias Bonfire.Federate.ActivityPub.AdapterUtils
@@ -13,8 +13,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
                "/.well-known/webfinger?resource=acct:" <> @actor_name
 
   # TODO: move this into fixtures
-  setup do
-    mock(fn
+  setup_all do
+    mock_global(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
 

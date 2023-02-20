@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
-  use Bonfire.Federate.ActivityPub.DataCase
+  use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
   alias ActivityPub.Config
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
@@ -9,9 +9,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
   @local_actor "alice"
 
-  setup do
+  setup_all do
     # TODO: move this into fixtures
-    mock(fn
+    mock_global(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
     end)

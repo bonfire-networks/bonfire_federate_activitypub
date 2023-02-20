@@ -202,7 +202,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp block_or_filter_recipients(block_types, activity, local_actor_ids) do
     case filter_recipients(block_types, activity, local_actor_ids) do
-      %{"type" => type} when type in ["Update", "Delete", "Flag"] ->
+      %{"type" => type} when type in ["Update", "Delete", "Flag", "Accept", "Reject", "Undo"] ->
         info("accept '#{type}' activity with no recipients")
         {:ok, activity}
 

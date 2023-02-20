@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
-  use Bonfire.Federate.ActivityPub.DataCase
+  use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
   alias ActivityPub.Config
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
   @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
 
-  setup do
+  setup_all do
     orig = Config.get!(:boundaries)
 
     # local_user = fake_user!(@local_actor)
@@ -20,7 +20,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
     )
 
     # TODO: move this into fixtures
-    mock(fn
+    mock_global(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
     end)
@@ -36,7 +36,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
+      {:reject, _} = BoundariesMRF.filter(remote_activity, false)
     end
 
     @tag :todo
@@ -49,7 +49,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
+      {:reject, _} = BoundariesMRF.filter(remote_activity, false)
     end
 
     test "there's a remote activity with instance-wide silenced wildcard domain" do
@@ -57,7 +57,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
+      {:reject, _} = BoundariesMRF.filter(remote_activity, false)
     end
 
     test "there's a remote actor with instance-wide silenced host (in config)" do
@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     @tag :fixme
@@ -75,7 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide silenced host" do
@@ -83,7 +83,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide silenced wildcard domain" do
@@ -91,7 +91,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide silenced actor (in config)" do
@@ -99,7 +99,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
   end
 

@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   import Bonfire.Federate.ActivityPub
   import Tesla.Mock
 
-  setup do
+  setup_all do
     mock(fn
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))

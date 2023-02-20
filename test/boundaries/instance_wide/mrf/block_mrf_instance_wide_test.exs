@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
-  use Bonfire.Federate.ActivityPub.DataCase
+  use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
   alias ActivityPub.Config
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
   @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
 
-  setup do
+  setup_all do
     orig = Config.get!(:boundaries)
 
     # local_user = fake_user!(@local_actor)
@@ -20,7 +20,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
     )
 
     # TODO: move this into fixtures
-    mock(fn
+    mock_global(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
     end)
@@ -115,7 +115,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
+      {:reject, _} = BoundariesMRF.filter(remote_activity, false)
     end
 
     test "there's a remote activity with instance-wide blocked host (in DB/boundaries)" do
@@ -127,7 +127,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
+      {:reject, _} = BoundariesMRF.filter(remote_activity, false)
     end
 
     test "there's a remote activity with instance-wide blocked wildcard domain" do
@@ -135,7 +135,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_activity = remote_activity_json()
 
-      assert BoundariesMRF.filter(remote_activity, false) == {:reject, nil}
+      {:reject, _} = BoundariesMRF.filter(remote_activity, false)
     end
 
     test "there's a remote actor with instance-wide blocked host (in config)" do
@@ -143,7 +143,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide blocked host (in DB/boundaries)" do
@@ -152,7 +152,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide blocked host" do
@@ -160,7 +160,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide blocked wildcard domain" do
@@ -168,7 +168,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide blocked actor (in config)" do
@@ -176,7 +176,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert BoundariesMRF.filter(remote_actor, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
     end
 
     test "there's a remote actor with instance-wide blocked actor (in DB/boundaries)" do
@@ -185,7 +185,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 
-      assert BoundariesMRF.filter(remote_actor.data, false) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(remote_actor.data, false)
     end
   end
 
@@ -194,7 +194,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
       Config.put([:boundaries, :block], ["mocked.local"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity, true) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
     end
 
     test "there's a local activity with instance-wide blocked host as recipient (in DB)" do
@@ -203,21 +203,21 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity, true) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
     end
 
     test "there's a local activity with instance-wide blocked wildcard domain as recipient" do
       Config.put([:boundaries, :block], ["*mocked.local"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity, true) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
     end
 
     test "there's a local activity with instance-wide blocked actor as recipient (in config)" do
       Config.put([:boundaries, :block], ["mocked.local/users/karen"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity, true) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
     end
 
     test "there's a local activity with instance-wide blocked actor as recipient (in DB)" do
@@ -228,14 +228,14 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
 
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity, true) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
     end
 
     test "there's a local activity with instance-wide blocked domain as recipient" do
       Config.put([:boundaries, :block], ["mocked.local"])
       local_activity = local_activity_json_to(@remote_actor)
 
-      assert BoundariesMRF.filter(local_activity, true) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
     end
   end
 

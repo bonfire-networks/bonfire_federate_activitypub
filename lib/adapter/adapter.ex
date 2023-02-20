@@ -192,7 +192,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_redirect_url(id_or_username) when is_binary(id_or_username) do
     # IO.inspect(get_redirect_url: id_or_username)
     if is_ulid?(id_or_username) do
-      get_object_url(id_or_username)
+      URIs.path(id_or_username)
     else
       get_url_by_username(id_or_username)
     end
@@ -213,8 +213,6 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     error(other, "Param not recognised")
     nil
   end
-
-  def get_object_url(id), do: URIs.path(id)
 
   defp get_url_by_username(username) do
     case URIs.path(username) do

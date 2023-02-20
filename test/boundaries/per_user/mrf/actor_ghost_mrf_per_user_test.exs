@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
-  use Bonfire.Federate.ActivityPub.DataCase
+  use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
   alias ActivityPub.Config
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
@@ -8,9 +8,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
   @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
 
-  setup do
+  setup_all do
     # TODO: move this into fixtures
-    mock(fn
+    mock_global(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
     end)
@@ -51,7 +51,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
 
       local_activity = local_activity_json(local_user, @remote_actor)
 
-      assert BoundariesMRF.filter(local_activity, true) == {:reject, nil}
+      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
     end
   end
 

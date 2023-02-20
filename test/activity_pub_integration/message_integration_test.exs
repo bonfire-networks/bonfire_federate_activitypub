@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 
-  setup do
+  setup_all do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
