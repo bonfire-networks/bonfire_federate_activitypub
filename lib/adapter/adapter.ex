@@ -96,7 +96,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    with {:ok, character} <- AdapterUtils.get_character_by_ap_id(actor) do
+    with {:ok, character} <- AdapterUtils.fetch_character_by_ap_id(actor) do
       keys = e(params, :keys, nil)
 
       params = Map.put(params, :character, %{id: character.id, actor: %{signing_key: keys}})
@@ -120,7 +120,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_remote_actor(actor) do
-    AdapterUtils.get_character_by_ap_id(actor)
+    AdapterUtils.fetch_character_by_ap_id(actor)
     |> info()
     |> update_remote_actor(actor)
   end
@@ -173,17 +173,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_create_remote_actor(actor) when not is_nil(actor) do
     log("AP - maybe_create_remote_actor for #{e(actor, :ap_id, nil) || e(actor, "id", nil)}")
 
-    case AdapterUtils.get_character_by_ap_id(actor) do
+    case AdapterUtils.fetch_character_by_ap_id(actor) do
       {:ok, character} ->
-        log("AP - remote actor already exists, return it: #{ulid(character)}")
+        log("AP - remote actor exists, return it: #{ulid(character)}")
         # already exists
         {:ok, character}
 
       e ->
-        warn(e, "seems like a new character? create it...")
-        AdapterUtils.create_remote_actor(actor)
-
-        # |> debug
+        error(e)
     end
   end
 

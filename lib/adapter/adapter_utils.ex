@@ -118,24 +118,45 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> get_character_by_username()
   end
 
+  def the_ap_id(%{ap_id: ap_id}) when is_binary(ap_id) do
+    ap_id
+  end
+
+  def the_ap_id(%{"id" => ap_id}) when is_binary(ap_id) when is_binary(ap_id) do
+    ap_id
+  end
+
+  def the_ap_id(%{data: %{"id" => ap_id} = _data}) do
+    ap_id
+  end
+
+  def fetch_character_by_ap_id(actor_or_ap_id) do
+    local_instance = ap_base_url()
+
+    with {:error, :not_found} <- get_character_by_ap_id(actor_or_ap_id),
+         ap_id when is_binary(ap_id) <- the_ap_id(actor_or_ap_id) do
+      if not String.starts_with?(ap_id, local_instance) do
+        debug(ap_id, "assume fetching remote character")
+        # FIXME: this should not query the AP db
+        # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
+        ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id, false)
+        |> info("fetched by ap_id")
+        |> return_character()
+      end
+    end
+  end
+
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
-    local_instance = ap_base_url() |> info
+    local_instance = ap_base_url()
     # only create Peer for remote instances
     if not String.starts_with?(ap_id, local_instance) do
-      info(ap_id, "assume remote character")
+      debug(ap_id, "assume looking up a known remote character")
       # FIXME: this should not query the AP db
       # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-      case ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id, false)
-           |> info("got_fetched_by_ap_id") do
-        {:ok, %{pointer_id: pointer_id}} when is_binary(pointer_id) ->
-          get_character_by_id(pointer_id)
-
-        {:ok, %{username: username} = actor} when is_binary(username) ->
-          get_character_by_username(ActivityPub.Actor.format_username(actor))
-
-        e ->
-          error(e, "Could not fetch the actor")
-      end
+      # ActivityPub.Actor.get_cached(ap_id: ap_id)
+      ActivityPub.Actor.get_remote_actor(ap_id, false)
+      |> info("got by ap_id")
+      |> return_character()
     else
       get_local_character_by_ap_id(ap_id, local_instance)
     end
@@ -205,7 +226,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  defp get_or_fetch_and_create_by_username(q, opts) when is_binary(q) do
+  def get_or_fetch_and_create_by_username(q, opts) when is_binary(q) do
     if String.contains?(q, "@") do
       log("AP - get_or_fetch_by_username: " <> q)
 
@@ -271,22 +292,36 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         {:ok, character}
 
       %{pointer_id: id} when is_binary(id) ->
-        return_pointer(id, opts)
+        # return_pointer(id, opts)
+        get_character_by_id(id)
+
+      %ActivityPub.Actor{username: username} when is_binary(username) ->
+        debug("we have a username")
+
+        with {:error, :not_found} <-
+               get_character_by_username(ActivityPub.Actor.format_username(fetched)) do
+          create_remote_actor(fetched)
+        end
 
       _ when is_binary(fetched) ->
-        return_pointer(fetched, opts)
+        if is_ulid?(fetched) do
+          get_character_by_id(fetched)
+        else
+          error(fetched, "dunno")
+        end
 
       # nope? let's try and find them from their ap id
       %ActivityPub.Actor{} ->
-        get_character_by_ap_id(fetched)
+        create_remote_actor(fetched)
 
       %ActivityPub.Object{} ->
-        get_character_by_ap_id(fetched)
+        create_remote_actor(fetched)
 
       %{id: _} ->
         {:ok, fetched}
 
       other ->
+        error(other, "unhandled case")
         other
     end
   end
@@ -478,6 +513,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
     # username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
     username = actor.username
+    name = actor.data["name"]
+    name = if empty?(name), do: username, else: name
 
     with {:error, :not_found} <- get_character_by_username(username),
          {:ok, user_etc} <-
@@ -493,7 +530,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                           username: username
                         },
                         profile: %{
-                          name: actor.data["name"] || username,
+                          name: name,
                           summary: actor.data["summary"]
                         },
                         peered: %{
