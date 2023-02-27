@@ -52,10 +52,15 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def get_actor_by_id(id) do
-    with {:ok, character} <- AdapterUtils.get_character_by_id(id) |> info(),
-         true <- AdapterUtils.is_local?(character),
-         %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
+  def get_actor_by_id(id) when is_binary(id) do
+    with {:ok, character} <- AdapterUtils.get_character_by_id(id) |> debug() do
+      get_actor_by_id(character)
+    end
+  end
+
+  def get_actor_by_id(character) when is_struct(character) do
+    with true <- AdapterUtils.is_local?(character) |> debug(),
+         %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) |> debug() do
       {:ok, actor}
     end
   end

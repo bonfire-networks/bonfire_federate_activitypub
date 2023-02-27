@@ -59,11 +59,19 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FetchTest do
     post =
       TestInstanceRepo.apply(fn ->
         Logger.metadata(action: "fetch post 1 by canonical_url")
-        assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+
+        assert {:ok, object} =
+                 AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+                 |> repo().maybe_preload(:post_content)
+
         assert object.post_content.html_body =~ attrs.post_content.html_body
 
         Logger.metadata(action: "fetch post 2 by friendly_url")
-        assert {:ok, object2} = AdapterUtils.get_by_url_ap_id_or_username(friendly_url)
+
+        assert {:ok, object2} =
+                 AdapterUtils.get_by_url_ap_id_or_username(friendly_url)
+                 |> repo().maybe_preload(:post_content)
+
         assert object2.post_content.html_body =~ attrs2.post_content.html_body
       end)
   end

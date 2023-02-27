@@ -34,7 +34,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
     remote_user = context[:remote][:user]
 
     post1_attrs = %{
-      post_content: %{html_body: "#{context[:remote][:username]} test federated at mention"}
+      post_content: %{html_body: "#{context[:remote][:username]} try federated boost"}
     }
 
     {:ok, post1} =
@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
     TestInstanceRepo.apply(fn ->
       assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
       post1remote = List.first(feed).activity.object
-      assert post1remote.post_content.html_body =~ "test federated at mention"
+      assert post1remote.post_content.html_body =~ "try federated boost"
 
       Logger.metadata(action: info("boost it"))
       Bonfire.Social.Boosts.boost(remote_user, post1remote)
@@ -53,13 +53,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
 
     assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_user)
 
-    Logger.metadata(
-      action: info("check that reply with mention was federated and is in OP's feed")
-    )
+    Logger.metadata(action: info("check that reply with boost was federated and is in OP's feed"))
 
     a_remote = List.first(feed).activity
     assert a_remote.verb.verb == "Boost"
     boosted_post = a_remote.object
-    assert boosted_post.post_content.html_body =~ "test federated at mention"
+    assert boosted_post.post_content.html_body =~ "try federated boost"
   end
 end

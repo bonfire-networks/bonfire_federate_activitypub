@@ -34,16 +34,18 @@ defmodule Bonfire.Federate.ActivityPub.Dance.LikesTest do
     remote_user = context[:remote][:user]
 
     post1_attrs = %{
-      post_content: %{html_body: "#{context[:remote][:username]} test federated at mention"}
+      post_content: %{html_body: "#{context[:remote][:username]} try federated @ mention"}
     }
 
     {:ok, post1} =
       Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
     TestInstanceRepo.apply(fn ->
-      assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
+      assert %{edges: feed} =
+               Bonfire.Social.FeedActivities.feed(:notifications, current_user: remote_user)
+
       post1remote = List.first(feed).activity.object
-      assert post1remote.post_content.html_body =~ "test federated at mention"
+      assert post1remote.post_content.html_body =~ "try federated @ mention"
 
       Logger.metadata(action: info("like it"))
       Bonfire.Social.Likes.like(remote_user, post1remote)
@@ -60,6 +62,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.LikesTest do
     a_remote = List.first(feed).activity
     assert a_remote.verb.verb == "Like"
     liked_post = a_remote.object
-    assert liked_post.post_content.html_body =~ "test federated at mention"
+    assert liked_post.post_content.html_body =~ "try federated @ mention"
   end
 end

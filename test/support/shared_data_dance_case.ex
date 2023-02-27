@@ -5,9 +5,9 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
   import Bonfire.UI.Common.Testing.Helpers
   alias Bonfire.Common.TestInstanceRepo
 
-  def a_fake_user!(name) do
+  def a_fake_user!(name, opts \\ []) do
     # repo().delete_all(ActivityPub.Object)
-    user = fake_user!("#{name} #{Pointers.ULID.generate()}")
+    user = fake_user!("#{name} #{Pointers.ULID.generate()}", %{}, opts)
 
     [
       user: user,
@@ -17,8 +17,8 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     ]
   end
 
-  def fake_remote!() do
-    TestInstanceRepo.apply(fn -> a_fake_user!("Remote") end)
+  def fake_remote!(opts \\ []) do
+    TestInstanceRepo.apply(fn -> a_fake_user!("Remote", opts) end)
   end
 
   setup_all tags do

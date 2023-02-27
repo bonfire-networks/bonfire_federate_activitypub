@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
+defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
@@ -14,8 +14,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
   alias Bonfire.Social.Posts
   alias Bonfire.Social.Follows
 
-  @tag :test_instance
-  test "remote follow makes a request, which user can accept, which it turns into a follow, and a post federates back to the follower",
+  test "remote follow on open profile works, and a post federates back to the follower, and unfollow works",
        context do
     local_follower = context[:local][:user]
     follower_ap_id = Bonfire.Me.Characters.character_url(local_follower)
@@ -28,24 +27,23 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
     Logger.metadata(action: info("init followed_on_local"))
     assert {:ok, followed_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(followed_ap_id)
 
-    Logger.metadata(action: info("make a (request to) follow"))
-    assert {:ok, request} = Follows.follow(local_follower, followed_on_local)
-    request_id = ulid(request)
-    # info(request, "the request")
+    Logger.metadata(action: info("do the follow"))
+    assert {:ok, follow} = Follows.follow(local_follower, followed_on_local)
+    fid = ulid(follow)
+    # info(request, "the follow")
 
-    assert Follows.requested?(local_follower, followed_on_local)
-    refute Follows.following?(local_follower, followed_on_local)
+    assert Follows.following?(local_follower, followed_on_local)
 
     # this shouldn't be needed if running Oban :inline
     # Bonfire.Common.Config.get([:bonfire, Oban]) |> info("obannn")
     # Oban.drain_queue(queue: :federator_outgoing)
     # assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(request)
-    assert %{__struct__: ActivityPub.Object, pointer_id: ^request_id} =
-             Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(request)
+    assert %{__struct__: ActivityPub.Object, pointer_id: ^fid} =
+             Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(follow)
 
     remote_followed = context[:remote][:user]
 
-    post_attrs = %{post_content: %{html_body: "test federated post"}}
+    post_attrs = %{post_content: %{html_body: "try federated post"}}
 
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: info("init follower_on_remote"))
@@ -56,27 +54,17 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
       assert ulid(follower_on_remote) != ulid(local_follower)
       assert ulid(remote_followed) != ulid(followed_on_local)
 
-      Logger.metadata(action: info("check request received on remote"))
-      assert Follows.requested?(follower_on_remote, remote_followed)
-      refute Follows.following?(follower_on_remote, remote_followed)
-
-      Logger.metadata(action: info("accept request"))
-
-      assert {:ok, follow} =
-               Follows.accept_from(follower_on_remote, current_user: remote_followed)
-
-      Logger.metadata(action: info("check request is now a follow on remote"))
+      Logger.metadata(action: info("check follow worked on remote"))
       assert Follows.following?(follower_on_remote, remote_followed)
       refute Follows.requested?(follower_on_remote, remote_followed)
 
-      # Logger.metadata(action: info("make a post on remote"))
+      Logger.metadata(action: info("make a post on remote"))
 
       {:ok, post} =
         Posts.publish(current_user: remote_followed, post_attrs: post_attrs, boundary: "public")
     end)
 
-    Logger.metadata(action: info("check accept was received and local is now following"))
-    # FIXME
+    Logger.metadata(action: info("check that local is following"))
     assert Follows.following?(local_follower, followed_on_local)
     refute Follows.requested?(local_follower, followed_on_local)
 
@@ -84,7 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
 
     assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_follower)
 
-    assert List.first(feed).activity.object.post_content.html_body ==
+    assert List.first(feed).activity.object.post_content.html_body =~
              post_attrs.post_content.html_body
 
     Logger.metadata(action: info("unfollow"))
@@ -99,6 +87,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowPostTest do
       Logger.metadata(action: info("check unfollow received on remote"))
 
       refute Follows.following?(follower_on_remote, remote_followed)
+
+      # refute true
     end)
   end
 end

@@ -24,41 +24,63 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       System.get_env("AP_BASE_PATH", "/pub")
   end
 
-  def is_local?(thing) do
+  def is_local?(thing, preload_if_needed \\ true) do
     if is_binary(thing) do
       Bonfire.Common.Pointers.one(thing, skip_boundary_check: true)
     else
       thing
     end
-    # NOTE: trying preloads seperately so the whole thing doesn't fail if a field doesn't exists on the thing (TODO: pattern matching for schema could avoid this)
-    |> repo().maybe_preload(:peered)
-    |> repo().maybe_preload(character: :peered)
-    |> repo().maybe_preload(creator: :peered)
-    |> repo().maybe_preload(created: [:peered, creator: :peered])
+    # |> debug("thing")
     |> case do
       %{is_local: true} ->
+        true
+
+      %{peered: nil} ->
         true
 
       %{peered: %Peered{}} ->
         false
 
+      %{character: %{peered: nil}} ->
+        true
+
       %{character: %{peered: %Peered{}}} ->
         false
+
+      %{creator: %{peered: nil}} ->
+        true
 
       %{creator: %{peered: %Peered{}}} ->
         false
 
+      %{created: %{peered: nil}} ->
+        true
+
       %{created: %{peered: %Peered{}}} ->
         false
+
+      %{created: %{creator: %{peered: nil}}} ->
+        true
 
       %{created: %{creator: %{peered: %Peered{}}}} ->
         false
 
-      thing when is_map(thing) ->
-        # info(thing, "declaring local")
-        true
+      object when is_struct(object) ->
+        if preload_if_needed do
+          # NOTE: trying preloads seperately so the whole thing doesn't fail if a field doesn't exists on the thing (TODO: only preload one of these based on what assocs are available)    
+          object
+          |> repo().maybe_preload(:peered)
+          |> repo().maybe_preload(character: :peered)
+          |> repo().maybe_preload(creator: :peered)
+          |> repo().maybe_preload(created: [:peered, creator: :peered])
+          |> is_local?(false)
+        else
+          debug(object, "declaring local because no other case matched")
+          true
+        end
 
-      _ ->
+      other ->
+        debug(other, "no case matched")
         false
     end
     |> debug(ulid(thing))
@@ -441,10 +463,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def format_actor(%{} = user_etc, type) do
     user_etc =
-      repo().preload(user_etc,
+      repo().maybe_preload(
+        user_etc,
+        :peered,
         profile: [:image, :icon],
-        character: [:actor],
-        peered: []
+        character: [:actor]
       )
 
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
@@ -609,6 +632,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_cached!(pointer: pointer_id) |> create_remote_actor()
   def create_remote_actor(%ActivityPub.Object{} = object),
     do: ActivityPub.Actor.format_remote_actor(object) |> create_remote_actor()
+
+  def character_module(%{__struct__: Pointers.Pointer} = struct),
+    do: Types.object_type(struct) |> character_module()
 
   def character_module(%{__struct__: type}), do: character_module(type)
 
