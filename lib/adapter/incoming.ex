@@ -50,9 +50,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         } = activity
       )
       when is_binary(object_id) do
-    info("AP - load the #{activity.data["id"]} activity's object data from URI: #{object_id}")
+    info(
+      "AP - fetch the #{activity.data["id"]} activity's object data from URI when we only have an AP ID: #{object_id}"
+    )
+
     # info(activity, "activity")
-    case ActivityPub.Federator.Fetcher.fetch_ap_object_from_id(object_id) do
+    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id) do
       {:ok, object} ->
         debug(object, "fetched object")
 
