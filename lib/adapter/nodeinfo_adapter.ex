@@ -16,7 +16,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
       user_count: Bonfire.Me.Users.maybe_count(),
       node_name: Config.get([:ui, :theme, :instance_name], nil),
       node_description: Config.get([:ui, :theme, :instance_description], nil),
-      federating: instance[:federating],
+      federating: instance[:federating] == true,
       app_repository: Bonfire.Application.repository()
     }
   end

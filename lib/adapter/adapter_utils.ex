@@ -136,7 +136,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_local_character_by_ap_id(ap_id, local_instance \\ nil) when is_binary(ap_id) do
     String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
-    |> info("assume local character")
+    |> debug("username")
     |> get_character_by_username()
   end
 
@@ -168,8 +168,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
-    local_instance = ap_base_url()
+  def get_actor_by_ap_id(ap_id, local_instance \\ nil) when is_binary(ap_id) do
+    local_instance = local_instance || ap_base_url()
     # only create Peer for remote instances
     if not String.starts_with?(ap_id, local_instance) do
       debug(ap_id, "assume looking up a known remote character")
@@ -178,9 +178,20 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # ActivityPub.Actor.get_cached(ap_id: ap_id)
       ActivityPub.Actor.get_remote_actor(ap_id, false)
       |> info("got by ap_id")
-      |> return_character()
-    else
-      get_local_character_by_ap_id(ap_id, local_instance)
+    end
+  end
+
+  def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
+    local_instance = ap_base_url()
+
+    case get_actor_by_ap_id(ap_id, local_instance) do
+      nil ->
+        debug(ap_id, "assume looking up a local character")
+        get_local_character_by_ap_id(ap_id, local_instance)
+
+      actor ->
+        actor
+        |> return_character()
     end
   end
 
@@ -472,7 +483,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
-    id = Bonfire.Common.URIs.maybe_generate_canonical_url(user_etc)
+    id = Bonfire.Common.URIs.canonical_url(user_etc)
 
     # icon = maybe_format_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
     # image = maybe_format_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
@@ -608,8 +619,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       end
     end
   end
-
-  def create_remote_actor(%ActivityPub.Actor{} = actor), do: create_remote_actor(actor)
 
   def create_remote_actor(%{ap_id: ap_id}) when is_binary(ap_id),
     do: create_remote_actor(ap_id)

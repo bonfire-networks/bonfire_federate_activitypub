@@ -73,10 +73,16 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_ap_id(ap_id) do
-    # TODO: Make more generic (currently assumes the actor is user)
-    with {:ok, character} <- AdapterUtils.get_local_character_by_ap_id(ap_id),
-         %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
-      {:ok, actor}
+    case AdapterUtils.get_actor_by_ap_id(ap_id) do
+      nil ->
+        debug(ap_id, "assume looking up a local character")
+
+        with {:ok, character} <- AdapterUtils.get_local_character_by_ap_id(ap_id) do
+          AdapterUtils.character_to_actor(character)
+        end
+
+      actor ->
+        actor
     end
   end
 
@@ -120,13 +126,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def update_remote_actor(%{pointer_id: pointer_id} = actor) when is_binary(pointer_id) do
     AdapterUtils.get_character_by_id(pointer_id)
-    |> info()
+    |> debug("character pre-update")
     ~> update_remote_actor(actor)
   end
 
   def update_remote_actor(actor) do
     AdapterUtils.fetch_character_by_ap_id(actor)
-    |> info()
+    |> debug("character pre-update")
     |> update_remote_actor(actor)
   end
 
@@ -136,20 +142,22 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def update_remote_actor(%{} = character, data) do
     params =
       %{
-        name: data["name"],
-        summary: data["summary"],
-        icon_id:
-          AdapterUtils.maybe_create_icon_object(
-            AdapterUtils.maybe_fix_image_object(data["icon"]),
-            character
-          ),
-        image_id:
-          AdapterUtils.maybe_create_banner_object(
-            AdapterUtils.maybe_fix_image_object(data["image"]),
-            character
-          )
+        profile: %{
+          name: data["name"],
+          summary: data["summary"],
+          icon_id:
+            AdapterUtils.maybe_create_icon_object(
+              AdapterUtils.maybe_fix_image_object(data["icon"]),
+              character
+            ),
+          image_id:
+            AdapterUtils.maybe_create_banner_object(
+              AdapterUtils.maybe_fix_image_object(data["image"]),
+              character
+            )
+        }
       }
-      |> info()
+      |> debug("params")
 
     # TODO - support other types
     Bonfire.Me.Users.update_remote(character, params)
