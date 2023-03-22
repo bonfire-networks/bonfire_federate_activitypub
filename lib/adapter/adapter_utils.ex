@@ -106,7 +106,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_character_by_username(username) when is_binary(username) do
     with {:error, :not_found} <- Users.by_username(username) do
-      info(username, "not a user, check for any other character types")
+      debug(username, "not a user, check for any other character types")
       Bonfire.Common.Pointers.get(username)
     end
     ~> get_character_by_username()
@@ -869,5 +869,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       _ ->
         nil
     end
+  end
+
+  def create_service_actor(username) do
+    Bonfire.Me.Fake.fake_user!(username, %{},
+      request_before_follow: true,
+      undiscoverable: true
+    )
   end
 end

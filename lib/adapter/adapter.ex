@@ -247,4 +247,20 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # |> info()
     |> Bonfire.Federate.ActivityPub.Outgoing.maybe_federate(:create, ...)
   end
+
+  def get_or_create_service_actor_by_username(nickname) do
+    case ActivityPub.Actor.get_cached(username: nickname) do
+      {:ok, actor} ->
+        {:ok, actor}
+
+      _ ->
+        with %{} = character <- AdapterUtils.create_service_actor(nickname),
+             %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
+          {:ok, actor}
+        else
+          e ->
+            error(e, "Cannot create service actor: #{nickname}")
+        end
+    end
+  end
 end
