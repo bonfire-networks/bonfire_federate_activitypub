@@ -13,6 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
   # alias Bonfire.Federate.ActivityPub.Incoming
+  alias ActivityPub.Actor
 
   # import Bonfire.Federate.ActivityPub
   import Untangle
@@ -35,20 +36,66 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     |> debug("receive done")
   end
 
+  defp character_id_from_actor(actor),
+    do: actor.pointer || actor.pointer_id || Characters.by_username!(actor.username)
+
+  defp get_followers(%Actor{} = actor) do
+    # debug(actor)
+    character_id_from_actor(actor)
+    |> debug("character")
+    |> get_followers()
+  end
+
+  defp get_followers(character) do
+    Bonfire.Social.Follows.all_subjects_by_object(character)
+    # |> debug()
+    |> Enum.map(&id(&1))
+  end
+
   def get_follower_local_ids(actor) do
-    # info(actor)
-    with {:ok, character} <- Characters.by_username(actor.username) do
-      # info(character)
-      Bonfire.Social.Follows.all_subjects_by_object(character)
-      # |> info()
-      |> Enum.map(&ulid(&1))
-    end
+    # debug(actor)
+    get_followers(actor)
+    |> Enum.map(&id(&1))
   end
 
   def get_following_local_ids(actor) do
     with {:ok, character} <- Characters.by_username(actor.username) do
       Bonfire.Social.Follows.all_objects_by_subject(character)
-      |> Enum.map(&ulid(&1))
+      |> Enum.map(&id(&1))
+    end
+  end
+
+  def external_followers_for_activity(actor, activity_data) do
+    debug(actor)
+    debug(activity_data)
+
+    with {:ok, object} <-
+           ActivityPub.Actor.get_cached(
+             ap_id: activity_data["object"]["id"] || activity_data["object"]
+           ),
+         object_id when is_binary(object_id) <- object.pointer || object.pointer_id,
+         character when is_struct(character) or is_binary(character) <-
+           character_id_from_actor(actor),
+         followers when followers != [] <-
+           get_followers(character)
+           |> debug("followers")
+           |> Enum.reject(&AdapterUtils.is_local?/1)
+           |> debug("remote followers") do
+      granted_followers =
+        Bonfire.Boundaries.users_grants_on(followers, object_id, [:see, :read])
+        #  only positive grants
+        |> Enum.filter(& &1.value)
+        |> Enum.map(&Map.take(&1, [:subject_id, :subject]))
+        |> debug("post_grants")
+        |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject))
+        |> filter_empty([])
+        |> debug("bcc actors based on grants")
+
+      {:ok, granted_followers}
+    else
+      e ->
+        warn(e, "Could not find the object or lookup followers")
+        {:ok, []}
     end
   end
 

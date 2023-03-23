@@ -152,6 +152,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     ap_id
   end
 
+  def the_ap_id(ap_id) when is_binary(ap_id) do
+    ap_id
+  end
+
   def fetch_character_by_ap_id(actor_or_ap_id) do
     local_instance = ap_base_url()
 
@@ -476,10 +480,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     user_etc =
       repo().maybe_preload(
         user_etc,
-        :peered,
-        profile: [:image, :icon],
-        character: [:actor]
+        [
+          :settings,
+          :actor,
+          profile: [:image, :icon],
+          character: [:peered]
+        ]
       )
+      |> debug("user_etc")
 
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
@@ -491,7 +499,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     icon = maybe_format_image_object_from_path(Media.avatar_url(user_etc))
     image = maybe_format_image_object_from_path(Media.banner_url(user_etc))
 
-    local = if user_etc.peered, do: false, else: true
+    local = if e(user_etc, :character, :peered, nil), do: false, else: true
 
     data = %{
       "type" => type,
@@ -531,7 +539,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     %Actor{
       id: user_etc.id,
       data: data,
-      keys: e(user_etc, :character, :actor, :signing_key, nil),
+      keys: e(user_etc, :actor, :signing_key, nil),
       local: local,
       ap_id: id,
       pointer_id: user_etc.id,

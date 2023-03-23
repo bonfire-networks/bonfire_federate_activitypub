@@ -28,7 +28,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     # num_local_authors = length(local_author_ids)
     # = (num_local_authors && num_local_authors == length(authors))
-    info(is_local?, "is_local?")
+    debug(is_local?, "is_local?")
 
     with {:ok, activity} <-
            maybe_check_and_filter(
@@ -76,7 +76,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_follow?(activity) and :silence == check_block_type and is_local? ->
         info("reject following silenced remote actors")
 
-        block_or_filter_recipients(block_types, activity, local_author_ids)
+        block_or_filter_recipients(block_types, activity, local_author_ids, is_local?)
 
       is_follow?(activity) and :silence == check_block_type and !is_local? ->
         info("accept follows from silenced remote actors")
@@ -105,13 +105,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
             block_or_filter_recipients(
               block_types,
               activity,
-              local_recipient_ids
+              local_recipient_ids,
+              is_local?
             )
 
       :ghost == check_block_type and is_local? ->
         info("filter ghosted recipients of outgoing local activities")
 
-        block_or_filter_recipients(block_types, activity, local_author_ids)
+        block_or_filter_recipients(block_types, activity, local_author_ids, is_local?)
 
       :ghost == check_block_type and !is_local? ->
         info("do nothing with ghosting on incoming remote activities")
@@ -200,7 +201,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       )
   end
 
-  defp block_or_filter_recipients(block_types, activity, local_actor_ids) do
+  defp block_or_filter_recipients(block_types, activity, local_actor_ids, is_local?) do
     case filter_recipients(block_types, activity, local_actor_ids) do
       %{"type" => type} when type in ["Update", "Delete", "Flag", "Accept", "Reject", "Undo"] ->
         info("accept '#{type}' activity with no recipients")
@@ -211,11 +212,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
           do: debug(filtered, "activity has been filtered"),
           else: debug("no blocks apply")
 
-        if e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
+        if is_local? || e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
              e(filtered, :bcc, nil) || e(filtered, :audience, nil) do
           {:ok, filtered}
         else
-          {:reject, "Do not federate because all recipients were filtered"}
+          debug(activity, "reject activity")
+
+          {:reject,
+           "Do not accept incoming federated activity because it has no recipients or they were all filtered"}
         end
     end
   end

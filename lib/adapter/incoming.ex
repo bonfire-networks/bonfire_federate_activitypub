@@ -124,7 +124,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     info("AP Match#1 - with activity_type and object_type: #{activity_type} & #{object_type}")
 
     with {:ok, actor} <- activity_character(activity) |> info("activity_character"),
-         {:error, _} <-
+         {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(
                {activity_type, object_type}
@@ -134,7 +134,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              activity,
              object
            ),
-         {:error, _} <-
+         {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type)
              |> info("AP attempt #1.2 - with activity_type"),
@@ -142,7 +142,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              activity,
              object
            ),
-         {:error, _} <-
+         {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type)
              |> info("AP attempt #1.3 - with object_type"),
@@ -210,7 +210,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     else
       error = "ActivityPub - ignored incoming activity - unhandled activity or object type"
 
-      receive_error("#{error}")
+      no_federation_module_match("#{error}")
       info("AP activity: #{inspect(activity, pretty: true)}")
       info("AP object: #{inspect(object, pretty: true)}")
       {:error, error}
@@ -285,7 +285,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
                  activity,
                  Map.merge(object, %{pointer_id: pointer_id})
                ],
-               &receive_error/2
+               &no_federation_module_match/2
              ) do
         info(
           "AP - created remote object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_obj_id}"
@@ -337,7 +337,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              module,
              :ap_receive_activity,
              [character, activity, object],
-             &receive_error/2
+             &no_federation_module_match/2
            ) do
       {:ok, pointable_object}
     end
@@ -352,7 +352,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              module,
              :ap_receive_activity,
              [character, activity, object],
-             &receive_error/2
+             &no_federation_module_match/2
            ) do
       # activity = ActivityPub.Object.normalize(activity)
       # ActivityPub.Object.update_existing(activity, %{pointer_id: pointable_object_id})
@@ -371,14 +371,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   end
 
   # defp handle_activity_with(_module, {:error, _}, activity, _) do
-  #   receive_error("AP - could not find local character for the actor", activity)
+  #   no_federation_module_match("AP - could not find local character for the actor", activity)
   # end
 
   defp handle_activity_with(_module, _actor, _activity, _object) do
     debug("AP - no match in handle_activity_with")
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
-    {:error, :skip}
+    {:no_federation_module_match, :skip}
   end
 
   defp activity_character(%{"actor" => actor}) do
@@ -420,12 +420,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     {:ok, nil}
   end
 
-  def receive_error(error, attrs \\ nil) do
+  def no_federation_module_match(error, attrs \\ nil) do
     error(
       attrs,
       "ActivityPub - Unable to process incoming federated activity - #{error}"
     )
 
-    {:error, {error, attrs}}
+    {:no_federation_module_match, {error, attrs}}
   end
 end
