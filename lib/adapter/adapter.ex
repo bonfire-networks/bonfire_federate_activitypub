@@ -66,35 +66,40 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def external_followers_for_activity(actor, activity_data) do
-    debug(actor)
-    debug(activity_data)
+    # debug(actor)
+    # debug(activity_data)
 
     with {:ok, object} <-
            ActivityPub.Actor.get_cached(
              ap_id: activity_data["object"]["id"] || activity_data["object"]
            ),
-         object_id when is_binary(object_id) <- object.pointer || object.pointer_id,
+         object when is_binary(object) or is_struct(object) <-
+           object.pointer || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-
            character_id_from_actor(actor),
-         followers when followers != [] <-
+         followers when is_list(followers) and followers != [] <-
            get_followers(character)
            |> debug("followers")
            |> Enum.reject(&AdapterUtils.is_local?/1)
-           |> debug("remote followers") do
-      granted_followers =
-        Bonfire.Boundaries.users_grants_on(followers, object_id, [:see, :read])
-        #  only positive grants
-        |> Enum.filter(& &1.value)
-        |> Enum.map(&Map.take(&1, [:subject_id, :subject]))
-        |> debug("post_grants")
-        |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject))
-        |> filter_empty([])
-        |> debug("bcc actors based on grants")
-
-      {:ok, granted_followers}
+           |> debug("remote followers"),
+         granted_followers when is_list(granted_followers) and granted_followers != [] <-
+           Bonfire.Boundaries.users_grants_on(followers, object, [:see, :read]) do
+      {:ok,
+       granted_followers
+       #  only positive grants 
+       |> Enum.filter(& &1.value)
+       |> Enum.map(&Map.take(&1, [:subject_id, :subject]))
+       |> debug("post_grants")
+       |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject_id))
+       |> filter_empty([])
+       |> debug("bcc actors based on grants")}
     else
+      [] ->
+        debug("No remote followers or grants")
+        {:ok, []}
+
       e ->
-        warn(e, "Could not find the object or lookup followers")
+        warn(e, "Could not find the object or actor?")
         {:ok, []}
     end
   end

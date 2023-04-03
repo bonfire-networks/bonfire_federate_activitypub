@@ -50,8 +50,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
 
     ## work on test instance
     TestInstanceRepo.apply(fn ->
-      assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
-      post1remote = List.first(feed).activity.object
+      assert %{edges: [feed_entry | _]} =
+               Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user),
+             "post wasn't federated to instance of mentioned actor"
+
+      post1remote = feed_entry.activity.object
       assert post1remote.post_content.html_body =~ "try out federated at mention"
 
       Logger.metadata(action: info("make a reply on remote"))
