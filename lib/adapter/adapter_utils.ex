@@ -544,7 +544,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ap_id: id,
       pointer_id: user_etc.id,
       username: e(user_etc, :character, :username, nil),
-      deactivated: false
+      deactivated: false,
+      updated_at: NaiveDateTime.utc_now()
     }
   end
 
