@@ -236,11 +236,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def maybe_create_remote_actor(actor) when not is_nil(actor) do
-    log("AP - maybe_create_remote_actor for #{e(actor, :ap_id, nil) || e(actor, "id", nil)}")
+    log("AP - maybe_create_remote_actor for #{inspect(actor)}")
 
     case AdapterUtils.fetch_character_by_ap_id(actor) do
       {:ok, character} ->
-        log("AP - remote actor exists, return it: #{ulid(character)}")
+        log("AP - remote actor exists, return it: #{id(character)}")
         # already exists
         {:ok, character}
 
