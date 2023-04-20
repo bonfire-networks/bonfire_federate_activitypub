@@ -94,4 +94,42 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
     post3remote = List.first(feed).activity.object
     assert post3remote.post_content.html_body =~ "try out federated reply with mention"
   end
+
+
+
+
+  # test "custom with circle containing remote users permitted", context do
+  #   post1_attrs = %{
+  #     post_content: %{html_body: "#{context[:remote][:username]} try out federated at mention"}
+  #   }
+  #   local_user = context[:local][:user]
+  #   # |> info("local_user")
+  #   local_ap_id =
+  #     Bonfire.Me.Characters.character_url(local_user)
+  #     |> info("local_ap_id")
+
+  #   remote_ap_id =
+  #     context[:remote][:canonical_url]
+  #     |> info("remote_ap_id")
+
+  #   remote_user = context[:remote][:user]
+
+  #   {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(remote_user)
+
+
+  #   # create a circle with alice and bob
+  #   {:ok, circle} = Circles.create(local_user, %{named: %{name: "family"}})
+  #   {:ok, _} = Circles.add_to_circles(remote_actor.id, circle)
+
+  #   # Logger.metadata(action: info("init remote_on_local"))
+  #   # assert {:ok, remote_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
+
+  #   {:ok, post1} =
+  #     Posts.publish(
+  #       current_user: local_user,
+  #       post_attrs: post1_attrs,
+  #       boundary: "custom",
+  #       to_circles: %{circle.id => "interact"})
+  # end
+
 end
