@@ -95,9 +95,4 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
     post3remote = List.first(feed).activity.object
     assert post3remote.post_content.html_body =~ "try out federated reply with mention"
   end
-
-
-
-
-
 end

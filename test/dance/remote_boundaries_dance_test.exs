@@ -19,14 +19,17 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
     post1_attrs = %{
       post_content: %{html_body: "try out federated post with circle containing remote users"}
     }
+
     alice_local = context[:local][:user]
 
-    local_ap_id =
-      Bonfire.Me.Characters.character_url(alice_local)
-
+    local_ap_id = Bonfire.Me.Characters.character_url(alice_local)
 
     bob_remote = context[:remote][:user]
-    {:ok, remote_actor} = Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(context[:remote][:canonical_url])
+
+    {:ok, remote_actor} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
+        context[:remote][:canonical_url]
+      )
 
     # create a circle with bob_remote in it
     {:ok, circle} = Circles.create(alice_local, %{named: %{name: "family"}})
@@ -44,15 +47,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
         current_user: alice_local,
         post_attrs: post1_attrs,
         boundary: "public",
-        to_circles: %{circle.id => "interact"})
+        to_circles: %{circle.id => "interact"}
+      )
 
     # on remote instance, bob_remote should see the post
     TestInstanceRepo.apply(fn ->
       assert %{edges: [feed_entry | _]} =
-        Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote) |> IO.inspect(label: "bob feed"),
-      "try out federated post with circle containing remote users"
-
-
+               Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
+               |> IO.inspect(label: "bob feed"),
+             "try out federated post with circle containing remote users"
     end)
   end
 end
