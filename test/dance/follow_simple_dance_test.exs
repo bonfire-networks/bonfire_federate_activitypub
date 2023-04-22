@@ -91,4 +91,34 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
       # refute true
     end)
   end
+
+
+
+  test "If a remote user is created, and the remote instance does not have a circle, a circle is created and the user is added to it", context do
+
+    # Here we store in a var the total amount of existing circles
+    # We will use this to check that a new circle was created
+    total_circles = Bonfire.Boundaries.Circles.list_my_with_counts(Bonfire.Boundaries.Fixtures.admin_circle(), exclude_stereotypes: false)
+
+    alice_local = context[:local][:user]
+    local_ap_id = Bonfire.Me.Characters.character_url(alice_local)
+    {:ok, bob_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
+    {:ok, follow} = Follows.follow(alice_local, bob_remote)
+    assert Follows.following?(alice_local, bob_remote)
+
+    updated_circles = Bonfire.Boundaries.Circles.list_my_with_counts(Bonfire.Boundaries.Fixtures.admin_circle(), exclude_stereotypes: false)
+    # assert that a new circle is created after the follow, the total amount of circles is increased by 1
+    assert length(total_circles) + 1  == updated_circles |> length()
+
+    # assert that the new circle name is the same as the remote instance name
+    assert Enum.any?(updated_circles, fn circle -> circle.named.name =~ context[:remote][:canonical_url] end)
+
+    # assert that the user is added to the new circle
+
+  end
+
+  test "If a remote user is created, and the remote instance does have a circle, the user is added to it but no new circles are created", context do
+
+  end
+
 end
