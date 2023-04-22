@@ -81,7 +81,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
 
     Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
 
-    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_user)
+    assert %{edges: feed} =
+             Bonfire.Social.FeedActivities.feed(:my, current_user: local_user) |> debug("feeeed")
 
     Enum.each(
       feed,
