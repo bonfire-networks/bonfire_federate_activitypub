@@ -3,6 +3,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
   import Tesla.Mock
   alias ActivityPub.Config
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
+  alias Bonfire.Social.Follows
   alias Bonfire.Data.ActivityPub.Peered
 
   @remote_actor "https://mocked.local/users/karen"
@@ -20,21 +22,36 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
     test "I try to follow someone on an per-user silenced instance" do
       local_user = fake_user!(@local_actor)
 
-      {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
+      # {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      # {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      # {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
+      assert {:ok, remote_user} = AdapterUtils.get_by_url_ap_id_or_username(@remote_actor)
 
-      {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
+      assert {:ok, instance} =
+               Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
+               |> debug("iiiii")
+
+      peer =
+        e(remote_user, :character, :peered, :peer, nil) || e(remote_user, :peered, :peer, nil) ||
+          e(remote_user, :character, :peered, :peer_id, nil) ||
+          e(remote_user, :peered, :peer_id, nil)
+
+      assert ulid(peer) == ulid(instance)
 
       {:ok, block} =
-        remote_user
-        |> e(:character, :peered, :peer_id, nil)
-        # |> debug
+        peer
+        |> debug("peeeeer_id")
         |> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
+
+      assert Bonfire.Federate.ActivityPub.Instances.is_blocked?(instance, :silence,
+               current_user: local_user
+             )
 
       refute match?(
                {:ok, follow_activity},
-               ActivityPub.follow(%{actor: local_actor, object: remote_actor, local: true})
+               Follows.follow(local_user, remote_user)
+               #  ActivityPub.follow(%{actor: local_actor, object: remote_actor, local: true})
              )
 
       # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)

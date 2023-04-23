@@ -378,7 +378,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     debug("AP - no match in handle_activity_with")
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
-    {:no_federation_module_match, :skip}
+    {:no_federation_module_match, :ignore}
   end
 
   defp activity_character(%{"actor" => actor}) do

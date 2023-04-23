@@ -137,7 +137,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_user
       |> e(:character, :peered, :peer_id, nil)
-      # |> debug
+      |> debug("peeeer")
       |> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
       assert {:ok, follow_activity} =
@@ -145,8 +145,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-      assert Bonfire.Social.Follows.requested?(remote_user, local_user)
-      # assert Bonfire.Social.Follows.following?(remote_user, local_user)
+      # assert Bonfire.Social.Follows.requested?(remote_user, local_user)
+      assert Bonfire.Social.Follows.following?(remote_user, local_user)
     end
   end
 

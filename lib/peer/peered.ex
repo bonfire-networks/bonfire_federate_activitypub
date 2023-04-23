@@ -154,15 +154,21 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
 
   def is_blocked?(id_or_uri, block_type, opts) when is_binary(id_or_uri) do
     if is_ulid?(id_or_uri) do
-      get(id_or_uri)
-      |> debug("existing Peered")
-      ~> is_blocked?(block_type, opts)
+      with {:ok, peered} <- get(id_or_uri) |> debug("existing Peered") do
+        is_blocked?(peered, block_type, opts)
+      else
+        other ->
+          error(other, "could not find a Peered, maybe it's just a local user?")
+          Bonfire.Boundaries.Blocks.is_blocked?(id_or_uri, block_type, opts)
+      end
     else
-      id_or_uri
-      |> debug("uri")
-      |> get_or_create()
-      |> debug("after get_or_create")
-      ~> is_blocked?(block_type, opts)
+      with {:ok, peered} <- get_or_create(id_or_uri) |> debug("found or created a Peered") do
+        is_blocked?(peered, block_type, opts)
+      else
+        other ->
+          error(other, "could not find or create a Peered, assuming not blocked")
+          false
+      end
     end
   end
 
@@ -188,6 +194,10 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   def is_blocked?(%{id: _} = character, block_type, opts) do
     Bonfire.Boundaries.Blocks.is_blocked?(character, block_type, opts)
     |> info("character blocked? ")
+  end
+
+  def is_blocked?(list, block_type, opts) when is_list(list) do
+    true in Enum.map(list, &is_blocked?(&1, block_type, opts))
   end
 
   defp is_blocked_peer_or_peered?(peer, peered, block_type, opts) do

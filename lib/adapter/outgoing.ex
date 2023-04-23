@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         "Skip (re)federating out '#{verb}' activity by remote actor '#{Types.ulid(subject)}'=#{subject_local?}, or remote object '#{Types.ulid(thing)}'=#{thing_local?}"
       )
 
-      :ignored
+      :ignore
     end
   end
 
@@ -154,7 +154,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
     )
 
-    :ignored
+    :ignore
   end
 
   def preparation_error(error, [_subject, verb, object]) do
@@ -163,13 +163,13 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
     )
 
-    :ignored
+    :ignore
   end
 
   def preparation_error(error, object) do
     error(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
 
-    :ignored
+    :ignore
   end
 
   def push_now!(activity) do
