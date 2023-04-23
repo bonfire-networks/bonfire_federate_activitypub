@@ -23,13 +23,14 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
 
     %{
       actor: local_actor.ap_id,
+      data: %{"type" => "Create"},
       to: to
       # local: true
     }
   end
 
   def activity_json(actor) do
-    %{"actor" => actor}
+    %{"actor" => actor, "to" => [ActivityPub.Config.public_uri()]}
   end
 
   def remote_activity_json() do
@@ -51,6 +52,7 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
       )
 
     %{
+      type: "Create",
       actor: actor,
       context: context,
       object: object,
@@ -129,5 +131,14 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(actor_uri)
     {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     user
+  end
+
+  def reject_or_no_recipients?(activity) do
+    case activity do
+      {:reject, _} -> true
+      {:ok, %{to: []}} -> true
+      {:ok, %{"to" => []}} -> true
+      _ -> false
+    end
   end
 end

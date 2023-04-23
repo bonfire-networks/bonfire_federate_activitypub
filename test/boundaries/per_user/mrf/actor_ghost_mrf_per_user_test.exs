@@ -51,7 +51,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
 
       local_activity = local_activity_json(local_user, @remote_actor)
 
-      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
+      # assert reject_or_no_recipients? BoundariesMRF.filter(local_activity, true)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(local_activity, true))
     end
   end
 
@@ -73,7 +74,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [ActivityPub.Config.public_uri()]
+                  to: [ActivityPub.Config.public_uri()],
+                  data: %{"type" => "Create"}
                 }}
     end
   end

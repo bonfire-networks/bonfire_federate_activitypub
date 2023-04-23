@@ -17,7 +17,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
   end
 
   describe "block incoming federation when" do
-    @tag :fixme
     test "there's a remote activity from a per-user silenced instance" do
       local_user = fake_user!(@local_actor)
 
@@ -29,20 +28,25 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
 
       remote_activity = remote_activity_json_to(local_user)
 
-      {:reject, _} = BoundariesMRF.filter(remote_activity, false)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(remote_activity, false))
     end
   end
 
   describe "filter incoming recipients when" do
-    @tag :fixme
     test "there's a remote activity from a per-user silenced instance" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      # |> debug
-      ~> Bonfire.Boundaries.Blocks.block(:silence, current_user: local_user)
+      assert {:ok, instance} =
+               Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
 
       # |> debug
+
+      assert Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
+
+      assert Bonfire.Federate.ActivityPub.Instances.is_blocked?(instance, :silence,
+               current_user: local_user
+             )
+
       public_uri = ActivityPub.Config.public_uri()
 
       remote_activity = remote_activity_json_to([local_user, public_uri])
@@ -75,13 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFPerUserTest do
         local_activity_json(local_user, [@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
   end
 end

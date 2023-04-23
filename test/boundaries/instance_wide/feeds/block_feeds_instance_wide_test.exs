@@ -29,10 +29,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
     end)
   end
 
-  @tag :fixme
   test "show in feeds a Post for an incoming Note with no blocking" do
     recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to(recipient)
+    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     # |> debug()
@@ -45,10 +44,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
     ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
 
     recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
+    assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
+    # feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+    # refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
   end
 
   test "does not show in feeds a Post for an incoming Note with blocked actor" do
@@ -57,13 +55,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
     Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 
     recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
+    assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
+    # feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+    # refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
   end
 
-  @tag :todo
   test "hides a Post in feed from a remote instance that was blocked later" do
     recipient = fake_user!(@local_actor)
     {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])

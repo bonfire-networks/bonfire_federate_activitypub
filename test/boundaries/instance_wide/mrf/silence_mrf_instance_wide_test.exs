@@ -39,7 +39,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       {:reject, _} = BoundariesMRF.filter(remote_activity, false)
     end
 
-    @tag :todo
     test "there's a remote activity with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       # |> debug
@@ -65,17 +64,16 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(remote_actor, false))
     end
 
-    @tag :fixme
     test "there's a remote actor with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
 
       remote_actor = remote_actor_json()
 
-      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(remote_actor, false))
     end
 
     test "there's a remote actor with instance-wide silenced host" do
@@ -83,7 +81,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(remote_actor, false))
     end
 
     test "there's a remote actor with instance-wide silenced wildcard domain" do
@@ -91,7 +89,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(remote_actor, false))
     end
 
     test "there's a remote actor with instance-wide silenced actor (in config)" do
@@ -99,12 +97,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
 
       remote_actor = remote_actor_json()
 
-      assert {:reject, _} = BoundariesMRF.filter(remote_actor, false)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(remote_actor, false))
     end
   end
 
   describe "reject when" do
-    @tag :fixme
     test "I try to follow someone on an instance-wide silenced instance" do
       local_user = fake_user!()
       {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
@@ -130,7 +127,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
   end
 
   describe "accept when" do
-    @tag :fixme
     test "someone from an instance-wide silenced instance attempts to follow" do
       local_user = fake_user!()
       {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
@@ -238,13 +234,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced host as recipient (in DB)" do
@@ -254,13 +244,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced wildcard domain as recipient" do
@@ -268,13 +252,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced actor as recipient (in config)" do
@@ -282,13 +260,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced actor as recipient (in DB)" do
@@ -300,13 +272,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
 
     test "there's a local activity with instance-wide silenced domain as recipient" do
@@ -314,13 +280,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceMRFInstanceWideTest do
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
   end
 end

@@ -293,7 +293,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
         # IO.inspect(pointable_object)
 
-        # maybe save the URI
+        # maybe save a Peer for instance and Peered URI
         Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
           pointable_object_id,
           ap_obj_id

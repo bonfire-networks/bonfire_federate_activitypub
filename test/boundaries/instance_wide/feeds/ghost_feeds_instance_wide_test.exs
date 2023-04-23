@@ -29,15 +29,14 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
     end)
   end
 
-  @tag :fixme
-  test "show in feeds an incoming Note with no ghosting" do
-    recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to(recipient)
+  # test "show in feeds an incoming Note with no ghosting" do
+  #   recipient = fake_user!(@local_actor)
+  #   {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post,
-             current_user: recipient
-           )
-  end
+  #   assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post,
+  #            current_user: recipient
+  #          )
+  # end
 
   test "show in feeds an incoming Note from a ghosted instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)

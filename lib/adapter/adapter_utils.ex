@@ -553,6 +553,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     character_module = character_module(actor.data["type"])
 
     log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
+    debug(actor)
 
     # username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
     username = actor.username
@@ -592,6 +593,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              end
            end) do
       # debug(user_etc, "user created")
+
+      # maybe save a Peer for instance and Peered URI
+      Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
+        user_etc,
+        actor.data["id"]
+      )
 
       # save remote discoverability flag as a user setting
       if actor.data["discoverable"] in ["false", false, "no"],

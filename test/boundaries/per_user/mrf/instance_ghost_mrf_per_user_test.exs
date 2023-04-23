@@ -25,12 +25,12 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
 
       local_activity = local_activity_json(local_user, @remote_actor)
 
-      assert {:reject, _} = BoundariesMRF.filter(local_activity, true)
+      # assert reject_or_no_recipients? BoundariesMRF.filter(local_activity, true)
+      assert reject_or_no_recipients?(BoundariesMRF.filter(local_activity, true))
     end
   end
 
   describe "filter outgoing recipients when" do
-    @tag :todo
     test "there's a local activity with per-user ghosted instance as recipient" do
       local_user = fake_user!(@local_actor)
 
@@ -46,7 +46,8 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
                   actor:
                     Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
                       "/actors/" <> @local_actor,
-                  to: [ActivityPub.Config.public_uri()]
+                  to: [ActivityPub.Config.public_uri()],
+                  data: %{"type" => "Create"}
                 }}
     end
   end

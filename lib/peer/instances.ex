@@ -8,20 +8,26 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   import Bonfire.Federate.ActivityPub
   import Ecto.Query
   alias Bonfire.Data.ActivityPub.Peer
+  alias Bonfire.Common.Utils
+  alias Bonfire.Common.URIs
 
   def get(canonical_uri) when is_binary(canonical_uri) do
-    uri = URI.parse(canonical_uri)
-    instance_url = "#{uri.scheme}://#{uri.host}"
-
-    do_get(instance_url)
+    with %URI{} = instance_url <- URIs.base_url(canonical_uri) do
+      do_get(instance_url)
+    end
   end
 
   defp do_get(instance_url) do
     repo().single(peer_url_query(instance_url))
   end
 
-  defp create(attrs) do
-    repo().insert(Peer.changeset(%Peer{}, attrs))
+  defp create(instance_url, host) do
+    Utils.maybe_apply(Bonfire.Boundaries.Circles, :get_or_create, host)
+    |> debug("circle for instance actors")
+
+    # TODO: maybe Peer should be a mixin so it can have the same ID as the Circle representing it?
+
+    repo().insert(Peer.changeset(%Peer{}, %{ap_base_uri: instance_url, display_hostname: host}))
   end
 
   defp peer_url_query(url) do
@@ -32,10 +38,11 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
   def get_or_create("https://www.w3.org/ns/activitystreams#Public"), do: nil
   def get_or_create(%{ap_id: canonical_uri}), do: get_or_create(canonical_uri)
-  def get_or_create(%{"id" => canonical_uri}), do: get_or_create(canonical_uri)
 
   def get_or_create(%{data: %{"id" => canonical_uri}}),
     do: get_or_create(canonical_uri)
+
+  def get_or_create(%{"id" => canonical_uri}), do: get_or_create(canonical_uri)
 
   def get_or_create(canonical_uri) when is_binary(canonical_uri) do
     local_instance = Bonfire.Common.URIs.base_url()
@@ -43,23 +50,44 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     if !String.starts_with?(canonical_uri, local_instance) do
       do_get_or_create(canonical_uri)
     else
-      info(canonical_uri)
-      info(local_instance)
-      error("Local actor treated as remote")
+      debug(canonical_uri)
+      debug(local_instance)
+      error("Local actor was treated as remote")
     end
   end
 
   defp do_get_or_create(canonical_uri) when is_binary(canonical_uri) do
-    uri = URI.parse(canonical_uri)
-    instance_url = "#{uri.scheme}://#{uri.host}"
+    uri =
+      URI.parse(canonical_uri)
+      |> debug()
 
-    case do_get(instance_url) do
-      {:ok, peer} ->
-        {:ok, peer}
+    host =
+      URIs.instance_domain(uri)
+      |> debug()
 
-      _none ->
-        debug(instance_url, "instance unknown, create it now")
-        create(%{ap_base_uri: instance_url, display_hostname: uri.host})
+    if host do
+      instance_url =
+        "#{uri.scheme}://#{host}"
+        |> debug()
+
+      case do_get(instance_url) do
+        {:ok, peer} ->
+          debug(instance_url, "instance already exists")
+
+          Utils.maybe_apply(Bonfire.Boundaries.Circles, :get_or_create, host)
+          |> warn(
+            "TEMPORARY: create a circle for instance (remove this in future, since doing it when a Peer is first created should be enough)"
+          )
+
+          {:ok, peer}
+
+        _none ->
+          debug(instance_url, "instance unknown, create a `Circle` and `Peer` for it now")
+
+          create(instance_url, host)
+      end
+    else
+      error(canonical_uri, "instance hostname unknown")
     end
   end
 
@@ -67,10 +95,23 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
   def is_blocked?(uri, block_type, opts) when is_binary(uri) do
     get_or_create(uri)
+    |> debug(uri)
     ~> is_blocked?(block_type, opts)
   end
 
-  def is_blocked?(%Peer{} = peer, block_type, opts) do
-    Bonfire.Boundaries.Blocks.is_blocked?(peer, block_type, opts)
+  def is_blocked?(%Peer{display_hostname: display_hostname} = peer, block_type, opts) do
+    with {:ok, circle} <- Bonfire.Boundaries.Circles.get_or_create(display_hostname) do
+      debug(circle, "cirrrcle")
+      Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
+    end
+  end
+
+  def is_blocked?(%Bonfire.Data.ActivityPub.Peered{} = peered, block_type, opts) do
+    # just in case
+    Bonfire.Federate.ActivityPub.Peered.is_blocked?(peered, block_type, opts)
+  end
+
+  def is_blocked?(%Bonfire.Data.AccessControl.Circle{} = circle, block_type, opts) do
+    Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
   end
 end

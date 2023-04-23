@@ -18,10 +18,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     end)
   end
 
-  @tag :fixme
   test "incoming Notes with no per-user silencing show up in the fediverse feed" do
     local_user = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to(local_user)
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
     # |> debug()
     assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, local_user)
   end
@@ -54,7 +53,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
 
-  @tag :todo
   test "does not show in any feeds an incoming Note from a per-user silenced actor" do
     local_user = fake_user!(@local_actor)
     {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
@@ -65,10 +63,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     # debug_user_acls(local_user, "local_user")
     # debug_user_acls(local_user, "remote_user")
 
-    {:ok, post} =
-      receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
-      ~> debug()
-      |> debug_object_acls()
+    {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
+
+    debug_object_acls(post)
 
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
@@ -79,7 +76,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, another_local_user)
   end
 
-  @tag :todo
   test "does not show in any feeds an incoming Note from an actor that was per-user silenced later on" do
     local_user = fake_user!(@local_actor)
     {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)

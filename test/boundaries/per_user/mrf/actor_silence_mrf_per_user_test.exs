@@ -43,7 +43,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
   end
 
   describe "accept when" do
-    @tag :fixme
     test "someone from an per-user silenced instance attempts to follow" do
       local_user = fake_user!(@local_actor)
 
@@ -63,8 +62,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
 
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-      assert Bonfire.Social.Follows.requested?(remote_user, local_user)
-      # assert Bonfire.Social.Follows.following?(remote_user, local_user)
+      # assert Bonfire.Social.Follows.requested?(remote_user, local_user)
+      assert Bonfire.Social.Follows.following?(remote_user, local_user)
     end
   end
 
@@ -96,13 +95,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
         local_activity_json(local_user, [@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==
-               {:ok,
-                %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
-                  to: [@remote_actor, ActivityPub.Config.public_uri()]
-                }}
+               {:ok, local_activity}
     end
   end
 end

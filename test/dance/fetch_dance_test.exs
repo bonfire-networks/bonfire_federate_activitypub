@@ -75,4 +75,24 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FetchTest do
         assert object2.post_content.html_body =~ attrs2.post_content.html_body
       end)
   end
+
+  test "If a remote user is created, a circle is created (if doesn't already exist) and the user is added to it",
+       context do
+    admin_circle = Bonfire.Boundaries.Fixtures.admin_circle()
+
+    actor_url = context[:remote][:canonical_url]
+    host = Bonfire.Common.URIs.instance_domain(actor_url)
+
+    {:ok, bob_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(actor_url)
+
+    # assert that an instance circle exists
+    assert {:ok, circle} = Bonfire.Boundaries.Circles.get_by_name(host, admin_circle)
+
+    # assert that the instance circle name is the hostname of the remote instance 
+    assert actor_url =~ circle.named.name
+    assert host == circle.named.name
+
+    # assert that the user is added to the instance circle
+    assert Bonfire.Boundaries.Circles.is_encircled_by?(bob_remote, circle)
+  end
 end
