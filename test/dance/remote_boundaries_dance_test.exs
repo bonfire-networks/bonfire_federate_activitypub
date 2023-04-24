@@ -21,25 +21,29 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
     }
 
     alice_local = context[:local][:user]
-
-    local_ap_id = Bonfire.Me.Characters.character_url(alice_local)
-
     bob_remote = context[:remote][:user]
 
-    {:ok, remote_actor} =
-      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
-        context[:remote][:canonical_url]
-      )
+    alice_local_ap_id = context[:local][:canonical_url]
+    bob_remote_ap_id = context[:local][:canonical_url]
+
+    {:ok, bob_remote_user_on_local} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
     # create a circle with bob_remote in it
     {:ok, circle} = Circles.create(alice_local, %{named: %{name: "family"}})
-    {:ok, _} = Circles.add_to_circles(remote_actor.id, circle)
+    {:ok, _} = Circles.add_to_circles(bob_remote_user_on_local.id, circle)
 
     # on remote instance, bob_remote follows alice_local
     TestInstanceRepo.apply(fn ->
-      {:ok, local} = AdapterUtils.get_or_fetch_and_create_by_uri(context[:local][:canonical_url])
-      Follows.follow(context[:remote][:user], local)
+      {:ok, local_from_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(alice_local_ap_id)
+
+      Follows.follow(bob_remote, local_from_remote)
+      |> debug("ffffoo")
+
+      assert Follows.following?(bob_remote, local_from_remote)
     end)
+
+    assert Follows.following?(bob_remote_user_on_local, alice_local)
 
     # on local instance, alice_local create a post with circle
     {:ok, post1} =
@@ -54,8 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
     TestInstanceRepo.apply(fn ->
       assert %{edges: [feed_entry | _]} =
                Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
-               |> IO.inspect(label: "bob feed"),
-             "try out federated post with circle containing remote users"
+               |> debug("bob feed")
     end)
   end
 end

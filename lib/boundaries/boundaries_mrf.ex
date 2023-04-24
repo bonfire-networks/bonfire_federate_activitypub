@@ -6,6 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   import Untangle
   alias ActivityPub.MRF
   alias Bonfire.Boundaries
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   @behaviour MRF
 
@@ -476,13 +477,13 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
           "local activity - need to check if local author blocks the (maybe remote) recipient"
         )
 
-        recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor_uri
+        recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
 
         {author_ids, recipient}
       else
         debug("remote activity - need to check if the local recipient blocks the remote author")
 
-        local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor_uri
+        local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
 
         {local_recipient, e(author_ids, nil) || all_actors(activity)}
       end
@@ -501,7 +502,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         user_ids: by_characters
       )
       |> debug(
-        "filter '#{actor_to_check}' blocked (#{inspect(block_types)}) by #{inspect(by_characters)} in DB, either instance-wide or by specified local_actor_ids?"
+        "filter '#{id(actor_to_check) || inspect(actor_to_check)}' blocked (#{inspect(block_types)}) by #{inspect(by_characters)} in DB, either instance-wide or by specified local_actor_ids?"
       )
   end
 
@@ -583,14 +584,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp local_actor_ids(actors) do
     # TODO: cleaner:
-    ap_base_uri = ActivityPub.Web.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
+    # ap_base_uri = ActivityPub.Web.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
 
     # |> debug("ap_base_uri")
 
     actors
     |> Enum.map(&id_or_object_id/1)
     |> Enum.uniq()
-    |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
+    # |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
     # |> debug("before local_actor_ids")
     |> Enum.map(&maybe_pointer_id_for_ap_id/1)
     |> filter_empty([])
@@ -598,9 +599,19 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   defp maybe_pointer_id_for_ap_id(ap_id) do
     case ActivityPub.Actor.get_cached(ap_id: ap_id) do
-      {:ok, %{pointer: pointer}} when not is_nil(pointer) -> {ap_id, pointer}
-      {:ok, %{pointer_id: pointer_id}} when not is_nil(pointer_id) -> {ap_id, pointer_id}
-      _ -> nil
+      {:ok, %{pointer: pointer}} when not is_nil(pointer) ->
+        {ap_id, pointer}
+
+      {:ok, %{pointer_id: pointer_id}} when not is_nil(pointer_id) ->
+        {ap_id, pointer_id}
+
+      _ ->
+        with {:ok, character} <- AdapterUtils.get_local_character_by_ap_id(ap_id) do
+          {ap_id, character}
+        else
+          _ ->
+            nil
+        end
     end
   end
 
