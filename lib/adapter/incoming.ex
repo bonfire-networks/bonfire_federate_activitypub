@@ -70,6 +70,37 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   def receive_activity(
         %{
           data: %{
+            "object" => [object_id_1 | _] = object_ids
+          }
+        } = activity
+      )
+      when is_binary(object_id_1) do
+    info(
+      "AP - we have a list of object IDs - fetch the #{activity.data["id"]} activity's object data from URIs when we only have AP IDs: #{inspect(object_ids)}"
+    )
+
+    # info(activity, "activity")
+    for object_id <- object_ids do
+      with {:ok, o} <- ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id) do
+        o
+      end
+    end
+    |> case do
+      [{:error, something} | _] = errors ->
+        error(errors, "Could not fetch object(s)")
+        {:error, something}
+
+      objects ->
+        debug(objects, "fetched objects")
+
+        receive_activity(activity, objects)
+        |> debug("received activity on #{repo()}...")
+    end
+  end
+
+  def receive_activity(
+        %{
+          data: %{
             "object" => object
           }
         } = activity
