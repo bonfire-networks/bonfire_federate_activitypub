@@ -69,10 +69,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # debug(actor)
     # debug(activity_data)
 
-    with {:ok, object} <-
-           ActivityPub.Actor.get_cached(
-             ap_id: activity_data["object"]["id"] || activity_data["object"]
-           ),
+    with ap_object when is_binary(ap_object) <-
+           e(activity_data, "object", "id", nil) || e(activity_data, "object", nil),
+         {:ok, object} <-
+           ActivityPub.Actor.get_cached(ap_id: ap_object),
          object when is_binary(object) or is_struct(object) <-
            object.pointer || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-

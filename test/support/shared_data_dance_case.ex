@@ -12,7 +12,10 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     [
       user: user,
       username: Bonfire.Me.Characters.display_username(user, true),
-      url_on_local: "@" <> Bonfire.Me.Characters.display_username(user, true) <> "@" <> Bonfire.Common.URIs.instance_domain(Bonfire.Me.Characters.character_url(user)),
+      url_on_local:
+        "@" <>
+          Bonfire.Me.Characters.display_username(user, true) <>
+          "@" <> Bonfire.Common.URIs.instance_domain(Bonfire.Me.Characters.character_url(user)),
       canonical_url: Bonfire.Me.Characters.character_url(user),
       friendly_url: Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(user)
     ]

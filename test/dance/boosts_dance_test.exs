@@ -49,11 +49,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
       Bonfire.Social.Boosts.boost(remote_user, post1remote)
     end)
 
-    Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
+    Logger.metadata(action: info("check that boost was federated and is in OP's feed"))
 
     assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_user)
-
-    Logger.metadata(action: info("check that reply with boost was federated and is in OP's feed"))
 
     a_remote = List.first(feed).activity
     assert a_remote.verb.verb == "Boost"
