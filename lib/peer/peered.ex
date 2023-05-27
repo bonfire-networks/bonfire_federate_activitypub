@@ -117,8 +117,8 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   defp add_to_instance_circle(id_or_peered, canonical_uri) do
     if module_enabled?(Bonfire.Boundaries.Circles) do
       host = URIs.instance_domain(canonical_uri)
-      # Bonfire.Boundaries.Circles.get_by_name(host, admin_circle)
-      with {:ok, instance_circle} <- Bonfire.Boundaries.Circles.get_or_create(host) do
+
+      with {:ok, instance_circle} <- Instances.get_or_create_instance_circle(host) do
         Bonfire.Boundaries.Circles.add_to_circles(id_or_peered, instance_circle)
       end
     end

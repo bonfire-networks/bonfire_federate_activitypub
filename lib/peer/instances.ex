@@ -10,6 +10,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   alias Bonfire.Data.ActivityPub.Peer
   alias Bonfire.Common.Utils
   alias Bonfire.Common.URIs
+  alias Bonfire.Common.Extend
 
   def get(canonical_uri) when is_binary(canonical_uri) do
     with %URI{} = instance_url <- URIs.base_url(canonical_uri) do
@@ -22,7 +23,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   defp create(instance_url, host) do
-    Utils.maybe_apply(Bonfire.Boundaries.Circles, :get_or_create, host)
+    get_or_create_instance_circle(host)
     |> debug("circle for instance actors")
 
     # TODO: maybe Peer should be a mixin so it can have the same ID as the Circle representing it?
@@ -74,7 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
         {:ok, peer} ->
           debug(instance_url, "instance already exists")
 
-          Utils.maybe_apply(Bonfire.Boundaries.Circles, :get_or_create, host)
+          get_or_create_instance_circle(host)
           |> warn(
             "TEMPORARY: create a circle for instance (remove this in future, since doing it when a Peer is first created should be enough)"
           )
@@ -88,6 +89,15 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
       end
     else
       error(canonical_uri, "instance hostname unknown")
+    end
+  end
+
+  def get_or_create_instance_circle(host) do
+    if Extend.module_enabled?(Bonfire.Boundaries.Circles) do
+      Bonfire.Boundaries.Circles.get_or_create(
+        host,
+        Bonfire.Boundaries.Fixtures.activity_pub_circle()
+      )
     end
   end
 
