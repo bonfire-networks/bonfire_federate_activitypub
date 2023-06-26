@@ -208,7 +208,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
     feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
     assert %{edges: [feed_entry]} =
-             Bonfire.Social.FeedActivities.feed_with_object(feed_id, post, current_user: recipient)
+             Bonfire.Social.FeedActivities.feed_with_object(feed_id, post,
+               current_user: recipient
+             )
 
     date =
       feed_entry.activity.object_id
