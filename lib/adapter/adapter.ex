@@ -88,7 +88,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
        granted_followers
        #  only positive grants 
        |> Enum.filter(& &1.value)
-       |> Enum.map(&Map.take(&1, [:subject_id, :subject]))
+       |> Enum.map(&Map.take(&1, [:subject_id]))
        |> debug("post_grants")
        |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject_id))
        |> filter_empty([])
