@@ -19,9 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
     local_follower = context[:local][:user]
     follower_ap_id = Bonfire.Me.Characters.character_url(local_follower)
     info(follower_ap_id, "follower_ap_id")
-
     followed_ap_id = context[:remote][:canonical_url]
-
     info(followed_ap_id, "followed_ap_id")
 
     Logger.metadata(action: info("init followed_on_local"))

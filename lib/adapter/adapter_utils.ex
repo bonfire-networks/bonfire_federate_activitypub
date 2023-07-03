@@ -137,7 +137,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_local_character_by_ap_id(ap_id, local_instance \\ nil) when is_binary(ap_id) do
     username =
       String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
-      |> debug("username")
+      |> debug("username?")
 
     if username != ap_id and !is_local_collection?(ap_id),
       do:
