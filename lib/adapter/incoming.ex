@@ -45,6 +45,30 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   def receive_activity(
         %{
           data: %{
+            "target" => target_id
+          }
+        } = activity
+      )
+      when is_binary(target_id) do
+    info(
+      "AP - fetch the #{activity.data["id"]} activity's target_id data from URI when we only have an AP ID: #{target_id}"
+    )
+
+    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(target_id) do
+      {:ok, target} ->
+        debug(target, "fetched target")
+
+        receive_activity(Map.update(activity, :data, %{}, &Map.put(&1, "target", target)))
+        |> debug("received activity on #{repo()}...")
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  def receive_activity(
+        %{
+          data: %{
             "object" => object_id
           }
         } = activity
@@ -122,7 +146,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     receive_activity(activity, nil)
   end
 
-  def receive_activity(activity, object) when not is_map_key(object, :data) do
+  def receive_activity(activity, object) when is_map(object) and not is_map_key(object, :data) do
     info("AP - case #3 when the object comes to us embeded in the activity")
     receive_activity(activity, %{data: object})
   end

@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
       |> debug("username")
 
-    if !is_local_collection?(ap_id),
+    if username != ap_id and !is_local_collection?(ap_id),
       do:
         username
         |> get_character_by_username()
