@@ -15,19 +15,19 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     info(activity, "to filter")
 
     authors =
-      all_actors(activity)
+      AdapterUtils.all_actors(activity)
       |> debug("authors")
 
     local_author_ids =
       authors
-      |> local_actor_ids()
+      |> AdapterUtils.local_actor_ids()
       |> debug("local_author_ids")
 
-    recipients = all_recipients(activity)
+    recipients = AdapterUtils.all_recipients(activity)
 
     local_recipient_ids =
       recipients
-      |> local_actor_ids()
+      |> AdapterUtils.local_actor_ids()
       |> debug("local_recipient_ids")
 
     # num_local_authors = length(local_author_ids)
@@ -75,7 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          activity
        ) do
     block_types = Boundaries.Blocks.types_blocked(check_block_type)
-    is_follow? = is_follow?(activity)
+    is_follow? = AdapterUtils.is_follow?(activity)
 
     rejects =
       rejects_regex(block_types)
@@ -91,7 +91,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
           block_types,
           local_author_ids,
           rejects,
-          id_or_object_id(e(activity, "object", nil))
+          AdapterUtils.id_or_object_id(e(activity, "object", nil))
         )
         |> debug("fabbb") || {:ok, activity}
 
@@ -150,28 +150,28 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       block_types,
       local_character_ids,
       rejects,
-      id_or_object_id(e(activity, "actor", nil))
+      AdapterUtils.id_or_object_id(e(activity, "actor", nil))
     )
     |> debug("activity's actor?") ||
       object_blocked?(
         block_types,
         local_character_ids,
         rejects,
-        id_or_object_id(e(activity, "object", "attributedTo", nil))
+        AdapterUtils.id_or_object_id(e(activity, "object", "attributedTo", nil))
       )
       |> debug("object's actor?") ||
       object_blocked?(
         block_types,
         local_character_ids,
         rejects,
-        id_or_object_id(activity)
+        AdapterUtils.id_or_object_id(activity)
       )
       |> debug("activity's instance?") ||
       object_blocked?(
         block_types,
         local_character_ids,
         rejects,
-        id_or_object_id(e(activity, "object", nil))
+        AdapterUtils.id_or_object_id(e(activity, "object", nil))
       )
       |> debug("object or its instance?")
   end
@@ -485,7 +485,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
         local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
 
-        {local_recipient, e(author_ids, nil) || all_actors(activity)}
+        {local_recipient, e(author_ids, nil) || AdapterUtils.all_actors(activity)}
       end
       |> debug("by_characters & actor_to_check")
 
@@ -504,115 +504,6 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       |> debug(
         "filter '#{id(actor_to_check) || inspect(actor_to_check)}' blocked (#{inspect(block_types)}) by #{inspect(by_characters)} in DB, either instance-wide or by specified local_actor_ids?"
       )
-  end
-
-  def all_actors(activity) do
-    actors =
-      ([e(activity, "actor", nil)] ++
-         [e(activity, "object", "actor", nil)] ++
-         [e(activity, "object", "attributedTo", nil)])
-      |> List.flatten()
-      |> filter_empty(nil)
-
-    # |> debug
-
-    # for actors themselves
-    (actors || [activity])
-    # |> debug
-    # |> Enum.map(&id_or_object_id/1)
-    # |> debug
-    |> filter_empty([])
-    # |> debug
-    # |> Enum.uniq()
-    |> Enum.uniq_by(&id_or_object_id/1)
-    |> debug()
-  end
-
-  def all_recipients(activity, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
-    activity
-    # |> debug
-    |> all_fields(fields)
-    |> debug()
-  end
-
-  defp all_fields(activity, fields) do
-    fields
-    # |> debug
-    |> Enum.map(&id_or_object_id(Utils.e(activity, &1, nil)))
-    # |> debug
-    |> List.flatten()
-    |> filter_empty([])
-    |> Enum.uniq()
-  end
-
-  defp id_or_object_id(%{"id" => id}) when is_binary(id) do
-    id
-  end
-
-  defp id_or_object_id(%{object: %{"id" => id}}) when is_binary(id) do
-    id
-  end
-
-  defp id_or_object_id(id) when is_binary(id) do
-    id
-  end
-
-  defp id_or_object_id(objects) when is_list(objects) do
-    Enum.map(objects, &id_or_object_id/1)
-  end
-
-  defp id_or_object_id(nil) do
-    nil
-  end
-
-  defp id_or_object_id(other) do
-    error(other, "could not find AP ID")
-    nil
-  end
-
-  defp is_follow?(%{"type" => "Follow"}) do
-    true
-  end
-
-  defp is_follow?(%{type: "Follow"}) do
-    true
-  end
-
-  defp is_follow?(_) do
-    false
-  end
-
-  defp local_actor_ids(actors) do
-    # TODO: cleaner:
-    # ap_base_uri = ActivityPub.Web.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
-
-    # |> debug("ap_base_uri")
-
-    actors
-    |> Enum.map(&id_or_object_id/1)
-    |> Enum.uniq()
-    # |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
-    # |> debug("before local_actor_ids")
-    |> Enum.map(&maybe_pointer_id_for_ap_id/1)
-    |> filter_empty([])
-  end
-
-  defp maybe_pointer_id_for_ap_id(ap_id) do
-    case ActivityPub.Actor.get_cached(ap_id: ap_id) do
-      {:ok, %{pointer: pointer}} when not is_nil(pointer) ->
-        {ap_id, pointer}
-
-      {:ok, %{pointer_id: pointer_id}} when not is_nil(pointer_id) ->
-        {ap_id, pointer_id}
-
-      _ ->
-        with {:ok, character} <- AdapterUtils.get_local_character_by_ap_id(ap_id) do
-          {ap_id, character}
-        else
-          _ ->
-            nil
-        end
-    end
   end
 
   defp rejects_regex(block_types) do

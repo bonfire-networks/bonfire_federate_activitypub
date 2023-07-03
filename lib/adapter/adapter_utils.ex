@@ -135,10 +135,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_local_character_by_ap_id(ap_id, local_instance \\ nil) when is_binary(ap_id) do
-    String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
-    |> debug("username")
-    |> get_character_by_username()
+    username =
+      String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
+      |> debug("username")
+
+    if !is_local_collection?(ap_id),
+      do:
+        username
+        |> get_character_by_username()
   end
+
+  def is_local_collection?(ap_id),
+    do: String.ends_with?(ap_id, ["/followers", "/following", "/outbox", "/inbox"])
 
   def the_ap_id(%{ap_id: ap_id}) when is_binary(ap_id) do
     ap_id
@@ -154,6 +162,116 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def the_ap_id(ap_id) when is_binary(ap_id) do
     ap_id
+  end
+
+  def all_actors(activity) do
+    actors =
+      ([e(activity, "actor", nil)] ++
+         [e(activity, "object", "actor", nil)] ++
+         [e(activity, "object", "attributedTo", nil)])
+      |> List.flatten()
+      |> filter_empty(nil)
+
+    # |> debug
+
+    # for actors themselves
+    (actors || [activity])
+    # |> debug
+    # |> Enum.map(&id_or_object_id/1)
+    # |> debug
+    |> filter_empty([])
+    # |> debug
+    # |> Enum.uniq()
+    |> Enum.uniq_by(&id_or_object_id/1)
+    |> debug()
+  end
+
+  def all_recipients(activity, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
+    activity
+    # |> debug
+    |> all_fields(fields)
+    |> debug()
+  end
+
+  defp all_fields(activity, fields) do
+    fields
+    # |> debug
+    |> Enum.map(&id_or_object_id(Utils.e(activity, &1, nil)))
+    # |> debug
+    |> List.flatten()
+    |> filter_empty([])
+    |> Enum.uniq()
+  end
+
+  def id_or_object_id(%{"id" => id}) when is_binary(id) do
+    id
+  end
+
+  def id_or_object_id(%{object: %{"id" => id}}) when is_binary(id) do
+    id
+  end
+
+  def id_or_object_id(id) when is_binary(id) do
+    id
+  end
+
+  def id_or_object_id(objects) when is_list(objects) do
+    Enum.map(objects, &id_or_object_id/1)
+  end
+
+  def id_or_object_id(nil) do
+    nil
+  end
+
+  def id_or_object_id(other) do
+    error(other, "could not find AP ID")
+    nil
+  end
+
+  def is_follow?(%{"type" => "Follow"}) do
+    true
+  end
+
+  def is_follow?(%{type: "Follow"}) do
+    true
+  end
+
+  def is_follow?(_) do
+    false
+  end
+
+  def local_actor_ids(actors) do
+    # TODO: cleaner: and put in AdapterUtils
+    # ap_base_uri = ActivityPub.Web.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
+
+    # |> debug("ap_base_uri")
+
+    actors
+    |> Enum.map(&id_or_object_id/1)
+    |> Enum.reject(&is_local_collection?/1)
+    |> Enum.uniq()
+    # |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
+    # |> debug("before local_actor_ids")
+    |> Enum.map(&maybe_pointer_id_for_ap_id/1)
+    |> filter_empty([])
+  end
+
+  def maybe_pointer_id_for_ap_id(ap_id) do
+    case ActivityPub.Actor.get_cached(ap_id: ap_id) do
+      {:ok, %{pointer: pointer}} when not is_nil(pointer) ->
+        {ap_id, pointer}
+
+      {:ok, %{pointer_id: pointer_id}} when not is_nil(pointer_id) ->
+        {ap_id, pointer_id}
+
+      _ ->
+        with {:ok, character} <- get_local_character_by_ap_id(ap_id) do
+          {ap_id, character}
+        else
+          _ ->
+            nil
+        end
+    end
   end
 
   def fetch_character_by_ap_id(actor_or_ap_id) do
@@ -182,6 +300,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # ActivityPub.Actor.get_cached(ap_id: ap_id)
       ActivityPub.Actor.get_remote_actor(ap_id, false)
       |> info("got by ap_id")
+    else
+      debug(ap_id, "assume looking up a local character")
+      get_local_actor_by_ap_id(ap_id)
+    end
+  end
+
+  def get_local_actor_by_ap_id(ap_id) do
+    with {:ok, character} <- get_local_character_by_ap_id(ap_id) do
+      character_to_actor(character)
     end
   end
 
@@ -484,10 +611,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           :settings,
           :actor,
           profile: [:image, :icon],
-          character: [:peered]
+          character: [
+            :peered,
+            # FIXME? should we used aliased, aliased, or a cross-reference of both?
+            aliases: [object: [:character]]
+            # aliased: [object: [:character]]
+          ]
         ]
       )
-      |> debug("user_etc")
+      |> debug("preloaded_user_etc")
 
     ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
@@ -501,6 +633,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
     local = if e(user_etc, :character, :peered, nil), do: false, else: true
 
+    aliases = e(user_etc, :character, :aliases, nil)
+    # aliased = e(user_etc, :character, :aliased, nil)
+
     data = %{
       "type" => type,
       "id" => id,
@@ -511,6 +646,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       "preferredUsername" => e(user_etc, :character, :username, nil),
       "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
       "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
+      "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases), else: []),
       "icon" => icon,
       "image" => image,
       "attachment" =>
@@ -548,6 +684,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       updated_at: NaiveDateTime.utc_now()
     }
   end
+
+  defp alias_actor_ids(aliases) when is_list(aliases),
+    do: Enum.map(aliases, &(e(&1, :object, nil) |> alias_actor_ids()))
+
+  defp alias_actor_ids(character), do: Bonfire.Common.URIs.canonical_url(character)
 
   def create_remote_actor(%ActivityPub.Actor{} = actor) do
     character_module = character_module(actor.data["type"])
@@ -599,6 +740,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         user_etc,
         actor.data["id"]
       )
+
+      maybe_add_aliases(user_etc, e(actor, :data, "alsoKnownAs", nil))
 
       # save remote discoverability flag as a user setting
       if actor.data["discoverable"] in ["false", false, "no"],
@@ -657,6 +800,26 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_cached!(pointer: pointer_id) |> create_remote_actor()
   def create_remote_actor(%ActivityPub.Object{} = object),
     do: ActivityPub.Actor.format_remote_actor(object) |> create_remote_actor()
+
+  def maybe_add_aliases(user_etc, aliases) do
+    case aliases do
+      nil ->
+        debug("no alsoKnownAs provided")
+
+      [] ->
+        debug("empty alsoKnownAs provided")
+
+      _ when is_list(aliases) ->
+        Enum.each(aliases, &maybe_add_aliases(user_etc, &1))
+
+      target ->
+        debug(target, "add alsoKnownAs provided")
+
+        get_character_by_ap_id(target)
+        ~> Bonfire.Social.Aliases.add(user_etc, ...)
+        |> debug("added??")
+    end
+  end
 
   def character_module(%{__struct__: Pointers.Pointer} = struct),
     do: Types.object_type(struct) |> character_module()

@@ -125,17 +125,18 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_ap_id(ap_id) do
-    case AdapterUtils.get_actor_by_ap_id(ap_id) do
-      nil ->
-        debug(ap_id, "assume looking up a local character")
+    AdapterUtils.get_local_actor_by_ap_id(ap_id)
+    # case   AdapterUtils.get_actor_by_ap_id(ap_id) do
+    #   nil ->
+    #     debug(ap_id, "assume looking up a local character")
 
-        with {:ok, character} <- AdapterUtils.get_local_character_by_ap_id(ap_id) do
-          AdapterUtils.character_to_actor(character)
-        end
+    #     with {:ok, character} <- AdapterUtils.get_local_character_by_ap_id(ap_id) do
+    #       AdapterUtils.character_to_actor(character)
+    #     end
 
-      actor ->
-        actor
-    end
+    #   actor ->
+    #     actor
+    # end
   end
 
   # def redirect_to_object(id) do
@@ -163,6 +164,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       keys = e(params, :keys, nil)
 
       params = Map.put(params, :character, %{id: character.id, actor: %{signing_key: keys}})
+
+      AdapterUtils.maybe_add_aliases(
+        character,
+        e(params, :also_known_as, nil) || e(params, :data, "alsoKnownAs", nil)
+      )
 
       # debug("update_local_actor: #{inspect character} with #{inspect params}")
       # FIXME use federation_module?
@@ -210,6 +216,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         }
       }
       |> debug("params")
+
+    AdapterUtils.maybe_add_aliases(
+      character,
+      e(data, :also_known_as, nil) || e(params, "alsoKnownAs", nil)
+    )
 
     # TODO - support other types
     Bonfire.Me.Users.update_remote(character, params)
