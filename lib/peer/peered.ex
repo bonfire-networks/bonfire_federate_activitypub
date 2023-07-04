@@ -200,6 +200,10 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     true in Enum.map(list, &is_blocked?(&1, block_type, opts))
   end
 
+  def is_blocked?(_, _, _) do
+    nil
+  end
+
   defp is_blocked_peer_or_peered?(peer, peered, block_type, opts) do
     (not is_nil(peer) and Instances.is_blocked?(peer, block_type, opts))
     |> debug("firstly, check if instance blocked? #{inspect(peer)}") ||

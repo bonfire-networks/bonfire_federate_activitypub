@@ -258,10 +258,17 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   end
 
   defp receive_activity_fallback(activity, object, actor \\ nil) do
-    if Application.get_env(:bonfire, :federation_fallback_module) do
+    module = Application.get_env(:bonfire, :federation_fallback_module)
+
+    if module do
       info("AP - handling activity with fallback")
-      module = Application.get_env(:bonfire, :federation_fallback_module)
-      module.create(actor, activity, object)
+      # module.create(actor, activity, object)
+      handle_activity_with(
+        {:ok, module},
+        actor,
+        activity,
+        object
+      )
     else
       error = "ActivityPub - ignored incoming activity - unhandled activity or object type"
 
@@ -429,8 +436,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   #   no_federation_module_match("AP - could not find local character for the actor", activity)
   # end
 
-  defp handle_activity_with(_module, _actor, _activity, _object) do
-    debug("AP - no match in handle_activity_with")
+  defp handle_activity_with(module, _actor, _activity, _object) do
+    debug(module, "AP - no match in handle_activity_with")
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
     {:no_federation_module_match, :ignore}
