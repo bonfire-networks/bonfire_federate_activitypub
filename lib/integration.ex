@@ -16,7 +16,11 @@ defmodule Bonfire.Federate.ActivityPub do
   end
 
   def disable() do
-    Bonfire.Me.Settings.set([activity_pub: [instance: [federating: false]]], scope: :instance, skip_boundary_check: true)
+    Bonfire.Me.Settings.set([activity_pub: [instance: [federating: false]]],
+      scope: :instance,
+      skip_boundary_check: true
+    )
+
     # Oban.cancel_all_jobs(Oban.Job)
   end
 end
