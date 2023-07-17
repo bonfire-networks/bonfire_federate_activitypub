@@ -130,7 +130,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             :ignore
 
           e ->
-            warn(e, "Unexpected result from federation preparation function")
+            warn(
+              e,
+              "Unexpected result from federation preparation function `#{module}.ap_publish_activity` when trying to handle verb '#{verb}' for object type #{object_type}"
+            )
+
             e
         end
 
