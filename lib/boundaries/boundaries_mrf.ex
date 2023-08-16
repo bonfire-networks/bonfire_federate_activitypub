@@ -257,7 +257,9 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       else: debug("no blocks apply")
 
     if is_local? || e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
-         e(filtered, :bcc, nil) || e(filtered, :audience, nil) do
+         e(filtered, :bcc, nil) || e(filtered, :audience, nil) ||
+         e(activity, "publishedDate", nil) || e(activity, "object", "publishedDate", nil) do
+      # ^ `publishedDate` here is intended as an exception for bookwyrm which doesn't put audience info
       {:ok, filtered}
     else
       debug(activity, "reject activity")
