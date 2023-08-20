@@ -90,7 +90,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_actor_username(%{username: u}) when is_binary(u), do: u
 
   def get_actor_username(%{character: %NotLoaded{}} = obj),
-    do: get_actor_username(repo().maybe_preload(obj, :character))
+    do: get_actor_username(repo().maybe_preload(obj, character: [:peered]))
 
   def get_actor_username(%{character: c}), do: get_actor_username(c)
   def get_actor_username(u) when is_binary(u), do: u
@@ -99,7 +99,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_character_by_username({:ok, c}), do: get_character_by_username(c)
 
   def get_character_by_username(character) when is_struct(character),
-    do: {:ok, repo().maybe_preload(character, [:actor, :character, :profile])}
+    do: {:ok, repo().maybe_preload(character, [:actor, :profile, character: [:peered]])}
 
   def get_character_by_username("@" <> username),
     do: get_character_by_username(username)
@@ -115,8 +115,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     # ~> get_character_by_username()
   end
 
-  def get_character_by_username(other),
-    do: error(other, "Could not find character")
+  def get_character_by_username(other) do
+    error(other, "Dunno how to look for character")
+    {:error, :not_found}
+  end
 
   def get_character_by_id(id, opts \\ [skip_boundary_check: true])
 
@@ -697,7 +699,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     debug(actor)
 
     # username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
-    username = actor.username
+    username = actor.username || actor.ap_id
     name = actor.data["name"]
     name = if empty?(name), do: username, else: name
 
