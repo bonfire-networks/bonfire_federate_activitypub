@@ -326,4 +326,6 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         end
     end
   end
+
+  def get_locale, do: Bonfire.Common.Localise.get_locale_id()
 end
