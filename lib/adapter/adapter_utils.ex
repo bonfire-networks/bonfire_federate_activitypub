@@ -1053,7 +1053,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def create_service_actor(username) do
-    Bonfire.Me.Fake.fake_user!(username, %{},
+    Bonfire.Me.Fake.fake_user!(username, %{id: "1ACT1V1TYPVBREM0TESFETCHER"},
       request_before_follow: true,
       undiscoverable: true
     )
