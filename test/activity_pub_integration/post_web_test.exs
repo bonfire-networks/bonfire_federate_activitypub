@@ -7,7 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 
-  setup_all do
+  setup do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
@@ -16,52 +16,54 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
     :ok
   end
 
-  test "fetch post from AP API with Pointer ID" do
-    user = fake_user!()
-    attrs = %{post_content: %{html_body: "content"}}
+  describe "" do
+    test "fetch post from AP API with Pointer ID" do
+      user = fake_user!()
+      attrs = %{post_content: %{html_body: "content"}}
 
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
-    obj =
-      build_conn()
-      |> get("/pub/objects/#{post.id}")
-      |> response(200)
-      # |> debug
-      |> Jason.decode!()
+      obj =
+        build_conn()
+        |> get("/pub/objects/#{post.id}")
+        |> response(200)
+        # |> debug
+        |> Jason.decode!()
 
-    assert obj["content"] =~ attrs.post_content.html_body
-  end
+      assert obj["content"] =~ attrs.post_content.html_body
+    end
 
-  test "fetch post from AP API with AP ID" do
-    user = fake_user!()
-    attrs = %{post_content: %{html_body: "content"}}
+    test "fetch post from AP API with AP ID" do
+      user = fake_user!()
+      attrs = %{post_content: %{html_body: "content"}}
 
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
-    id = ap_activity.object.data["id"]
+      id = ap_activity.object.data["id"]
 
-    obj =
-      build_conn()
-      |> get(id)
-      |> response(200)
-      |> Jason.decode!()
+      obj =
+        build_conn()
+        |> get(id)
+        |> response(200)
+        |> Jason.decode!()
 
-    assert obj["content"] =~ attrs.post_content.html_body
-  end
+      assert obj["content"] =~ attrs.post_content.html_body
+    end
 
-  test "fetch post from AP API with friendly URL and Accept header" do
-    user = fake_user!()
-    attrs = %{post_content: %{html_body: "content"}}
+    test "fetch post from AP API with friendly URL and Accept header" do
+      user = fake_user!()
+      attrs = %{post_content: %{html_body: "content"}}
 
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert build_conn()
-           |> put_req_header("accept", "application/activity+json")
-           |> get("/post/#{post.id}")
-           |> redirected_to() =~ "/pub/objects/#{post.id}"
+      assert build_conn()
+             |> put_req_header("accept", "application/activity+json")
+             |> get("/post/#{post.id}")
+             |> redirected_to() =~ "/pub/objects/#{post.id}"
+    end
   end
 end

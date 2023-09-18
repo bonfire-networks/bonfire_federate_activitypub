@@ -9,7 +9,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
   @actor_name "karen@mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 
-  setup_all do
+  setup do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
@@ -25,166 +25,172 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     :ok
   end
 
-  test "follows get queued to federate" do
-    me = fake_user!()
-    followed = fake_user!()
-    assert {:ok, follow} = Follows.follow(me, followed)
+  describe "" do
+    test "follows get queued to federate" do
+      me = fake_user!()
+      followed = fake_user!()
+      assert {:ok, follow} = Follows.follow(me, followed)
 
-    ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(follow)
-    assert %{__struct__: ActivityPub.Object} = ap_activity
+      ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(follow)
+      assert %{__struct__: ActivityPub.Object} = ap_activity
 
-    Oban.Testing.assert_enqueued(repo(),
-      worker: ActivityPub.Federator.Workers.PublisherWorker,
-      args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
-    )
-  end
+      Oban.Testing.assert_enqueued(repo(),
+        worker: ActivityPub.Federator.Workers.PublisherWorker,
+        args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
+      )
+    end
 
-  test "outgoing follow makes requests" do
-    follower = fake_user!()
-    {:ok, ap_followed} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    {:ok, followed} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-    # info(followed)
-    {:ok, follow} = Follows.follow(follower, followed)
-    info(follow)
+    test "outgoing follow makes requests" do
+      debug(self(), "toppid")
+      follower = fake_user!()
+      {:ok, ap_followed} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, followed} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      # info(followed)
+      {:ok, follow} = Follows.follow(follower, followed)
+      info(follow)
 
-    assert {:ok, _follow_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
+      assert {:ok, _follow_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
 
-    assert Bonfire.Social.Follows.requested?(follower, followed)
-    refute Bonfire.Social.Follows.following?(follower, followed)
-  end
+      assert Bonfire.Social.Follows.requested?(follower, followed)
+      refute Bonfire.Social.Follows.following?(follower, followed)
+    end
 
-  test "outgoing follow which then gets an Accept works" do
-    follower = fake_user!()
-    {:ok, ap_follower} = ActivityPub.Federator.Adapter.get_actor_by_id(follower.id)
+    test "outgoing follow which then gets an Accept works" do
+      follower = fake_user!()
+      {:ok, ap_follower} = ActivityPub.Federator.Adapter.get_actor_by_id(follower.id)
 
-    {:ok, ap_followed} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    {:ok, followed} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      {:ok, ap_followed} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, followed} = Bonfire.Me.Users.by_ap_id(@remote_actor)
 
-    {:ok, follow} = Follows.follow(follower, followed)
+      {:ok, follow} = Follows.follow(follower, followed)
 
-    assert {:ok, follow_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
+      assert {:ok, follow_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
 
-    assert Bonfire.Social.Follows.requested?(follower, followed)
+      assert Bonfire.Social.Follows.requested?(follower, followed)
 
-    {:ok, accept} =
-      ActivityPub.accept(%{
-        actor: ap_followed,
-        to: [ap_follower.data],
-        object: follow_activity.data,
-        local: false
-      })
+      {:ok, accept} =
+        ActivityPub.accept(%{
+          actor: ap_followed,
+          to: [ap_follower.data],
+          object: follow_activity.data,
+          local: false
+        })
 
-    # |> debug
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
+      # |> debug
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
 
-    assert Bonfire.Social.Follows.following?(follower, followed)
-  end
+      assert Bonfire.Social.Follows.following?(follower, followed)
+    end
 
-  test "incoming follow request works" do
-    followed = fake_user!()
-    # info(ulid(followed), "followed ID")
-    {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
+    test "incoming follow request works" do
+      followed = fake_user!(%{}, %{}, request_before_follow: true)
+      # info(ulid(followed), "followed ID")
+      {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
-    {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-    # info(ulid(follower), "follower ID")
+      {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      # info(ulid(follower), "follower ID")
 
-    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
+      {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
-    # |> debug
-    assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
+      # |> debug
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-    assert Bonfire.Social.Follows.requested?(follower, followed)
-  end
+      assert Bonfire.Social.Follows.requested?(follower, followed)
+    end
 
-  test "incoming follow + accept works" do
-    followed = fake_user!()
-    # info(ulid(followed), "followed ID")
-    {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
+    test "incoming follow + accept works" do
+      followed = fake_user!(%{}, %{}, request_before_follow: true)
+      # info(ulid(followed), "followed ID")
+      {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
-    {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-    # info(ulid(follower), "follower ID")
+      {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      # info(ulid(follower), "follower ID")
 
-    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
+      {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
-    # |> info("requested AP")
-    assert {:ok, request} =
-             Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
+      # |> info("requested AP")
+      assert {:ok, request} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-    # info(ulid(request), "request ID")
+      # info(ulid(request), "request ID")
 
-    assert Bonfire.Social.Follows.requested?(follower, followed)
+      assert Bonfire.Social.Follows.requested?(follower, followed)
 
-    assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
+      assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
 
-    # assert not is_nil(request.accepted_at)
-    assert Bonfire.Social.Follows.following?(follower, followed)
-  end
+      # assert not is_nil(request.accepted_at)
+      assert Bonfire.Social.Follows.following?(follower, followed)
+    end
 
-  test "incoming follow + ignore works (does not federate rejections)" do
-    followed = fake_user!()
-    info(ulid(followed), "followed ID")
-    {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
+    test "incoming follow + ignore works (does not federate rejections)" do
+      followed = fake_user!(%{}, %{}, request_before_follow: true)
+      info(ulid(followed), "followed ID")
+      {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
-    {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-    info(ulid(follower), "follower ID")
+      {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      info(ulid(follower), "follower ID")
 
-    {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
+      {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
-    assert {:ok, request} =
-             Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
-             |> info("request")
+      assert {:ok, request} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
+               |> info("request")
 
-    assert {:ok, request} = Bonfire.Social.Follows.ignore(request, current_user: followed)
+      assert {:ok, request} = Bonfire.Social.Follows.ignore(request, current_user: followed)
 
-    assert not is_nil(request.ignored_at)
-  end
+      assert not is_nil(request.ignored_at)
+    end
 
-  # test "incoming follow works" do # FIXME: need to change the boundaries to allow following without request
-  #   followed = fake_user!()
-  #   info(ulid(followed), "followed ID")
-  #   {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
+    test "incoming follow works" do
+      # when you allow following without request
+      followed = fake_user!(%{}, %{}, request_before_follow: false)
+      info(ulid(followed), "followed ID")
+      {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
-  #   {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-  #   {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-  #   info(ulid(follower), "follower ID")
+      {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      info(ulid(follower), "follower ID")
 
-  # {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
+      {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
-  #   assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity) |> debug
-  #   assert Bonfire.Social.Follows.following?(follower, followed)
-  # end
+      assert {:ok, _} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity) |> debug
 
-  test "incoming follow / accept / unfollow works" do
-    {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      assert Bonfire.Social.Follows.following?(follower, followed)
+    end
 
-    followed = fake_user!()
-    {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
+    test "incoming follow / accept / unfollow works" do
+      {:ok, ap_follower} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
 
-    {:ok, follow_activity} =
-      ActivityPub.follow(%{actor: ap_follower, object: ap_followed, local: false})
+      followed = fake_user!(%{}, %{}, request_before_follow: true)
+      {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
-    # |> info("requested AP")
-    assert {:ok, request} =
-             Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
+      {:ok, follow_activity} =
+        ActivityPub.follow(%{actor: ap_follower, object: ap_followed, local: false})
 
-    # info(ulid(request), "request ID")
+      # |> info("requested AP")
+      assert {:ok, request} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-    assert Bonfire.Social.Follows.requested?(follower, followed)
+      # info(ulid(request), "request ID")
 
-    assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
+      assert Bonfire.Social.Follows.requested?(follower, followed)
 
-    # assert not is_nil(request.accepted_at)
-    assert Bonfire.Social.Follows.following?(follower, followed)
+      assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
 
-    {:ok, unfollow_activity} =
-      ActivityPub.unfollow(%{actor: ap_follower, object: ap_followed, local: false})
-      |> info("unfollow_activity")
+      # assert not is_nil(request.accepted_at)
+      assert Bonfire.Social.Follows.following?(follower, followed)
 
-    Bonfire.Federate.ActivityPub.Incoming.receive_activity(unfollow_activity)
-    refute Bonfire.Social.Follows.following?(follower, followed)
+      {:ok, unfollow_activity} =
+        ActivityPub.unfollow(%{actor: ap_follower, object: ap_followed, local: false})
+        |> info("unfollow_activity")
+
+      Bonfire.Federate.ActivityPub.Incoming.receive_activity(unfollow_activity)
+      refute Bonfire.Social.Follows.following?(follower, followed)
+    end
   end
 end

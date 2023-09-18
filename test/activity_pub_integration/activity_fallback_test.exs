@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
   alias Bonfire.Social.Posts
 
-  setup_all do
+  setup do
     mock(fn
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))
@@ -13,46 +13,48 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
     :ok
   end
 
-  test "peertube video object" do
-    data =
-      "../fixtures/peertube-video.json"
-      |> Path.expand(__DIR__)
-      |> File.read!()
-      |> Jason.decode!()
+  describe "" do
+    test "peertube video object" do
+      data =
+        "../fixtures/peertube-video.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
 
-    {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
-    assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+      assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
-    assert activity.__struct__ == Bonfire.Data.Social.APActivity
-    assert is_map(activity.json["object"])
-    assert activity.json["object"]["type"] == "Video"
-    assert is_binary(activity.json["object"]["content"])
-  end
+      assert activity.__struct__ == Bonfire.Data.Social.APActivity
+      assert is_map(activity.json["object"])
+      assert activity.json["object"]["type"] == "Video"
+      assert is_binary(activity.json["object"]["content"])
+    end
 
-  test "pleroma emoji react" do
-    ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
+    test "pleroma emoji react" do
+      ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
 
-    user = fake_user!()
+      user = fake_user!()
 
-    attrs = %{post_content: %{html_body: "content"}}
+      attrs = %{post_content: %{html_body: "content"}}
 
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-    assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
-    data =
-      "../fixtures/pleroma-emojireact.json"
-      |> Path.expand(__DIR__)
-      |> File.read!()
-      |> Jason.decode!()
-      |> Map.put("object", ap_activity.data["object"])
+      data =
+        "../fixtures/pleroma-emojireact.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+        |> Map.put("object", ap_activity.data["object"])
 
-    {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
-    assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+      assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
-    assert is_map(activity.json["object"])
-    assert activity.json["type"] == "EmojiReact"
+      assert is_map(activity.json["object"])
+      assert activity.json["type"] == "EmojiReact"
+    end
   end
 end

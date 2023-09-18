@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 
-  setup_all do
+  setup do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
@@ -17,86 +17,88 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     :ok
   end
 
-  test "messages get queued to federate" do
-    me = fake_user!()
-    messaged = fake_user!()
+  describe "" do
+    test "messages get queued to federate" do
+      me = fake_user!()
+      messaged = fake_user!()
 
-    msg = "hey you have an epic text message"
-    attrs = %{to_circles: [messaged.id], post_content: %{html_body: msg}}
+      msg = "hey you have an epic text message"
+      attrs = %{to_circles: [messaged.id], post_content: %{html_body: msg}}
 
-    assert {:ok, message} = Messages.send(me, attrs)
+      assert {:ok, message} = Messages.send(me, attrs)
 
-    ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(message)
-    assert %{__struct__: ActivityPub.Object} = ap_activity
+      ap_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(message)
+      assert %{__struct__: ActivityPub.Object} = ap_activity
 
-    Oban.Testing.assert_enqueued(repo(),
-      worker: ActivityPub.Federator.Workers.PublisherWorker,
-      args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
-    )
-  end
+      Oban.Testing.assert_enqueued(repo(),
+        worker: ActivityPub.Federator.Workers.PublisherWorker,
+        args: %{"op" => "publish", "activity_id" => ap_activity.id, "repo" => repo()}
+      )
+    end
 
-  test "can federate message" do
-    me = fake_user!()
-    messaged = fake_user!()
-    msg = "hey you have an epic text message"
-    attrs = %{to_circles: [messaged.id], post_content: %{html_body: msg}}
-    assert {:ok, message} = Messages.send(me, attrs)
+    test "can federate message" do
+      me = fake_user!()
+      messaged = fake_user!()
+      msg = "hey you have an epic text message"
+      attrs = %{to_circles: [messaged.id], post_content: %{html_body: msg}}
+      assert {:ok, message} = Messages.send(me, attrs)
 
-    {:ok, activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(message)
+      {:ok, activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(message)
 
-    assert activity.object.data["content"] =~ msg
-  end
+      assert activity.object.data["content"] =~ msg
+    end
 
-  test "can receive federated ChatMessage" do
-    me = fake_user!()
-    {:ok, local_actor} = ActivityPub.Actor.get_cached(pointer: me.id)
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    context = "blabla"
+    test "can receive federated ChatMessage" do
+      me = fake_user!()
+      {:ok, local_actor} = ActivityPub.Actor.get_cached(pointer: me.id)
+      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      context = "blabla"
 
-    object = %{
-      "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
-      "content" => "content",
-      "type" => "ChatMessage"
-    }
+      object = %{
+        "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
+        "content" => "content",
+        "type" => "ChatMessage"
+      }
 
-    to = [local_actor.ap_id]
+      to = [local_actor.ap_id]
 
-    params = %{
-      actor: actor,
-      context: context,
-      object: object,
-      to: to
-    }
+      params = %{
+        actor: actor,
+        context: context,
+        object: object,
+        to: to
+      }
 
-    {:ok, activity} = ActivityPub.create(params)
+      {:ok, activity} = ActivityPub.create(params)
 
-    assert {:ok, %Bonfire.Data.Social.Message{} = message} =
-             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
-  end
+      assert {:ok, %Bonfire.Data.Social.Message{} = message} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+    end
 
-  test "creates a Message for an incoming private Note with @ mention" do
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-    recipient = fake_user!()
-    recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
+    test "creates a Message for an incoming private Note with @ mention" do
+      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      recipient = fake_user!()
+      recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
-    params =
-      remote_PM_json(actor, recipient_actor)
-      |> info("json!")
+      params =
+        remote_PM_json(actor, recipient_actor)
+        |> info("json!")
 
-    {:ok, activity} = ActivityPub.create(params)
+      {:ok, activity} = ActivityPub.create(params)
 
-    assert actor.data["id"] == activity.data["actor"]
-    assert params.object["content"] == activity.object.data["content"]
+      assert actor.data["id"] == activity.data["actor"]
+      assert params.object["content"] == activity.object.data["content"]
 
-    assert {:ok, %Bonfire.Data.Social.Message{} = message} =
-             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
-             |> repo().maybe_preload(:post_content)
+      assert {:ok, %Bonfire.Data.Social.Message{} = message} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               |> repo().maybe_preload(:post_content)
 
-    assert message.post_content.html_body =~ params.object["content"]
+      assert message.post_content.html_body =~ params.object["content"]
 
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+      feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
-    refute =
-      Bonfire.Social.FeedActivities.feed_contains?(feed_id, message, current_user: recipient)
+      refute =
+        Bonfire.Social.FeedActivities.feed_contains?(feed_id, message, current_user: recipient)
+    end
   end
 end

@@ -488,7 +488,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       other ->
         error(other, "unhandled case")
-        other
     end
   end
 
@@ -633,7 +632,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     icon = maybe_format_image_object_from_path(Media.avatar_url(user_etc))
     image = maybe_format_image_object_from_path(Media.banner_url(user_etc))
 
-    local = if e(user_etc, :character, :peered, nil), do: false, else: true
+    local? = if e(user_etc, :character, :peered, nil), do: false, else: true
 
     aliases = e(user_etc, :character, :aliases, nil)
     # aliased = e(user_etc, :character, :aliased, nil)
@@ -678,19 +677,23 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       id: user_etc.id,
       data: data,
       keys: e(user_etc, :actor, :signing_key, nil),
-      local: local,
+      local: local?,
       ap_id: id,
       pointer_id: user_etc.id,
       username: e(user_etc, :character, :username, nil),
       deactivated: false,
       updated_at: NaiveDateTime.utc_now()
     }
+    |> debug("formatted")
   end
 
   defp alias_actor_ids(aliases) when is_list(aliases),
     do: Enum.map(aliases, &(e(&1, :object, nil) |> alias_actor_ids()))
 
   defp alias_actor_ids(character), do: Bonfire.Common.URIs.canonical_url(character)
+
+  def create_remote_actor({:ok, a}),
+    do: create_remote_actor(a)
 
   def create_remote_actor(%ActivityPub.Actor{} = actor) do
     character_module = character_module(actor.data["type"])
@@ -801,7 +804,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   # def create_remote_actor(%{pointer_id: pointer_id}) when is_binary(pointer_id), do: ActivityPub.Object.get_cached!(pointer: pointer_id) |> create_remote_actor()
   def create_remote_actor(%ActivityPub.Object{} = object),
-    do: ActivityPub.Actor.format_remote_actor(object) |> create_remote_actor()
+    do:
+      ActivityPub.Actor.format_remote_actor(object)
+      |> debug("cfa")
+      |> create_remote_actor()
 
   def maybe_add_aliases(user_etc, aliases) do
     case aliases do
