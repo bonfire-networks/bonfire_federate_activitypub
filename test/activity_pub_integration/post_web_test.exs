@@ -101,7 +101,6 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
 
       # assert doc
       #        |> debug
-
     end
   end
 end
