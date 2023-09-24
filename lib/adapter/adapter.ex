@@ -203,6 +203,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         profile: %{
           name: data["name"],
           summary: data["summary"],
+          location: e(data["location"], "name", nil),
           icon_id:
             AdapterUtils.maybe_create_icon_object(
               AdapterUtils.maybe_fix_image_object(data["icon"]),

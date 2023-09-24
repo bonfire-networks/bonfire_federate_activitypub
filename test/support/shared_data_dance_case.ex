@@ -7,7 +7,8 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
 
   def a_fake_user!(name, opts \\ []) do
     # repo().delete_all(ActivityPub.Object)
-    user = fake_user!("#{name} #{Pointers.ULID.generate()}", %{}, opts)
+    id = Pointers.ULID.generate()
+    user = fake_user!("#{name} #{id}", opts, opts)
 
     [
       user: user,

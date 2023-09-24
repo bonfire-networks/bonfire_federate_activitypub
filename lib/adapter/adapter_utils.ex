@@ -636,6 +636,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         [
           :settings,
           :actor,
+          # :tags,
           profile: [:image, :icon],
           character: [
             :peered,
@@ -662,6 +663,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     aliases = e(user_etc, :character, :aliases, nil)
     # aliased = e(user_etc, :character, :aliased, nil)
 
+    location = e(user_etc, :profile, :location, nil)
+
     data = %{
       "type" => type,
       "id" => id,
@@ -672,9 +675,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       "preferredUsername" => e(user_etc, :character, :username, nil),
       "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
       "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
-      "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases), else: []),
+      "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases)),
       "icon" => icon,
       "image" => image,
+      "location" =>
+        if(location,
+          do: %{
+            "name" => location,
+            "type" => "Place"
+            # "longitude"=> 12.34,
+            # "latitude"=> 56.78,
+          }
+        ),
       "attachment" =>
         filter_empty(
           [
@@ -684,10 +696,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             ),
             maybe_attach_property_value(
               l("Location"),
-              e(user_etc, :profile, :location, nil)
+              location
             )
           ],
-          []
+          nil
         ),
       "endpoints" => %{
         "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
@@ -746,7 +758,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                         },
                         profile: %{
                           name: name,
-                          summary: actor.data["summary"]
+                          summary: actor.data["summary"],
+                          location: e(actor.data["location"], "name", nil)
                         },
                         peered: %{
                           peer_id: peer.id,

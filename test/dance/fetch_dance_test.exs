@@ -33,6 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FetchTest do
     assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:friendly_url])
 
     assert object.profile.name == remote[:user].profile.name
+    assert object.profile.location == remote[:user].profile.location
   end
 
   @tag :test_instance
