@@ -27,6 +27,16 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     |> receive_activity()
   end
 
+  def receive_activity(
+        %{
+          is_object: true
+        } = object
+      ) do
+    info("AP - case when an Object comes to us instead of an activity")
+
+    receive_object(nil, object)
+  end
+
   def receive_activity(%{"id" => _} = activity) when not is_map_key(activity, :data) do
     info(activity, "AP - case when the worker gives us activity or object JSON data")
     receive_activity(%{data: activity})
@@ -461,7 +471,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     with {:error, e} <-
            AdapterUtils.get_or_fetch_and_create_by_uri(actor, fetch_collection: false) |> info do
       error(e, "AP - could not find local character for the actor")
-      {:ok, nil}
+      {:ok, AdapterUtils.get_or_create_service_character()}
     end
   end
 
@@ -479,7 +489,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   defp activity_character(actor) do
     error(actor, "AP - could not find an actor in the activity or object")
-    {:ok, nil}
+    {:ok, AdapterUtils.get_or_create_service_character()}
   end
 
   def no_federation_module_match(error, attrs \\ nil) do

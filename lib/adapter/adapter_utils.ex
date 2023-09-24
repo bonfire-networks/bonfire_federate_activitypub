@@ -9,8 +9,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # alias Bonfire.Social.Threads
   alias Ecto.Association.NotLoaded
   alias Bonfire.Federate.ActivityPub.Adapter
+  alias Bonfire.Federate.ActivityPub.Incoming
   require Logger
+  require ActivityPub.Config
   import Untangle
+
+  @service_character_id "1ACT1V1TYPVBREM0TESFETCHER"
 
   def public_uri(), do: ActivityPub.Config.public_uri()
 
@@ -312,7 +316,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
         ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id, false)
         |> info("fetched by ap_id")
-        |> return_character()
+        |> return_pointable()
       end
     end
   end
@@ -349,7 +353,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       actor ->
         actor
-        |> return_character()
+        |> return_pointable()
     end
   end
 
@@ -422,7 +426,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       log("AP - get_or_fetch_by_username: " <> q)
 
       ActivityPub.Actor.get_or_fetch_by_username(q, opts)
-      ~> return_character()
+      ~> return_pointable()
     else
       log("AP - get_character_by_username: " <> q)
       get_character_by_username(q)
@@ -443,16 +447,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
           {:ok, pointable}
 
-        {:ok, %{pointer_id: pointer_id} = _ap_object} when is_binary(pointer_id) ->
-          # FIXME? for non-actors
-          return_character(pointer_id)
+        {:ok, %{pointer_id: _pointer_id} = ap_object} ->
+          return_pointable(ap_object)
 
         {:ok, %ActivityPub.Actor{} = actor} ->
-          return_character(actor)
+          return_pointable(actor)
 
         {:ok, %ActivityPub.Object{} = object} ->
           # FIXME? for non-actors
-          return_character(object)
+          return_pointable(object)
 
         # {{:ok, object}, _actor} -> {:ok, object}
         {:ok, object} ->
@@ -470,21 +473,31 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # expects an ActivityPub.Actor. tries to load the associated object:
   # * if pointer_id is present, use that
   # * else use the id in the object
-  defp return_character(f, opts \\ [skip_boundary_check: true])
+  defp return_pointable(f, opts \\ [skip_boundary_check: true])
 
-  defp return_character({:ok, fetched}, opts),
-    do: return_character(fetched, opts)
+  defp return_pointable({:ok, fetched}, opts),
+    do: return_pointable(fetched, opts)
 
   # FIXME: privacy
-  defp return_character(fetched, opts) do
+  defp return_pointable(fetched, opts) do
     # info(fetched, "fetched")
     case fetched do
-      %{pointer: %{id: _} = character} ->
-        {:ok, character}
+      %{pointer: %{id: _} = pointable} ->
+        {:ok, pointable}
+
+      %{pointer_id: id, data: %{"type" => type}}
+      when is_binary(id) and ActivityPub.Config.is_in(type, :supported_actor_types) ->
+        with {:error, :not_found} <- get_character_by_id(id) do
+          # in case the local pointer was deleted
+          create_remote_actor(fetched)
+        end
 
       %{pointer_id: id} when is_binary(id) ->
-        # return_pointer(id, opts)
-        get_character_by_id(id)
+        with {:error, :not_found} <- return_pointer(id, opts) do
+          # in case the local pointer was deleted
+          debug(fetched, "re-create pointer for remote")
+          Incoming.receive_activity(fetched)
+        end
 
       %ActivityPub.Actor{username: username} when is_binary(username) ->
         debug("we have a username")
@@ -498,21 +511,26 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         if is_ulid?(fetched) do
           get_character_by_id(fetched)
         else
-          error(fetched, "dunno")
+          error(fetched, "Don't know how to find this object")
         end
 
       # nope? let's try and find them from their ap id
       %ActivityPub.Actor{} ->
         create_remote_actor(fetched)
 
-      %ActivityPub.Object{} ->
+      %ActivityPub.Object{data: %{"type" => type}}
+      when ActivityPub.Config.is_in(type, :supported_actor_types) ->
         create_remote_actor(fetched)
+
+      %ActivityPub.Object{} ->
+        debug(fetched, "re-create pointer for remote object")
+        Incoming.receive_activity(fetched)
 
       %{id: _} ->
         {:ok, fetched}
 
       other ->
-        error(other, "unhandled case")
+        error(other, "unhandled case for return_pointable")
     end
   end
 
@@ -1096,10 +1114,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def create_service_actor(username) do
-    Bonfire.Me.Fake.fake_user!(username, %{id: "1ACT1V1TYPVBREM0TESFETCHER"},
+  def create_service_character() do
+    Bonfire.Me.Fake.fake_user!("activitypub_fetcher", %{id: @service_character_id},
       request_before_follow: true,
       undiscoverable: true
     )
+  end
+
+  def get_or_create_service_character() do
+    with {:ok, user} <- Bonfire.Me.Users.by_id(@service_character_id) do
+      user
+    else
+      {:error, :not_found} ->
+        create_service_character()
+    end
   end
 end
