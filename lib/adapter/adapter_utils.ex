@@ -32,6 +32,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
     # |> debug("thing")
     |> case do
+      true ->
+        true
+
+      false ->
+        false
+
       %{is_local: true} ->
         true
 
@@ -67,23 +73,42 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       object when is_struct(object) ->
         if preload_if_needed do
-          # NOTE: trying preloads seperately so the whole thing doesn't fail if a field doesn't exists on the thing (TODO: only preload one of these based on what assocs are available)    
-          object
-          |> repo().maybe_preload(:peered)
-          |> repo().maybe_preload(character: :peered)
-          |> repo().maybe_preload(creator: :peered)
-          |> repo().maybe_preload(created: [:peered, creator: :peered])
+          warn(
+            object,
+            "will try preloading peered info (should do this in original query to avoid n+1)"
+          )
+
+          case object do
+            %{peered: _} ->
+              object
+              |> repo().maybe_preload(:peered)
+
+            %{character: _} ->
+              object
+              |> repo().maybe_preload(character: :peered)
+
+            %{creator: _} ->
+              object
+              |> repo().maybe_preload(creator: :peered)
+
+            %{created: _} ->
+              object
+              |> repo().maybe_preload(created: [:peered, creator: :peered])
+
+            _ ->
+              warn(object, "did not know how to check this object for locality")
+              true
+          end
           |> is_local?(false)
         else
-          debug(object, "declaring local because no other case matched")
+          warn(object, "no case matched for struct")
           true
         end
 
       other ->
-        debug(other, "no case matched")
-        false
+        warn(other, "no case matched")
+        true
     end
-    |> debug(ulid(thing))
   end
 
   def get_actor_username(%{preferred_username: u}) when is_binary(u), do: u
