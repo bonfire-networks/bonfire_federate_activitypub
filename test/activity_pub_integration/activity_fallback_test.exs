@@ -1,11 +1,11 @@
 defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
-  use Bonfire.Federate.ActivityPub.ConnCase
+  use Bonfire.Federate.ActivityPub.ConnCase, async: false
   import Tesla.Mock
 
   alias Bonfire.Social.Posts
 
-  setup do
-    mock(fn
+  setup_all do
+    mock_global(fn
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))
     end)

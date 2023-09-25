@@ -256,16 +256,28 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       do: debug(filtered, "activity has been filtered"),
       else: debug("no blocks apply")
 
-    if is_local? || e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
+    if e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
          e(filtered, :bcc, nil) || e(filtered, :audience, nil) ||
          e(activity, "publishedDate", nil) || e(activity, "object", "publishedDate", nil) do
       # ^ `publishedDate` here is intended as an exception for bookwyrm which doesn't put audience info
       {:ok, filtered}
     else
-      debug(activity, "reject activity")
+      if is_local? do
+        debug(
+          activity,
+          "do not federate local activity because it has no recipients or they were all filtered"
+        )
 
-      {:reject,
-       "Do not accept incoming federated activity because it has no recipients or they were all filtered"}
+        :ignore
+      else
+        debug(
+          activity,
+          "reject remote activity because it has no recipients or they were all filtered"
+        )
+
+        {:reject,
+         "Do not accept incoming federated activity because it has no recipients or they were all filtered"}
+      end
     end
   end
 

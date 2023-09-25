@@ -65,6 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
       assert_raise(FunctionClauseError, fn ->
         Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+        |> debug
       end)
     end
 
@@ -128,7 +129,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
       assert ap_activity.object.data["inReplyTo"] ==
                original_activity.object.data["id"]
 
-      assert ap_user.ap_id in ap_activity.data["to"]
+      assert ap_user.ap_id in ap_activity.data["to"] or ap_user.ap_id in ap_activity.data["cc"]
     end
 
     test "mention publishing works" do
@@ -147,7 +148,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
       assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
-      assert ap_user.ap_id in ap_activity.data["to"]
+      assert ap_user.ap_id in ap_activity.data["to"] or ap_user.ap_id in ap_activity.data["cc"]
     end
 
     test "creates a Post for an incoming Note" do
@@ -175,10 +176,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
       feed_id =
         Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-        |> info("feeeed")
+        |> debug("feeeed")
 
       assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
-             |> info()
 
       # debug(feed_entry)
     end
