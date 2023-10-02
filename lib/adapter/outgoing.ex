@@ -31,7 +31,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         do: thing_local?,
         else: AdapterUtils.is_local?(subject)
 
-    if (is_nil(subject) and thing_local?) or subject_local? do
+    if federate_outgoing?(subject) and
+         ((is_nil(subject) and thing_local?) or
+            subject_local?) do
       prepare_and_queue(subject, verb, thing)
     else
       info(
@@ -41,6 +43,15 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
       :ignore
     end
+  end
+
+  def federate_outgoing?(subject \\ nil) do
+    Bonfire.Federate.ActivityPub.federating?(subject)
+    # and Bonfire.Common.Extend.module_enabled?(
+    #   Bonfire.Federate.ActivityPub.Outgoing,
+    #   subject
+    # )
+    # ^ TODO: to disabled only outgoing federation
   end
 
   defp prepare_and_queue(subject, verb, thing)

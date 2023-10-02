@@ -394,13 +394,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     error(other, "Invalid parameters when looking up an actor")
   end
 
-  # def get_character_by_ap_id!(ap_id) do
-  #   case get_character_by_ap_id(ap_id) do
-  #     {:ok, character} -> character
-  #     %{} = character -> character
-  #     _ -> nil
-  #   end
-  # end
+  def get_character_by_ap_id!(ap_id) do
+    case get_character_by_ap_id(ap_id) do
+      {:ok, character} -> character
+      %{} = character -> character
+      _ -> nil
+    end
+  end
 
   def get_by_url_ap_id_or_username(q, opts \\ [])
 

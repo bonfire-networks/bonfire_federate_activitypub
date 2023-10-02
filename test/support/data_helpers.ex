@@ -65,16 +65,44 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     }
   end
 
-  def remote_PM_json(actor, to) do
-    remote_activity_json(actor, [to.ap_id], %{
-      "tag" => [
+  def remote_activity_json_with_mentions(actor, tos, extra \\ %{}) do
+    context = "blabla"
+
+    object =
+      Map.merge(
         %{
-          "href" => to.ap_id,
-          "name" => to.username,
-          "type" => "Mention"
-        }
-      ]
-    })
+          "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
+          "content" => "content",
+          "type" => "Note",
+          "published" => "2015-02-10T15:00:00Z",
+          "tag" =>
+            Enum.map(
+              List.wrap(tos),
+              fn to ->
+                if to != ActivityPub.Config.public_uri(),
+                  do: %{
+                    "href" => to.ap_id,
+                    "name" => to.username,
+                    "type" => "Mention"
+                  }
+              end
+            )
+        },
+        extra
+      )
+
+    %{
+      type: "Create",
+      actor: actor,
+      context: context,
+      object: object,
+      to: tos,
+      local: false,
+      additional: %{
+        "id" => @remote_instance <> "/pub/" <> Pointers.ULID.autogenerate(),
+        "published" => "2015-02-10T15:10:00Z"
+      }
+    }
   end
 
   def local_actor_ids(to) when is_list(to), do: Enum.map(to, &local_actor_ids/1)

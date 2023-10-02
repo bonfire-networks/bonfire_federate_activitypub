@@ -423,101 +423,107 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     false
   end
 
-  defp filter_actor?(
-         activity,
-         %{ap_id: actor},
-         block_types,
-         rejects,
-         local_author_ids,
-         local_recipient_ids,
-         is_local?
-       )
-       when is_binary(actor) do
-    filter_actor?(
-      activity,
-      actor,
-      block_types,
-      rejects,
-      local_author_ids,
-      local_recipient_ids,
-      is_local?
-    )
-  end
+  # defp filter_actor?(
+  #        activity,
+  #        %{ap_id: actor},
+  #        block_types,
+  #        rejects,
+  #        local_author_ids,
+  #        local_recipient_ids,
+  #        is_local?
+  #      )
+  #      when is_binary(actor) do
+  #   filter_actor?(
+  #     activity,
+  #     actor,
+  #     block_types,
+  #     rejects,
+  #     local_author_ids,
+  #     local_recipient_ids,
+  #     is_local?
+  #   )
+  # end
+
+  # defp filter_actor?(
+  #        activity,
+  #        %{"id" => actor},
+  #        block_types,
+  #        rejects,
+  #        local_author_ids,
+  #        local_recipient_ids,
+  #        is_local?
+  #      )
+  #      when is_binary(actor) do
+  #   filter_actor?(
+  #     activity,
+  #     actor,
+  #     block_types,
+  #     rejects,
+  #     local_author_ids,
+  #     local_recipient_ids,
+  #     is_local?
+  #   )
+  # end
 
   defp filter_actor?(
          activity,
-         %{"id" => actor},
+         recipient,
          block_types,
          rejects,
          local_author_ids,
          local_recipient_ids,
          is_local?
-       )
-       when is_binary(actor) do
-    filter_actor?(
-      activity,
-      actor,
-      block_types,
-      rejects,
-      local_author_ids,
-      local_recipient_ids,
-      is_local?
-    )
-  end
+       ) do
+    recipient_actor =
+      e(recipient, :ap_id, nil) || e(recipient, "id", nil) || e(recipient, :data, "id", nil) ||
+        recipient
 
-  defp filter_actor?(
-         activity,
-         recipient_actor,
-         block_types,
-         rejects,
-         local_author_ids,
-         local_recipient_ids,
-         is_local?
-       )
-       when is_binary(recipient_actor) do
     # |> debug("uri")
-    recipient_actor_uri = URI.parse(recipient_actor)
-    clean_recipient_actor_uri = "#{recipient_actor_uri.host}#{recipient_actor_uri.path}"
 
     debug(is_local?, "is_local???")
 
-    author_ids =
-      local_author_ids
-      |> Enum.map(&(elem(&1, 1) |> ulid()))
+    if is_binary(recipient_actor) do
+      recipient_actor_uri = URI.parse(recipient_actor)
+      clean_recipient_actor_uri = "#{recipient_actor_uri.host}#{recipient_actor_uri.path}"
 
-    {by_characters, actor_to_check} =
-      if is_local? do
-        debug(
-          "local activity - need to check if local author blocks the (maybe remote) recipient"
-        )
+      author_ids =
+        local_author_ids
+        |> Enum.map(&(elem(&1, 1) |> ulid()))
 
-        recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
+      {by_characters, actor_to_check} =
+        if is_local? do
+          debug(
+            "local activity - need to check if local author blocks the (maybe remote) recipient"
+          )
 
-        {author_ids, recipient}
-      else
-        debug("remote activity - need to check if the local recipient blocks the remote author")
+          local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
 
-        local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
+          {author_ids, local_recipient}
+        else
+          debug("remote activity - need to check if the local recipient blocks the remote author")
 
-        {local_recipient, e(author_ids, nil) || AdapterUtils.all_actors(activity)}
-      end
-      |> debug("by_characters & actor_to_check")
+          local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
 
-    #  || Bonfire.Federate.ActivityPub.Peered.is_blocked?(recipient_actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
-    MRF.subdomain_match?(rejects, recipient_actor_uri.host)
-    |> debug(
-      "filter '#{recipient_actor_uri.host}' blocked #{inspect(block_types)} instance in config?"
-    ) ||
-      MRF.subdomain_match?(rejects, clean_recipient_actor_uri)
+          {local_recipient, e(author_ids, nil) || AdapterUtils.all_actors(activity)}
+        end
+        |> debug("by_characters & actor_to_check")
+
+      #  || Bonfire.Federate.ActivityPub.Peered.is_blocked?(recipient_actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
+      MRF.subdomain_match?(rejects, recipient_actor_uri.host)
       |> debug(
-        "filter '#{clean_recipient_actor_uri}' blocked #{inspect(block_types)} actor in config?"
+        "filter '#{recipient_actor_uri.host}' blocked #{inspect(block_types)} instance in config?"
       ) ||
-      Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_to_check, block_types,
-        user_ids: by_characters
-      )
-      |> debug(
-        "filter '#{id(actor_to_check) || inspect(actor_to_check)}' blocked (#{inspect(block_types)}) by #{inspect(by_characters)} in DB, either instance-wide or by specified local_actor_ids?"
-      )
+        MRF.subdomain_match?(rejects, clean_recipient_actor_uri)
+        |> debug(
+          "filter '#{clean_recipient_actor_uri}' blocked #{inspect(block_types)} actor in config?"
+        ) ||
+        Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_to_check, block_types,
+          user_ids: by_characters
+        )
+        |> debug(
+          "filter '#{id(actor_to_check) || inspect(actor_to_check)}' blocked (#{inspect(block_types)}) by #{inspect(by_characters)} in DB, either instance-wide or by specified local_actor_ids?"
+        )
+    end
   end
 
   defp rejects_regex(block_types) do

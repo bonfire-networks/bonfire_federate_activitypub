@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
+defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   use Bonfire.Federate.ActivityPub.ConnCase
   import Tesla.Mock
   import Untangle
@@ -13,13 +13,17 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
     end)
+    |> IO.inspect(label: "setup done")
 
     :ok
   end
 
-  describe "" do
-    test "fetch post from AP API with Pointer ID" do
-      user = fake_user!()
+  describe "can" do
+    test "fetch local post from AP API with Pointer ID" do
+      user =
+        fake_user!()
+        |> IO.inspect(label: "a user")
+
       attrs = %{post_content: %{html_body: "content"}}
 
       {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
@@ -36,7 +40,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
       assert obj["content"] =~ attrs.post_content.html_body
     end
 
-    test "fetch post from AP API with AP ID" do
+    test "fetch local post from AP API with AP ID" do
       user = fake_user!()
       attrs = %{post_content: %{html_body: "content"}}
 
@@ -55,7 +59,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
       assert obj["content"] =~ attrs.post_content.html_body
     end
 
-    test "fetch post from AP API with friendly URL and Accept header" do
+    test "fetch local post from AP API with friendly URL and Accept header" do
       user = fake_user!()
       attrs = %{post_content: %{html_body: "content"}}
 
@@ -67,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.PostIntegrationTest do
              |> redirected_to() =~ "/pub/objects/#{post.id}"
     end
 
-    test "pixelfed activity with image" do
+    test "process pixelfed activity with image" do
       data =
         "../fixtures/pixelfed-image.json"
         |> Path.expand(__DIR__)

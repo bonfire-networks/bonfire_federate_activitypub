@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
+defmodule Bonfire.Federate.ActivityPub.PostDataTest do
   use Bonfire.Federate.ActivityPub.DataCase
   import Tesla.Mock
   alias Bonfire.Social.Posts
@@ -17,7 +17,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
   end
 
   describe "" do
-    test "posts get queued to federate" do
+    test "local posts get queued to federate" do
       attrs = %{
         post_content: %{
           summary: "summary",
@@ -54,6 +54,23 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
 
       # debug(ap_activity)
       assert ap_activity.object.data["content"] =~ post.post_content.html_body
+    end
+
+    test "Outgoing federated can be disabled by each user" do
+      user = fake_user!()
+
+      user =
+        Bonfire.Federate.ActivityPub.disable(user)
+        ~> current_user()
+
+      attrs = %{post_content: %{html_body: "content"}}
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+      assert_raise(FunctionClauseError, fn ->
+        Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+        |> debug
+      end)
     end
 
     test "does not publish private Posts with no recipients" do
@@ -151,13 +168,10 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
       assert ap_user.ap_id in ap_activity.data["to"] or ap_user.ap_id in ap_activity.data["cc"]
     end
 
-    test "creates a Post for an incoming Note" do
+    test "creates a Post for an incoming public Note" do
       {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
-      recipient = fake_user!()
-      recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
       to = [
-        recipient_actor.ap_id,
         ActivityPub.Config.public_uri()
       ]
 
@@ -178,7 +192,85 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
         Bonfire.Social.Feeds.named_feed_id(:activity_pub)
         |> debug("feeeed")
 
-      assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
+      assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post)
+
+      # debug(feed_entry)
+    end
+
+    test "creates a Post and notifies mentioned users for an incoming public Note" do
+      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      recipient = fake_user!()
+      recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
+
+      to = [
+        recipient_actor,
+        ActivityPub.Config.public_uri()
+      ]
+
+      params = remote_activity_json_with_mentions(actor, to)
+
+      {:ok, activity} = ActivityPub.create(params)
+
+      assert actor.data["id"] == activity.data["actor"]
+      assert params.object["content"] == activity.object.data["content"]
+
+      assert {:ok, post} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               |> repo().maybe_preload(:post_content)
+
+      assert post.post_content.html_body =~ params.object["content"]
+
+      feed_id =
+        Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+        |> debug("feeeed")
+
+      assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post)
+
+      assert Bonfire.Social.FeedActivities.feed_contains?(:notifications, post,
+               current_user: recipient
+             )
+
+      # debug(feed_entry)
+    end
+
+    test "creates a Post but does not notify mentioned user who has federation disabled" do
+      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+
+      recipient = fake_user!()
+
+      recipient =
+        Bonfire.Federate.ActivityPub.disable(recipient)
+        ~> current_user()
+
+      recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
+
+      to = [
+        recipient_actor,
+        ActivityPub.Config.public_uri()
+      ]
+
+      params = remote_activity_json_with_mentions(actor, to)
+
+      {:ok, activity} = ActivityPub.create(params)
+
+      assert actor.data["id"] == activity.data["actor"]
+      assert params.object["content"] == activity.object.data["content"]
+
+      assert {:ok, post} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               |> repo().maybe_preload(:post_content)
+
+      assert post.post_content.html_body =~ params.object["content"]
+
+      feed_id =
+        Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+        |> debug("feeeed")
+
+      assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post)
+
+      refute Bonfire.Social.FeedActivities.feed_contains?(:notifications, post,
+               current_user: recipient
+             )
 
       # debug(feed_entry)
     end
@@ -189,7 +281,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataIntegrationTest do
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
       to = [
-        recipient_actor.ap_id,
+        recipient_actor,
         ActivityPub.Config.public_uri()
       ]
 

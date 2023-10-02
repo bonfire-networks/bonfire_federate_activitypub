@@ -81,7 +81,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
       params =
-        remote_PM_json(actor, recipient_actor)
+        remote_activity_json_with_mentions(actor, recipient_actor)
         |> info("json!")
 
       {:ok, activity} = ActivityPub.create(params)
@@ -95,10 +95,31 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
       assert message.post_content.html_body =~ params.object["content"]
 
+      assert %{edges: feed} = Messages.list(recipient)
+      assert List.first(feed).id == message.id
+
       feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
       refute =
         Bonfire.Social.FeedActivities.feed_contains?(feed_id, message, current_user: recipient)
+    end
+
+    test "rejects a Message for an incoming private Note for a user with federation disabled" do
+      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+
+      recipient = fake_user!()
+
+      recipient =
+        Bonfire.Federate.ActivityPub.disable(recipient)
+        ~> current_user()
+
+      recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
+
+      params =
+        remote_activity_json_with_mentions(actor, recipient_actor)
+        |> info("json!")
+
+      {:error, _} = ActivityPub.create(params)
     end
   end
 end
