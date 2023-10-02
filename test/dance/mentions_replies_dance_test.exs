@@ -49,8 +49,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
       context[:remote][:canonical_url]
       |> info("remote_ap_id")
 
-    remote_user = context[:remote][:user]
-
     # Logger.metadata(action: info("init remote_on_local"))
     # assert {:ok, remote_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
@@ -58,6 +56,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
 
     ## work on test instance
     TestInstanceRepo.apply(fn ->
+      remote_user = context[:remote][:user]
+
       feed = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
 
       assert match?(%{edges: [feed_entry | _]}, feed),
@@ -129,7 +129,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
            "reply with mention is NOT in OP's feed"
 
     Logger.metadata(
-      action: info("check that reply without mention was federated and is local feed")
+      action: info("check that reply without mention was federated and is in local feed")
     )
 
     assert %{edges: feed} =

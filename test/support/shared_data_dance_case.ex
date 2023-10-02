@@ -9,16 +9,18 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     # repo().delete_all(ActivityPub.Object)
     id = Pointers.ULID.generate()
     user = fake_user!("#{name} #{id}", opts, opts)
+    display_username = Bonfire.Me.Characters.display_username(user, true)
 
     [
       user: user,
-      username: Bonfire.Me.Characters.display_username(user, true),
+      username: display_username,
       url_on_local:
         "@" <>
-          Bonfire.Me.Characters.display_username(user, true) <>
+          display_username <>
           "@" <> Bonfire.Common.URIs.instance_domain(Bonfire.Me.Characters.character_url(user)),
       canonical_url: Bonfire.Me.Characters.character_url(user),
-      friendly_url: Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(user)
+      friendly_url:
+        "#{Bonfire.Common.URIs.base_url()}#{Bonfire.Common.URIs.path(user) || "/@#{display_username}"}"
     ]
   end
 
