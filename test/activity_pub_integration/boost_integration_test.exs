@@ -76,7 +76,42 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
 
       {:ok, ap_boost} = ActivityPub.announce(%{actor: actor, object: ap_activity.object})
 
-      assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
+      assert {:ok, %Boost{} = boost_pointer} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
+
+      assert Bonfire.Social.FeedActivities.feed_contains?(
+               :notifications,
+               [activity: boost_pointer.activity],
+               current_user: user
+             )
+    end
+
+    test "boost receiving works, but doesn't notify me if I disabled federation" do
+      user = fake_user!()
+
+      attrs = %{post_content: %{html_body: "content"}}
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
+
+      # now disable federation
+      user =
+        Bonfire.Federate.ActivityPub.disable(user)
+        ~> current_user()
+
+      {:ok, ap_boost} = ActivityPub.announce(%{actor: actor, object: ap_activity.object})
+
+      assert {:ok, boost_pointer} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
+
+      refute Bonfire.Social.FeedActivities.feed_contains?(
+               :notifications,
+               [activity: boost_pointer.activity],
+               current_user: user
+             )
     end
 
     test "unboost receiving works" do
