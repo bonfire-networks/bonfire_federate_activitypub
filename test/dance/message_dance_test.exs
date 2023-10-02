@@ -62,20 +62,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessageTest do
       remote_user = context[:remote][:user]
       assert {:ok, local_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(local_ap_id)
 
-      feed =
+      messages =
         Bonfire.Social.Messages.list(remote_user)
         |> debug("list")
 
-      assert match?(%{edges: [feed_entry | _]}, feed),
+      assert match?(%{edges: [feed_entry | _]}, messages),
              "message 1 wasn't federated to instance of mentioned actor"
 
-      %{edges: [feed_entry | _]} = feed
+      %{edges: [feed_entry | _]} = messages
       message1remote = feed_entry.activity.object
       assert message1remote.post_content.html_body =~ message1_attrs.post_content.html_body
 
-      Logger.metadata(action: info("make a mentions-only reply on remote"))
+      Logger.metadata(action: info("attempt a reply without TO on remote"))
 
-      {:ok, message2} =
+      {:error, _} =
         Messages.send(
           remote_user,
           message2_attrs |> Map.put(:reply_to_id, ulid(message1remote))
@@ -92,63 +92,60 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessageTest do
 
       # raise nil
 
-      Logger.metadata(action: info("make a reply without TO on remote"))
+      Logger.metadata(action: info("attempt a message in thread without TO on remote"))
 
-      {:ok, message4} =
+      {:error, _} =
         Messages.send(
           remote_user,
-          message4_attrs |> Map.put(:reply_to_id, ulid(message1remote))
+          message4_attrs |> Map.put(:thread_id, ulid(message1remote))
         )
 
-      Logger.metadata(action: info("make a reply in thread on remote"))
+      Logger.metadata(action: info("message in thread on remote"))
 
       {:ok, message5} =
         Messages.send(
           remote_user,
-          message5_attrs |> Map.put(:reply_to_id, ulid(message4))
+          message5_attrs |> Map.put(:reply_to_id, ulid(message1remote)),
+          local_on_remote
         )
     end)
 
     ## back to primary instance
 
-    Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
+    Logger.metadata(action: info("check that reply-only is NOT in OP's messages"))
 
-    assert %{edges: feed} =
+    assert %{edges: messages} =
              Bonfire.Social.Messages.list(local_user) |> debug("feeeed")
 
     Enum.each(
-      feed,
+      messages,
       &refute(&1.activity.object.post_content.html_body =~ message2_attrs.post_content.html_body)
     )
 
     Logger.metadata(
-      action: info("check that reply with mention was federated and is in OP's feed")
+      action: info("check that reply with mention was federated and is in OP's messages")
     )
 
     assert Bonfire.Social.FeedActivities.feed_contains?(
-             feed,
+             messages,
              message3_attrs.post_content.html_body
            ),
-           "reply with mention is NOT in OP's feed"
+           "reply with mention should be in OP's messages"
 
     Logger.metadata(
-      action: info("check that reply without mention was federated and is in local feed")
+      action: info("check that reply without mention was federated and is in local messages")
     )
 
-    assert %{edges: feed} =
+    assert %{edges: messages} =
              Bonfire.Social.Messages.list(local_user)
              |> debug("feeeedlocal")
 
     assert Bonfire.Social.FeedActivities.feed_contains?(
-             feed,
-             message4_attrs.post_content.html_body
-           ),
-           "if the message is public, the actor we are replying to should be CCed even if not mentioned"
-
-    assert Bonfire.Social.FeedActivities.feed_contains?(
-             feed,
+             messages,
              message5_attrs.post_content.html_body
            ),
-           "if the message is public, the actor who started the thread should be CCed even if not mentioned"
+           "the repply in thread should be received"
+
+    # TODO ^ check that message5 is in the correct thread
   end
 end
