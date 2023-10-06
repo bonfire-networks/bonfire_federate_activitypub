@@ -3,14 +3,14 @@
 
 defmodule Bonfire.Federate.ActivityPub do
   alias Bonfire.Common.Config
-  alias Bonfire.Me.Settings
+  alias Bonfire.Common.Settings
 
   def repo, do: Config.repo()
 
   def disable(scope \\ :instance) do
     # if scope == :instance, do: Oban.cancel_all_jobs(Oban.Job)
 
-    Bonfire.Me.Settings.set([activity_pub: [instance: [federating: false]]],
+    Bonfire.Common.Settings.set([activity_pub: [instance: [federating: false]]],
       scope: scope,
       skip_boundary_check: true
     )

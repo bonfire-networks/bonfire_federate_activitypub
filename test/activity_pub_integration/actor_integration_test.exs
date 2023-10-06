@@ -77,7 +77,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "serves user in AP API with profile fields" do
     user = fake_user!()
 
-    Bonfire.Me.Settings.put([Bonfire.Me.Users, :undiscoverable], true, current_user: user)
+    Bonfire.Common.Settings.put([Bonfire.Me.Users, :undiscoverable], true, current_user: user)
 
     conn =
       build_conn()
@@ -121,7 +121,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert actor.data["discoverable"] == false
 
     assert true ==
-             Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], nil, current_user: user)
+             Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
+               current_user: user
+             )
   end
 
   test "can follow pointers to remote actors" do

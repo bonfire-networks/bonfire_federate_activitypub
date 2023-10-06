@@ -724,7 +724,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       },
       # whether user should appear in directories and search engines
       "discoverable" =>
-        Bonfire.Me.Settings.get([Bonfire.Me.Users, :undiscoverable], nil, current_user: user_etc) !=
+        Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
+          current_user: user_etc
+        ) !=
           true
     }
 
@@ -807,7 +809,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # save remote discoverability flag as a user setting
       if actor.data["discoverable"] in ["false", false, "no"],
         do:
-          Bonfire.Me.Settings.put(
+          Bonfire.Common.Settings.put(
             [Bonfire.Me.Users, :undiscoverable],
             true,
             current_user: user_etc
