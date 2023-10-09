@@ -647,101 +647,115 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       when struct == Bonfire.Data.AccessControl.Circle or type == "Circle",
       do: nil
 
-  def format_actor(%{} = user_etc, type) do
+  def format_actor(%{id: pointer_id} = user_etc, type) do
     user_etc =
       repo().maybe_preload(
         user_etc,
-        [
-          :settings,
-          :actor,
-          # :tags,
-          profile: [:image, :icon],
-          character: [
-            :peered,
-            # FIXME? should we used aliased, aliased, or a cross-reference of both?
-            aliases: [object: [:character]]
-            # aliased: [object: [:character]]
-          ]
+        character: [
+          :peered
         ]
       )
       |> debug("preloaded_user_etc")
 
-    ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
-
+    local? = if e(user_etc, :character, :peered, nil), do: false, else: true
     id = Bonfire.Common.URIs.canonical_url(user_etc)
 
-    # icon = maybe_format_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
-    # image = maybe_format_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
-
-    icon = maybe_format_image_object_from_path(Media.avatar_url(user_etc))
-    image = maybe_format_image_object_from_path(Media.banner_url(user_etc))
-
-    local? = if e(user_etc, :character, :peered, nil), do: false, else: true
-
-    aliases = e(user_etc, :character, :aliases, nil)
-    # aliased = e(user_etc, :character, :aliased, nil)
-
-    location = e(user_etc, :profile, :location, nil)
-
-    data = %{
-      "type" => type,
-      "id" => id,
-      "inbox" => "#{id}/inbox",
-      "outbox" => "#{id}/outbox",
-      "followers" => "#{id}/followers",
-      "following" => "#{id}/following",
-      "preferredUsername" => e(user_etc, :character, :username, nil),
-      "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
-      "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
-      "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases)),
-      "icon" => icon,
-      "image" => image,
-      "location" =>
-        if(location,
-          do: %{
-            "name" => location,
-            "type" => "Place"
-            # "longitude"=> 12.34,
-            # "latitude"=> 56.78,
-          }
-        ),
-      "attachment" =>
-        filter_empty(
+    if local? do
+      user_etc =
+        repo().maybe_preload(
+          user_etc,
           [
-            maybe_attach_property_value(
-              :website,
-              e(user_etc, :profile, :website, nil)
-            ),
-            maybe_attach_property_value(
-              l("Location"),
-              location
-            )
-          ],
-          nil
-        ),
-      "endpoints" => %{
-        "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
-      },
-      # whether user should appear in directories and search engines
-      "discoverable" =>
-        Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
-          current_user: user_etc
-        ) !=
-          true
-    }
+            :settings,
+            :actor,
+            # :tags,
+            profile: [:image, :icon],
+            character: [
+              # FIXME? should we used aliased, aliased, or a cross-reference of both?
+              aliases: [object: [:character]]
+              # aliased: [object: [:character]]
+            ]
+          ]
+        )
+        |> debug("preloaded_user_etc")
 
-    %Actor{
-      id: user_etc.id,
-      data: data,
-      keys: e(user_etc, :actor, :signing_key, nil),
-      local: local?,
-      ap_id: id,
-      pointer_id: user_etc.id,
-      username: e(user_etc, :character, :username, nil),
-      deactivated: false,
-      updated_at: NaiveDateTime.utc_now()
-    }
-    |> debug("formatted")
+      # icon = maybe_format_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
+      # image = maybe_format_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
+
+      icon = maybe_format_image_object_from_path(Media.avatar_url(user_etc))
+      image = maybe_format_image_object_from_path(Media.banner_url(user_etc))
+
+      ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
+
+      aliases = e(user_etc, :character, :aliases, nil)
+      # aliased = e(user_etc, :character, :aliased, nil)
+
+      location = e(user_etc, :profile, :location, nil)
+
+      data = %{
+        "type" => type,
+        "id" => id,
+        "inbox" => "#{id}/inbox",
+        "outbox" => "#{id}/outbox",
+        "followers" => "#{id}/followers",
+        "following" => "#{id}/following",
+        "preferredUsername" => e(user_etc, :character, :username, nil),
+        "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
+        "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
+        "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases)),
+        "icon" => icon,
+        "image" => image,
+        "location" =>
+          if(location,
+            do: %{
+              "name" => location,
+              "type" => "Place"
+              # "longitude"=> 12.34,
+              # "latitude"=> 56.78,
+            }
+          ),
+        "attachment" =>
+          filter_empty(
+            [
+              maybe_attach_property_value(
+                :website,
+                e(user_etc, :profile, :website, nil)
+              ),
+              maybe_attach_property_value(
+                l("Location"),
+                location
+              )
+            ],
+            nil
+          ),
+        "endpoints" => %{
+          "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
+        },
+        # whether user should appear in directories and search engines
+        "discoverable" =>
+          Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
+            current_user: user_etc
+          ) !=
+            true
+      }
+
+      %Actor{
+        id: user_etc.id,
+        data: data,
+        keys: e(user_etc, :actor, :signing_key, nil),
+        local: local?,
+        ap_id: id,
+        pointer_id: user_etc.id,
+        username: e(user_etc, :character, :username, nil),
+        deactivated: false,
+        updated_at: NaiveDateTime.utc_now()
+      }
+      |> debug("formatted")
+    else
+      with {:error, :not_found} <- Actor.get_cached(pointer: user_etc),
+           {:error, :not_found} <- Actor.get_cached(ap_id: id) do
+        error(user_etc, "Could not find remote Actor")
+      end
+    end
   end
 
   defp alias_actor_ids(aliases) when is_list(aliases),

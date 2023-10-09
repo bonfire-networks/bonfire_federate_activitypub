@@ -114,11 +114,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         )
 
         cond do
-          Code.ensure_loaded?(module) and function_exported?(module, :ap_publish_activity, 2) ->
+          Code.ensure_loaded?(module) and function_exported?(module, :ap_publish_activity, 3) ->
             Bonfire.Common.Utils.maybe_apply(
               module,
               :ap_publish_activity,
-              [verb, local_object],
+              [subject, verb, local_object],
               &preparation_error/2
             )
 
@@ -126,10 +126,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             Bonfire.Common.Utils.maybe_apply(
               module,
               :ap_publish_activity,
-              [subject, verb, local_object],
+              [verb, local_object],
               &preparation_error/2
             )
         end
+        |> debug("donz")
         |> case do
           {:ok, activity} ->
             {:ok, activity}
@@ -138,6 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             {:ok, activity, object}
 
           :ignore ->
+            debug("Ignore outgoing federation")
             :ignore
 
           e ->
