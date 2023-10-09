@@ -42,6 +42,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       false ->
         false
 
+      %{id: @service_character_id} ->
+        false
+
       %{is_local: true} ->
         true
 
@@ -57,6 +60,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{character: %{peered: %Peered{}}} ->
         false
 
+      %{creator_id: @service_character_id} ->
+        false
+
+      %{creator: %{id: @service_character_id}} ->
+        false
+
       %{creator: %{peered: nil}} ->
         true
 
@@ -67,6 +76,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         true
 
       %{created: %{peered: %Peered{}}} ->
+        false
+
+      %{created: %{creator_id: @service_character_id}} ->
+        false
+
+      %{created: %{creator: %{id: @service_character_id}}} ->
         false
 
       %{created: %{creator: %{peered: nil}}} ->
