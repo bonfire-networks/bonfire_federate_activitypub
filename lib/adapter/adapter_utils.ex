@@ -750,7 +750,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
             current_user: user_etc
           ) !=
-            true
+            true,
+        "indexable" => Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user_etc)
       }
 
       %Actor{

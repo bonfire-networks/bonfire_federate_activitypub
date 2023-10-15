@@ -74,10 +74,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
            |> redirected_to() =~ "/pub/actors/#{user.character.username}"
   end
 
-  test "serves user in AP API with profile fields" do
+  test "serves user in AP API with profile fields, taking into account privacy settings" do
     user = fake_user!()
-
-    Bonfire.Common.Settings.put([Bonfire.Me.Users, :undiscoverable], true, current_user: user)
 
     conn =
       build_conn()
@@ -85,7 +83,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
       |> response(200)
       |> Jason.decode!()
 
-    # |> debug
+    # |> IO.inspect
 
     assert conn["preferredUsername"] == user.character.username
     assert conn["name"] =~ user.profile.name
@@ -98,7 +96,29 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
     assert conn["publicKey"]
 
+    assert conn["discoverable"] == true
+    assert conn["indexable"] == Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer)
+
+    user =
+      current_user(
+        Bonfire.Common.Settings.put([Bonfire.Me.Users, :undiscoverable], true, current_user: user)
+      )
+
+    user =
+      current_user(
+        Bonfire.Common.Settings.put([Bonfire.Search.Indexer, :disabled], true, current_user: user)
+      )
+
+    conn =
+      build_conn()
+      |> get("/pub/actors/#{user.character.username}")
+      |> response(200)
+      |> Jason.decode!()
+
+    # |> IO.inspect
+
     assert conn["discoverable"] == false
+    assert conn["indexable"] == false
   end
 
   test "remote actor creation" do

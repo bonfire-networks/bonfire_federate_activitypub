@@ -19,10 +19,17 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   end
 
   describe "can" do
-    test "fetch local post from AP API with Pointer ID" do
+    test "fetch local post from AP API with Pointer ID, and take into account unindexable setting" do
       user =
         fake_user!()
         |> IO.inspect(label: "a user")
+
+      user =
+        current_user(
+          Bonfire.Common.Settings.put([Bonfire.Search.Indexer, :disabled], true,
+            current_user: user
+          )
+        )
 
       attrs = %{post_content: %{html_body: "content"}}
 
@@ -38,6 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         |> Jason.decode!()
 
       assert obj["content"] =~ attrs.post_content.html_body
+      assert obj["indexable"] == false
     end
 
     test "fetch local post from AP API with AP ID" do
