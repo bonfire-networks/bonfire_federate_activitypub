@@ -357,7 +357,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
                  activity,
                  Map.merge(object, %{pointer_id: pointer_id})
                ],
-               &no_federation_module_match/2
+               no_argument_rescue: true,
+               fallback_fun: &no_federation_module_match/2
              ) do
         info(
           "AP - created remote object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_obj_id}"
@@ -409,7 +410,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              module,
              :ap_receive_activity,
              [character, activity, object],
-             &no_federation_module_match/2
+             no_argument_rescue: true,
+             fallback_fun: &no_federation_module_match/2
            ) do
       {:ok, pointable_object}
     end
@@ -424,7 +426,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              module,
              :ap_receive_activity,
              [character, activity, object],
-             &no_federation_module_match/2
+             no_argument_rescue: true,
+             fallback_fun: &no_federation_module_match/2
            ) do
       # activity = ActivityPub.Object.normalize(activity)
       # ActivityPub.Object.update_existing(activity, %{pointer_id: pointable_object_id})

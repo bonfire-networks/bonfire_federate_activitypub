@@ -185,11 +185,17 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
       |> debug("username?")
 
-    if username != ap_id and !is_local_collection?(ap_id),
+    if username != ap_id and !is_local_collection_or_built_in?(ap_id),
       do:
         username
         |> get_character_by_username()
   end
+
+  def is_local_collection_or_built_in?("https://www.w3.org/ns/activitystreams#Public"),
+    do: true
+
+  def is_local_collection_or_built_in?(ap_id),
+    do: is_local_collection?(ap_id)
 
   def is_local_collection?(ap_id),
     do: String.ends_with?(ap_id, ["/followers", "/following", "/outbox", "/inbox"])
@@ -294,7 +300,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
     actors
     |> Enum.map(&id_or_object_id/1)
-    |> Enum.reject(&is_local_collection?/1)
+    |> Enum.reject(&is_local_collection_or_built_in?/1)
     |> Enum.uniq()
     # |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
     # |> debug("before local_actor_ids")
