@@ -435,7 +435,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
       id = Types.ulid(pointable_object_id)
 
-      if id do
+      if id && e(activity, :data, "type", nil) != "Update" do
         ActivityPub.Object.update_existing(Enums.id(activity) || Enums.id(object), %{
           pointer_id: id
         })

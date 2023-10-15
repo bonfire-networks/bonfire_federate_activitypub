@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Dance.MessageTest do
+defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
