@@ -19,17 +19,17 @@ defmodule Bonfire.Federate.ActivityPub.Dance.UsersTest do
        _context do
     # lookup 3 separate users to be sure
 
-    remote = fake_remote!()
+    remote = fancy_fake_user_on_test_instance()
     assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:username])
 
     assert object.profile.name == remote[:user].profile.name
 
-    remote = fake_remote!()
+    remote = fancy_fake_user_on_test_instance()
     assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
 
     assert object.profile.name == remote[:user].profile.name
 
-    remote = fake_remote!()
+    remote = fancy_fake_user_on_test_instance()
     assert {:ok, object} = AdapterUtils.get_by_url_ap_id_or_username(remote[:friendly_url])
 
     assert object.profile.name == remote[:user].profile.name

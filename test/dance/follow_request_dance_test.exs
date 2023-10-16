@@ -19,8 +19,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
     [
-      local: SharedDataDanceCase.a_fake_user!("Local", request_before_follow: true),
-      remote: SharedDataDanceCase.fake_remote!(request_before_follow: true)
+      local: SharedDataDanceCase.fancy_fake_user!("Local", request_before_follow: true),
+      remote: SharedDataDanceCase.fancy_fake_user_on_test_instance(request_before_follow: true)
     ]
   end
 

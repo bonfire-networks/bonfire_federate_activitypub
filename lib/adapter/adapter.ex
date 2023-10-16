@@ -15,7 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   # alias Bonfire.Federate.ActivityPub.Incoming
   alias ActivityPub.Actor
 
-  # import Bonfire.Federate.ActivityPub
+  import Bonfire.Federate.ActivityPub
   import Untangle
 
   @behaviour ActivityPub.Federator.Adapter
@@ -160,23 +160,63 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    with {:ok, character} <- AdapterUtils.fetch_character_by_ap_id(actor) do
-      keys = e(params, :keys, nil)
+    case AdapterUtils.fetch_character_by_ap_id(actor) do
+      {:ok, %Bonfire.Data.Identity.Character{} = character} ->
+        character_module =
+          AdapterUtils.character_module(character)
+          |> debug("character_module")
 
-      params = Map.put(params, :character, %{id: character.id, actor: %{signing_key: keys}})
+        character =
+          character
+          |> repo().maybe_preload(:actor)
 
-      AdapterUtils.maybe_add_aliases(
-        character,
-        e(params, :also_known_as, nil) || e(params, :data, "alsoKnownAs", nil)
-      )
+        keys = e(params, :keys, nil) || e(character, :actor, :keys, nil)
 
-      # debug("update_local_actor: #{inspect character} with #{inspect params}")
-      # FIXME use federation_module?
-      Bonfire.Common.ContextModule.maybe_apply(
-        character,
-        :update_local_actor,
-        [character, params]
-      )
+        params =
+          params
+          |> deep_merge(%{actor: %{id: character.id, signing_key: keys}})
+
+        AdapterUtils.maybe_add_aliases(
+          character,
+          e(params, :also_known_as, nil) || e(params, :data, "alsoKnownAs", nil)
+        )
+
+        maybe_apply(
+          character_module,
+          [:update_local_actor, :update],
+          [character, params]
+        )
+
+      {:ok, user_etc} ->
+        user_etc =
+          user_etc
+          |> repo().maybe_preload(character: [:actor])
+
+        character_module =
+          AdapterUtils.character_module(user_etc)
+          |> debug("character_module")
+
+        keys =
+          e(params, :keys, nil) || e(user_etc, :character, :actor, :keys, nil) ||
+            e(user_etc, :actor, :keys, nil)
+
+        params =
+          params
+          |> deep_merge(%{
+            character: %{id: user_etc.id, actor: %{id: user_etc.id, signing_key: keys}}
+          })
+
+        AdapterUtils.maybe_add_aliases(
+          user_etc,
+          e(params, :also_known_as, nil) || e(params, :data, "alsoKnownAs", nil)
+        )
+
+        # FIXME use federation_module?
+        maybe_apply(
+          character_module,
+          [:update_local_actor, :update],
+          [user_etc, params]
+        )
     end
   end
 
@@ -223,8 +263,17 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       e(data, :also_known_as, nil) || e(params, "alsoKnownAs", nil)
     )
 
-    # TODO - support other types
-    Bonfire.Me.Users.update_remote(character, params)
+    # WIP - support types other than user
+    case AdapterUtils.character_module(character) do
+      nil ->
+        Bonfire.Me.Users.update_remote_actor(character, params)
+
+      character_module ->
+        maybe_apply(character_module, [:update_remote_actor, :update], [
+          character,
+          params
+        ])
+    end
   end
 
   def update_remote_actor({:ok, character}, actor) do

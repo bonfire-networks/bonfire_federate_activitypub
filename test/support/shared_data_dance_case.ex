@@ -5,29 +5,6 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
   import Bonfire.UI.Common.Testing.Helpers
   alias Bonfire.Common.TestInstanceRepo
 
-  def a_fake_user!(name, opts \\ []) do
-    # repo().delete_all(ActivityPub.Object)
-    id = Pointers.ULID.generate()
-    user = fake_user!("#{name} #{id}", opts, opts)
-    display_username = Bonfire.Me.Characters.display_username(user, true)
-
-    [
-      user: user,
-      username: display_username,
-      url_on_local:
-        "@" <>
-          display_username <>
-          "@" <> Bonfire.Common.URIs.instance_domain(Bonfire.Me.Characters.character_url(user)),
-      canonical_url: Bonfire.Me.Characters.character_url(user),
-      friendly_url:
-        "#{Bonfire.Common.URIs.base_url()}#{Bonfire.Common.URIs.path(user) || "/@#{display_username}"}"
-    ]
-  end
-
-  def fake_remote!(opts \\ []) do
-    TestInstanceRepo.apply(fn -> a_fake_user!("Remote", opts) end)
-  end
-
   setup_all tags do
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
@@ -43,8 +20,8 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     end)
 
     [
-      local: a_fake_user!("Local"),
-      remote: fake_remote!()
+      local: fancy_fake_user!("Local"),
+      remote: fancy_fake_user_on_test_instance()
     ]
   end
 end

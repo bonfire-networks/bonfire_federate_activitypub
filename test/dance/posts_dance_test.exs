@@ -58,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
   test "can federate edits",
        context do
     user = context[:local][:user]
-    local2 = a_fake_user!("Local2")
+    local2 = fancy_fake_user!("Local2")
     user2 = local2[:user]
 
     Logger.metadata(action: "create local post 1")

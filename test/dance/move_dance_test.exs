@@ -66,8 +66,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MoveTest do
     follow_context = context
 
     context = [
-      local: a_fake_user!("Local"),
-      remote: fake_remote!()
+      local: fancy_fake_user!("Local"),
+      remote: fancy_fake_user_on_test_instance()
     ]
 
     local_follower = follow_context[:local][:user]

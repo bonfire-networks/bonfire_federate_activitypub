@@ -442,7 +442,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def get_or_fetch_and_create_by_username(q, opts) when is_binary(q) do
+  def get_or_fetch_and_create_by_username(q, opts \\ []) when is_binary(q) do
     if String.contains?(q, "@") do
       log("AP - get_or_fetch_by_username: " <> q)
 
@@ -676,7 +676,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           :peered
         ]
       )
-      |> debug("preloaded_user_etc")
 
     local? = if e(user_etc, :character, :peered, nil), do: false, else: true
     id = Bonfire.Common.URIs.canonical_url(user_etc)
@@ -712,53 +711,55 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       location = e(user_etc, :profile, :location, nil)
 
-      data = %{
-        "type" => type,
-        "id" => id,
-        "inbox" => "#{id}/inbox",
-        "outbox" => "#{id}/outbox",
-        "followers" => "#{id}/followers",
-        "following" => "#{id}/following",
-        "preferredUsername" => e(user_etc, :character, :username, nil),
-        "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
-        "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
-        "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases)),
-        "icon" => icon,
-        "image" => image,
-        "location" =>
-          if(location,
-            do: %{
-              "name" => location,
-              "type" => "Place"
-              # "longitude"=> 12.34,
-              # "latitude"=> 56.78,
-            }
-          ),
-        "attachment" =>
-          filter_empty(
-            [
-              maybe_attach_property_value(
-                :website,
-                e(user_etc, :profile, :website, nil)
-              ),
-              maybe_attach_property_value(
-                l("Location"),
-                location
-              )
-            ],
-            nil
-          ),
-        "endpoints" => %{
-          "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
-        },
-        # whether user should appear in directories and search engines
-        "discoverable" =>
-          Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
-            current_user: user_etc
-          ) !=
-            true,
-        "indexable" => Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user_etc)
-      }
+      data =
+        %{
+          "type" => type,
+          "id" => id,
+          "inbox" => "#{id}/inbox",
+          "outbox" => "#{id}/outbox",
+          "followers" => "#{id}/followers",
+          "following" => "#{id}/following",
+          "preferredUsername" => e(user_etc, :character, :username, nil),
+          "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
+          "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
+          "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases)),
+          "icon" => icon,
+          "image" => image,
+          "location" =>
+            if(location,
+              do: %{
+                "name" => location,
+                "type" => "Place"
+                # "longitude"=> 12.34,
+                # "latitude"=> 56.78,
+              }
+            ),
+          "attachment" =>
+            filter_empty(
+              [
+                maybe_attach_property_value(
+                  :website,
+                  e(user_etc, :profile, :website, nil)
+                ),
+                maybe_attach_property_value(
+                  l("Location"),
+                  location
+                )
+              ],
+              nil
+            ),
+          "endpoints" => %{
+            "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
+          },
+          # whether user should appear in directories and search engines
+          "discoverable" =>
+            Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
+              current_user: user_etc
+            ) !=
+              true,
+          "indexable" => Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user_etc)
+        }
+        |> debug("data")
 
       %Actor{
         id: user_etc.id,
@@ -866,7 +867,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         )
 
       with {:ok, updated_user} <-
-             maybe_apply(character_module, [:update_remote, :update], [
+             maybe_apply(character_module, [:update_remote_actor, :update], [
                user_etc,
                %{"profile" => %{"icon_id" => icon_id, "image_id" => banner_id}}
              ]) do
