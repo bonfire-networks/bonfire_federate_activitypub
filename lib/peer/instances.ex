@@ -110,8 +110,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   def is_blocked?(%Peer{display_hostname: display_hostname} = peer, block_type, opts) do
-    with {:ok, circle} <- Bonfire.Boundaries.Circles.get_or_create(display_hostname) do
-      debug(circle, "cirrrcle")
+    with {:ok, circle} <- get_or_create_instance_circle(display_hostname) do
       Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
     end
   end
