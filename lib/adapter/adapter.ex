@@ -86,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
            Bonfire.Boundaries.users_grants_on(followers, object, [:see, :read]) do
       {:ok,
        granted_followers
-       #  only positive grants 
+       #  only positive grants
        |> Enum.filter(& &1.value)
        |> Enum.map(&Map.take(&1, [:subject_id]))
        |> debug("post_grants")
@@ -382,5 +382,6 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def actor_federating?(actor) do
     AdapterUtils.get_character(actor)
     ~> Bonfire.Federate.ActivityPub.federating?()
+    |> debug("CACHED_FEDERATED")
   end
 end

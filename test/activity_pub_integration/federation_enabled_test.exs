@@ -5,7 +5,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
   alias Bonfire.Common.Config
   alias Bonfire.Common.Settings
 
-  setup do
+  setup_all do
     orig = Config.get([:activity_pub, :instance, :federating])
 
     on_exit(fn ->
