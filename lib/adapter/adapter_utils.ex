@@ -454,6 +454,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  def get_character("http" <> _ = q) do
+    get_character_by_ap_id(q)
+  end
+
+  def get_character(q) when is_binary(q) do
+    get_character_by_username(q)
+  end
+
   def get_or_fetch_and_create_by_uri(q, opts \\ []) when is_binary(q) do
     # TODO: support objects, not just characters
     if not String.starts_with?(

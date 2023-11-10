@@ -378,4 +378,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_locale, do: Bonfire.Common.Localise.get_locale_id()
+
+  def actor_federating?(actor) do
+    AdapterUtils.get_character(actor)
+    ~> Bonfire.Federate.ActivityPub.federating?()
+  end
 end
