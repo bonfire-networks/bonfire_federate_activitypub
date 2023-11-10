@@ -462,6 +462,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     get_character_by_username(q)
   end
 
+  def get_character(q) do
+    warn(q, "dunno how")
+    {:error, :not_found}
+  end
+
   def get_or_fetch_and_create_by_uri(q, opts \\ []) when is_binary(q) do
     # TODO: support objects, not just characters
     if not String.starts_with?(
