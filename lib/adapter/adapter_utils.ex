@@ -48,6 +48,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{is_local: true} ->
         true
 
+      %Bonfire.Data.ActivityPub.Peered{} ->
+        false
+
       %{peered: %Peered{}} ->
         false
 
