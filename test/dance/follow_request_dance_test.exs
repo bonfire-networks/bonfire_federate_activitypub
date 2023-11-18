@@ -19,8 +19,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
     [
-      local: Bonfire.UI.Common.Testing.Helpers.fancy_fake_user!("Local", request_before_follow: true),
-      remote: Bonfire.UI.Common.Testing.Helpers.fancy_fake_user_on_test_instance(request_before_follow: true)
+      local:
+        Bonfire.UI.Common.Testing.Helpers.fancy_fake_user!("Local", request_before_follow: true),
+      remote:
+        Bonfire.UI.Common.Testing.Helpers.fancy_fake_user_on_test_instance(
+          request_before_follow: true
+        )
     ]
   end
 
@@ -49,7 +53,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     # Bonfire.Common.Config.get([:bonfire, Oban]) |> info("obannn")
     # Oban.drain_queue(queue: :federator_outgoing)
     # assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(request)
-
 
     # assert %{__struct__: ActivityPub.Object, pointer_id: ^request_id} =
     #          Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(request)
