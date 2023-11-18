@@ -96,7 +96,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       # |> debug
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-      assert Bonfire.Social.Follows.requested?(follower, followed)
+      assert Bonfire.Social.Follows.followed?(follower, followed)
     end
 
     test "incoming follow + accept works" do
