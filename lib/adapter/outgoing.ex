@@ -21,17 +21,22 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
                       ]
                     )
 
-  def maybe_federate(subject \\ nil, verb, thing) do
+  def maybe_federate(subject, verb, thing, opts \\ []) do
     verb = verb || :create
 
+    thing = AdapterUtils.preload_peered(thing)
     thing_local? = AdapterUtils.is_local?(thing)
 
+    subject = AdapterUtils.preload_peered(subject)
+
     subject_local? =
-      if Enums.id(thing) == Enums.id(subject),
+      if is_nil(subject) or Enums.id(thing) == Enums.id(subject),
         do: thing_local?,
         else: AdapterUtils.is_local?(subject)
 
-    if federate_outgoing?(subject) and
+    federate_outgoing? = federate_outgoing?(subject)
+
+    if (federate_outgoing? == true or (opts[:manually_fetching?] and federate_outgoing? != false)) and
          ((is_nil(subject) and thing_local?) or
             subject_local?) do
       prepare_and_queue(subject, verb, thing)

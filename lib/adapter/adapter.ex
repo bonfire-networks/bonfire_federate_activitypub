@@ -350,15 +350,17 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def maybe_publish_object(pointer_id) when is_binary(pointer_id) do
+  def maybe_publish_object(pointer_id, manually_fetching?) when is_binary(pointer_id) do
     Bonfire.Common.Pointers.get(pointer_id)
-    ~> maybe_publish_object()
+    ~> maybe_publish_object(manually_fetching?)
   end
 
-  def maybe_publish_object(%{} = object) do
+  def maybe_publish_object(%{} = object, manually_fetching?) do
     object
     # |> info()
-    |> Bonfire.Federate.ActivityPub.Outgoing.maybe_federate(:create, ...)
+    |> Bonfire.Federate.ActivityPub.Outgoing.maybe_federate(nil, :create, ...,
+      manually_fetching?: true
+    )
   end
 
   def get_or_create_service_actor() do

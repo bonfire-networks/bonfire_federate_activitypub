@@ -48,14 +48,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{is_local: true} ->
         true
 
-      %{peered: nil} ->
-        true
-
       %{peered: %Peered{}} ->
         false
-
-      %{character: %{peered: nil}} ->
-        true
 
       %{character: %{peered: %Peered{}}} ->
         false
@@ -66,14 +60,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{creator: %{id: @service_character_id}} ->
         false
 
-      %{creator: %{peered: nil}} ->
-        true
-
       %{creator: %{peered: %Peered{}}} ->
         false
-
-      %{created: %{peered: nil}} ->
-        true
 
       %{created: %{peered: %Peered{}}} ->
         false
@@ -84,40 +72,30 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{created: %{creator: %{id: @service_character_id}}} ->
         false
 
-      %{created: %{creator: %{peered: nil}}} ->
-        true
-
       %{created: %{creator: %{peered: %Peered{}}}} ->
         false
 
+      %{creator: %{peered: nil}} ->
+        true
+
+      %{created: %{creator: %{peered: nil}}} ->
+        true
+
+      %{created: %{peered: nil}} ->
+        true
+
+      %{character: %{peered: nil}} ->
+        true
+
+      %{peered: nil} ->
+        true
+
       object when is_struct(object) ->
         if preload_if_needed do
-          warn(
-            object,
-            "will try preloading peered info (should do this in original query to avoid n+1)"
+          preload_peered(object)
+          |> warn(
+            "preloaded peered info (should try always doing this in original query to avoid n+1)"
           )
-
-          case object do
-            %{peered: _} ->
-              object
-              |> repo().maybe_preload(:peered)
-
-            %{character: _} ->
-              object
-              |> repo().maybe_preload(character: :peered)
-
-            %{creator: _} ->
-              object
-              |> repo().maybe_preload(creator: :peered)
-
-            %{created: _} ->
-              object
-              |> repo().maybe_preload(created: [:peered, creator: :peered])
-
-            _ ->
-              warn(object, "did not know how to check this object for locality")
-              true
-          end
           |> is_local?(false)
         else
           warn(object, "no case matched for struct")
@@ -127,6 +105,34 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       other ->
         warn(other, "no case matched")
         true
+    end
+  end
+
+  def preload_peered(object) do
+    case object do
+      %{peered: _, created: _} ->
+        object
+        |> repo().maybe_preload([:peered, created: [creator: :peered]])
+
+      %{peered: _} ->
+        object
+        |> repo().maybe_preload(:peered)
+
+      %{character: _} ->
+        object
+        |> repo().maybe_preload(character: :peered)
+
+      %{creator: _} ->
+        object
+        |> repo().maybe_preload(creator: :peered)
+
+      %{created: _} ->
+        object
+        |> repo().maybe_preload(created: [:peered, creator: :peered])
+
+      _ ->
+        warn(object, "did not know how to preload peered")
+        object
     end
   end
 
