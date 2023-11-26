@@ -42,6 +42,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       false ->
         false
 
+      {:ok, thing} ->
+        is_local?(thing, preload_if_needed)
+
       %{id: @service_character_id} ->
         false
 
@@ -339,7 +342,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     local_instance = ap_base_url()
 
     with {:error, :not_found} <- get_character_by_ap_id(actor_or_ap_id),
-         ap_id when is_binary(ap_id) <- the_ap_id(actor_or_ap_id) do
+         ap_id when is_binary(ap_id) <- the_ap_id(actor_or_ap_id) || {:error, :not_found} do
       if not String.starts_with?(ap_id, local_instance) do
         debug(ap_id, "assume fetching remote character")
         # FIXME: this should not query the AP db

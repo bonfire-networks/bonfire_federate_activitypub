@@ -37,7 +37,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   defp character_id_from_actor(actor),
-    do: actor.pointer || actor.pointer_id || Characters.by_username!(actor.username)
+    do: e(actor, :pointer, nil) || actor.pointer_id || Characters.by_username!(actor.username)
 
   defp get_followers(%Actor{} = actor) do
     # debug(actor)
@@ -74,7 +74,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          {:ok, object} <-
            ActivityPub.Actor.get_cached(ap_id: ap_object),
          object when is_binary(object) or is_struct(object) <-
-           object.pointer || object.pointer_id,
+           e(object, :pointer, nil) || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-
            character_id_from_actor(actor),
          followers when is_list(followers) and followers != [] <-
@@ -161,6 +161,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def update_local_actor(actor, params) do
     case AdapterUtils.fetch_character_by_ap_id(actor) do
+      # {:error, :not_found} ->
+      #   warn(actor, "no such character, but pretend all good for the case of user Tombstone")
+      #   {:ok, actor}
+
       {:ok, %Bonfire.Data.Identity.Character{} = character} ->
         character_module =
           AdapterUtils.character_module(character)

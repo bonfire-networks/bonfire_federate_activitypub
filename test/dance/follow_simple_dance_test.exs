@@ -28,7 +28,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
     Logger.metadata(action: info("do the follow"))
     assert {:ok, follow} = Follows.follow(local_follower, followed_on_local)
     fid = ulid(follow)
-    info(follow, "the follow")
+    info(follow, "the local follow")
 
     assert Follows.following?(local_follower, followed_on_local)
 

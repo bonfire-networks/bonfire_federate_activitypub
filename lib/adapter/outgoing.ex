@@ -85,7 +85,6 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp prepare_and_queue(_subject, :delete, %Bonfire.Data.Identity.User{} = user) do
     # is this broken?
     with actor <- AdapterUtils.character_to_actor(user) do
-      ActivityPub.Actor.set_cache(actor)
       ActivityPub.delete(actor)
     end
   end
@@ -95,7 +94,6 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # For Topics, Groups, and other non-user actors
 
     with actor <- AdapterUtils.character_to_actor(character) do
-      ActivityPub.Actor.invalidate_cache(actor)
       ActivityPub.delete(actor, true, subject)
     end
   end

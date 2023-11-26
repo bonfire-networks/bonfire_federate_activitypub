@@ -44,10 +44,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     Logger.metadata(action: info("make a (request to) follow"))
     assert {:ok, request} = Follows.follow(local_follower, followed_on_local)
     request_id = ulid(request)
-    # info(request, "the request")
+    info(request, "the local request")
 
     refute Follows.following?(local_follower, followed_on_local)
-    # assert Follows.requested?(local_follower, followed_on_local)
+    assert Follows.requested?(local_follower, followed_on_local)
 
     # this shouldn't be needed if running Oban :inline
     # Bonfire.Common.Config.get([:bonfire, Oban]) |> info("obannn")
