@@ -347,8 +347,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         debug(ap_id, "assume fetching remote character")
         # FIXME: this should not query the AP db
         # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-        ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id, false)
-        |> info("fetched by ap_id")
+        ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id)
+        |> info("got by ap_id")
         |> return_pointable()
       end
     end
@@ -361,8 +361,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       debug(ap_id, "assume looking up a known remote character")
       # FIXME: this should not query the AP db
       # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-      # ActivityPub.Actor.get_cached(ap_id: ap_id)
-      ActivityPub.Actor.get_remote_actor(ap_id, false)
+      ActivityPub.Actor.get_cached(ap_id: ap_id)
       |> info("got by ap_id")
     else
       debug(ap_id, "assume looking up a local character")
@@ -456,9 +455,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_or_fetch_and_create_by_username(q, opts \\ []) when is_binary(q) do
     if String.contains?(q, "@") do
-      log("AP - get_or_fetch_by_username: " <> q)
+      log("AP - get_cached_or_fetch(username: : " <> q)
 
-      ActivityPub.Actor.get_or_fetch_by_username(q, opts)
+      ActivityPub.Actor.get_cached_or_fetch(username: q)
       ~> return_pointable()
     else
       log("AP - get_character_by_username: " <> q)
@@ -612,7 +611,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
     log("AP - get_object_or_actor_by_ap_id! : " <> ap_id)
     # FIXME?
-    ok_unwrap(ActivityPub.Actor.get_or_fetch_by_ap_id(ap_id: ap_id)) ||
+    ok_unwrap(ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id)) ||
       ActivityPub.Object.get_cached!(ap_id: ap_id) || ap_id
   end
 

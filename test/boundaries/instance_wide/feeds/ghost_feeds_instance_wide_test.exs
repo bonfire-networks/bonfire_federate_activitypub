@@ -52,7 +52,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
   end
 
   test "show in feeds an incoming Note with ghosted actor" do
-    {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
     Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
 

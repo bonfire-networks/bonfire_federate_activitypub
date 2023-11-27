@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
     end
 
     test "pleroma emoji react" do
-      ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
+      ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
 
       user = fake_user!()
 

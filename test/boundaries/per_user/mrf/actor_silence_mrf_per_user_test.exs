@@ -24,7 +24,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
 
       # {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
-      # {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      # {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       # {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
       assert {:ok, remote_user} = AdapterUtils.get_by_url_ap_id_or_username(@remote_actor)
 
@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
 
       {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 
@@ -88,7 +88,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
     test "there's a local activity with per-user silenced actor as recipient" do
       local_user = fake_user!(@local_actor)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :silence, current_user: local_user)
@@ -103,7 +103,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
     test "there's a local activity with per-user silenced actor as recipient" do
       local_user = fake_user!(@local_actor)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :silence, current_user: local_user)

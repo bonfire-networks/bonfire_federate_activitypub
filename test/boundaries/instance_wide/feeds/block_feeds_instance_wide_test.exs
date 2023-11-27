@@ -50,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
   end
 
   test "does not show in feeds a Post for an incoming Note with blocked actor" do
-    {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
     Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
 

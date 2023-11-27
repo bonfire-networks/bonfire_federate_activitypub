@@ -21,7 +21,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
       local_user = fake_user!(@local_actor)
       {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 
@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
     test "there's a local activity with per-user ghosted actor as recipient" do
       local_user = fake_user!(@local_actor)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, current_user: local_user)
@@ -60,7 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
     test "there's a local activity with per-user ghosted actor as recipient" do
       local_user = fake_user!(@local_actor)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, current_user: local_user)

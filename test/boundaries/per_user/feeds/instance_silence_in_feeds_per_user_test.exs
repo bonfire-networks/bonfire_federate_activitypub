@@ -46,7 +46,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
   test "does not show in my_feed an incoming Note from a per-user silenced instance (from an actor that I am already following)" do
     local_user = fake_user!(@local_actor)
 
-    {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
     assert {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 

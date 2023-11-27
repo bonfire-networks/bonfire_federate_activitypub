@@ -122,7 +122,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   end
 
   test "remote actor creation" do
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     # debug(actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     # |> debug()
@@ -136,7 +136,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   end
 
   test "remote actor discoverability flag is preserved" do
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     assert actor.data["discoverable"] == false
 
@@ -147,7 +147,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   end
 
   test "can follow pointers to remote actors" do
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     assert {:ok, _} = Common.Pointers.one(user.id)
   end

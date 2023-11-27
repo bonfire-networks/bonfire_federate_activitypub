@@ -169,7 +169,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
     end
 
     test "creates a Post for an incoming public Note" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       to = [
         ActivityPub.Config.public_uri()
@@ -198,7 +198,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
     end
 
     test "creates a Post and notifies mentioned users for an incoming public Note" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
@@ -234,7 +234,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
     end
 
     test "creates a Post but does not notify mentioned user who has federation disabled" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       recipient = fake_user!()
 
@@ -276,7 +276,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
     end
 
     test "creates a Post for an incoming Note with the Note's published date" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
@@ -316,7 +316,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
     end
 
     test "creates a reply for an incoming note with a reply" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
@@ -353,7 +353,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
     end
 
     test "does not set public circle for remote objects not addressed to AP public URI" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 

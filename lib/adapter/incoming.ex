@@ -2,6 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   import Untangle
   use Arrows
   use Bonfire.Common.Utils
+  require ActivityPub.Config
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   # import AdapterUtils, only: [log: 1]
@@ -12,13 +13,6 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   # the following constants are derived from config, so please make any changes/additions there
 
   @creation_verbs ["Create"]
-  @actor_types Application.compile_env(:bonfire, :actor_AP_types, [
-                 "Person",
-                 "Group",
-                 "Application",
-                 "Service",
-                 "Organization"
-               ])
 
   def receive_activity(activity_id) when is_binary(activity_id) do
     info("AP - load the activity data from ID")
@@ -166,7 +160,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         %{data: %{"type" => "Update"}} = _activity,
         %{data: %{"type" => object_type, "id" => ap_id}} = _object
       )
-      when object_type in @actor_types do
+      when ActivityPub.Config.is_in(object_type, :supported_actor_types) do
     info("AP Match#0 - update actor")
 
     with {:ok, actor} <- ActivityPub.Actor.get_cached(ap_id: ap_id),

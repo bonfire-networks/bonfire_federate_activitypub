@@ -51,7 +51,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     test "can receive federated ChatMessage" do
       me = fake_user!()
       {:ok, local_actor} = ActivityPub.Actor.get_cached(pointer: me.id)
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       context = "blabla"
 
       object = %{
@@ -76,7 +76,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     end
 
     test "creates a Message for an incoming private Note with @ mention" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
@@ -105,7 +105,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
     end
 
     test "rejects a Message for an incoming private Note for a user with federation disabled" do
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       recipient = fake_user!()
 

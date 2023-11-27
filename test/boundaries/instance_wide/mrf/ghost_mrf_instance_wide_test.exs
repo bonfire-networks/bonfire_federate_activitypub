@@ -35,7 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
       local_user = fake_user!()
       {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
 
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 
@@ -87,7 +87,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide ghosted actor as recipient (in DB)" do
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
@@ -169,7 +169,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
     end
 
     test "there's a local activity with instance-wide ghosted actor as recipient (in DB)" do
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
@@ -286,7 +286,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.GhostInstanceWideTest do
     end
 
     test "there's a remote actor with instance-wide ghosted actor (in DB/boundaries)" do
-      {:ok, remote_actor} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
       Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)

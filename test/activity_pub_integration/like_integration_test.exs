@@ -70,7 +70,8 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
       assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
+      {:ok, actor} =
+        ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
 
       {:ok, ap_like} = ActivityPub.like(%{actor: actor, object: ap_activity.object})
 
@@ -94,7 +95,8 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
       assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
+      {:ok, actor} =
+        ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
 
       # now disable federation
       user =
@@ -121,7 +123,8 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
       assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
-      {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_ap_id("https://mocked.local/users/karen")
+      {:ok, actor} =
+        ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
 
       {:ok, ap_like} = ActivityPub.like(%{actor: actor, object: ap_activity.object})
 

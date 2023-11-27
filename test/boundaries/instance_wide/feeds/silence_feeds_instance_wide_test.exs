@@ -47,7 +47,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
   end
 
   test "does not accept an incoming Note with silenced actor" do
-    {:ok, remote_user} = ActivityPub.Actor.get_or_fetch_by_ap_id(@remote_actor)
+    {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
     Bonfire.Boundaries.Blocks.block(user, :silence, :instance_wide)
 
