@@ -15,6 +15,33 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   alias Bonfire.Social.Follows
   alias Bonfire.Boundaries.{Circles, Acls, Grants}
 
+  setup_all(context) do
+    clean_slate(context)
+
+    on_exit(fn ->
+      clean_slate(context)
+    end)
+  end
+
+  def clean_slate(context) do
+    {:ok, bob_remote_user_on_local} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
+        context[:remote][:canonical_url]
+      )
+
+    Blocks.unblock(context[:local][:user], bob_remote_user_on_local)
+
+    # on remote instance, bob_remote follows alice
+    TestInstanceRepo.apply(fn ->
+      {:ok, local_on_remote} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
+          context[:local][:canonical_url]
+        )
+
+      Blocks.unblock(context[:remote][:user], local_on_remote)
+    end)
+  end
+
   describe "if I silenced a remote user i will not receive any update from it" do
     test "i'll not see anything they publish in feeds", context do
       alice_local = context[:local][:user]
@@ -24,6 +51,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
+
+      clean_slate(context)
 
       # alice follows bob_remote
       assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
@@ -64,6 +93,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
+      clean_slate(context)
+
       # alice follows bob_remote
       assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
       assert Follows.following?(alice_local, bob_remote_user_on_local)
@@ -99,6 +130,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
+
+      clean_slate(context)
 
       # alice follows bob_remote
       assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
@@ -140,6 +173,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
+
+      clean_slate(context)
 
       # alice follows bob_remote
       assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
@@ -193,6 +228,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
+      clean_slate(context)
+
       # on remote instance, bob_remote follows alice
       TestInstanceRepo.apply(fn ->
         {:ok, local_on_remote} =
@@ -243,6 +280,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
+      clean_slate(context)
+
       # on remote instance, bob_remote follows alice
       TestInstanceRepo.apply(fn ->
         {:ok, local_on_remote} =
@@ -289,6 +328,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
+
+      clean_slate(context)
 
       # on remote instance, bob_remote follows alice
       TestInstanceRepo.apply(fn ->
@@ -349,6 +390,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
     {:ok, bob_remote_user_on_local} =
       Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
+
+    clean_slate(context)
 
     # create a circle with bob_remote in it
     {:ok, circle} = Circles.create(alice_local, %{named: %{name: "family"}})

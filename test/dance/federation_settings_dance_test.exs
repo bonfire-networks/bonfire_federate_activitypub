@@ -14,13 +14,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
   alias Bonfire.Social.Posts
   alias Bonfire.Social.Follows
 
-  # setup_all do
-  #   orig = Config.get([:activity_pub, :instance, :federating])
+  setup_all do
+    orig = Config.get([:activity_pub, :instance, :federating])
 
-  #   on_exit(fn ->
-  #     Config.put([:activity_pub, :instance, :federating], orig)
-  #   end)
-  # end
+    on_exit(fn ->
+      Config.put([:activity_pub, :instance, :federating], orig)
+    end)
+  end
 
   @tag :test_instance
   test "can disable instance federation entirely", context do
@@ -30,13 +30,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
     user = context[:local][:user]
     remote_follower = context[:remote][:user]
 
-    auto_assert {:error, "Error trying to connect with ActivityPub remote"} <-
+    ActivityPub.Utils.cache_clear()
+
+    auto_assert {:error, "Federation is disabled"} <-
                   AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
 
     TestInstanceRepo.apply(fn ->
       ActivityPub.Utils.cache_clear()
 
-      auto_assert {:error, "Error trying to connect with ActivityPub remote"} <-
+      auto_assert {:error, "Federation is disabled"} <-
                     AdapterUtils.get_or_fetch_and_create_by_uri(context[:local][:canonical_url])
     end)
   end
@@ -48,6 +50,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
 
     user = context[:local][:user]
     remote_follower = context[:remote][:user]
+
+    user =
+      current_user(Settings.put([:activity_pub, :user_federating], nil, current_user: user))
+
+    TestInstanceRepo.apply(fn ->
+      Settings.put([:activity_pub, :user_federating], nil, current_user: remote_follower)
+    end)
 
     auto_assert {:ok, %Bonfire.Data.Identity.User{}} <-
                   AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])

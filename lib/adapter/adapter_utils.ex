@@ -338,7 +338,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def fetch_character_by_ap_id(actor_or_ap_id) do
+  def get_or_fetch_character_by_ap_id(actor_or_ap_id) do
     local_instance = ap_base_url()
 
     with {:error, :not_found} <- get_character_by_ap_id(actor_or_ap_id),
@@ -426,6 +426,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     error(other, "Invalid parameters when looking up an actor")
   end
 
+  @doc "without :ok / :error tuple"
   def get_character_by_ap_id!(ap_id) do
     case get_character_by_ap_id(ap_id) do
       {:ok, character} -> character
@@ -511,7 +512,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       end
     else
       log("AP - uri - get_character_by_ap_id: assume local : " <> q)
-      get_character_by_ap_id(q)
+      get_or_fetch_character_by_ap_id(q)
     end
   end
 
@@ -949,7 +950,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       target ->
         debug(target, "add alsoKnownAs provided")
 
-        get_character_by_ap_id(target)
+        get_or_fetch_character_by_ap_id(target)
         ~> Bonfire.Social.Aliases.add(user_etc, ...)
         |> debug("added??")
     end

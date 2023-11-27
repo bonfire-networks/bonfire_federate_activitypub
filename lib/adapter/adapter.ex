@@ -160,7 +160,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_local_actor(actor, params) do
-    case AdapterUtils.fetch_character_by_ap_id(actor) do
+    case AdapterUtils.get_or_fetch_character_by_ap_id(actor) do
       # {:error, :not_found} ->
       #   warn(actor, "no such character, but pretend all good for the case of user Tombstone")
       #   {:ok, actor}
@@ -233,7 +233,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def update_remote_actor(actor) do
-    AdapterUtils.fetch_character_by_ap_id(actor)
+    AdapterUtils.get_or_fetch_character_by_ap_id(actor)
     |> debug("character pre-update")
     |> update_remote_actor(actor)
   end
@@ -303,7 +303,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_create_remote_actor(actor) when not is_nil(actor) do
     log("AP - maybe_create_remote_actor for #{inspect(actor)}")
 
-    case AdapterUtils.fetch_character_by_ap_id(actor) do
+    case AdapterUtils.get_or_fetch_character_by_ap_id(actor) do
       {:ok, character} ->
         log("AP - remote actor exists, return it: #{id(character)}")
         # already exists

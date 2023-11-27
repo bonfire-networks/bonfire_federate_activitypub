@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
+defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
@@ -16,7 +16,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
   alias Bonfire.Boundaries.{Circles, Acls, Grants}
 
   @tag :test_instance
-  test "mention", context do
+  test "private mention and reply", context do
     # context |> info("context")
 
     post1_attrs = %{
@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
     {:ok, post1} =
       Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "mentions")
 
-    error(post1.activity.tagged)
+    # error(post1.activity.tagged)
 
     remote_ap_id =
       context[:remote][:canonical_url]
@@ -52,6 +52,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesTest do
     # Logger.metadata(action: info("init remote_on_local"))
     # assert {:ok, remote_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
+    debug(post1.activity)
+    assert post1.activity.federate_activity_pub
     assert List.first(post1.activity.federate_activity_pub.data["cc"]) == remote_ap_id
 
     ## work on test instance

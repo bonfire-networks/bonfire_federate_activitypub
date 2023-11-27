@@ -398,6 +398,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     (actors || [])
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
+    |> debug("before filter")
     |> Enum.reject(
       &filter_actor?(
         activity,
