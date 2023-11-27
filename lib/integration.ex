@@ -39,36 +39,50 @@ defmodule Bonfire.Federate.ActivityPub do
   def federating?(subject \\ nil)
 
   def federating?(nil) do
-    Bonfire.Common.Extend.module_enabled?(ActivityPub) and
-      ActivityPub.Config.federating?()
+    case federating_default?() do
+      {:default, value} -> value
+      {:override, value} -> value
+    end
   end
 
   def federating?(subject) do
-    if Bonfire.Common.Extend.module_enabled?(ActivityPub) do
-      case ActivityPub.Config.federating?() do
-        #  enabled
-        true ->
-          case user_federating?(subject) do
-            :not_set -> true
-            :manual -> nil
-            other -> other
-          end
+    case federating_default?() do
+      {:override, value} ->
+        value
 
-        #  manual mode
-        nil ->
-          case user_federating?(subject) do
-            :not_set -> nil
-            :manual -> nil
-            # manual overrides auto
-            true -> nil
-            other -> other
-          end
+      #  enabled
+      {:default, true} ->
+        case user_federating?(subject) do
+          :not_set -> true
+          :manual -> nil
+          other -> other
+        end
 
-        false ->
-          false
-      end
-    else
-      false
+      #  manual mode
+      {:default, nil} ->
+        case user_federating?(subject) do
+          :not_set -> nil
+          :manual -> nil
+          # manual overrides auto
+          true -> nil
+          other -> other
+        end
+
+      {:default, false} ->
+        false
+    end
+    |> debug()
+  end
+
+  def federating_default?() do
+    case Process.get(:federating) do
+      nil ->
+        {:default,
+         Bonfire.Common.Extend.module_enabled?(ActivityPub) and
+           ActivityPub.Config.federating?()}
+
+      other ->
+        {:override, other}
     end
   end
 
