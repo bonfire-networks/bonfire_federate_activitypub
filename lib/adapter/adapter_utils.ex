@@ -531,6 +531,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{pointer: %{id: _} = pointable} ->
         {:ok, pointable}
 
+      %{pointer_id: id, data: %{"type" => "Tombstone"}} ->
+        {:error, :not_found}
+
       %{pointer_id: id, data: %{"type" => type}}
       when is_binary(id) and ActivityPub.Config.is_in(type, :supported_actor_types) ->
         with {:error, :not_found} <- get_character_by_id(id) do
@@ -574,6 +577,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       %{id: _} ->
         {:ok, fetched}
+
+      {:error, :not_found} ->
+        error(fetched, "no Pointable found for")
+        {:error, :not_found}
 
       other ->
         error(other, "unhandled case for return_pointable")

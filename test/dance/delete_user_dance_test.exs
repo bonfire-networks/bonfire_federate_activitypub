@@ -52,11 +52,29 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
 
       Logger.metadata(action: info("delete the user on remote"))
 
-      {:ok, _} = Users.delete(remote_user)
+      {:ok, post} =
+        Posts.publish(current_user: remote_user, post_attrs: post_attrs, boundary: "public")
     end)
 
-    Logger.metadata(action: info("check that deletion was federated"))
+    Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
+    assert Bonfire.Social.FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+             current_user: local_user
+           )
+
+    TestInstanceRepo.apply(fn ->
+      {:ok, _} = Users.enqueue_delete(remote_user)
+    end)
+
+    Logger.metadata(action: info("check user deletion was federated"))
+
+    auto_assert {:error, :not_found} <- Users.by_id(Enums.id(remote_on_local))
     auto_assert {:error, :not_found} <- AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
+
+    # TODO!
+    # Logger.metadata(action: info("check post deletion was federated"))
+    # refute Bonfire.Social.FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+    #          current_user: local_user
+    #        )
   end
 end

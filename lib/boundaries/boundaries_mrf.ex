@@ -258,7 +258,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     if e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
          e(filtered, :bcc, nil) || e(filtered, :audience, nil) ||
-         e(activity, "publishedDate", nil) || e(activity, "object", "publishedDate", nil) do
+         e(activity, "publishedDate", nil) || e(activity, "object", "publishedDate", nil) ||
+         e(activity, "object", "type", nil) == "Tombstone" do
       # ^ `publishedDate` here is intended as an exception for bookwyrm which doesn't put audience info
       {:ok, filtered}
     else

@@ -72,7 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     with ap_object when is_binary(ap_object) <-
            e(activity_data, "object", "id", nil) || e(activity_data, "object", nil),
          {:ok, object} <-
-           ActivityPub.Actor.get_cached(ap_id: ap_object),
+           ActivityPub.Object.get_cached(ap_id: ap_object),
          object when is_binary(object) or is_struct(object) <-
            e(object, :pointer, nil) || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-
@@ -386,8 +386,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_locale, do: Bonfire.Common.Localise.get_locale_id()
 
   def actor_federating?(actor) do
-    AdapterUtils.get_character(actor)
-    ~> Bonfire.Federate.ActivityPub.federating?()
-    |> debug("CACHED_FEDERATED")
+    case AdapterUtils.get_character(actor) do
+      {:ok, character} ->
+        Bonfire.Federate.ActivityPub.federating?(character)
+
+      _ ->
+        debug(actor, "no character for actor")
+        Bonfire.Federate.ActivityPub.federating?()
+    end
   end
 end
