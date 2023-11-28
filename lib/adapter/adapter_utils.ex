@@ -519,13 +519,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # expects an ActivityPub.Actor. tries to load the associated object:
   # * if pointer_id is present, use that
   # * else use the id in the object
-  defp return_pointable(f, opts \\ [skip_boundary_check: true])
+  def return_pointable(f, opts \\ [skip_boundary_check: true])
 
-  defp return_pointable({:ok, fetched}, opts),
+  def return_pointable({:ok, fetched}, opts),
     do: return_pointable(fetched, opts)
 
   # FIXME: privacy
-  defp return_pointable(fetched, opts) do
+  def return_pointable(fetched, opts) do
     # info(fetched, "fetched")
     case fetched do
       %{pointer: %{id: _} = pointable} ->
