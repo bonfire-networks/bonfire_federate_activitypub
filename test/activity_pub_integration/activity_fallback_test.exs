@@ -14,6 +14,9 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
     mock_global(fn
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))
+
+      env ->
+        apply(ActivityPub.Test.HttpRequestMock, :request, [env])
     end)
 
     :ok
