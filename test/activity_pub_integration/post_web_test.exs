@@ -12,6 +12,12 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
+
+      %{method: :get, url: "https://pixelfed.local/users/dajbelshaw"} ->
+        json(Simulate.actor_json("https://pixelfed.local/users/dajbelshaw"))
+
+      _ ->
+        raise Tesla.Mock.Error, "Request not mocked"
     end)
     |> IO.inspect(label: "setup done")
 

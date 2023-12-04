@@ -11,6 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
     on_exit(fn ->
       Config.put([:activity_pub, :instance, :federating], orig)
     end)
+
+    :ok
   end
 
   test "can disable instance federation entirely" do
@@ -42,6 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
   test "can set federation to manual mode for a user" do
     me = fake_user!()
+    Config.put([:activity_pub, :instance, :federating], true)
 
     me =
       current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: me))
@@ -51,6 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
   test "can enable federation for a user" do
     me = fake_user!()
+    Config.put([:activity_pub, :instance, :federating], true)
 
     me =
       current_user(Settings.put([:activity_pub, :user_federating], true, current_user: me))

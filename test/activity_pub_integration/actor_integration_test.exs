@@ -140,7 +140,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
     assert actor.data["discoverable"] == false
 
-    assert true ==
+    assert nil ==
              Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
                current_user: user
              )

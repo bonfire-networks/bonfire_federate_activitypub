@@ -3,7 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
   import Tesla.Mock
   alias Bonfire.Social.Posts
   alias Bonfire.Common.Text
-
+  use Mneme
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 
@@ -208,7 +208,6 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       ]
 
       params = remote_activity_json_with_mentions(actor, to)
-
       {:ok, activity} = ActivityPub.create(params)
 
       assert actor.data["id"] == activity.data["actor"]
@@ -222,15 +221,12 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       feed_id =
         Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-        |> debug("feeeed")
 
       assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post)
 
       assert Bonfire.Social.FeedActivities.feed_contains?(:notifications, post,
                current_user: recipient
              )
-
-      # debug(feed_entry)
     end
 
     test "creates a Post but does not notify mentioned user who has federation disabled" do
