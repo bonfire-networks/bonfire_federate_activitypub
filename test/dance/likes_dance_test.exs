@@ -56,7 +56,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.LikesTest do
     assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_user)
 
     a_remote = List.first(feed).activity
-    assert a_remote.verb.verb == "Like"
+    # assert a_remote.verb.verb == "Like"
+    assert a_remote.verb_id == "11KES1ND1CATEAM11DAPPR0VA1"
     liked_post = a_remote.object
     assert liked_post.post_content.html_body =~ "try federated @ mention"
   end

@@ -54,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
     assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_user)
 
     a_remote = List.first(feed).activity
-    assert a_remote.verb.verb == "Boost"
+    assert a_remote.verb_id == "300ST0R0RANN0VCEANACT1V1TY"
     boosted_post = a_remote.object
     assert boosted_post.post_content.html_body =~ "try federated boost"
   end
