@@ -15,6 +15,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
   alias Bonfire.Social.Follows
   alias Bonfire.Boundaries.{Circles, Acls, Grants}
 
+  use Mneme
+
   @tag :test_instance
   test "private mention and reply", context do
     # context |> info("context")
@@ -41,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
       |> info("local_ap_id")
 
     {:ok, post1} =
-      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "mentions")
+      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
     # error(post1.activity.tagged)
 
@@ -53,8 +55,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     # assert {:ok, remote_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
     debug(post1.activity)
-    assert post1.activity.federate_activity_pub
-    assert List.first(post1.activity.federate_activity_pub.data["cc"]) == remote_ap_id
+    auto_assert %ActivityPub.Object{} <- post1.activity.federate_activity_pub
+
+    auto_assert true <-
+                  List.first(post1.activity.federate_activity_pub.data["cc"]) == remote_ap_id
 
     ## work on test instance
     TestInstanceRepo.apply(fn ->
@@ -62,12 +66,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
 
       feed = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
 
-      assert match?(%{edges: [feed_entry | _]}, feed),
-             "post 1 wasn't federated to instance of mentioned actor"
+      auto_assert true <- match?(%{edges: [feed_entry | _]}, feed)
+
+      # debug("post 1 wasn't federated to instance of mentioned actor")
 
       %{edges: [feed_entry | _]} = feed
       post1remote = feed_entry.activity.object
-      assert post1remote.post_content.html_body =~ "try out federated at mention"
+      auto_assert true <- post1remote.post_content.html_body =~ "try out federated at mention"
 
       Logger.metadata(action: info("make a mentions-only reply on remote"))
 
