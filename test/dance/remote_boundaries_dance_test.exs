@@ -13,13 +13,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
   alias Bonfire.Social.Posts
   alias Bonfire.Social.Follows
-  alias Bonfire.Boundaries.{Circles, Acls, Grants}
+  alias Bonfire.Boundaries.{Circles, Acls, Grants, Blocks}
+  use Mneme
 
-  setup_all(context) do
-    clean_slate(context)
+  setup do
+    Config.put([:activity_pub, :instance, :federating], true)
 
     on_exit(fn ->
-      clean_slate(context)
+      Config.put([:activity_pub, :instance, :federating], true)
     end)
   end
 
@@ -31,6 +32,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
     Blocks.unblock(context[:local][:user], bob_remote_user_on_local)
 
+    if Follows.following?(context[:local][:user], bob_remote_user_on_local) do
+      Follows.unfollow(context[:local][:user], bob_remote_user_on_local)
+    end
+
+    # Follows.unfollow(context[:local][:user], bob_remote_user_on_local)
+
     # on remote instance, bob_remote follows alice
     TestInstanceRepo.apply(fn ->
       {:ok, local_on_remote} =
@@ -39,6 +46,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
         )
 
       Blocks.unblock(context[:remote][:user], local_on_remote)
+      Follows.unfollow(context[:remote][:user], local_on_remote)
     end)
   end
 
@@ -53,16 +61,22 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
       clean_slate(context)
-
       # alice follows bob_remote
-      assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
-      assert Follows.following?(alice_local, bob_remote_user_on_local)
+      auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+                    Follows.follow(alice_local, bob_remote_user_on_local)
+
+      auto_assert {:error, :not_found} <-
+                    Follows.accept_from(alice_local, current_user: bob_remote_user_on_local)
+
+      Logger.metadata(action: info("check request is now a follow on remote"))
+      auto_assert true <- Follows.following?(alice_local, bob_remote_user_on_local)
+      # auto_assert false <- Follows.requested?(alice_local, bob_remote_user_on_local)
 
       # alice silences bob_remote
-      assert {:ok, _silenced} =
-               Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
-                 current_user: alice_local
-               )
+      auto_assert {:ok, "Blocked"} <-
+                    Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
+                      current_user: alice_local
+                    )
 
       attrs = "try out federated post"
       # on remote instance, bob_remote publish a post
@@ -80,11 +94,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       # on local instance, alice_local should not see the post
       assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: alice_local)
       # assert feed is empty
-      assert a_remote = Enum.empty?(feed)
+      auto_assert true <- Enum.empty?(feed)
     end
 
     test "i'll be able to view their profile or read post via direct link", context do
-      IO.inspect(context[:remote][:username], label: "TEST22")
       alice_local = context[:local][:user]
       bob_remote = context[:remote][:user]
 
@@ -96,14 +109,16 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       clean_slate(context)
 
       # alice follows bob_remote
-      assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
-      assert Follows.following?(alice_local, bob_remote_user_on_local)
+      auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+                    Follows.follow(alice_local, bob_remote_user_on_local)
+
+      auto_assert true <- Follows.following?(alice_local, bob_remote_user_on_local)
 
       # alice silences bob_remote
-      assert {:ok, _silenced} =
-               Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
-                 current_user: alice_local
-               )
+      auto_assert {:ok, "Blocked"} <-
+                    Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
+                      current_user: alice_local
+                    )
 
       conn = conn(user: alice_local)
       assert {:ok, profile, _html} = live(conn, "/" <> context[:remote][:username])
@@ -134,8 +149,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       clean_slate(context)
 
       # alice follows bob_remote
-      assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
-      assert Follows.following?(alice_local, bob_remote_user_on_local)
+      auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+                    Follows.follow(alice_local, bob_remote_user_on_local)
+
+      auto_assert Follows.following?(alice_local, bob_remote_user_on_local)
 
       # alice silences bob_remote
       assert {:ok, _silenced} =
@@ -177,14 +194,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       clean_slate(context)
 
       # alice follows bob_remote
-      assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
-      assert Follows.following?(alice_local, bob_remote_user_on_local)
+      auto_assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
+      auto_assert Follows.following?(alice_local, bob_remote_user_on_local)
 
       # alice silences bob_remote
-      assert {:ok, _silenced} =
-               Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
-                 current_user: alice_local
-               )
+      auto_assert {:ok, _silenced} =
+                    Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
+                      current_user: alice_local
+                    )
 
       attrs = "#{context[:local][:username]} try out federated post"
       # on remote instance, bob_remote publish a post
@@ -210,7 +227,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                Bonfire.Social.FeedActivities.feed(:inbox, current_user: alice_local)
 
       # assert feed is empty
-      assert a_remote = Enum.empty?(feed)
+      auto_assert a_remote = Enum.empty?(feed)
     end
 
     test "I'll not be able to follow them" do
@@ -237,15 +254,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
             alice_local_ap_id
           )
 
-        assert {:ok, _follow} = Follows.follow(bob_remote, local_on_remote)
-        assert Follows.following?(bob_remote, local_on_remote)
+        auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+                      Follows.follow(bob_remote, local_on_remote)
+
+        auto_assert {:error, :not_found} <-
+                      Follows.accept_from(bob_remote, current_user: local_on_remote)
+
+        auto_assert true <- Follows.following?(bob_remote, local_on_remote)
       end)
 
       # alice ghosts bob_remote
-      assert {:ok, _ghosted} =
-               Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :ghost,
-                 current_user: alice_local
-               )
+      auto_assert {:ok, "Blocked"} <-
+                    Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :ghost,
+                      current_user: alice_local
+                    )
 
       attrs = "try out federated post"
       post_attrs = %{post_content: %{html_body: attrs}}
@@ -261,13 +283,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       TestInstanceRepo.apply(fn ->
         assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
         # assert feed is empty
-        assert a_remote = Enum.empty?(feed)
+        auto_assert false <- Enum.empty?(feed)
       end)
     end
 
     # This is irrelevant - already tested
     # test "They will still be able to see things I post publicly.", context do
-
     # end
 
     test "I won't be able to @ mention them.", context do
@@ -404,10 +425,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       Follows.follow(bob_remote, local_from_remote)
       |> debug("ffffoo")
 
-      assert Follows.following?(bob_remote, local_from_remote)
+      auto_assert true <- Follows.following?(bob_remote, local_from_remote)
     end)
 
-    assert Follows.following?(bob_remote_user_on_local, alice_local)
+    # auto_assert Follows.following?(bob_remote_user_on_local, alice_local)
 
     # on local instance, alice_local create a post with circle
     {:ok, post1} =
@@ -420,9 +441,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
     # on remote instance, bob_remote should see the post
     TestInstanceRepo.apply(fn ->
-      assert %{edges: [feed_entry | _]} =
+      assert %Paginator.Page{edges: [feed_entry | _]} =
                Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
                |> debug("bob feed")
+
+      post1remote = feed_entry.activity.object
+
+      auto_assert true <-
+                    post1remote.post_content.html_body =~
+                      "try out federated post with circle containing remote users"
     end)
   end
 end

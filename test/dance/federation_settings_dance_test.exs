@@ -14,7 +14,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
   alias Bonfire.Social.Posts
   alias Bonfire.Social.Follows
 
-  setup_all do
+  setup do
     orig = Config.get([:activity_pub, :instance, :federating])
 
     on_exit(fn ->

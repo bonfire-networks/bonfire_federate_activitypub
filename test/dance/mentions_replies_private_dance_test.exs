@@ -14,13 +14,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
   alias Bonfire.Social.Posts
   alias Bonfire.Social.Follows
   alias Bonfire.Boundaries.{Circles, Acls, Grants}
-
+  alias Bonfire.Social.Messages
   use Mneme
 
   @tag :test_instance
   test "private mention and reply", context do
     # context |> info("context")
-
     post1_attrs = %{
       post_content: %{html_body: "#{context[:remote][:username]} try out federated at mention"}
     }
@@ -37,13 +36,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     post5_attrs = %{post_content: %{html_body: "try out federated reply in thread"}}
 
     local_user = context[:local][:user]
+
     # |> info("local_user")
     local_ap_id =
       Bonfire.Me.Characters.character_url(local_user)
       |> info("local_ap_id")
 
     {:ok, post1} =
-      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
+      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "mentions")
 
     # error(post1.activity.tagged)
 
@@ -63,15 +63,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     ## work on test instance
     TestInstanceRepo.apply(fn ->
       remote_user = context[:remote][:user]
+      assert %{edges: feed} = Messages.list(remote_user)
+      auto_assert %Bonfire.Data.Social.Message{} <- List.first(feed)
 
-      feed = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
-
-      auto_assert true <- match?(%{edges: [feed_entry | _]}, feed)
-
+      # feed = Bonfire.Social.FeedActivities.feed(:inbox, current_user: remote_user)
+      # auto_assert true <- match?(%{edges: [feed_entry | _]}, feed)
       # debug("post 1 wasn't federated to instance of mentioned actor")
 
-      %{edges: [feed_entry | _]} = feed
-      post1remote = feed_entry.activity.object
+      # %{edges: [feed_entry | _]} = feed
+      post1remote = List.first(feed).activity.object
       auto_assert true <- post1remote.post_content.html_body =~ "try out federated at mention"
 
       Logger.metadata(action: info("make a mentions-only reply on remote"))
@@ -129,24 +129,41 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
       action: info("check that reply with mention was federated and is in OP's feed")
     )
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(
-             feed,
-             "try out federated reply with mention"
-           ),
-           "reply with mention is NOT in OP's feed"
+    assert %{edges: feed} = Messages.list(local_user)
+    auto_assert %Bonfire.Data.Social.Message{} <- List.first(feed)
+    post2remote = List.first(feed).activity.object
+
+    auto_assert true <-
+                  post2remote.post_content.html_body =~ "try out federated reply with mention"
+
+    # assert Bonfire.Social.FeedActivities.feed_contains?(
+    #          feed,
+    #          "try out federated reply with mention"
+    #        )
+    #  "reply with mention is NOT in OP's feed"
 
     Logger.metadata(
-      action: info("check that reply without mention was federated and is in local feed")
+      action: info("check that reply without mention was federated and is in fediverse feed")
     )
 
     assert %{edges: feed} =
-             Bonfire.Social.FeedActivities.feed(:local, current_user: local_user)
-             |> debug("feeeedlocal")
+             Bonfire.Social.FeedActivities.feed(:fediverse, current_user: local_user)
+             |> debug("remotefeed")
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(feed, post4_attrs.post_content.html_body),
-           "if the post is public, the actor we are replying to should be CCed even if not mentioned"
+    auto_assert %Pointers.Pointer{} <-
+                  Bonfire.Social.FeedActivities.feed_contains?(
+                    feed,
+                    post4_attrs.post_content.html_body
+                  )
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(feed, post5_attrs.post_content.html_body),
-           "if the post is public, the actor who started the thread should be CCed even if not mentioned"
+    #  "if the post is public, the actor we are replying to should be CCed even if not mentioned"
+
+    auto_assert %Pointers.Pointer{} <-
+                  Bonfire.Social.FeedActivities.feed_contains?(
+                    feed,
+                    post5_attrs.post_content.html_body
+                  )
+
+    #  "if the post is public, the actor who started the thread should be CCed even if not mentioned"
   end
 end
