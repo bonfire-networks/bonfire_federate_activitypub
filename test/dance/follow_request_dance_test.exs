@@ -14,8 +14,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
 
   alias Bonfire.Social.Posts
   alias Bonfire.Social.Follows
+  use Mneme
 
-  setup_all tags do
+  setup tags do
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
     [
@@ -26,6 +27,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
           request_before_follow: true
         )
     ]
+
   end
 
   # https://github.com/bonfire-networks/bonfire-app/issues/537
@@ -42,14 +44,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
 
     Logger.metadata(action: info("init followed_on_local"))
     assert {:ok, followed_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(followed_ap_id)
-
+    # auto_assert Follows.following?(local_follower, followed_on_local)
+    # auto_assert Follows.requested?(local_follower, followed_on_local)
     Logger.metadata(action: info("make a (request to) follow"))
     assert {:ok, request} = Follows.follow(local_follower, followed_on_local)
     request_id = ulid(request)
     info(request, "the local request")
 
-    refute Follows.following?(local_follower, followed_on_local)
-    assert Follows.requested?(local_follower, followed_on_local)
+    auto_assert Follows.following?(local_follower, followed_on_local)
+    auto_assert Follows.requested?(local_follower, followed_on_local)
 
     # this shouldn't be needed if running Oban :inline
     # Bonfire.Common.Config.get([:bonfire, Oban]) |> info("obannn")
