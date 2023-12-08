@@ -112,7 +112,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     refute Follows.following?(local_follower, followed_on_local) |> info()
 
     TestInstanceRepo.apply(fn ->
-      assert {:ok, follower_on_remote} = 
+      assert {:ok, follower_on_remote} =
                AdapterUtils.get_or_fetch_and_create_by_uri(follower_ap_id)
 
       Logger.metadata(action: info("check unfollow received on remote"))
