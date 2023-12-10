@@ -84,7 +84,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
     TestInstanceRepo.apply(fn ->
       ActivityPub.Utils.cache_clear()
 
-      auto_assert {:error, "ActivityPub remote replied with HTTP 403"} <-
+      auto_assert {:error,
+                   "Remote response with HTTP 403: this instance is not currently federating"} <-
                     AdapterUtils.get_or_fetch_and_create_by_uri(context[:local][:canonical_url])
     end)
   end

@@ -79,7 +79,6 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     rejects =
       rejects_regex(block_types)
-      |> debug("MRF instance_wide blocks from config")
 
     cond do
       is_follow? and :silence == check_block_type and is_local? ->
@@ -183,11 +182,20 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     # |> debug("uri")
 
     instance_blocked_in_config?(uri, rejects) ||
-      actor_or_instance_blocked?(block_types, local_author_ids, uri, rejects)
+      actor_or_instance_blocked?(block_types, local_author_ids, uri, nil, rejects)
+  end
+
+  defp object_blocked?(block_types, local_author_ids, rejects, %{} = object) do
+    canonical_uri = URIs.canonical_url(object)
+    uri = URI.parse(canonical_uri)
+
+    instance_blocked_in_config?(uri, rejects) ||
+      actor_or_instance_blocked?(block_types, local_author_ids, uri, object, rejects)
   end
 
   defp object_blocked?(_, _, _, canonical_uri) do
     warn(canonical_uri, "no valid URI")
+    # raise "no valid URI"
     nil
   end
 
@@ -202,6 +210,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          block_types,
          local_author_ids,
          %URI{} = actor_uri,
+         actor,
          rejects
        ) do
     clean_url = "#{actor_uri.host}#{actor_uri.path}"
@@ -217,7 +226,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     # || Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
     # |> debug()
     MRF.subdomain_match?(rejects, clean_url) ||
-      Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, block_types,
+      Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor || actor_uri, block_types,
         user_ids: local_author_ids
       )
   end
@@ -285,7 +294,6 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp filter_recipients(block_types, activity, local_author_ids, local_recipient_ids, is_local?) do
     rejects =
       rejects_regex(block_types)
-      |> debug("MRF actor filter from config")
 
     activity
     |> filter_recipients_field(
@@ -535,5 +543,66 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     |> filter_empty([])
     # |> debug()
     |> MRF.subdomains_regex()
+    |> debug("MRF instance_wide blocks from config")
+  end
+
+  def actor_blocked?(
+        actor,
+        direction \\ nil,
+        by_user \\ nil
+      )
+
+  def actor_blocked?(
+        actor,
+        :in,
+        by_user
+      ) do
+    actor_blocked?(
+      actor,
+      :silence,
+      by_user
+    )
+  end
+
+  def actor_blocked?(
+        actor,
+        :out,
+        by_user
+      ) do
+    actor_blocked?(
+      actor,
+      :ghost,
+      by_user
+    )
+  end
+
+  def actor_blocked?(
+        actor,
+        nil,
+        by_user
+      ) do
+    actor_blocked?(
+      actor,
+      [:ghost, :silence],
+      by_user
+    )
+  end
+
+  def actor_blocked?(
+        actor,
+        check_block_types,
+        by_user
+      ) do
+    block_types = Boundaries.Blocks.types_blocked(check_block_types)
+
+    rejects = rejects_regex(block_types)
+
+    object_blocked?(
+      block_types,
+      by_user || [],
+      rejects,
+      AdapterUtils.id_or_object_id(actor) || actor
+    )
+    |> debug("fabbb")
   end
 end

@@ -177,6 +177,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def is_blocked?(%{peered: _} = object, block_type, opts) do
+    # FIXME: why force?
     object =
       repo().preload(object, [peered: [:peer]], force: true)
       |> debug("fooooobj")

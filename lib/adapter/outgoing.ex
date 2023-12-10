@@ -3,6 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Untangle
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
+  alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Common
   # alias Bonfire.Common.Utils
   alias Common.Enums
@@ -51,7 +52,12 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def federate_outgoing?(subject \\ nil) do
-    Bonfire.Federate.ActivityPub.federating?(subject)
+    Bonfire.Federate.ActivityPub.federating?(subject) &&
+      !BoundariesMRF.actor_blocked?(
+        subject,
+        :out
+      )
+
     # and Bonfire.Common.Extend.module_enabled?(
     #   Bonfire.Federate.ActivityPub.Outgoing,
     #   subject

@@ -5,6 +5,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   """
 
   alias Bonfire.Federate.ActivityPub.AdapterUtils
+  alias Bonfire.Federate.ActivityPub.BoundariesMRF
   import AdapterUtils, only: [log: 1]
 
   use Bonfire.Common.Utils
@@ -385,10 +386,40 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_locale, do: Bonfire.Common.Localise.get_locale_id()
 
-  def actor_federating?(actor) do
-    case AdapterUtils.get_character(actor) do
-      {:ok, character} ->
-        Bonfire.Federate.ActivityPub.federating?(character)
+  def federate_actor?(
+        actor,
+        direction \\ nil,
+        by_actor \\ nil
+      ) do
+    case {AdapterUtils.get_character(actor),
+          if(by_actor, do: AdapterUtils.get_character(by_actor))} do
+      {{:ok, character}, {:ok, by_character}} ->
+        Bonfire.Federate.ActivityPub.federating?(character) &&
+          Bonfire.Federate.ActivityPub.federating?(by_character) &&
+          !BoundariesMRF.actor_blocked?(
+            character,
+            direction,
+            by_character
+          ) &&
+          !BoundariesMRF.actor_blocked?(
+            by_character,
+            direction,
+            character
+          )
+
+      {{:ok, character}, _} ->
+        Bonfire.Federate.ActivityPub.federating?(character) &&
+          !BoundariesMRF.actor_blocked?(
+            character,
+            direction
+          )
+
+      {_, {:ok, by_character}} ->
+        Bonfire.Federate.ActivityPub.federating?(by_character) &&
+          !BoundariesMRF.actor_blocked?(
+            by_character,
+            direction
+          )
 
       _ ->
         debug(actor, "no character for actor")

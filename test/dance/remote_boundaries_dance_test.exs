@@ -181,7 +181,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       assert a_remote = Enum.empty?(feed)
     end
 
-    test "i'll not see any  DM from them", context do
+    test "i'll not see any DM from them", context do
       alice_local = context[:local][:user]
       bob_remote = context[:remote][:user]
 
