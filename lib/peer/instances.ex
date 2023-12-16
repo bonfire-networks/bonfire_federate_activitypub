@@ -63,7 +63,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
       |> debug()
 
     host =
-      URIs.instance_domain(uri)
+      URIs.base_domain(uri)
       |> debug()
 
     if host do

@@ -41,7 +41,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.UsersTest do
     parent_circle = Bonfire.Boundaries.Fixtures.activity_pub_circle()
 
     actor_url = context[:remote][:canonical_url]
-    host = Bonfire.Common.URIs.instance_domain(actor_url)
+    host = Bonfire.Common.URIs.base_domain(actor_url)
 
     {:ok, bob_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(actor_url)
 
