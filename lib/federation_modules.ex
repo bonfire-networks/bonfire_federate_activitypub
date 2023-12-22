@@ -98,7 +98,6 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   # TODO: cache the linked activity/object types
   def linked_federation_modules() do
-    Bonfire.Common.ExtensionBehaviour.apply_modules(modules(), :federation_module)
-    |> Map.new()
+    Bonfire.Common.ExtensionBehaviour.apply_modules_cached(modules(), :federation_module)
   end
 end
