@@ -64,11 +64,12 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   @doc "Look up a Federation Module, throw :not_found if not found."
-  def federation_module!(query) do
-    with {:ok, module} <- federation_module(query) do
+  def federation_module!(query, modules \\ linked_federation_modules()) do
+    with {:ok, module} <- federation_module(query, modules) do
       module
     else
-      _e ->
+      e ->
+        error(e, "No federation module found for #{inspect query}")
         throw(:not_found)
     end
   end
@@ -84,8 +85,8 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   @doc "Look up many types at once, throw :not_found if any of them are not found"
   def federation_modules(queries) do
-    modules = modules()
-    Enum.map(queries, &federation_module(&1, modules))
+    modules = linked_federation_modules()
+    Enum.map(queries, &federation_module!(&1, modules))
   end
 
   def app_modules() do
