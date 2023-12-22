@@ -1,59 +1,39 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.FederationModules do
-  # TODO refactor for Bonfire.Common.ExtensionBehaviour
   @moduledoc """
-  A Global cache of known federation modules to be queried by activity and/or object type.
+  A automatically-generated global list of federation modules which can queried by activity and/or object type.
 
-  Use of the FederationModules Service requires:
+  To add a module to this list, you should declare `@behaviour Bonfire.Federate.ActivityPub.FederationModules` in it and define a `federation_module/0` function which returns a list of object and/or activity types which that module handles.
 
-  1. Exporting `federation_module/0` in relevant modules (in context modules indicating what activity or object types the module can handle)
-  2. To populate `:bonfire, :federation_search_path` in config with the list of OTP applications where federation modules are declared.
-  3. Start the `Bonfire.Federate.ActivityPub.FederationModules` application before querying.
-  4. OTP 21.2 or greater, though we recommend using the most recent
-     release available.
+  Example:
+  ```
+  @behaviour Bonfire.Federate.ActivityPub.FederationModules
+  def federation_module,
+    do: [
+      "Announce",
+      {"Create", "Announce"},
+      {"Undo", "Announce"},
+      {"Delete", "Announce"}
+    ]
+  ```
 
-  While this module is a GenServer, it is only responsible for setup
-  of the cache and then exits with :ignore having done so. It is not
-  recommended to restart the service as this will lead to a stop the
-  world garbage collection of all processes and the copying of the
-  entire cache to each process that has queried it since its last
-  local garbage collection.
+  You should also then implement these two functions:
+  - for outgoing federation: `ap_publish_activity(subject_struct, verb, object_struct)`
+  - for incoming federation: `ap_receive_activity(subject_struct, activity_json, object_json)`
   """
+  @behaviour Bonfire.Common.ExtensionBehaviour
 
   import Untangle
   # alias Bonfire.Common.Utils
 
-  use GenServer, restart: :transient
+  @doc "Get a Federation Module identified by activity and/or object type, given a activity and/or object (string or {activity, object} tuple)."
+  @callback federation_module() :: any
+  def federation_module(query, modules \\ linked_federation_modules())
 
-  @typedoc """
-  A query is either a federation_module name atom or (Pointer) id binary
-  """
-  @type query :: binary | atom | tuple
-
-  @spec start_link(ignored :: term) :: GenServer.on_start()
-  @doc "Populates the global cache with federation_module data via introspection."
-  def start_link(_), do: GenServer.start_link(__MODULE__, [])
-
-  def data() do
-    :persistent_term.get(__MODULE__)
-  rescue
-    _e in ArgumentError ->
-      debug("Gathering a list of federation modules...")
-      populate()
-  end
-
-  # defp data_init() do
-  #   error("The FederationModules service was not started. Please add it to your Application.")
-
-  #   populate()
-  # end
-
-  @spec federation_module(query :: query) :: {:ok, atom} | {:error, :not_found}
-  @doc "Get a Federation Module identified by activity and/or object type, as string or {activity, object} tuple."
-  def federation_module({_verb, type} = query) when is_atom(type) do
-    case Map.get(data(), query) do
+  def federation_module({_verb, type} = query, modules) when is_atom(type) do
+    case Map.get(modules || linked_federation_modules(), query) do
       nil ->
-        # fallback to context module
+        # fallback to context module (with object type only)
         Bonfire.Common.ContextModule.context_module(type)
 
       other ->
@@ -61,8 +41,8 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     end
   end
 
-  def federation_module(query) when is_atom(query) do
-    case Map.get(data(), query) do
+  def federation_module(query, modules) when is_atom(query) do
+    case Map.get(modules || linked_federation_modules(), query) do
       nil ->
         # fallback to context module
         Bonfire.Common.ContextModule.context_module(query)
@@ -72,9 +52,9 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
     end
   end
 
-  def federation_module(query)
+  def federation_module(query, modules)
       when is_binary(query) or is_atom(query) or is_tuple(query) do
-    case Map.get(data(), query) do
+    case Map.get(modules || linked_federation_modules(), query) do
       nil ->
         {:error, :not_found}
 
@@ -84,83 +64,41 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   @doc "Look up a Federation Module, throw :not_found if not found."
-  def federation_module!(query), do: Map.get(data(), query) || throw(:not_found)
-
-  @spec federation_modules([binary | atom]) :: [binary]
-  @doc "Look up many types at once, throw :not_found if any of them are not found"
-  def federation_modules(modules) do
-    data = data()
-    Enum.map(modules, &Map.get(data, &1))
+  def federation_module!(query) do
+    with {:ok, module} <- federation_module(query) do
+      module
+    else
+      _e ->
+        throw(:not_found)
+    end
   end
 
-  def maybe_federation_module(query) do
-    # fallback
+  def maybe_federation_module(query, fallback \\ nil) do
     with {:ok, module} <- federation_module(query) do
       module
     else
       _ ->
-        nil
+        fallback
     end
   end
 
-  def federation_function_error(error, _args) do
-    warn(
-      error,
-      "FederationModules - there's no federation module declared for this schema: 1) No function federation_module/0 was found that returns this type (as a binary, tuple, or within a list). 2)"
-    )
-
-    nil
+  @doc "Look up many types at once, throw :not_found if any of them are not found"
+  def federation_modules(queries) do
+    modules = modules()
+    Enum.map(queries, &federation_module(&1, modules))
   end
 
-  # GenServer callback
-
-  @doc false
-  def init(_) do
-    populate()
-    :ignore
+  def app_modules() do
+    Bonfire.Common.ExtensionBehaviour.behaviour_app_modules(__MODULE__)
   end
 
-  def populate() do
-    indexed =
-      search_path()
-      # |> IO.inspect
-      |> Enum.flat_map(&app_modules/1)
-      # |> debug(limit: :infinity)
-      |> Enum.filter(&declares_federation_module?/1)
-      # |> debug(limit: :infinity)
-      |> Enum.reduce(%{}, &index/2)
-
-    # |> IO.inspect
-    :persistent_term.put(__MODULE__, indexed)
-    indexed
+  def modules() do
+    Bonfire.Common.ExtensionBehaviour.behaviour_modules(__MODULE__)
   end
 
-  defp app_modules(app), do: app_modules(app, Application.spec(app, :modules))
-  defp app_modules(_, nil), do: []
-  defp app_modules(_, mods), do: mods
-
-  # called by populate/0
-  defp search_path(),
-    do: Application.fetch_env!(:bonfire, :federation_search_path)
-
-  # called by populate/0
-  defp declares_federation_module?(module),
-    do:
-      Code.ensure_loaded?(module) and
-        function_exported?(module, :federation_module, 0)
-
-  # called by populate/0
-  defp index(mod, acc), do: index(acc, mod, mod.federation_module())
-
-  # called by index/2
-  defp index(acc, declaring_module, handle_federation)
-       when is_list(handle_federation) do
-    Enum.map(handle_federation, &{&1, declaring_module})
-    |> Enum.into(%{})
-    |> Map.merge(acc)
-  end
-
-  defp index(acc, declaring_module, handle_federation) do
-    Map.merge(%{handle_federation => declaring_module}, acc)
+  # TODO: cache the linked activity/object types
+  def linked_federation_modules() do
+    Bonfire.Common.ExtensionBehaviour.apply_modules(modules(), :federation_module)
+    |> Map.new()
   end
 end
