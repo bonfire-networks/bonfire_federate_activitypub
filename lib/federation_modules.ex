@@ -28,10 +28,10 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   @doc "Get a Federation Module identified by activity and/or object type, given a activity and/or object (string or {activity, object} tuple)."
   @callback federation_module() :: any
-  def federation_module(query, modules \\ linked_federation_modules())
+  def federation_module(query, modules \\ federation_modules_data_types())
 
   def federation_module({_verb, type} = query, modules) when is_atom(type) do
-    case Map.get(modules || linked_federation_modules(), query) do
+    case Map.get(modules || federation_modules_data_types(), query) do
       nil ->
         # fallback to context module (with object type only)
         Bonfire.Common.ContextModule.context_module(type)
@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   def federation_module(query, modules) when is_atom(query) do
-    case Map.get(modules || linked_federation_modules(), query) do
+    case Map.get(modules || federation_modules_data_types(), query) do
       nil ->
         # fallback to context module
         Bonfire.Common.ContextModule.context_module(query)
@@ -54,7 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   def federation_module(query, modules)
       when is_binary(query) or is_atom(query) or is_tuple(query) do
-    case Map.get(modules || linked_federation_modules(), query) do
+    case Map.get(modules || federation_modules_data_types(), query) do
       nil ->
         {:error, :not_found}
 
@@ -64,12 +64,12 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   @doc "Look up a Federation Module, throw :not_found if not found."
-  def federation_module!(query, modules \\ linked_federation_modules()) do
+  def federation_module!(query, modules \\ federation_modules_data_types()) do
     with {:ok, module} <- federation_module(query, modules) do
       module
     else
       e ->
-        error(e, "No federation module found for #{inspect query}")
+        error(e, "No federation module found for #{inspect(query)}")
         throw(:not_found)
     end
   end
@@ -85,7 +85,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
   @doc "Look up many types at once, throw :not_found if any of them are not found"
   def federation_modules(queries) do
-    modules = linked_federation_modules()
+    modules = federation_modules_data_types()
     Enum.map(queries, &federation_module!(&1, modules))
   end
 
@@ -98,7 +98,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   end
 
   # TODO: cache the linked activity/object types
-  def linked_federation_modules() do
+  def federation_modules_data_types() do
     Bonfire.Common.ExtensionBehaviour.apply_modules_cached(modules(), :federation_module)
   end
 end
