@@ -58,7 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
 
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
-    auto_assert %Pointers.Pointer{} <-
+    auto_assert %Needle.Pointer{} <-
                   Bonfire.Social.FeedActivities.feed_contains?(
                     :my,
                     post_attrs.post_content.html_body,

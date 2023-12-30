@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.Migrations do
   @moduledoc false
   use Ecto.Migration
-  # import Pointers.Migration
+  # import Needle.Migration
 
   defp map(:up) do
     quote do

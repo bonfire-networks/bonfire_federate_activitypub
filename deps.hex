@@ -5,4 +5,5 @@ telemetry_metrics = "~> 0.6.1"
 telemetry_poller = "~> 1.0.0"
 # specific for this extension:
 oban = "~> 2.17"
-untangle = "~> 0.1"
+untangle = "~> 0.3.0"
+needle = "~> 0.7"

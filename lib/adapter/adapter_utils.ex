@@ -30,7 +30,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def is_local?(thing, preload_if_needed \\ true) do
     if is_binary(thing) do
-      Bonfire.Common.Pointers.one(thing, skip_boundary_check: true)
+      Bonfire.Common.Needle.one(thing, skip_boundary_check: true)
     else
       thing
     end
@@ -163,11 +163,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_character_by_username(username) when is_binary(username) do
     with {:error, :not_found} <- Users.by_username(username) do
       debug(username, "not a user, check for any other character types")
-      Bonfire.Common.Pointers.get(username)
+      Bonfire.Common.Needle.get(username)
     end
     ~> get_character_by_username()
 
-    # Bonfire.Common.Pointers.get(username, [skip_boundary_check: true])
+    # Bonfire.Common.Needle.get(username, [skip_boundary_check: true])
     # ~> get_character_by_username()
   end
 
@@ -187,7 +187,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     pointer_id = ulid(id)
 
     if pointer_id do
-      Bonfire.Common.Pointers.get(pointer_id, opts)
+      Bonfire.Common.Needle.get(pointer_id, opts)
       ~> get_character_by_username()
     end
   end
@@ -588,7 +588,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def return_pointer(id, opts) do
-    Bonfire.Common.Pointers.get(ulid(id), opts)
+    Bonfire.Common.Needle.get(ulid(id), opts)
     # |> info("got")
     # actor_integration_test
     |> repo().maybe_preload([:actor, :character, :profile])
@@ -956,7 +956,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def character_module(%{__struct__: Pointers.Pointer} = struct),
+  def character_module(%{__struct__: Needle.Pointer} = struct),
     do: Types.object_type(struct) |> character_module()
 
   def character_module(%{__struct__: type}), do: character_module(type)

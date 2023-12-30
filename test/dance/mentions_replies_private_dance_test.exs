@@ -150,7 +150,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
              Bonfire.Social.FeedActivities.feed(:fediverse, current_user: local_user)
              |> debug("remotefeed")
 
-    auto_assert %Pointers.Pointer{} <-
+    auto_assert %Needle.Pointer{} <-
                   Bonfire.Social.FeedActivities.feed_contains?(
                     feed,
                     post4_attrs.post_content.html_body
@@ -158,7 +158,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
 
     #  "if the post is public, the actor we are replying to should be CCed even if not mentioned"
 
-    auto_assert %Pointers.Pointer{} <-
+    auto_assert %Needle.Pointer{} <-
                   Bonfire.Social.FeedActivities.feed_contains?(
                     feed,
                     post5_attrs.post_content.html_body

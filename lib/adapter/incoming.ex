@@ -313,9 +313,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     info(character, "character")
     ap_obj_id = object.data["id"]
 
-    if Bonfire.Common.Pointers.exists?(ap_obj_id) do
+    if Bonfire.Common.Needle.exists?(ap_obj_id) do
       error(ap_obj_id, "Already exists locally")
-      Bonfire.Common.Pointers.get(ap_obj_id, skip_boundary_check: true)
+      Bonfire.Common.Needle.get(ap_obj_id, skip_boundary_check: true)
     else
       pointer_id =
         with published when is_binary(published) <-
@@ -329,7 +329,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           # |> info("utc_date_published")
           |> DateTime.to_unix(:millisecond)
           # |> info("to_unix")
-          |> Pointers.ULID.generate()
+          |> Needle.ULID.generate()
         else
           _ -> nil
         end

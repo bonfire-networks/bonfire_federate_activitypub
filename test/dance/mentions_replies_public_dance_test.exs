@@ -128,7 +128,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
       action: info("check that reply with mention was federated and is in OP's feed")
     )
 
-    auto_assert %Pointers.Pointer{} <-
+    auto_assert %Needle.Pointer{} <-
                   Bonfire.Social.FeedActivities.feed_contains?(
                     feed,
                     "try out federated reply with mention"
@@ -143,7 +143,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
     assert %{edges: feed} =
              Bonfire.Social.FeedActivities.feed(:fediverse, current_user: local_user)
 
-    auto_assert %Pointers.Pointer{} <-
+    auto_assert %Needle.Pointer{} <-
                   Bonfire.Social.FeedActivities.feed_contains?(
                     feed,
                     post4_attrs.post_content.html_body
@@ -151,7 +151,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
 
     #  "if the post is public, the actor we are replying to should be CCed even if not mentioned"
 
-    auto_assert %Pointers.Pointer{} <-
+    auto_assert %Needle.Pointer{} <-
                   Bonfire.Social.FeedActivities.feed_contains?(
                     feed,
                     post5_attrs.post_content.html_body
