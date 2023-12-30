@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
 
       user =
         current_user(
-          Bonfire.Common.Settings.put([Bonfire.Search.Indexer, :disabled], true,
+          Bonfire.Common.Settings.put([Bonfire.Search.Indexer, :modularity], :disabled,
             current_user: user
           )
         )

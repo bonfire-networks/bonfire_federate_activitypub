@@ -106,7 +106,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
     user =
       current_user(
-        Bonfire.Common.Settings.put([Bonfire.Search.Indexer, :disabled], true, current_user: user)
+        Bonfire.Common.Settings.put([Bonfire.Search.Indexer, :modularity], :disabled,
+          current_user: user
+        )
       )
 
     conn =
