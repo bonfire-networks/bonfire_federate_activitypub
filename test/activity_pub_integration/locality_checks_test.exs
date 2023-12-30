@@ -2,11 +2,11 @@ defmodule Bonfire.Federate.ActivityPub.LocalityChecksTest do
   use Bonfire.Federate.ActivityPub.DataCase
 
   alias Bonfire.Me.Fake
-  alias Bonfire.Social.Follows
-  alias Bonfire.Social.Posts
+  alias Bonfire.Social.Graph.Follows
+  alias Bonfire.Posts
   alias Bonfire.Social.Likes
   alias Bonfire.Social.Boosts
-  alias Bonfire.Social.Messages
+  alias Bonfire.Messages
 
   alias ActivityPub.Federator.Workers.PublisherWorker
 

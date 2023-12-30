@@ -11,8 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.LikesTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
-  alias Bonfire.Social.Follows
+  alias Bonfire.Posts
+  alias Bonfire.Social.Graph.Follows
 
   @tag :test_instance
   test "like", context do

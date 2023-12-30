@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
   alias ActivityPub.Config
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Federate.ActivityPub.AdapterUtils
-  alias Bonfire.Social.Follows
+  alias Bonfire.Social.Graph.Follows
   alias Bonfire.Data.ActivityPub.Peered
 
   @remote_actor "https://mocked.local/users/karen"
@@ -55,7 +55,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
              )
 
       # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
-      refute Bonfire.Social.Follows.following?(local_user, remote_user)
+      refute Bonfire.Social.Graph.Follows.following?(local_user, remote_user)
     end
   end
 
@@ -79,8 +79,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
 
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-      # assert Bonfire.Social.Follows.requested?(remote_user, local_user)
-      assert Bonfire.Social.Follows.following?(remote_user, local_user)
+      # assert Bonfire.Social.Graph.Follows.requested?(remote_user, local_user)
+      assert Bonfire.Social.Graph.Follows.following?(remote_user, local_user)
     end
   end
 

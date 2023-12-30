@@ -11,8 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.UsersTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
-  alias Bonfire.Social.Follows
+  alias Bonfire.Posts
+  alias Bonfire.Social.Graph.Follows
 
   @tag :test_instance
   test "can lookup actors from AP API with username, AP ID and with friendly URL",

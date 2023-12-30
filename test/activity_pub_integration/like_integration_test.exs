@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
   use Bonfire.Federate.ActivityPub.DataCase
 
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
   alias Bonfire.Social.Likes
 
   import Tesla.Mock

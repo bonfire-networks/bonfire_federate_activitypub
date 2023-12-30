@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
   import Tesla.Mock
 
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
 
   setup_all do
     data =

@@ -11,8 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
-  alias Bonfire.Social.Follows
+  alias Bonfire.Posts
+  alias Bonfire.Social.Graph.Follows
 
   test "remote follow on open profile works, and a post federates back to the follower, and unfollow works",
        context do

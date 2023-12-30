@@ -951,7 +951,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         debug(target, "add alsoKnownAs provided")
 
         get_or_fetch_character_by_ap_id(target)
-        ~> Bonfire.Social.Aliases.add(user_etc, ...)
+        ~> Bonfire.Social.Graph.Aliases.add(user_etc, ...)
         |> debug("added??")
     end
   end

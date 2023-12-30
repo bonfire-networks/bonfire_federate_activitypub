@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   use Bonfire.Federate.ActivityPub.ConnCase
   import Tesla.Mock
   import Untangle
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
   use Bonfire.Common.Repo
 
   @remote_instance "https://mocked.local"

@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
   use Bonfire.Federate.ActivityPub.DataCase
 
-  alias Bonfire.Social.Follows
+  alias Bonfire.Social.Graph.Follows
 
   import Tesla.Mock
 
@@ -51,8 +51,8 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       assert {:ok, _follow_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
 
-      assert Bonfire.Social.Follows.requested?(follower, followed)
-      refute Bonfire.Social.Follows.following?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.requested?(follower, followed)
+      refute Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
 
     test "outgoing follow which then gets an Accept works" do
@@ -66,7 +66,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       assert {:ok, follow_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
 
-      assert Bonfire.Social.Follows.requested?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.requested?(follower, followed)
 
       {:ok, accept} =
         ActivityPub.accept(%{
@@ -79,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       # |> debug
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
 
-      assert Bonfire.Social.Follows.following?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
 
     test "incoming follow request works" do
@@ -96,7 +96,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       # |> debug
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-      assert Bonfire.Social.Follows.following?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
 
     test "incoming follow + accept works" do
@@ -116,12 +116,12 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       # info(ulid(request), "request ID")
 
-      assert Bonfire.Social.Follows.requested?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.requested?(follower, followed)
 
-      assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
+      assert {:ok, follow} = Bonfire.Social.Graph.Follows.accept(request, current_user: followed)
 
       # assert not is_nil(request.accepted_at)
-      assert Bonfire.Social.Follows.following?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
 
     test "incoming follow + ignore works (does not federate rejections)" do
@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
                |> info("request")
 
-      assert {:ok, request} = Bonfire.Social.Follows.ignore(request, current_user: followed)
+      assert {:ok, request} = Bonfire.Social.Graph.Follows.ignore(request, current_user: followed)
 
       assert not is_nil(request.ignored_at)
     end
@@ -159,7 +159,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       assert {:ok, _} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity) |> debug
 
-      assert Bonfire.Social.Follows.following?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
 
     test "incoming follow / accept / unfollow works" do
@@ -178,19 +178,19 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       # info(ulid(request), "request ID")
 
-      assert Bonfire.Social.Follows.requested?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.requested?(follower, followed)
 
-      assert {:ok, follow} = Bonfire.Social.Follows.accept(request, current_user: followed)
+      assert {:ok, follow} = Bonfire.Social.Graph.Follows.accept(request, current_user: followed)
 
       # assert not is_nil(request.accepted_at)
-      assert Bonfire.Social.Follows.following?(follower, followed)
+      assert Bonfire.Social.Graph.Follows.following?(follower, followed)
 
       {:ok, unfollow_activity} =
         ActivityPub.unfollow(%{actor: ap_follower, object: ap_followed, local: false})
         |> info("unfollow_activity")
 
       Bonfire.Federate.ActivityPub.Incoming.receive_activity(unfollow_activity)
-      refute Bonfire.Social.Follows.following?(follower, followed)
+      refute Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
   end
 end

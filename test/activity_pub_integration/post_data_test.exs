@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.PostDataTest do
   use Bonfire.Federate.ActivityPub.DataCase
   import Tesla.Mock
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
   alias Bonfire.Common.Text
   use Mneme
   @remote_instance "https://mocked.local"

@@ -85,7 +85,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
              )
 
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
-      refute Bonfire.Social.Follows.following?(remote_user, local_user)
+      refute Bonfire.Social.Graph.Follows.following?(remote_user, local_user)
     end
 
     test "attempting to follow someone on an instance-wide blocked instance" do
@@ -107,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.BlockInstanceWideTest do
              )
 
       # refute match? {:ok, _}, Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
-      refute Bonfire.Social.Follows.following?(local_user, remote_user)
+      refute Bonfire.Social.Graph.Follows.following?(local_user, remote_user)
     end
 
     test "there's a remote activity with instance-wide blocked host (in config)" do

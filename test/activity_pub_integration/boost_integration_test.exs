@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
   use Bonfire.Federate.ActivityPub.DataCase
 
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
   alias Bonfire.Data.Social.Boost
   alias Bonfire.Social.Boosts
 

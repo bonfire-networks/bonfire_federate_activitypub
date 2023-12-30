@@ -11,9 +11,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
   alias Bonfire.Social.PostContents
-  alias Bonfire.Social.Follows
+  alias Bonfire.Social.Graph.Follows
 
   @tag :test_instance
   test "can make a public post, and fetch it from AP API (both with AP ID and with friendly URL and Accept header)",
@@ -106,10 +106,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
 
     # back to local
     Logger.metadata(action: "edit post1")
-    assert {:ok, _} = PostContents.edit(user, id(post), %{html_body: "edited 1"})
+    assert {:ok, _} = Bonfire.Social.PostContents.edit(user, id(post), %{html_body: "edited 1"})
 
     Logger.metadata(action: "edit post2")
-    assert {:ok, _} = PostContents.edit(user2, id(post2), %{html_body: "edited 2"})
+    assert {:ok, _} = Bonfire.Social.PostContents.edit(user2, id(post2), %{html_body: "edited 2"})
 
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: "check edit of post 1 was federated to follower")

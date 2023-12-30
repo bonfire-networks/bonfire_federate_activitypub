@@ -11,8 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
-  alias Bonfire.Social.Follows
+  alias Bonfire.Posts
+  alias Bonfire.Social.Graph.Follows
   alias Bonfire.Social.Objects
   alias Bonfire.Me.Users
 

@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
 
     assert {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 
-    Bonfire.Social.Follows.follow(local_user, remote_user)
+    Bonfire.Social.Graph.Follows.follow(local_user, remote_user)
 
     Bonfire.Boundaries.Blocks.block(remote_user, :silence, current_user: local_user)
 

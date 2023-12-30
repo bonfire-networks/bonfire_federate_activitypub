@@ -13,8 +13,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
-  alias Bonfire.Social.Follows
+  alias Bonfire.Posts
+  alias Bonfire.Social.Graph.Follows
   use Mneme
 
   setup_all tags do

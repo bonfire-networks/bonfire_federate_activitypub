@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 
-  alias Bonfire.Social.Messages
+  alias Bonfire.Messages
 
   import Tesla.Mock
 

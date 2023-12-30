@@ -11,8 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Messages
-  alias Bonfire.Social.Follows
+  alias Bonfire.Messages
+  alias Bonfire.Social.Graph.Follows
   alias Bonfire.Boundaries.{Circles, Acls, Grants}
 
   @tag :test_instance
@@ -63,7 +63,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
       assert {:ok, local_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(local_ap_id)
 
       messages =
-        Bonfire.Social.Messages.list(remote_user)
+        Bonfire.Messages.list(remote_user)
         |> debug("list")
 
       assert match?(%{edges: [feed_entry | _]}, messages),
@@ -115,7 +115,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
     Logger.metadata(action: info("check that reply-only is NOT in OP's messages"))
 
     assert %{edges: messages} =
-             Bonfire.Social.Messages.list(local_user) |> debug("feeeed")
+             Bonfire.Messages.list(local_user) |> debug("feeeed")
 
     Enum.each(
       messages,
@@ -137,7 +137,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
     )
 
     assert %{edges: messages} =
-             Bonfire.Social.Messages.list(local_user)
+             Bonfire.Messages.list(local_user)
              |> debug("feeeedlocal")
 
     assert Bonfire.Social.FeedActivities.feed_contains?(

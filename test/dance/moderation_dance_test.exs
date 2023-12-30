@@ -11,7 +11,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
 
   test "cross-instance flagging", context do
     # context |> info("context")
