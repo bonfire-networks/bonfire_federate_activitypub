@@ -151,7 +151,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "can follow pointers to remote actors" do
     {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
-    assert {:ok, _} = Common.Needle.one(user.id)
+    assert {:ok, _} = Common.Needles.one(user.id)
   end
 
   test "fetches an actor by AP ID" do
