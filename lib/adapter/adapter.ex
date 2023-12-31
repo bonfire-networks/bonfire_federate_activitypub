@@ -10,7 +10,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   use Bonfire.Common.Utils
 
-  # alias Bonfire.Common.Needle
+  # alias Bonfire.Common.Needles
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
   # alias Bonfire.Federate.ActivityPub.Incoming
@@ -356,7 +356,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def maybe_publish_object(pointer_id, manually_fetching?) when is_binary(pointer_id) do
-    Bonfire.Common.Needle.get(pointer_id)
+    Bonfire.Common.Needles.get(pointer_id)
     ~> maybe_publish_object(manually_fetching?)
   end
 
