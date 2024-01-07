@@ -287,6 +287,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     nil
   end
 
+  def id_or_object_id(%{character: %{peered: %{canonical_uri: id}}}) when is_binary(id) do
+    id
+  end
+
+  def id_or_object_id(%{peered: %{canonical_uri: id}}) when is_binary(id) do
+    id
+  end
+
+  def id_or_object_id(%{canonical_uri: id}) when is_binary(id) do
+    id
+  end
+
   def id_or_object_id(other) do
     error(other, "could not find AP ID")
     nil
