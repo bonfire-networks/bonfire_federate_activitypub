@@ -59,7 +59,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
              Bonfire.Social.FeedActivities.feed(:notifications, current_user: local_admin)
 
     a_remote = List.first(feed).activity
-    assert a_remote.verb.verb == "Flag"
+    assert a_remote.verb_id == "71AGSPAM0RVNACCEPTAB1E1TEM"
     flagged_post = a_remote.object
     assert flagged_post.post_content.html_body =~ "try federated flagging"
   end

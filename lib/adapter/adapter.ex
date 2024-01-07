@@ -106,7 +106,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_actor_by_id(id) when is_binary(id) do
-    with {:ok, character} <- AdapterUtils.get_character_by_id(id) |> debug() do
+    with {:ok, character} <- AdapterUtils.get_character_by_id(id) |> debug(id) do
       get_actor_by_id(character)
     end
   end

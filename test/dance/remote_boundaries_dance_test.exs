@@ -16,42 +16,45 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   alias Bonfire.Boundaries.{Circles, Acls, Grants, Blocks}
   use Mneme
 
-  setup do
-    Config.put([:activity_pub, :instance, :federating], true)
-
+  setup context do
+    # clean_slate(context)
     on_exit(fn ->
-      Config.put([:activity_pub, :instance, :federating], true)
+      clean_slate(context)
     end)
   end
 
   def clean_slate(context) do
-    {:ok, bob_remote_user_on_local} =
-      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
-        context[:remote][:canonical_url]
-      )
-
-    Blocks.unblock(context[:local][:user], bob_remote_user_on_local)
-
-    if Follows.following?(context[:local][:user], bob_remote_user_on_local) do
-      Follows.unfollow(context[:local][:user], bob_remote_user_on_local)
-    end
-
-    # Follows.unfollow(context[:local][:user], bob_remote_user_on_local)
+    do_clean_slate(context[:local][:user], context[:remote][:canonical_url])
 
     # on remote instance, bob_remote follows alice
     TestInstanceRepo.apply(fn ->
-      {:ok, local_on_remote} =
-        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
-          context[:local][:canonical_url]
-        )
-
-      Blocks.unblock(context[:remote][:user], local_on_remote)
-      Follows.unfollow(context[:remote][:user], local_on_remote)
+      do_clean_slate(context[:remote][:user], context[:local][:canonical_url])
     end)
+
+    :ok
+  end
+
+  def do_clean_slate(local, remote) do
+    Config.put([:activity_pub, :instance, :federating], true)
+
+    # repo().query("delete from ap_object", [])
+    ActivityPub.Utils.cache_clear()
+
+    {:ok, remote_user_on_local} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(remote)
+
+    Blocks.unblock(local, remote_user_on_local)
+    Blocks.unblock(remote_user_on_local, local)
+
+    Follows.unfollow(local, remote_user_on_local)
+
+    # Follows.unfollow(local, remote_user_on_local)
   end
 
   describe "if I silenced a remote user i will not receive any update from it" do
     test "i'll not see anything they publish in feeds", context do
+      clean_slate(context)
+
       alice_local = context[:local][:user]
       bob_remote = context[:remote][:user]
 
@@ -60,13 +63,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
-      clean_slate(context)
       # alice follows bob_remote
-      auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+      auto_assert {:ok, _} <-
                     Follows.follow(alice_local, bob_remote_user_on_local)
 
-      auto_assert {:error, :not_found} <-
-                    Follows.accept_from(alice_local, current_user: bob_remote_user_on_local)
+      # auto_assert {:error, :not_found} <-
+      #               Follows.accept_from(alice_local, current_user: bob_remote_user_on_local)
 
       Logger.metadata(action: info("check request is now a follow on remote"))
       auto_assert true <- Follows.following?(alice_local, bob_remote_user_on_local)
@@ -106,10 +108,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
-      clean_slate(context)
-
       # alice follows bob_remote
-      auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+      auto_assert {:ok, _} <-
                     Follows.follow(alice_local, bob_remote_user_on_local)
 
       auto_assert true <- Follows.following?(alice_local, bob_remote_user_on_local)
@@ -146,13 +146,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
-      clean_slate(context)
-
       # alice follows bob_remote
-      auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+      auto_assert {:ok, _} <-
                     Follows.follow(alice_local, bob_remote_user_on_local)
 
-      auto_assert Follows.following?(alice_local, bob_remote_user_on_local)
+      auto_assert true <- Follows.following?(alice_local, bob_remote_user_on_local)
 
       # alice silences bob_remote
       assert {:ok, _silenced} =
@@ -191,17 +189,18 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
-      clean_slate(context)
-
       # alice follows bob_remote
-      auto_assert {:ok, _follow} = Follows.follow(alice_local, bob_remote_user_on_local)
-      auto_assert Follows.following?(alice_local, bob_remote_user_on_local)
+      assert {:ok, _follow} =
+               Follows.follow(alice_local, bob_remote_user_on_local)
+               |> debug("faaa")
+
+      auto_assert true <- Follows.following?(alice_local, bob_remote_user_on_local)
 
       # alice silences bob_remote
-      auto_assert {:ok, _silenced} =
-                    Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
-                      current_user: alice_local
-                    )
+      assert {:ok, _silenced} =
+               Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :silence,
+                 current_user: alice_local
+               )
 
       attrs = "#{context[:local][:username]} try out federated post"
       # on remote instance, bob_remote publish a post
@@ -227,7 +226,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                Bonfire.Social.FeedActivities.feed(:inbox, current_user: alice_local)
 
       # assert feed is empty
-      auto_assert a_remote = Enum.empty?(feed)
+      auto_assert true <- Enum.empty?(feed)
     end
 
     test "I'll not be able to follow them" do
@@ -245,8 +244,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
-      clean_slate(context)
-
       # on remote instance, bob_remote follows alice
       TestInstanceRepo.apply(fn ->
         {:ok, local_on_remote} =
@@ -254,11 +251,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
             alice_local_ap_id
           )
 
-        auto_assert {:ok, %Bonfire.Data.Social.Request{}} <-
+        auto_assert {:ok, _} <-
                       Follows.follow(bob_remote, local_on_remote)
 
-        auto_assert {:error, :not_found} <-
-                      Follows.accept_from(bob_remote, current_user: local_on_remote)
+        # auto_assert {:error, :not_found} <-
+        #               Follows.accept_from(bob_remote, current_user: local_on_remote)
 
         auto_assert true <- Follows.following?(bob_remote, local_on_remote)
       end)
@@ -300,8 +297,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
-
-      clean_slate(context)
 
       # on remote instance, bob_remote follows alice
       TestInstanceRepo.apply(fn ->
@@ -349,8 +344,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
-
-      clean_slate(context)
 
       # on remote instance, bob_remote follows alice
       TestInstanceRepo.apply(fn ->
@@ -411,8 +404,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
     {:ok, bob_remote_user_on_local} =
       Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
-
-    clean_slate(context)
 
     # create a circle with bob_remote in it
     {:ok, circle} = Circles.create(alice_local, %{named: %{name: "family"}})

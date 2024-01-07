@@ -92,7 +92,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
           rejects,
           AdapterUtils.id_or_object_id(e(activity, "object", nil))
         )
-        |> debug("fabbb") || {:ok, activity}
+        |> debug("object_blocked") || {:ok, activity}
 
       is_follow? and :silence == check_block_type and !is_local? ->
         debug("accept follows from silenced remote actors")
@@ -603,6 +603,6 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       rejects,
       AdapterUtils.id_or_object_id(actor) || actor
     )
-    |> debug("fabbb")
+    |> debug()
   end
 end
