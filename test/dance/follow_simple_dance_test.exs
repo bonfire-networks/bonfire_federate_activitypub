@@ -12,6 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   alias Bonfire.Posts
+  alias Bonfire.Social.FeedActivities
   alias Bonfire.Social.Graph.Follows
 
   test "remote follow on open profile works, and a post federates back to the follower, and unfollow works",
@@ -41,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
 
     remote_followed = context[:remote][:user]
 
-    post_attrs = %{post_content: %{html_body: "try federated post"}}
+    post_attrs = %{post_content: %{html_body: "try federated post 44"}}
 
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: info("init follower_on_remote"))
@@ -68,10 +69,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
 
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
-    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_follower)
+    assert FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+             current_user: local_follower
+           )
 
-    assert List.first(feed).activity.object.post_content.html_body =~
-             post_attrs.post_content.html_body
+    # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_follower)
+    # assert List.first(feed).activity.object.post_content.html_body =~
+    #          post_attrs.post_content.html_body
 
     Logger.metadata(action: info("unfollow"))
     assert {:ok, unfollow} = Follows.unfollow(local_follower, followed_on_local)

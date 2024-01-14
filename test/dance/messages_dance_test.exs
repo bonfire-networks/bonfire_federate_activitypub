@@ -43,7 +43,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
       Bonfire.Me.Characters.character_url(local_user)
       |> info("local_ap_id")
 
-    {:ok, message1} = Messages.send(local_user, message1_attrs, remote_recipient_on_local)
+    {:ok, message1} =
+      Messages.send(local_user, message1_attrs, remote_recipient_on_local)
+      |> repo().maybe_preload(activity: [:tagged])
 
     error(message1.activity.tagged)
 

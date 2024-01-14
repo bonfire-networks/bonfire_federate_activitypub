@@ -72,13 +72,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
     assert post_id
 
     TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: info("delete!"))
       {:ok, _} = Users.enqueue_delete(remote_user)
     end)
 
     Logger.metadata(action: info("check user deletion was federated"))
 
-    auto_assert {:error, :not_found} <- Users.by_id(Enums.id(remote_on_local))
-    auto_assert {:error, :not_found} <- AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
+    assert {:error, :not_found} = Users.by_id(Enums.id(remote_on_local))
+    assert {:error, :not_found} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
     Logger.metadata(action: info("check post deletion was federated"))
 

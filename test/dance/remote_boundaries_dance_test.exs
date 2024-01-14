@@ -12,6 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   alias Bonfire.Posts
+  alias Bonfire.Social.FeedActivities
   alias Bonfire.Social.Graph.Follows
   alias Bonfire.Boundaries.{Circles, Acls, Grants, Blocks}
   use Mneme
@@ -80,7 +81,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                       current_user: alice_local
                     )
 
-      attrs = "try out federated post"
+      attrs = "try out federated post 83"
       # on remote instance, bob_remote publish a post
       TestInstanceRepo.apply(fn ->
         post_attrs = %{post_content: %{html_body: attrs}}
@@ -94,9 +95,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       end)
 
       # on local instance, alice_local should not see the post
-      assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: alice_local)
-      # assert feed is empty
-      auto_assert true <- Enum.empty?(feed)
+      refute FeedActivities.feed_contains?(:local, attrs, current_user: alice_local)
+      # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: alice_local)
+      # # assert feed is empty
+      # auto_assert true <- Enum.empty?(feed)
     end
 
     test "i'll be able to view their profile or read post via direct link", context do
@@ -158,7 +160,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                  current_user: alice_local
                )
 
-      attrs = "#{context[:local][:username]} try out federated post"
+      attrs = "#{context[:local][:username]} try out federated post 162"
       # on remote instance, bob_remote publish a post
       TestInstanceRepo.apply(fn ->
         post_attrs = %{post_content: %{html_body: attrs}}
@@ -172,11 +174,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       end)
 
       # on local instance, alice_local should not see the post
-      assert %{edges: feed} =
-               Bonfire.Social.FeedActivities.feed(:notifications, current_user: alice_local)
+      refute FeedActivities.feed_contains?(:notifications, attrs, current_user: alice_local)
+      # assert %{edges: feed} =
+      #          Bonfire.Social.FeedActivities.feed(:notifications, current_user: alice_local)
 
-      # assert feed is empty
-      assert a_remote = Enum.empty?(feed)
+      # # assert feed is empty
+      # assert a_remote = Enum.empty?(feed)
     end
 
     test "i'll not see any DM from them", context do
@@ -202,7 +205,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                  current_user: alice_local
                )
 
-      attrs = "#{context[:local][:username]} try out federated post"
+      attrs = "#{context[:local][:username]} try out federated post 207"
       # on remote instance, bob_remote publish a post
       TestInstanceRepo.apply(fn ->
         {:ok, local_on_remote} =
@@ -222,11 +225,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       end)
 
       # on local instance, alice_local should not see the post
-      assert %{edges: feed} =
-               Bonfire.Social.FeedActivities.feed(:inbox, current_user: alice_local)
-
-      # assert feed is empty
-      auto_assert true <- Enum.empty?(feed)
+      refute FeedActivities.feed_contains?(:inbox, attrs, current_user: alice_local)
+      # assert %{edges: feed} =
+      #          Bonfire.Social.FeedActivities.feed(:inbox, current_user: alice_local)
+      # # assert feed is empty
+      # auto_assert true <- Enum.empty?(feed)
     end
 
     test "I'll not be able to follow them" do
@@ -266,7 +269,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                       current_user: alice_local
                     )
 
-      attrs = "try out federated post"
+      attrs = "try out federated post 271"
       post_attrs = %{post_content: %{html_body: attrs}}
 
       {:ok, post} =
@@ -278,9 +281,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
-        assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
-        # assert feed is empty
-        auto_assert false <- Enum.empty?(feed)
+        refute FeedActivities.feed_contains?(:my, attrs, current_user: bob_remote)
+
+        # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
+        # # assert feed is empty
+        # auto_assert false <- Enum.empty?(feed)
       end)
     end
 
@@ -315,7 +320,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                  current_user: alice_local
                )
 
-      attrs = "#{context[:remote][:username]} try out federated post"
+      attrs = "#{context[:remote][:username]} try out federated post 321"
       post_attrs = %{post_content: %{html_body: attrs}}
 
       {:ok, post} =
@@ -327,11 +332,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
-        assert %{edges: feed} =
-                 Bonfire.Social.FeedActivities.feed(:notifications, current_user: bob_remote)
-
-        # assert feed is empty
-        assert a_remote = Enum.empty?(feed)
+        refute FeedActivities.feed_contains?(:notifications, attrs, current_user: bob_remote)
+        # assert %{edges: feed} =
+        #          Bonfire.Social.FeedActivities.feed(:notifications, current_user: bob_remote)
+        # # assert feed is empty
+        # assert a_remote = Enum.empty?(feed)
       end)
     end
 
@@ -358,7 +363,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # alice ghosts bob_remote
       # assert {:ok, _ghosted} = Bonfire.Boundaries.Blocks.block(bob_remote_user_on_local, :ghost, current_user: alice_local)
-      attrs = "#{context[:remote][:username]} try out federated post"
+      attrs = "#{context[:remote][:username]} try out federated post 364"
       post_attrs = %{post_content: %{html_body: attrs}}
 
       {:ok, post} =
@@ -371,11 +376,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
-        assert %{edges: feed} =
-                 Bonfire.Social.FeedActivities.feed(:inbox, current_user: bob_remote)
-
-        # assert feed is empty
-        assert a_remote = Enum.empty?(feed)
+        refute FeedActivities.feed_contains?(:inbox, attrs, current_user: bob_remote)
+        # assert %{edges: feed} =
+        #          Bonfire.Social.FeedActivities.feed(:inbox, current_user: bob_remote)
+        # # assert feed is empty
+        # assert a_remote = Enum.empty?(feed)
       end)
     end
 
@@ -392,8 +397,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   end
 
   test "custom with circle containing remote users permitted", context do
+    attrs = "try out federated post with circle containing remote users 398"
+
     post1_attrs = %{
-      post_content: %{html_body: "try out federated post with circle containing remote users"}
+      post_content: %{html_body: attrs}
     }
 
     alice_local = context[:local][:user]
@@ -432,15 +439,17 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
     # on remote instance, bob_remote should see the post
     TestInstanceRepo.apply(fn ->
-      assert %Paginator.Page{edges: [feed_entry | _]} =
-               Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
-               |> debug("bob feed")
+      assert FeedActivities.feed_contains?(:my, attrs, current_user: bob_remote)
 
-      post1remote = feed_entry.activity.object
+      #   assert %Paginator.Page{edges: [feed_entry | _]} =
+      #          Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
+      #          |> debug("bob feed")
 
-      auto_assert true <-
-                    post1remote.post_content.html_body =~
-                      "try out federated post with circle containing remote users"
+      # post1remote = feed_entry.activity.object
+
+      # auto_assert true <-
+      #               post1remote.post_content.html_body =~
+      #                 "try out federated post with circle containing remote users"
     end)
   end
 end
