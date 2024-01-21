@@ -46,8 +46,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
       TestInstanceRepo.apply(fn ->
         Logger.metadata(action: info("init local_on_remote"))
 
-        assert {:ok, local_on_remote} =
-                 AdapterUtils.get_or_fetch_and_create_by_uri(local_ap_id)
+        assert {:ok, local_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(local_ap_id)
 
         assert ulid(local_on_remote) != ulid(local_user)
         assert ulid(remote_user) != ulid(remote_on_local)

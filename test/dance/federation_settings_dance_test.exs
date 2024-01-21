@@ -58,8 +58,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
     user = context[:local][:user]
     remote_follower = context[:remote][:user]
 
-    user =
-      current_user(Settings.put([:activity_pub, :user_federating], nil, current_user: user))
+    user = current_user(Settings.put([:activity_pub, :user_federating], nil, current_user: user))
 
     TestInstanceRepo.apply(fn ->
       Settings.put([:activity_pub, :user_federating], nil, current_user: remote_follower)

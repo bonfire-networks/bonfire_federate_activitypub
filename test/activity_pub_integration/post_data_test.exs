@@ -219,8 +219,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       assert post.post_content.html_body =~ params.object["content"]
 
-      feed_id =
-        Bonfire.Social.Feeds.named_feed_id(:activity_pub)
+      feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
       assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post)
 

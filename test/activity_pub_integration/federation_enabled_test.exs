@@ -36,8 +36,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
   test "can disable federation entirely for a user" do
     me = fake_user!()
 
-    me =
-      current_user(Settings.put([:activity_pub, :user_federating], false, current_user: me))
+    me = current_user(Settings.put([:activity_pub, :user_federating], false, current_user: me))
 
     auto_assert false <- Bonfire.Federate.ActivityPub.federating?(me)
   end
@@ -46,8 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
     me = fake_user!()
     Config.put([:activity_pub, :instance, :federating], true)
 
-    me =
-      current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: me))
+    me = current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: me))
 
     auto_assert nil <- Bonfire.Federate.ActivityPub.federating?(me)
   end
@@ -56,8 +54,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
     me = fake_user!()
     Config.put([:activity_pub, :instance, :federating], true)
 
-    me =
-      current_user(Settings.put([:activity_pub, :user_federating], true, current_user: me))
+    me = current_user(Settings.put([:activity_pub, :user_federating], true, current_user: me))
 
     auto_assert true <- Bonfire.Federate.ActivityPub.federating?(me)
   end
@@ -67,8 +64,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
     me = fake_user!()
 
-    me =
-      current_user(Settings.put([:activity_pub, :user_federating], true, current_user: me))
+    me = current_user(Settings.put([:activity_pub, :user_federating], true, current_user: me))
 
     auto_assert nil <- Bonfire.Federate.ActivityPub.federating?(me)
   end
@@ -78,8 +74,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
     me = fake_user!()
 
-    me =
-      current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: me))
+    me = current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: me))
 
     auto_assert false <- Bonfire.Federate.ActivityPub.federating?(me)
   end

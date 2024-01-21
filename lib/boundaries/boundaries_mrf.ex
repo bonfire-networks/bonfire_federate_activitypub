@@ -77,8 +77,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     block_types = Boundaries.Blocks.types_blocked(check_block_type)
     is_follow? = AdapterUtils.is_follow?(activity)
 
-    rejects =
-      rejects_regex(block_types)
+    rejects = rejects_regex(block_types)
 
     cond do
       is_follow? and :silence == check_block_type and is_local? ->
@@ -292,8 +291,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   end
 
   defp filter_recipients(block_types, activity, local_author_ids, local_recipient_ids, is_local?) do
-    rejects =
-      rejects_regex(block_types)
+    rejects = rejects_regex(block_types)
 
     activity
     |> filter_recipients_field(

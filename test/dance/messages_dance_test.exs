@@ -116,8 +116,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
 
     Logger.metadata(action: info("check that reply-only is NOT in OP's messages"))
 
-    assert %{edges: messages} =
-             Bonfire.Messages.list(local_user) |> debug("feeeed")
+    assert %{edges: messages} = Bonfire.Messages.list(local_user) |> debug("feeeed")
 
     Enum.each(
       messages,

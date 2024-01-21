@@ -35,8 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MoveTest do
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: info("init origin_on_remote"))
 
-      assert {:ok, origin_on_remote} =
-               AdapterUtils.get_or_fetch_and_create_by_uri(origin_ap_id)
+      assert {:ok, origin_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(origin_ap_id)
 
       assert ulid(origin_on_remote) != ulid(local_origin)
       assert ulid(remote_target) != ulid(target_on_local)
@@ -107,8 +106,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MoveTest do
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: info("init origin_on_remote"))
 
-      assert {:ok, origin_on_remote} =
-               AdapterUtils.get_or_fetch_and_create_by_uri(origin_ap_id)
+      assert {:ok, origin_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(origin_ap_id)
 
       Logger.metadata(action: info("init followers_on_remote"))
 
@@ -145,8 +143,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MoveTest do
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: info("init origin_on_remote"))
 
-      assert {:ok, origin_on_remote} =
-               AdapterUtils.get_or_fetch_and_create_by_uri(origin_ap_id)
+      assert {:ok, origin_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(origin_ap_id)
 
       Logger.metadata(action: info("init followers_on_remote"))
 
