@@ -177,7 +177,6 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp object_blocked?(block_types, local_author_ids, rejects, canonical_uri)
        when is_binary(canonical_uri) do
     uri = URI.parse(canonical_uri)
-
     # |> debug("uri")
 
     instance_blocked_in_config?(uri, rejects) ||

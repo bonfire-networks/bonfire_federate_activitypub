@@ -299,6 +299,31 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     id
   end
 
+  def id_or_object_id(%{character: %{peered: nil}} = object) do
+    debug(object, "local actor, so could not find AP ID - generate it instead")
+    URIs.canonical_url(object)
+  end
+
+  def id_or_object_id(%{peered: nil} = object) do
+    debug(object, "local actor, so could not find AP ID - generate it instead")
+    URIs.canonical_url(object)
+  end
+
+  def id_or_object_id(%{actor: %{id: _}} = object) do
+    debug(object, "local actor, so could not find AP ID - attempt to generate it instead")
+    URIs.canonical_url(object)
+  end
+
+  def id_or_object_id(%{character: %{peered: %Ecto.Association.NotLoaded{}}} = object) do
+    error(object, "peered not preloaded, so could not find AP ID")
+    nil
+  end
+
+  def id_or_object_id(%{peered: %Ecto.Association.NotLoaded{}} = object) do
+    error(object, "peered not preloaded, so could not find AP ID")
+    nil
+  end
+
   def id_or_object_id(other) do
     error(other, "could not find AP ID")
     nil
