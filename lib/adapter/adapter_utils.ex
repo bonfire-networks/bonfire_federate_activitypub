@@ -28,7 +28,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       System.get_env("AP_BASE_PATH", "/pub")
   end
 
-  def is_local?(thing, preload_if_needed \\ true) do
+  def is_local?(thing, opts \\ [])
+
+  def is_local?(thing, preload_if_needed) when is_boolean(preload_if_needed),
+    do: is_local?(thing, preload_if_needed: preload_if_needed)
+
+  def is_local?(thing, opts) do
     if is_binary(thing) do
       Bonfire.Common.Needles.one(thing, skip_boundary_check: true)
     else
@@ -43,7 +48,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         false
 
       {:ok, thing} ->
-        is_local?(thing, preload_if_needed)
+        is_local?(thing, opts)
 
       %{id: @service_character_id} ->
         false
@@ -97,12 +102,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         true
 
       object when is_struct(object) ->
-        if preload_if_needed do
+        if opts[:preload_if_needed] != false do
           preload_peered(object)
           |> warn(
             "preloaded peered info (should try always doing this in original query to avoid n+1)"
           )
-          |> is_local?(false)
+          |> is_local?(preload_if_needed: false)
         else
           warn(object, "no case matched for struct")
           true
