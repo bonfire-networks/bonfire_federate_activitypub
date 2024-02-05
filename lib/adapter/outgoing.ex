@@ -40,7 +40,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     if (federate_outgoing? == true or (opts[:manually_fetching?] and federate_outgoing? != false)) and
          ((is_nil(subject) and thing_local?) or
             subject_local?) do
-      prepare_and_queue(subject, verb, thing)
+      prepare_and_queue(subject, verb, thing, opts)
     else
       info(
         thing,
@@ -65,56 +65,19 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # ^ TODO: to disabled only outgoing federation
   end
 
-  defp prepare_and_queue(subject, verb, thing)
+  defp prepare_and_queue(subject, verb, thing, opts)
 
-  defp prepare_and_queue(_subject, :update, %{__struct__: type, id: id})
-       when type in @types_characters do
+  defp prepare_and_queue(_subject, verb, %{__struct__: type, id: id} = character, _opts)
+       when verb in [:update, :edit] and type in @types_characters do
     # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
-    with {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: id),
-         actor_object <-
-           ActivityPub.Web.ActorView.render("actor.json", %{actor: actor}),
-         params <- %{
-           to: [AdapterUtils.public_uri()],
-           cc: [actor.data["followers"]],
-           object: actor_object,
-           actor: actor,
-           local: true
-         } do
-      ActivityPub.Actor.set_cache(actor)
-      ActivityPub.update(params)
-    else
-      e ->
-        preparation_error("Error while attempting to federate the update", e)
-    end
+    push_actor_update(character)
   end
 
-  defp prepare_and_queue(_subject, :delete, %Bonfire.Data.Identity.User{} = user) do
-    # is this broken?
-    with actor <- AdapterUtils.character_to_actor(user) do
-      ActivityPub.delete(actor)
-    end
+  defp prepare_and_queue(subject, :delete, thing, opts) do
+    push_delete(Types.object_type(thing), subject, thing, opts)
   end
 
-  defp prepare_and_queue(subject, :delete, %{__struct__: type} = character)
-       when type in @types_characters do
-    # For Topics, Groups, and other non-user actors
-
-    with actor <- AdapterUtils.character_to_actor(character) do
-      ActivityPub.delete(actor, true, subject)
-    end
-  end
-
-  # delete anything else
-  defp prepare_and_queue(_subject, :delete, %{__struct__: _type} = thing) do
-    with %{} = object <-
-           ActivityPub.Object.get_cached!(pointer: thing.id) do
-      ActivityPub.delete(object)
-    else
-      e -> preparation_error("Error while attempting to federate the delete", e)
-    end
-  end
-
-  defp prepare_and_queue(subject, verb, %{__struct__: object_type} = local_object) do
+  defp prepare_and_queue(subject, verb, %{__struct__: object_type} = local_object, _opts) do
     case Bonfire.Federate.ActivityPub.FederationModules.federation_module({verb, object_type}) do
       {:ok, module} when is_atom(module) ->
         info(
@@ -196,6 +159,77 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     error(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
 
     :ignore
+  end
+
+  defp push_delete(Bonfire.Data.Identity.User, _subject, %{} = user, opts) do
+    # is this broken?
+    with %{} = actor <- opts[:ap_object] || AdapterUtils.character_to_actor(user) do
+      ActivityPub.delete(actor, true, opts ++ [bcc: opts[:ap_bcc]])
+    end
+  end
+
+  defp push_delete(type, subject, character, opts)
+       when type in @types_characters do
+    # For Topics, Groups, and other non-user actors
+    with %{} = actor <- opts[:ap_object] || AdapterUtils.character_to_actor(character) do
+      ActivityPub.delete(
+        actor,
+        true,
+        opts ++
+          [
+            subject: ActivityPub.Actor.get_cached!(pointer: subject),
+            bcc: opts[:ap_bcc]
+          ]
+      )
+    end
+  end
+
+  # delete anything else
+  defp push_delete(_other, subject, %{id: id} = _thing, opts) do
+    with %{} = object <-
+           opts[:ap_object] ||
+             ActivityPub.Object.get_cached!(pointer: id) do
+      ActivityPub.delete(
+        object,
+        true,
+        opts ++
+          [
+            subject: ActivityPub.Actor.get_cached!(pointer: subject),
+            bcc: opts[:ap_bcc]
+          ]
+      )
+    else
+      e -> preparation_error("Could not find the AP object to delete", e)
+    end
+  end
+
+  def push_actor_update(%ActivityPub.Actor{} = actor) do
+    with %{} = actor_object <-
+           ActivityPub.Web.ActorView.render("actor.json", %{actor: actor}),
+         params <- %{
+           to: [AdapterUtils.public_uri()],
+           cc: [actor.data["followers"]],
+           object: actor_object,
+           actor: actor,
+           local: true
+         } do
+      ActivityPub.update(params)
+    else
+      e ->
+        preparation_error("Error while attempting to federate the update", e)
+    end
+  end
+
+  def push_actor_update(%{__struct__: type, id: id})
+      when type in @types_characters do
+    # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
+    with {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: id) do
+      ActivityPub.Actor.set_cache(actor)
+      push_actor_update(actor)
+    else
+      e ->
+        preparation_error("Error while attempting to find the Actor to update", e)
+    end
   end
 
   def push_now!(activity) do

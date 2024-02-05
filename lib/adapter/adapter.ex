@@ -13,7 +13,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   # alias Bonfire.Common.Needles
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
-  # alias Bonfire.Federate.ActivityPub.Incoming
+  alias Bonfire.Federate.ActivityPub.Incoming
+  alias Bonfire.Federate.ActivityPub.Outgoing
   alias ActivityPub.Actor
 
   import Bonfire.Federate.ActivityPub
@@ -33,7 +34,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     #   "activity_id" => activity.id
     #   # "activity" => activity
     # })
-    Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+    Incoming.receive_activity(activity)
     |> debug("receive done")
   end
 
@@ -293,9 +294,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   @doc """
   For updating an Actor in cache after a User/etc is updated
   """
-  def update_local_actor_cache(character) do
+  def local_actor_updated(character, is_local?) do
     with %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
       ActivityPub.Actor.set_cache(actor)
+
+      if is_local?,
+        do:
+          Outgoing.push_actor_update(character)
+          |> debug("federated actor Update")
     end
 
     {:ok, character}
@@ -363,13 +369,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_publish_object(%{} = object, manually_fetching?) do
     object
     # |> info()
-    |> Bonfire.Federate.ActivityPub.Outgoing.maybe_federate(nil, :create, ...,
-      manually_fetching?: true
-    )
+    |> Outgoing.maybe_federate(nil, :create, ..., manually_fetching?: true)
   end
 
   def get_or_create_service_actor() do
-    case ActivityPub.Actor.get_cached(username: "activitypub_fetcher") do
+    case ActivityPub.Actor.get_cached(pointer: AdapterUtils.service_character_id()) do
       {:ok, actor} ->
         {:ok, actor}
 

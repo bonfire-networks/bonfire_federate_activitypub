@@ -15,6 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   import Untangle
 
   @service_character_id "1ACT1V1TYPVBREM0TESFETCHER"
+  @service_character_username "fediverse_user"
 
   def public_uri(), do: ActivityPub.Config.public_uri()
 
@@ -785,6 +786,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       location = e(user_etc, :profile, :location, nil)
 
+      # TODO: actual update time?
+      updated_at = NaiveDateTime.utc_now()
+
       data =
         %{
           "type" => type,
@@ -831,7 +835,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
               current_user: user_etc
             ) !=
               true,
-          "indexable" => Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user_etc)
+          "indexable" => Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user_etc),
+          "updated" =>
+            updated_at
+            |> NaiveDateTime.to_iso8601()
         }
         |> debug("data")
 
@@ -844,7 +851,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         pointer_id: user_etc.id,
         username: e(user_etc, :character, :username, nil),
         deactivated: false,
-        updated_at: NaiveDateTime.utc_now()
+        updated_at: updated_at
       }
       |> debug("formatted")
     else
@@ -1227,15 +1234,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def create_service_character() do
-    Bonfire.Me.Fake.fake_user!("activitypub_fetcher", %{id: @service_character_id},
+  def service_character_id, do: @service_character_id
+  def service_character_username, do: @service_character_username
+
+  def create_service_character(username \\ service_character_username()) do
+    Bonfire.Me.Fake.fake_user!(username, %{id: service_character_id()},
       request_before_follow: true,
       undiscoverable: true
     )
   end
 
   def get_or_create_service_character() do
-    with {:ok, user} <- Bonfire.Me.Users.by_id(@service_character_id) do
+    with {:ok, user} <- Bonfire.Me.Users.by_id(service_character_id()) do
       user
     else
       {:error, :not_found} ->
