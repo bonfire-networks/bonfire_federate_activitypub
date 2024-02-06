@@ -1,4 +1,4 @@
-defmodule Bonfire.Repo.Migrations.CreateObanTables  do
+defmodule Bonfire.Repo.Migrations.CreateObanTables do
   @moduledoc false
   use Ecto.Migration
 
