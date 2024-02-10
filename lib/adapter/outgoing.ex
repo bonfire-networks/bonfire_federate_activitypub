@@ -133,7 +133,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  defp prepare_and_queue(_subject, verb, object) do
+  defp prepare_and_queue(_subject, verb, object, _) do
     preparation_error("Unrecognised object for AP publisher", [verb, object])
   end
 
