@@ -1234,7 +1234,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def service_character_id, do: @service_character_id
+  # @service_character_id
+  def service_character_id, do: Bonfire.Me.Users.remote_fetcher()
   def service_character_username, do: @service_character_username
 
   def create_service_character(username \\ service_character_username()) do

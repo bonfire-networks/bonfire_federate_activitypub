@@ -112,8 +112,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def get_actor_by_id(character) when is_struct(character) do
-    with true <- AdapterUtils.is_local?(character) |> debug(),
+  def get_actor_by_id(%{id: id} = character) when is_struct(character) do
+    with true <- AdapterUtils.is_local?(character) or id == AdapterUtils.service_character_id(),
          %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) |> debug() do
       {:ok, actor}
     end
