@@ -517,6 +517,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     get_character_by_username(q)
   end
 
+  def get_character(%{ap_id: q}) when is_binary(q) do
+    get_character_by_ap_id(q)
+  end
+
+  def get_character(%{username: q}) when is_binary(q) do
+    get_character_by_username(q)
+  end
+
   def get_character(q) do
     warn(q, "dunno how")
     {:error, :not_found}

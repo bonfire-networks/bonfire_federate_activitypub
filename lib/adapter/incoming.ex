@@ -58,7 +58,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       "AP - fetch the #{activity.data["id"]} activity's target_id data from URI when we only have an AP ID: #{target_id}"
     )
 
-    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(target_id) do
+    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(target_id,
+           return_tombstones: e(activity.data, "type", nil) == "Delete"
+         ) do
       {:ok, target} ->
         debug(target, "fetched target")
 
@@ -83,15 +85,17 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     )
 
     # info(activity, "activity")
-    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id) do
+    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id,
+           return_tombstones: e(activity.data, "type", nil) == "Delete"
+         ) do
       {:ok, object} ->
         debug(object, "fetched object")
 
         receive_activity(activity, object)
         |> debug("received activity on #{repo()}...")
 
-      _ ->
-        {:error, :not_found}
+      e ->
+        error(e)
     end
   end
 
@@ -109,7 +113,10 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     # info(activity, "activity")
     for object_id <- object_ids do
-      with {:ok, o} <- ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id) do
+      with {:ok, o} <-
+             ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id,
+               return_tombstones: e(activity.data, "type", nil) == "Delete"
+             ) do
         o
       end
     end
