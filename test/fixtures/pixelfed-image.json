@@ -1,31 +1,41 @@
 {
     "@context": [
-        "https://www.w3.org/ns/activitystreams",
         "https://w3id.org/security/v1",
+        "https://www.w3.org/ns/activitystreams",
         {
-            "sc": "http://schema.org#",
             "Hashtag": "as:Hashtag",
             "sensitive": "as:sensitive",
-            "commentsEnabled": "sc:Boolean",
+            "schema": "http://schema.org/",
+            "pixelfed": "http://pixelfed.org/ns#",
+            "commentsEnabled": {
+                "@id": "pixelfed:commentsEnabled",
+                "@type": "schema:Boolean"
+            },
             "capabilities": {
-                "announce": {
-                    "@type": "@id"
-                },
-                "like": {
-                    "@type": "@id"
-                },
-                "reply": {
-                    "@type": "@id"
-                }
+                "@id": "pixelfed:capabilities",
+                "@container": "@set"
+            },
+            "announce": {
+                "@id": "pixelfed:canAnnounce",
+                "@type": "@id"
+            },
+            "like": {
+                "@id": "pixelfed:canLike",
+                "@type": "@id"
+            },
+            "reply": {
+                "@id": "pixelfed:canReply",
+                "@type": "@id"
             },
             "toot": "http://joinmastodon.org/ns#",
-            "Emoji": "toot:Emoji"
+            "Emoji": "toot:Emoji",
+            "blurhash": "toot:blurhash"
         }
     ],
     "id": "https://pixelfed.local/p/dajbelshaw/371584017931323759",
     "type": "Note",
     "summary": null,
-    "content": "At the end of last year I sat down with a bunch of magazines and created this A3-sized collage. It was a cathartic exercise, so I'm considering doing it again this <a href=\"https://wikipedia.org/2021\">year</a>. I also fixed a bug (\u003ca href=\"https://writefreely.org/issues/470\"\u003e#470\u003c/a\u003e)...",
+    "content": "At the end of last year I sat down with a bunch of magazines and created this A3-sized collage. It was a cathartic exercise, so I'm considering doing it again this year.",
     "inReplyTo": null,
     "published": "2021-12-01T09:02:13+00:00",
     "url": "https://pixelfed.local/p/dajbelshaw/371584017931323759",
@@ -41,8 +51,11 @@
         {
             "type": "Image",
             "mediaType": "image/jpeg",
-            "url": "https://pixelfed-prod.nyc3.cdn.digitaloceanspaces.com/public/m/_v2/411/7198ec0c0-99bc91/6CWmVqUJS5Rx/cXZwkROZAkUOQEidxDNxZYlezi5nRBBLy5f2YAm0.jpg",
-            "name": null
+            "url": "https://pxscdn.com/public/m/_v2/411/7198ec0c0-99bc91/6CWmVqUJS5Rx/cXZwkROZAkUOQEidxDNxZYlezi5nRBBLy5f2YAm0.jpg",
+            "name": null,
+            "blurhash": "U8H-lR?]4mQS0NWaE5kS9qrr9tEgMdZ~$|X9",
+            "width": 1440,
+            "height": 1080
         }
     ],
     "tag": [],
