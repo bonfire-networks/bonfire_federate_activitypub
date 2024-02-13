@@ -12,6 +12,17 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   alias Bonfire.Common.URIs
   alias Bonfire.Common.Extend
 
+  def list do
+    repo().many(
+      from(p in Peer)
+      |> order_by(desc: :id)
+    )
+  end
+
+  def list_paginated do
+    # TODO: 
+  end
+
   def get(canonical_uri) when is_binary(canonical_uri) do
     with %URI{} = instance_url <- URIs.base_url(canonical_uri) do
       do_get(instance_url)

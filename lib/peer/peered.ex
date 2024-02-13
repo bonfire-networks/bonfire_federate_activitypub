@@ -57,6 +57,13 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     nil
   end
 
+  def list do
+    repo().many(
+      from(p in Peered)
+      |> proload(:peer)
+    )
+  end
+
   def get_canonical_uri(obj_or_id),
     do: get(obj_or_id) |> Utils.e(:canonical_uri, nil)
 
