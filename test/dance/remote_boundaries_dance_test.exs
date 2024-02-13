@@ -3,6 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
   @moduletag :test_instance
+  @moduletag :mneme
 
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]

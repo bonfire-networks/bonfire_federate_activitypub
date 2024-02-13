@@ -31,6 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
   end
 
   @tag :test_instance
+  @tag :mneme
   test "can disable instance federation entirely", context do
     Config.put([:activity_pub, :instance, :federating], false)
     user = context[:local][:user]
@@ -64,19 +65,16 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
       Settings.put([:activity_pub, :user_federating], nil, current_user: remote_follower)
     end)
 
-    auto_assert {:ok, %ActivityPub.Actor{}} <-
-                  ActivityPub.Federator.Fetcher.fetch_object_from_id(
-                    context[:remote][:canonical_url]
-                  )
+    assert {:ok, %ActivityPub.Actor{}} =
+             ActivityPub.Federator.Fetcher.fetch_object_from_id(context[:remote][:canonical_url])
 
     TestInstanceRepo.apply(fn ->
-      auto_assert {:ok, %ActivityPub.Actor{}} <-
-                    ActivityPub.Federator.Fetcher.fetch_object_from_id(
-                      context[:local][:canonical_url]
-                    )
+      assert {:ok, %ActivityPub.Actor{}} =
+               ActivityPub.Federator.Fetcher.fetch_object_from_id(context[:local][:canonical_url])
     end)
   end
 
+  @tag :mneme
   test "can disable federation entirely for a user", context do
     Config.put([:activity_pub, :instance, :federating], true)
     debug(Config.get([:activity_pub, :instance, :federating]), "askjhdas")
@@ -108,10 +106,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
       current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: user))
 
     TestInstanceRepo.apply(fn ->
-      auto_assert {:ok, %ActivityPub.Actor{}} <-
-                    ActivityPub.Federator.Fetcher.fetch_object_from_id(
-                      context[:local][:canonical_url]
-                    )
+      assert {:ok, %ActivityPub.Actor{}} =
+               ActivityPub.Federator.Fetcher.fetch_object_from_id(context[:local][:canonical_url])
     end)
   end
 end

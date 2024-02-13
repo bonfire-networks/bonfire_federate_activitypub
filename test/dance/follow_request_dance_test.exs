@@ -32,6 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
   end
 
   # https://github.com/bonfire-networks/bonfire-app/issues/537
+  @tag :mneme
   @tag :fixme
   test "remote follow on locked-down profile makes a request, which user can accept, which it turns into a follow, and a post federates back to the follower, and unfollow works",
        context do

@@ -18,19 +18,19 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
   test "can disable instance federation entirely" do
     Config.put([:activity_pub, :instance, :federating], false)
 
-    auto_assert false <- Bonfire.Federate.ActivityPub.federating?()
+    assert false == Bonfire.Federate.ActivityPub.federating?()
   end
 
   test "can set instance federation to manual mode" do
     Config.put([:activity_pub, :instance, :federating], nil)
 
-    auto_assert nil <- Bonfire.Federate.ActivityPub.federating?()
+    assert nil == Bonfire.Federate.ActivityPub.federating?()
   end
 
   test "can enable instance federation" do
     Config.put([:activity_pub, :instance, :federating], true)
 
-    auto_assert true <- Bonfire.Federate.ActivityPub.federating?()
+    assert Bonfire.Federate.ActivityPub.federating?()
   end
 
   test "can disable federation entirely for a user" do
@@ -38,7 +38,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
     me = current_user(Settings.put([:activity_pub, :user_federating], false, current_user: me))
 
-    auto_assert false <- Bonfire.Federate.ActivityPub.federating?(me)
+    assert false == Bonfire.Federate.ActivityPub.federating?(me)
   end
 
   test "can set federation to manual mode for a user" do
@@ -47,7 +47,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
     me = current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: me))
 
-    auto_assert nil <- Bonfire.Federate.ActivityPub.federating?(me)
+    assert nil == Bonfire.Federate.ActivityPub.federating?(me)
   end
 
   test "can enable federation for a user" do
@@ -56,7 +56,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
     me = current_user(Settings.put([:activity_pub, :user_federating], true, current_user: me))
 
-    auto_assert true <- Bonfire.Federate.ActivityPub.federating?(me)
+    assert Bonfire.Federate.ActivityPub.federating?(me)
   end
 
   test "cannot enable federation for user when instance is in manual mode" do
@@ -66,7 +66,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
     me = current_user(Settings.put([:activity_pub, :user_federating], true, current_user: me))
 
-    auto_assert nil <- Bonfire.Federate.ActivityPub.federating?(me)
+    assert nil == Bonfire.Federate.ActivityPub.federating?(me)
   end
 
   test "cannot put user in manual mode when instance federation is disabled" do
@@ -76,6 +76,6 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
 
     me = current_user(Settings.put([:activity_pub, :user_federating], :manual, current_user: me))
 
-    auto_assert false <- Bonfire.Federate.ActivityPub.federating?(me)
+    assert false == Bonfire.Federate.ActivityPub.federating?(me)
   end
 end
