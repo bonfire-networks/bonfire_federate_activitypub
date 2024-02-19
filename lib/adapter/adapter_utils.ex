@@ -87,6 +87,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{created: %{creator: %{peered: %Peered{}}}} ->
         false
 
+      %{peered: nil} ->
+        true
+
       %{creator: %{peered: nil}} ->
         true
 
@@ -99,7 +102,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{character: %{peered: nil}} ->
         true
 
-      %{peered: nil} ->
+      %{user: %{peered: nil}} ->
         true
 
       object when is_struct(object) ->
@@ -141,6 +144,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{created: _} ->
         object
         |> repo().maybe_preload(created: [:peered, creator: :peered])
+
+       %{user: _} ->
+        object
+        |> repo().maybe_preload(user: :peered)
 
       _ ->
         warn(object, "did not know how to preload peered")
