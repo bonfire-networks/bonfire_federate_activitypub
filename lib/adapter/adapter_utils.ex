@@ -145,7 +145,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         object
         |> repo().maybe_preload(created: [:peered, creator: :peered])
 
-       %{user: _} ->
+      %{user: _} ->
         object
         |> repo().maybe_preload(user: :peered)
 
