@@ -127,7 +127,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         # TODO: fallback to creating a Note for unknown types that have a PostContent, Profile or Named?
 
         preparation_error(
-          "No FederationModules was defined for verb {#{inspect(verb)}, #{object_type}}",
+          "No FederationModules or SchemaModules was defined for verb {#{inspect(verb)}, #{object_type}}",
           [verb, local_object]
         )
     end
