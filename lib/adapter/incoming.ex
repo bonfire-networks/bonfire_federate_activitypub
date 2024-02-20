@@ -326,17 +326,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     else
       pointer_id =
         with published when is_binary(published) <-
-               object.data["published"] || activity.data["published"],
-             {:ok, utc_date_published, _} <-
-               DateTime.from_iso8601(published) |> info("date from AP"),
-             # only if published in the past
-             :lt <-
-               DateTime.compare(utc_date_published, DateTime.now!("Etc/UTC")) do
-          utc_date_published
-          # |> info("utc_date_published")
-          |> DateTime.to_unix(:millisecond)
-          # |> info("to_unix")
-          |> Needle.ULID.generate()
+               object.data["published"] || activity.data["published"] do
+          DatesTimes.maybe_generate_ulid(published)
         else
           _ -> nil
         end
