@@ -13,20 +13,30 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   alias Bonfire.Common.Extend
 
   def list do
-    repo().many(
-      from(p in Peer)
-      |> order_by(desc: :id)
-    )
+    repo().many(list_query())
   end
 
-  def list_paginated do
-    # TODO: 
+  def list_paginated(opts) do
+    repo().many_paginated(list_query(), opts)
+  end
+
+  def list_query() do
+    from(p in Peer)
+    |> order_by(desc: :id)
   end
 
   def get(canonical_uri) when is_binary(canonical_uri) do
     with %URI{} = instance_url <- URIs.base_url(canonical_uri) do
       do_get(instance_url)
     end
+  end
+
+  def get_by_domain(canonical_uri) when is_binary(canonical_uri) do
+    from(p in Peer,
+      where: p.display_hostname == ^canonical_uri
+    )
+    # |> repo().maybe_where_ilike("ap_base_uri", canonical_uri, "%//")
+    |> repo().single()
   end
 
   defp do_get(instance_url) do
