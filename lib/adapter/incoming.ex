@@ -86,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     # info(activity, "activity")
     case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id,
-           return_tombstones: e(activity.data, "type", nil) == "Delete"
+           return_tombstones: e(activity.data, "type", nil) == "Delete" or e(activity.data, "object", "type", nil) == "Tombstone"
          ) do
       {:ok, object} ->
         debug(object, "fetched object")
@@ -232,7 +232,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     info("AP Match#2 - by activity_type only: #{activity_type}")
 
     with {:ok, actor} <- activity_character(activity),
-         {:error, _} <-
+         {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type),
              actor,
@@ -251,7 +251,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     info("AP Match#3 - by object_type only: #{object_type}")
 
     with {:ok, actor} <- activity_character(activity),
-         {:error, _} <-
+         {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type),
              actor,
@@ -272,7 +272,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     module = Application.get_env(:bonfire, :federation_fallback_module)
 
     if module do
-      info("AP - handling activity with fallback")
+      info("AP - handling activity with fallback module")
       # module.create(actor, activity, object)
       handle_activity_with(
         {:ok, module},
@@ -442,7 +442,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   # end
 
   defp handle_activity_with(module, _actor, _activity, _object) do
-    debug(module, "AP - no match in handle_activity_with")
+    warn(module, "AP - no match in handle_activity_with")
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
     {:no_federation_module_match, :ignore}
