@@ -86,7 +86,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     # info(activity, "activity")
     case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id,
-           return_tombstones: e(activity.data, "type", nil) == "Delete" or e(activity.data, "object", "type", nil) == "Tombstone"
+           return_tombstones:
+             e(activity.data, "type", nil) == "Delete" or
+               e(activity.data, "object", "type", nil) == "Tombstone"
          ) do
       {:ok, object} ->
         debug(object, "fetched object")
@@ -320,7 +322,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     info(character, "character")
     ap_obj_id = object.data["id"]
 
-    if Bonfire.Common.Needles.exists?(ap_obj_id) do
+    if ap_obj_id && Bonfire.Common.Needles.exists?(ap_obj_id) do
       error(ap_obj_id, "Already exists locally")
       Bonfire.Common.Needles.get(ap_obj_id, skip_boundary_check: true)
     else
