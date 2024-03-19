@@ -797,7 +797,22 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
-      aliases = e(user_etc, :character, :aliases, nil)
+      aliases =
+        e(user_etc, :character, :aliases, nil)
+        |> Enum.map(&(e(&1, :object, :character, nil) || e(&1, :object, nil)))
+        |> Enum.reject(&is_nil/1)
+        # |> IO.inspect(label: "objjj")
+        |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+        |> Enum.group_by(fn
+          %struct{} ->
+            struct
+
+          other ->
+            warn(other, "unsupported data")
+            :unknown
+        end)
+        # |> IO.inspect(label: "aliaases")
+
       # aliased = e(user_etc, :character, :aliased, nil)
 
       location = e(user_etc, :profile, :location, nil)
@@ -816,7 +831,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           "preferredUsername" => e(user_etc, :character, :username, nil),
           "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
           "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
-          "alsoKnownAs" => if(aliases, do: alias_actor_ids(aliases)),
+          "alsoKnownAs" =>
+            if(also_known = Map.get(aliases, Bonfire.Data.Identity.Character),
+              do: alias_actor_ids(also_known)
+            ),
           "icon" => icon,
           "image" => image,
           "location" =>
@@ -829,19 +847,17 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
               }
             ),
           "attachment" =>
-            filter_empty(
-              [
-                maybe_attach_property_value(
-                  :website,
-                  e(user_etc, :profile, :website, nil)
-                ),
-                maybe_attach_property_value(
-                  l("Location"),
-                  location
-                )
-              ],
-              nil
-            ),
+            ([
+               maybe_attach_property_value(
+                 :website,
+                 e(user_etc, :profile, :website, nil)
+               ),
+               maybe_attach_property_value(
+                 l("Location"),
+                 location
+               )
+             ] ++ alias_maybe_attach_property_values(Map.get(aliases, Bonfire.Files.Media)))
+            |> filter_empty(nil),
           "endpoints" => %{
             "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
           },
@@ -879,18 +895,24 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   defp alias_actor_ids(aliases) when is_list(aliases) and aliases != [],
-    do:
-      aliases
-      |> Enum.map(&(e(&1, :object, :character, nil) || e(&1, :object, nil)))
-      |> Enum.reject(&is_nil/1)
-      |> IO.inspect(label: "objjj")
-      |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
-      |> IO.inspect(label: "followwed")
-      # |> Enum.map(&(e(&1, :object, nil)))
-      |> Enum.map(&alias_actor_ids/1)
+    do: Enum.map(aliases, &alias_actor_ids/1)
 
-  defp alias_actor_ids(%{} = character), do: Bonfire.Common.URIs.canonical_url(character)
+  defp alias_actor_ids(%{} = o), do: Bonfire.Common.URIs.canonical_url(o)
   defp alias_actor_ids(_), do: []
+
+  defp alias_maybe_attach_property_values(aliases) when is_list(aliases) and aliases != [] do
+    Enum.map(aliases, fn o ->
+      uri = Bonfire.Common.URIs.canonical_url(o)
+
+      maybe_attach_property_value(
+        e(o, :metadata, "label", nil) || e(o, :media_type, nil) || e(o, :username, nil) ||
+          URIs.display_url(uri),
+        uri
+      )
+    end)
+  end
+
+  defp alias_maybe_attach_property_values(_), do: []
 
   def create_remote_actor({:ok, a}),
     do: create_remote_actor(a)
@@ -1219,12 +1241,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def maybe_format_image_object_from_path(_), do: nil
 
-  def maybe_attach_property_value(:website, "http" <> _ = url)
+  def maybe_attach_property_value(key, "http" <> _ = url)
       when is_binary(url),
-      do: property_value(l("Website"), "<a rel=\"me\" href=\"#{url}\">#{url}</a>")
+      do: property_value(key || l("Website"), "<a rel=\"me\" href=\"#{url}\">#{url}</a>")
 
   def maybe_attach_property_value(:website, url) when is_binary(url),
-    do: maybe_attach_property_value(:website, "http://" <> url)
+    do: maybe_attach_property_value(nil, "http://" <> url)
 
   def maybe_attach_property_value(key, value) when is_binary(value),
     do: property_value(to_string(key), value)
