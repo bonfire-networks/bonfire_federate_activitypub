@@ -786,6 +786,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             ]
           ]
         )
+        # |> Bonfire.Common.Needles.Preload.maybe_preload_nested_pointers([character: [aliases: [:object]]])
         |> debug("preloaded_user_etc")
 
       # icon = maybe_format_image_object_from_path(Bonfire.Files.IconUploader.remote_url(user_etc.profile.icon))
@@ -877,10 +878,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  defp alias_actor_ids(aliases) when is_list(aliases),
-    do: Enum.map(aliases, &(e(&1, :object, nil) |> alias_actor_ids()))
+  defp alias_actor_ids(aliases) when is_list(aliases) and aliases != [],
+    do:
+      aliases
+      |> Enum.map(&(e(&1, :object, :character, nil) || e(&1, :object, nil)))
+      |> Enum.reject(&is_nil/1)
+      |> IO.inspect(label: "objjj")
+      |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+      |> IO.inspect(label: "followwed")
+      # |> Enum.map(&(e(&1, :object, nil)))
+      |> Enum.map(&alias_actor_ids/1)
 
-  defp alias_actor_ids(character), do: Bonfire.Common.URIs.canonical_url(character)
+  defp alias_actor_ids(%{} = character), do: Bonfire.Common.URIs.canonical_url(character)
+  defp alias_actor_ids(_), do: []
 
   def create_remote_actor({:ok, a}),
     do: create_remote_actor(a)

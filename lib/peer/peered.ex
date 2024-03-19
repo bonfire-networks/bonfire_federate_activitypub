@@ -187,10 +187,11 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     # FIXME: why force?
     object =
       repo().preload(object, [peered: [:peer]], force: true)
-      |> debug("fooooobj")
 
-    opts
-    |> debug("fooooopts")
+    # |> debug("fooooobj")
+
+    # opts
+    # |> debug("fooooopts")
 
     peered = Map.get(object, :peered) || %{}
     peer = Map.get(peered, :peer)
