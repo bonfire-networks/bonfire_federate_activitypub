@@ -811,7 +811,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             warn(other, "unsupported data")
             :unknown
         end)
-        # |> IO.inspect(label: "aliaases")
+
+      # |> IO.inspect(label: "aliaases")
 
       # aliased = e(user_etc, :character, :aliased, nil)
 
