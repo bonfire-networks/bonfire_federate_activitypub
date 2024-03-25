@@ -798,7 +798,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
       aliases =
-        e(user_etc, :character, :aliases, nil)
+        e(user_etc, :character, :aliases, [])
         |> Enum.map(&(e(&1, :object, :character, nil) || e(&1, :object, nil)))
         |> Enum.reject(&is_nil/1)
         # |> IO.inspect(label: "objjj")
