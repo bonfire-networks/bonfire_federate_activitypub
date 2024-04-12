@@ -5,8 +5,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Common
-  # alias Bonfire.Common.Utils
+  alias Common.Utils
   alias Common.Enums
+  alias Common.Extend
   alias Common.Types
 
   # defines default types that can be federated as AP Actors (overriden by config)
@@ -86,20 +87,22 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         )
 
         cond do
-          Code.ensure_loaded?(module) and function_exported?(module, :ap_publish_activity, 3) ->
-            Bonfire.Common.Utils.maybe_apply(
+          Extend.module_enabled?(module) and function_exported?(module, :ap_publish_activity, 3) ->
+            Utils.maybe_apply(
               module,
               :ap_publish_activity,
               [subject, verb, local_object],
-              &preparation_error/2
+              current_user: subject,
+              fallback_fun: &preparation_error/2
             )
 
           true ->
-            Bonfire.Common.Utils.maybe_apply(
+            Utils.maybe_apply(
               module,
               :ap_publish_activity,
               [verb, local_object],
-              &preparation_error/2
+              current_user: subject,
+              fallback_fun: &preparation_error/2
             )
         end
         |> debug("donz")

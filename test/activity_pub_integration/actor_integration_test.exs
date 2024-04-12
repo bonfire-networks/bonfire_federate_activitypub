@@ -97,7 +97,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert conn["publicKey"]
 
     assert conn["discoverable"] == true
-    assert conn["indexable"] == Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer)
+
+    assert conn["indexable"] ==
+             Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user)
 
     user =
       current_user(
