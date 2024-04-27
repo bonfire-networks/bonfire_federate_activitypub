@@ -11,7 +11,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
     instance = Application.get_env(:activity_pub, :instance)
 
     %Nodeinfo{
-      app_name: app_name,
+      app_name: "#{app_name}; compatible: mastodon, akkoma",
       app_version: Bonfire.Application.version(),
       open_registrations: !Bonfire.Me.Accounts.instance_is_invite_only?(),
       user_count: Bonfire.Me.Users.maybe_count(),
