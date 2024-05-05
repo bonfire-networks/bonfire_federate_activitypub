@@ -2,6 +2,8 @@
 # Bonfire.Common.Config.require_extension_config!(:bonfire_federate_activitypub)
 
 defmodule Bonfire.Federate.ActivityPub do
+  @moduledoc "./README.md" |> File.stream!() |> Enum.drop(1) |> Enum.join()
+
   import Untangle
   alias Bonfire.Common.Config
   alias Bonfire.Common.Settings
