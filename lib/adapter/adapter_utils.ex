@@ -795,6 +795,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       icon = maybe_format_image_object_from_path(Media.avatar_url(user_etc))
       image = maybe_format_image_object_from_path(Media.banner_url(user_etc))
 
+      base_url = Bonfire.Common.URIs.base_url()
       ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
       aliases =
@@ -860,7 +861,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              ] ++ alias_maybe_attach_property_values(Map.get(aliases, Bonfire.Files.Media)))
             |> filter_empty(nil),
           "endpoints" => %{
-            "sharedInbox" => Bonfire.Common.URIs.base_url() <> ap_base_path <> "/shared_inbox"
+            "sharedInbox" => base_url <> ap_base_path <> "/shared_inbox",
+            "oauthAuthorizationEndpoint" => base_url <> "/oauth/authorize",
+            "oauthRegistrationEndpoint" => base_url <> "/api/v1/apps",
+            "oauthTokenEndpoint" => base_url <> "/oauth/token"
           },
           # whether user should appear in directories and search engines
           "discoverable" =>
