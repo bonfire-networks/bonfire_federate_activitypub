@@ -34,8 +34,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     #   "activity_id" => activity.id
     #   # "activity" => activity
     # })
+
+    # case 
     Incoming.receive_activity(activity)
-    |> debug("receive done")
+    # |> debug("receive done") do
+    #   nil -> activity
+    #   received -> received
+    # end
   end
 
   defp character_id_from_actor(actor),

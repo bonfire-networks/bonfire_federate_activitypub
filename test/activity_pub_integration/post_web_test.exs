@@ -1,5 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.PostWebTest do
-  use Bonfire.Federate.ActivityPub.ConnCase
+  use Bonfire.Federate.ActivityPub.ConnCase, async: false
   import Tesla.Mock
   import Untangle
   alias Bonfire.Posts
@@ -8,8 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 
-  setup do
-    mock(fn
+  setup_all do
+    mock_global(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
 
@@ -19,7 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       _ ->
         raise Tesla.Mock.Error, "Request not mocked"
     end)
-    |> IO.inspect(label: "setup done")
+    |> debug("setup done")
 
     :ok
   end
@@ -28,7 +28,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
     test "fetch local post from AP API with Pointer ID, and take into account unindexable setting" do
       user =
         fake_user!()
-        |> IO.inspect(label: "a user")
+
+      # |> debug("a user")
 
       user =
         current_user(

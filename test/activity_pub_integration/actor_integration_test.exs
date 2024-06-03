@@ -11,6 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   @remote_actor_url @remote_instance <> "/@karen"
   @webfinger @remote_instance <>
                "/.well-known/webfinger?resource=acct:" <> @actor_name
+  @webfinger @remote_instance <>
+               "/.well-known/webfinger?resource=acct%3Akaren%40mocked.local"
 
   # TODO: move this into fixtures
   setup_all do
@@ -22,6 +24,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
         json(Simulate.actor_json(@remote_actor))
 
       %{method: :get, url: @webfinger} ->
+        json(Simulate.webfingered())
+
+      %{method: :get, url: @webfinger2} ->
         json(Simulate.webfingered())
 
       %{

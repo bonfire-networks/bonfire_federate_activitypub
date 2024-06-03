@@ -65,7 +65,9 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     }
   end
 
-  def remote_activity_json_with_mentions(actor, tos, extra \\ %{}) do
+  def remote_activity_json_with_mentions(actor, tos, extra \\ %{})
+
+  def remote_activity_json_with_mentions(actor, tos, extra) do
     context = "blabla"
 
     object =
@@ -96,7 +98,11 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
       actor: actor,
       context: context,
       object: object,
-      to: tos,
+      to:
+        Enum.map(List.wrap(tos), fn
+          %{ap_id: ap_id} -> ap_id
+          ap_id -> ap_id
+        end),
       local: false,
       additional: %{
         "id" => @remote_instance <> "/pub/" <> Needle.ULID.autogenerate(),
