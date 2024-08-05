@@ -164,8 +164,13 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     :ignore
   end
 
+  defp push_delete(Bonfire.Data.Identity.Account, _subject, _, _opts) do
+    debug("do not federate deletion of account, since that's an internal construct")
+    :ignore
+  end
+
   defp push_delete(Bonfire.Data.Identity.User, _subject, %{} = user, opts) do
-    # is this broken?
+    # TODO: is this broken?
     with %{} = actor <- opts[:ap_object] || AdapterUtils.character_to_actor(user) do
       ActivityPub.delete(actor, true, opts ++ [bcc: opts[:ap_bcc]])
     end
