@@ -207,7 +207,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
           ]
       )
     else
-      e -> preparation_error("Could not find the AP object to delete", e)
+      e ->
+        preparation_error("Could not find the AP object to delete", e)
+        :ignore
     end
   end
 
