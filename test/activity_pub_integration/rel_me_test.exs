@@ -1,5 +1,5 @@
 # defmodule Bonfire.Federate.ActivityPub.RelMeTest do
-#  # NOTE: see also `Furlex.RelMeTest`
+#  # NOTE: see also `Unfurl.RelMeTest`
 #   use Bonfire.Federate.ActivityPub.ConnCase, async: false
 #   import Tesla.Mock
 #   import Untangle
