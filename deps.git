@@ -3,5 +3,5 @@ bonfire_me = "https://github.com/bonfire-networks/bonfire_me"
 bonfire_social = "https://github.com/bonfire-networks/bonfire_social"
 # bonfire_web_phoenix = "https://github.com/bonfire-networks/bonfire_web_phoenix"
 
-activity_pub = "https://github.com/bonfire-networks/activity_pub#develop"
+activity_pub = "https://github.com/bonfire-networks/activity_pub"
 nodeinfo = "https://github.com/bonfire-networks/nodeinfo"
