@@ -113,7 +113,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           )
           |> is_local?(preload_if_needed: false)
         else
-          warn(object, "no case matched for struct")
+          warn(object, "no case matched for struct (maybe need to preload peered info)")
           true
         end
 
