@@ -713,10 +713,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_context_ap_id(_), do: nil
 
+  def character_to_actor(nil), do: nil
+
   def character_to_actor(character) do
-    # debug(character, "character")
+    debug(character, "character")
 
     character_module(character)
+    |> debug()
     |> maybe_apply_or(:format_actor, character)
 
     # with %ActivityPub.Actor{} = actor <-
@@ -734,21 +737,30 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     # end
   end
 
-  # TODO: put in generic place, maybe as part of maybe_apply
-  def maybe_apply_or(module, fun, args, fallback_fn \\ nil) do
+  defp maybe_apply_or(type, fun, args, fallback_fn \\ nil)
+
+  defp maybe_apply_or(type, fun, args, fallback_fn) when is_atom(type) and not is_nil(type) do
     with {:error, e} <-
            Bonfire.Common.ContextModule.maybe_apply(
-             module,
+             type,
              fun,
              args
            ) do
       warn(e, "falling back on generic function")
 
-      case fallback_fn || fun do
-        fun when is_function(fun) -> apply(fun, List.wrap(args))
-        {mod, fun} -> apply(mod, fun, List.wrap(args))
-        fun when is_atom(fun) -> apply(__MODULE__, fun, List.wrap(args))
-      end
+      apply_fun_style(fallback_fn || fun, args)
+    end
+  end
+
+  defp maybe_apply_or(_, fun, args, fallback_fn), do: apply_fun_style(fallback_fn || fun, args)
+
+  # TODO: put in generic place, maybe as part of maybe_apply
+  def apply_fun_style(fallback_module \\ __MODULE__, fun, args) do
+    case fun do
+      fun when is_function(fun) -> apply(fun, List.wrap(args))
+      {mod, fun} -> apply(mod, fun, List.wrap(args))
+      fun when is_atom(fun) -> apply(fallback_module, fun, List.wrap(args))
+      _ -> error("no function to run")
     end
   end
 

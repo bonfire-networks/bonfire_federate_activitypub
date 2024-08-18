@@ -299,7 +299,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   @doc """
   For updating an Actor in cache after a User/etc is updated
   """
-  def local_actor_updated(character, is_local?) do
+  def local_actor_updated(character, is_local?) when not is_nil(character) do
     with %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
       ActivityPub.Actor.set_cache(actor)
 
