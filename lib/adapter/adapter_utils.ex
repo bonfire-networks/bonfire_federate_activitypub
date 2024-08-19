@@ -1299,22 +1299,23 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   # @service_character_id
-  def service_character_id, do: Bonfire.Me.Users.remote_fetcher()
+  def service_character_id, do: Bonfire.Me.Users.remote_fetcher_id()
   def service_character_username, do: @service_character_username
 
-  def create_service_character(username \\ service_character_username()) do
-    Bonfire.Me.Fake.fake_user!(username, %{id: service_character_id()},
-      request_before_follow: true,
-      undiscoverable: true
+  def get_or_create_service_character(
+        service_character_id \\ service_character_id(),
+        service_character_username \\ service_character_username()
+      ) do
+    Bonfire.Me.Users.get_or_create_service_character(
+      service_character_id,
+      service_character_username
     )
   end
 
-  def get_or_create_service_character() do
-    with {:ok, user} <- Bonfire.Me.Users.by_id(service_character_id()) do
-      user
-    else
-      {:error, :not_found} ->
-        create_service_character()
-    end
+  defp create_service_character(
+         service_character_id \\ service_character_id(),
+         service_character_username \\ service_character_username()
+       ) do
+    Bonfire.Me.Users.create_service_character(service_character_id, service_character_username)
   end
 end

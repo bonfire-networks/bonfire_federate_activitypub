@@ -383,7 +383,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         {:ok, actor}
 
       _ ->
-        with %{} = character <- AdapterUtils.create_service_character(),
+        with %{} = character <- AdapterUtils.get_or_create_service_character(),
              %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
           {:ok, actor}
         else
