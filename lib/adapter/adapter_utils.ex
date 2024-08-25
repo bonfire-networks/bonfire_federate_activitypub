@@ -273,7 +273,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   defp all_fields(activity, fields) do
     fields
     # |> debug
-    |> Enum.map(&id_or_object_id(Utils.e(activity, &1, nil)))
+    |> Enum.map(&id_or_object_id(e(activity, &1, nil)))
     # |> debug
     |> List.flatten()
     |> filter_empty([])
