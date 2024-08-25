@@ -811,19 +811,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
 
       aliases =
-        e(user_etc, :character, :aliases, [])
-        |> Enum.map(&(e(&1, :object, :character, nil) || e(&1, :object, nil)))
-        |> Enum.reject(&is_nil/1)
-        # |> IO.inspect(label: "objjj")
-        |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
-        |> Enum.group_by(fn
-          %struct{} ->
-            struct
+        case e(user_etc, :character, :aliases, [])
+             |> Enum.map(&(e(&1, :object, :character, nil) || e(&1, :object, nil)))
+             |> Enum.reject(&is_nil/1) do
+          [] ->
+            %{}
 
-          other ->
-            warn(other, "unsupported data")
-            :unknown
-        end)
+          list ->
+            list
+            # |> IO.inspect(label: "objjj")
+            |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+            |> Enum.group_by(fn
+              %struct{} ->
+                struct
+
+              other ->
+                warn(other, "unsupported data")
+                :unknown
+            end)
+        end
 
       # |> IO.inspect(label: "aliaases")
 

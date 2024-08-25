@@ -61,6 +61,11 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         warn(e, "Activity rejected by Boundaries")
         {:reject, e}
 
+      :ignore ->
+        info("Activity will not be federated")
+        # {:ignore, "Activity will not be federated"}
+        :ignore
+
       e ->
         warn(e, "Activity rejected by Boundaries")
         {:reject, e}
