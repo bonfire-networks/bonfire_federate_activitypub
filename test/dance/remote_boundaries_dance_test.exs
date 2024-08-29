@@ -291,7 +291,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
     end
 
     # This is irrelevant - already tested
-    # test "They will still be able to see things I post publicly.", context do
+    # test "They may still be able to see things I post publicly.", context do
     # end
 
     test "I won't be able to @ mention them.", context do
