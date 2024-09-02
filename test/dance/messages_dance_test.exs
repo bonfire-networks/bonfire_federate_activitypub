@@ -92,8 +92,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
           local_on_remote
         )
 
-      # raise nil
-
       Logger.metadata(action: info("attempt a message in thread without TO on remote"))
 
       {:error, _} =

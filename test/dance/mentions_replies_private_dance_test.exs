@@ -93,8 +93,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
           boundary: "mentions"
         )
 
-      # raise nil
-
       Logger.metadata(action: info("make a reply without mention on remote"))
 
       {:ok, post4} =
