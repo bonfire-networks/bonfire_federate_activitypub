@@ -223,7 +223,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     local_author_ids =
       local_author_ids
-      |> Enum.map(&(elem(&1, 1) |> ulid()))
+      |> Enum.map(&(elem(&1, 1) |> uid()))
       |> debug("local_author_ids")
 
     # || Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
@@ -500,7 +500,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
       author_ids =
         local_author_ids
-        |> Enum.map(&(elem(&1, 1) |> ulid()))
+        |> Enum.map(&(elem(&1, 1) |> uid()))
 
       {by_characters, actor_to_check} =
         if is_local? do

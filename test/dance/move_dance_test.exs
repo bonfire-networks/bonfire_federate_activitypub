@@ -37,8 +37,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MoveTest do
 
       assert {:ok, origin_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(origin_ap_id)
 
-      assert ulid(origin_on_remote) != ulid(local_origin)
-      assert ulid(remote_target) != ulid(target_on_local)
+      assert uid(origin_on_remote) != uid(local_origin)
+      assert uid(remote_target) != uid(target_on_local)
 
       Logger.metadata(action: info("add local actor as an alias of remote user"))
 
@@ -116,8 +116,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MoveTest do
       assert {:ok, follower2_on_remote} =
                AdapterUtils.get_or_fetch_and_create_by_uri(follower2_ap_id)
 
-      assert ulid(origin_on_remote) != ulid(local_origin)
-      assert ulid(remote_target) != ulid(target_on_local)
+      assert uid(origin_on_remote) != uid(local_origin)
+      assert uid(remote_target) != uid(target_on_local)
 
       Logger.metadata(action: info("add local actor as an alias of remote user"))
 

@@ -31,7 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
 
     Logger.metadata(action: info("do the follow"))
     assert {:ok, follow} = Follows.follow(local_user, remote_on_local)
-    fid = ulid(follow)
+    fid = uid(follow)
     info(follow, "the follow")
 
     remote_user = context[:remote][:user]
@@ -48,8 +48,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
 
         assert {:ok, local_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(local_ap_id)
 
-        assert ulid(local_on_remote) != ulid(local_user)
-        assert ulid(remote_user) != ulid(remote_on_local)
+        assert uid(local_on_remote) != uid(local_user)
+        assert uid(remote_user) != uid(remote_on_local)
 
         Logger.metadata(action: info("check follow worked on remote"))
         assert Follows.following?(local_on_remote, remote_user)

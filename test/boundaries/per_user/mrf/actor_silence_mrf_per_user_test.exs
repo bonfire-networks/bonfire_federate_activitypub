@@ -37,7 +37,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFPerUserTest do
           e(remote_user, :character, :peered, :peer_id, nil) ||
           e(remote_user, :peered, :peer_id, nil)
 
-      assert ulid(peer) == ulid(instance)
+      assert uid(peer) == uid(instance)
 
       {:ok, block} =
         peer

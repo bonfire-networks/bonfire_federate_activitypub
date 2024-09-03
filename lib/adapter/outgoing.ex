@@ -45,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     else
       info(
         thing,
-        "Skip (re)federating out '#{verb}' activity by remote actor '#{Types.ulid(subject)}'=#{subject_local?}, or remote object '#{Types.ulid(thing)}'=#{thing_local?}"
+        "Skip (re)federating out '#{verb}' activity by remote actor '#{Types.uid(subject)}'=#{subject_local?}, or remote object '#{Types.uid(thing)}'=#{thing_local?}"
       )
 
       :ignore

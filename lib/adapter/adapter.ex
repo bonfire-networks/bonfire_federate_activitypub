@@ -330,7 +330,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_redirect_url(id_or_username) when is_binary(id_or_username) do
     # IO.inspect(get_redirect_url: id_or_username)
-    if is_ulid?(id_or_username) do
+    if is_uid?(id_or_username) do
       URIs.path(id_or_username)
     else
       get_url_by_username(id_or_username)

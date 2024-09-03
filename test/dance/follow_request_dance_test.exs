@@ -50,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     # auto_assert Follows.requested?(local_follower, followed_on_local)
     Logger.metadata(action: info("make a (request to) follow"))
     assert {:ok, request} = Follows.follow(local_follower, followed_on_local)
-    request_id = ulid(request)
+    request_id = uid(request)
     info(request, "the local request")
 
     auto_assert false <- Follows.following?(local_follower, followed_on_local)
@@ -74,8 +74,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
       assert {:ok, follower_on_remote} =
                AdapterUtils.get_or_fetch_and_create_by_uri(follower_ap_id)
 
-      assert ulid(follower_on_remote) != ulid(local_follower)
-      assert ulid(remote_followed) != ulid(followed_on_local)
+      assert uid(follower_on_remote) != uid(local_follower)
+      assert uid(remote_followed) != uid(followed_on_local)
 
       Logger.metadata(action: info("check request received on remote"))
       assert Follows.requested?(follower_on_remote, remote_followed)

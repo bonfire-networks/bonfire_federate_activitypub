@@ -197,7 +197,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_character_by_id(id, opts)
       when is_binary(id) do
-    pointer_id = ulid(id)
+    pointer_id = uid(id)
 
     if pointer_id do
       Bonfire.Common.Needles.get(pointer_id, opts)
@@ -615,7 +615,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         end
 
       _ when is_binary(fetched) ->
-        if is_ulid?(fetched) do
+        if is_uid?(fetched) do
           get_character_by_id(fetched)
         else
           error(fetched, "Don't know how to find this object")
@@ -646,7 +646,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def return_pointer(id, opts) do
-    Bonfire.Common.Needles.get(ulid(id), opts)
+    Bonfire.Common.Needles.get(uid(id), opts)
     # |> info("got")
     # actor_integration_test
     |> repo().maybe_preload([:actor, :character, :profile])

@@ -84,12 +84,12 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     test "incoming follow request works" do
       followed = fake_user!(%{}, %{}, request_before_follow: true)
-      # info(ulid(followed), "followed ID") 
+      # info(uid(followed), "followed ID") 
       {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
       {:ok, ap_follower} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-      # info(ulid(follower), "follower ID")
+      # info(uid(follower), "follower ID")
 
       {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
@@ -102,12 +102,12 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     test "incoming follow + accept works" do
       followed = fake_user!(%{}, %{}, request_before_follow: true)
-      # info(ulid(followed), "followed ID")
+      # info(uid(followed), "followed ID")
       {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
       {:ok, ap_follower} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-      # info(ulid(follower), "follower ID")
+      # info(uid(follower), "follower ID")
 
       {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
@@ -115,7 +115,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       assert {:ok, request} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-      # info(ulid(request), "request ID")
+      # info(uid(request), "request ID")
 
       assert Bonfire.Social.Graph.Follows.requested?(follower, followed)
 
@@ -127,12 +127,12 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
     test "incoming follow + ignore works (does not federate rejections)" do
       followed = fake_user!(%{}, %{}, request_before_follow: true)
-      info(ulid(followed), "followed ID")
+      info(uid(followed), "followed ID")
       {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
       {:ok, ap_follower} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-      info(ulid(follower), "follower ID")
+      info(uid(follower), "follower ID")
 
       {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
@@ -148,12 +148,12 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     test "incoming follow works" do
       # when you allow following without request
       followed = fake_user!(%{}, %{}, request_before_follow: false)
-      info(ulid(followed), "followed ID")
+      info(uid(followed), "followed ID")
       {:ok, ap_followed} = ActivityPub.Federator.Adapter.get_actor_by_id(followed.id)
 
       {:ok, ap_follower} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, follower} = Bonfire.Me.Users.by_ap_id(@remote_actor)
-      info(ulid(follower), "follower ID")
+      info(uid(follower), "follower ID")
 
       {:ok, follow_activity} = ActivityPub.follow(%{actor: ap_follower, object: ap_followed})
 
@@ -177,7 +177,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       assert {:ok, request} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
-      # info(ulid(request), "request ID")
+      # info(uid(request), "request ID")
 
       assert Bonfire.Social.Graph.Follows.requested?(follower, followed)
 

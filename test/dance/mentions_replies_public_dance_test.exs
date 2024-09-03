@@ -82,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
       {:ok, post2} =
         Posts.publish(
           current_user: remote_user,
-          post_attrs: post2_attrs |> Map.put(:reply_to_id, ulid(post1remote)),
+          post_attrs: post2_attrs |> Map.put(:reply_to_id, uid(post1remote)),
           boundary: "public"
         )
 
@@ -91,7 +91,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
       {:ok, post3} =
         Posts.publish(
           current_user: remote_user,
-          post_attrs: post3_attrs |> Map.put(:reply_to_id, ulid(post1remote)),
+          post_attrs: post3_attrs |> Map.put(:reply_to_id, uid(post1remote)),
           boundary: "public"
         )
 
@@ -100,7 +100,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
       {:ok, post4} =
         Posts.publish(
           current_user: remote_user,
-          post_attrs: post4_attrs |> Map.put(:reply_to_id, ulid(post1remote)),
+          post_attrs: post4_attrs |> Map.put(:reply_to_id, uid(post1remote)),
           boundary: "public"
         )
 
@@ -109,7 +109,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
       {:ok, post5} =
         Posts.publish(
           current_user: remote_user,
-          post_attrs: post5_attrs |> Map.put(:reply_to_id, ulid(post4)),
+          post_attrs: post5_attrs |> Map.put(:reply_to_id, uid(post4)),
           boundary: "public"
         )
     end)

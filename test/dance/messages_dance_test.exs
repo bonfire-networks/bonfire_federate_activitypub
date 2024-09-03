@@ -80,7 +80,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
       {:error, _} =
         Messages.send(
           remote_user,
-          message2_attrs |> Map.put(:reply_to_id, ulid(message1remote))
+          message2_attrs |> Map.put(:reply_to_id, uid(message1remote))
         )
 
       Logger.metadata(action: info("make a reply with TO on remote"))
@@ -88,7 +88,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
       {:ok, message3} =
         Messages.send(
           remote_user,
-          message3_attrs |> Map.put(:reply_to_id, ulid(message1remote)),
+          message3_attrs |> Map.put(:reply_to_id, uid(message1remote)),
           local_on_remote
         )
 
@@ -97,7 +97,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
       {:error, _} =
         Messages.send(
           remote_user,
-          message4_attrs |> Map.put(:thread_id, ulid(message1remote))
+          message4_attrs |> Map.put(:thread_id, uid(message1remote))
         )
 
       Logger.metadata(action: info("message in thread on remote"))
@@ -105,7 +105,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
       {:ok, message5} =
         Messages.send(
           remote_user,
-          message5_attrs |> Map.put(:reply_to_id, ulid(message1remote)),
+          message5_attrs |> Map.put(:reply_to_id, uid(message1remote)),
           local_on_remote
         )
     end)

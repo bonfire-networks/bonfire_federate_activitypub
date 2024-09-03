@@ -28,7 +28,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
 
     Logger.metadata(action: info("do the follow"))
     assert {:ok, follow} = Follows.follow(local_follower, followed_on_local)
-    fid = ulid(follow)
+    fid = uid(follow)
     info(follow, "the local follow")
 
     assert Follows.following?(local_follower, followed_on_local)
@@ -50,8 +50,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
       assert {:ok, follower_on_remote} =
                AdapterUtils.get_or_fetch_and_create_by_uri(follower_ap_id)
 
-      assert ulid(follower_on_remote) != ulid(local_follower)
-      assert ulid(remote_followed) != ulid(followed_on_local)
+      assert uid(follower_on_remote) != uid(local_follower)
+      assert uid(remote_followed) != uid(followed_on_local)
 
       Logger.metadata(action: info("check follow worked on remote"))
       assert Follows.following?(follower_on_remote, remote_followed)

@@ -13,7 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   alias Bonfire.Federate.ActivityPub.Instances
 
   def get(id) when is_binary(id) do
-    if Types.is_ulid?(id) do
+    if Types.is_uid?(id) do
       repo().single(
         from(p in Peered)
         |> where([p], p.id == ^id)
@@ -138,7 +138,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     repo().insert_or_ignore(%Peered{
       id: id,
       peer: peer,
-      peer_id: Types.ulid(peer),
+      peer_id: Types.uid(peer),
       canonical_uri: canonical_uri
     })
   end
@@ -160,7 +160,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def is_blocked?(id_or_uri, block_type, opts) when is_binary(id_or_uri) do
-    if is_ulid?(id_or_uri) do
+    if is_uid?(id_or_uri) do
       with {:ok, peered} <- get(id_or_uri) |> debug("existing Peered") do
         is_blocked?(peered, block_type, opts)
       else
