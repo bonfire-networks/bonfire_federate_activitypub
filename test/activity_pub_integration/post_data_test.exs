@@ -327,7 +327,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
       reply_object = %{
-        "id" => @remote_instance <> "/pub/" <> Needle.ULID.autogenerate(),
+        "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),
         "content" => "content",
         "type" => "Note",
         "inReplyTo" => activity.object.data["id"]

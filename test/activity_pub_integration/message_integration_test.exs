@@ -55,7 +55,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
       context = "blabla"
 
       object = %{
-        "id" => @remote_instance <> "/pub/" <> Needle.ULID.autogenerate(),
+        "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),
         "content" => "content",
         "type" => "ChatMessage"
       }
