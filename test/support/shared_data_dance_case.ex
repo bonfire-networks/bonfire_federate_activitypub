@@ -19,6 +19,13 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
       :ok
     end)
 
+    TestInstanceRepo.apply(fn ->
+      if !Bonfire.Boundaries.Circles.exists?(Bonfire.Boundaries.Circles.get_id!(:local)) do
+        info("Seems boundary fixtures are missing on test instance, running now")
+        Bonfire.Boundaries.Scaffold.insert()
+      end
+    end)
+
     [
       local: fancy_fake_user!("Local"),
       remote: fancy_fake_user_on_test_instance()

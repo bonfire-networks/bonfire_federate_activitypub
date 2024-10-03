@@ -117,7 +117,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     if module = Extend.maybe_module(Bonfire.Boundaries.Circles) do
       module.get_or_create(
         host,
-        Bonfire.Boundaries.Fixtures.activity_pub_circle()
+        Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
       )
     end
   end

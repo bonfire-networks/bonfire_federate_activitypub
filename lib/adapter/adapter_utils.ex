@@ -3,6 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   use Bonfire.Common.Utils
   # alias Bonfire.Common.URIs
   import Bonfire.Federate.ActivityPub
+  alias Needle.Pointer
   alias ActivityPub.Actor
   alias Bonfire.Data.ActivityPub.Peered
   alias Bonfire.Me.Users
@@ -165,10 +166,67 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_actor_username(u) when is_binary(u), do: u
   def get_actor_username(_), do: nil
 
-  def get_character_by_username({:ok, c}), do: get_character_by_username(c)
+  def get_character(q, opts \\ [])
 
-  def get_character_by_username(character) when is_struct(character),
-    do: {:ok, repo().maybe_preload(character, [:actor, :profile, character: [:peered]])}
+  def get_character("http" <> _ = q, opts) do
+    skip?(:ap_id, opts) || get_character_by_ap_id(q)
+  end
+
+  def get_character(q, opts) when is_binary(q) do
+    skip?(:username, opts) || get_character_by_username(q)
+  end
+
+  def get_character(%struct{id: _} = character, _opts) when struct not in [Actor, Pointer] do
+    {:ok, repo().maybe_preload(character, [:actor, :character, :profile])}
+  end
+
+  def get_character(%{pointer: %{id: _} = pointer}, _opts) do
+    {:ok, repo().maybe_preload(pointer, [:actor, :profile, character: [:peered]])}
+  end
+
+  def get_character(%{pointer_id: pointer_id}, opts) when is_binary(pointer_id) do
+    skip?(:id, opts) || get_character_by_id(pointer_id, opts)
+  end
+
+  def get_character(%{id: pointer_id} = object, opts) when is_binary(pointer_id) do
+    if opts[:skip] != :id do
+      get_character_by_id(pointer_id, opts)
+    else
+      case object do
+        %Pointer{} ->
+          {:ok, repo().maybe_preload(object, [:actor, :profile, character: [:peered]])}
+
+        _ when is_struct(object) ->
+          {:ok, object}
+
+        %{__typename: Pointer} ->
+          {:ok, object}
+
+        other ->
+          error(other, "unrecognised")
+          {:error, :not_found}
+      end
+    end
+  end
+
+  def get_character(%{ap_id: q}, opts) when is_binary(q) do
+    skip?(:ap_id, opts) || get_character_by_ap_id(q)
+  end
+
+  def get_character(%{username: q}, opts) when is_binary(q) do
+    skip?(:username, opts) || get_character_by_username(q)
+  end
+
+  def get_character(q, _opts) do
+    warn(q, "dunno how")
+    {:error, :not_found}
+  end
+
+  defp skip?(type, opts) do
+    if opts[:skip] == type, do: {:error, :not_found}
+  end
+
+  def get_character_by_username({:ok, c}), do: get_character_by_username(c)
 
   def get_character_by_username("@" <> username),
     do: get_character_by_username(username)
@@ -178,30 +236,88 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       debug(username, "not a user, check for any other character types")
       Bonfire.Common.Needles.get(username)
     end
-    ~> get_character_by_username()
+    ~> get_character(skip: :username)
 
     # Bonfire.Common.Needles.get(username, [skip_boundary_check: true])
-    # ~> get_character_by_username()
+    # ~> get_character()
   end
 
   def get_character_by_username(other) do
-    error(other, "Dunno how to look for character")
-    {:error, :not_found}
+    error(other, "Dunno how to look for character, attempt fallback to `get_character/1`")
+    get_character(other, skip: :username)
   end
 
   def get_character_by_id(id, opts \\ [skip_boundary_check: true])
 
-  def get_character_by_id(%{id: _} = c, _opts) do
-    {:ok, c}
-  end
-
   def get_character_by_id(id, opts)
       when is_binary(id) do
-    pointer_id = uid(id)
-
-    if pointer_id do
+    if pointer_id = uid(id) do
       Bonfire.Common.Needles.get(pointer_id, opts)
-      ~> get_character_by_username()
+      ~> get_character(skip: :id)
+    else
+      error(id, "Expected a UID, attempt fallback to `get_character/1`")
+      get_character(id, skip: :id)
+    end
+  end
+
+  def get_character_by_id(other, opts) do
+    error(other, "Dunno how to look for character, attempt fallback to `get_character/1`")
+    get_character(other, skip: :id)
+  end
+
+  def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
+    local_instance = ap_base_url()
+
+    case get_actor_by_ap_id(ap_id, local_instance) do
+      nil ->
+        debug(ap_id, "assume looking up a local character")
+        get_local_character_by_ap_id(ap_id, local_instance)
+
+      actor ->
+        actor
+        |> return_pointable()
+    end
+  end
+
+  def get_character_by_ap_id(%{ap_id: ap_id}) when is_binary(ap_id) do
+    get_character_by_ap_id(ap_id)
+  end
+
+  def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) when is_binary(ap_id) do
+    get_character_by_ap_id(ap_id)
+  end
+
+  def get_character_by_ap_id(%{data: %{"id" => ap_id} = _data}) do
+    get_character_by_ap_id(ap_id)
+  end
+
+  def get_character_by_ap_id(%{username: username} = actor) when is_binary(username) do
+    get_character_by_username(ActivityPub.Actor.format_username(actor))
+  end
+
+  # def get_character_by_ap_id(%{username: username}) when is_binary(username) do
+  #   get_character_by_username(username)
+  # end
+  # def get_character_by_ap_id(%{"preferredUsername" => username}) when is_binary(username) do
+  #   get_character_by_username(username) |> info("preferredUsername: #{username}")
+  # end
+
+  def get_character_by_ap_id(other) do
+    error(
+      other,
+      "Invalid parameters when looking up an actor, attempt fallback to `get_character/1`"
+    )
+
+    get_character(other, skip: :ap_id)
+  end
+
+  @doc "without :ok / :error tuple"
+  def get_character_by_ap_id!(ap_id) do
+    case get_character_by_ap_id(ap_id) do
+      {:ok, character} -> character
+      # TEMP
+      %{} = character -> character
+      _ -> nil
     end
   end
 
@@ -425,66 +541,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
-    local_instance = ap_base_url()
-
-    case get_actor_by_ap_id(ap_id, local_instance) do
-      nil ->
-        debug(ap_id, "assume looking up a local character")
-        get_local_character_by_ap_id(ap_id, local_instance)
-
-      actor ->
-        actor
-        |> return_pointable()
-    end
-  end
-
-  def get_character_by_ap_id(%{pointer: %{id: _} = pointer}) do
-    {:ok, pointer}
-  end
-
-  def get_character_by_ap_id(%{pointer_id: pointer_id}) when is_binary(pointer_id) do
-    get_character_by_id(pointer_id)
-  end
-
-  def get_character_by_ap_id(%{ap_id: ap_id}) when is_binary(ap_id) do
-    get_character_by_ap_id(ap_id)
-  end
-
-  def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) when is_binary(ap_id) do
-    get_character_by_ap_id(ap_id)
-  end
-
-  def get_character_by_ap_id(%{data: %{"id" => ap_id} = _data}) do
-    get_character_by_ap_id(ap_id)
-  end
-
-  def get_character_by_ap_id(%{username: username} = actor) when is_binary(username) do
-    get_character_by_username(ActivityPub.Actor.format_username(actor))
-  end
-
-  # def get_character_by_ap_id(%{username: username}) when is_binary(username) do
-  #   get_character_by_username(username)
-  # end
-  # def get_character_by_ap_id(%{"preferredUsername" => username}) when is_binary(username) do
-  #   get_character_by_username(username) |> info("preferredUsername: #{username}")
-  # end
-  def get_character_by_ap_id(%{} = character) when is_struct(character),
-    do: {:ok, repo().maybe_preload(character, [:actor, :character, :profile])}
-
-  def get_character_by_ap_id(other) do
-    error(other, "Invalid parameters when looking up an actor")
-  end
-
-  @doc "without :ok / :error tuple"
-  def get_character_by_ap_id!(ap_id) do
-    case get_character_by_ap_id(ap_id) do
-      {:ok, character} -> character
-      %{} = character -> character
-      _ -> nil
-    end
-  end
-
   def get_by_url_ap_id_or_username(q, opts \\ [])
 
   def get_by_url_ap_id_or_username("@" <> username, opts),
@@ -514,27 +570,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       log("AP - get_character_by_username: " <> q)
       get_character_by_username(q)
     end
-  end
-
-  def get_character("http" <> _ = q) do
-    get_character_by_ap_id(q)
-  end
-
-  def get_character(q) when is_binary(q) do
-    get_character_by_username(q)
-  end
-
-  def get_character(%{ap_id: q}) when is_binary(q) do
-    get_character_by_ap_id(q)
-  end
-
-  def get_character(%{username: q}) when is_binary(q) do
-    get_character_by_username(q)
-  end
-
-  def get_character(q) do
-    warn(q, "dunno how")
-    {:error, :not_found}
   end
 
   def get_or_fetch_and_create_by_uri(q, opts \\ []) when is_binary(q) do
@@ -1079,8 +1114,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     do: Types.object_type(struct) |> character_module()
 
   def character_module(%{__struct__: type}), do: character_module(type)
+  def character_module(%{__typename: type}), do: character_module(type)
 
-  def character_module(type) do
+  def character_module(type) when is_atom(type) or is_binary(type) do
     with {:ok, module} <-
            Bonfire.Federate.ActivityPub.FederationModules.federation_module(type) do
       module

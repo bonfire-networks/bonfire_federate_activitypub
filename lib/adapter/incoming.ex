@@ -84,11 +84,13 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       "AP - fetch the #{activity.data["id"]} activity's object data from URI when we only have an AP ID: #{object_id}"
     )
 
+    is_deleted? =
+      e(activity.data, "type", nil) in ["Delete", "Tombstone"] or
+        e(activity.data, "object", "type", nil) == "Tombstone"
+
     # info(activity, "activity")
     case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id,
-           return_tombstones:
-             e(activity.data, "type", nil) == "Delete" or
-               e(activity.data, "object", "type", nil) == "Tombstone"
+           return_tombstones: is_deleted?
          ) do
       {:ok, object} ->
         debug(object, "fetched object")
@@ -466,7 +468,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     info(actor, "AP - receive - get activity_character")
     # FIXME to handle actor types other than Person/User
     with {:error, e} <-
-           AdapterUtils.get_or_fetch_and_create_by_uri(actor, fetch_collection: false) |> info do
+           AdapterUtils.get_or_fetch_and_create_by_uri(actor,
+             fetch_collection: false,
+             return_tombstones: true
+           )
+           |> debug("fetched actor") do
       error(e, "AP - could not find local character for the actor")
       {:ok, AdapterUtils.get_or_create_service_character()}
     end

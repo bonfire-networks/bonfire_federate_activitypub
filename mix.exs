@@ -25,7 +25,8 @@ defmodule Bonfire.Federate.ActivityPub.MixProject do
       aliases: aliases(),
       deps:
         Mess.deps([
-          {:floki, ">= 0.0.0", only: [:dev, :test]}
+          {:floki, ">= 0.0.0", only: [:dev, :test]},
+          {:bonfire_boundaries, git: "https://github.com/bonfire-networks/bonfire_boundaries", optional: true}
         ])
     ]
   end

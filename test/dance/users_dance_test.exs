@@ -38,7 +38,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.UsersTest do
 
   test "If a remote user is created, a circle is created (if doesn't already exist) and the user is added to it",
        context do
-    parent_circle = Bonfire.Boundaries.Fixtures.activity_pub_circle()
+    parent_circle = Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
 
     actor_url = context[:remote][:canonical_url]
     host = Bonfire.Common.URIs.base_domain(actor_url)

@@ -185,7 +185,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         true,
         opts ++
           [
-            subject: ActivityPub.Actor.get_cached!(pointer: subject),
+            subject: AdapterUtils.the_ap_id(ActivityPub.Actor.get_cached!(pointer: subject)),
             bcc: opts[:ap_bcc]
           ]
       )
@@ -202,7 +202,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         true,
         opts ++
           [
-            subject: ActivityPub.Actor.get_cached!(pointer: subject),
+            subject: AdapterUtils.the_ap_id(ActivityPub.Actor.get_cached!(pointer: subject)),
             bcc: opts[:ap_bcc]
           ]
       )

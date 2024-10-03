@@ -94,7 +94,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
           block_types,
           local_author_ids,
           rejects,
-          AdapterUtils.id_or_object_id(e(activity, "object", nil))
+          AdapterUtils.id_or_object_id(ed(activity, "object", nil))
         )
         |> debug("object_blocked") || {:ok, activity}
 
@@ -153,14 +153,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       block_types,
       local_character_ids,
       rejects,
-      AdapterUtils.id_or_object_id(e(activity, "actor", nil))
+      AdapterUtils.id_or_object_id(ed(activity, "actor", nil))
     )
     |> debug("activity's actor?") ||
       object_blocked?(
         block_types,
         local_character_ids,
         rejects,
-        AdapterUtils.id_or_object_id(e(activity, "object", "attributedTo", nil))
+        AdapterUtils.id_or_object_id(ed(activity, "object", "attributedTo", nil))
       )
       |> debug("object's actor?") ||
       object_blocked?(
@@ -174,7 +174,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         block_types,
         local_character_ids,
         rejects,
-        AdapterUtils.id_or_object_id(e(activity, "object", nil))
+        AdapterUtils.id_or_object_id(ed(activity, "object", nil))
       )
       |> debug("object or its instance?")
   end
@@ -268,10 +268,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       do: debug(filtered, "activity has been filtered"),
       else: debug("no blocks apply")
 
-    if e(filtered, :to, nil) || e(filtered, :cc, nil) || e(filtered, :bto, nil) ||
-         e(filtered, :bcc, nil) || e(filtered, :audience, nil) ||
-         e(activity, "publishedDate", nil) || e(activity, "object", "publishedDate", nil) ||
-         e(activity, "object", "type", nil) == "Tombstone" do
+    if ed(filtered, :to, nil) || ed(filtered, :cc, nil) || ed(filtered, :bto, nil) ||
+         ed(filtered, :bcc, nil) || ed(filtered, :audience, nil) ||
+         e(activity, "publishedDate", nil) || ed(activity, "object", "publishedDate", nil) ||
+         ed(activity, "object", "type", nil) == "Tombstone" do
       # ^ `publishedDate` here is intended as an exception for bookwyrm which doesn't put audience info
       {:ok, filtered}
     else
@@ -487,7 +487,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          is_local?
        ) do
     recipient_actor =
-      e(recipient, :ap_id, nil) || e(recipient, "id", nil) || e(recipient, :data, "id", nil) ||
+      ed(recipient, :ap_id, nil) || ed(recipient, "id", nil) || e(recipient, :data, "id", nil) ||
         recipient
 
     # |> debug("uri")
@@ -508,15 +508,15 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
             "local activity - need to check if local author blocks the (maybe remote) recipient"
           )
 
-          local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
+          local_recipient = ed(local_recipient_ids, recipient_actor, nil) || recipient_actor
 
           {author_ids, local_recipient}
         else
           debug("remote activity - need to check if the local recipient blocks the remote author")
 
-          local_recipient = e(local_recipient_ids, recipient_actor, nil) || recipient_actor
+          local_recipient = ed(local_recipient_ids, recipient_actor, nil) || recipient_actor
 
-          {local_recipient, e(author_ids, nil) || AdapterUtils.all_actors(activity)}
+          {local_recipient, ed(author_ids, nil) || AdapterUtils.all_actors(activity)}
         end
         |> debug("by_characters & actor_to_check")
 
