@@ -67,20 +67,22 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   def get_canonical_uri(obj_or_id),
     do: get(obj_or_id) |> e(:canonical_uri, nil)
 
-  def save_canonical_uri(%{id: id}, canonical_uri),
-    do: save_canonical_uri(id, canonical_uri)
+  def save_canonical_uri(object_or_actor, canonical_uri, opts \\ [])
 
-  def save_canonical_uri(id, canonical_uri)
+  def save_canonical_uri(%{id: id}, canonical_uri, opts),
+    do: save_canonical_uri(id, canonical_uri, opts)
+
+  def save_canonical_uri(id, canonical_uri, opts)
       when is_binary(id) and is_binary(canonical_uri) do
-    get_or_create(canonical_uri, id)
+    get_or_create(canonical_uri, Keyword.put(opts, :id, id))
   end
 
-  defp get_or_create(canonical_uri, id \\ nil) when is_binary(canonical_uri) do
+  defp get_or_create(canonical_uri, opts \\ []) when is_binary(canonical_uri) do
     base_url = Bonfire.Common.URIs.base_url()
 
     # only create Peer for remote instances
     if not String.starts_with?(canonical_uri, base_url) do
-      do_get_or_create(canonical_uri, id)
+      do_get_or_create(canonical_uri, opts[:id], opts[:type])
     else
       warn("Skip creating a Peered for local URI: #{canonical_uri}")
 
@@ -91,13 +93,13 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     end
   end
 
-  defp do_get_or_create(canonical_uri, id)
+  defp do_get_or_create(canonical_uri, id, type)
        when is_binary(canonical_uri) do
     case get(canonical_uri) do
       {:ok, peered} ->
         debug("found an existing Actor or other Peered object")
 
-        if id,
+        if type == :actor and id,
           do:
             add_to_instance_circle(peered, canonical_uri)
             |> warn(
@@ -112,6 +114,9 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
         with {:ok, peer} <- Instances.get_or_create(canonical_uri) do
           if id do
             debug(peer, "now create a Peered linked to the ID of the User or Object")
+
+            if type == :actor, do: add_to_instance_circle(id, canonical_uri)
+
             create(id, peer, canonical_uri)
           else
             debug("just return the Instance / Peer")
@@ -132,9 +137,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     |> debug()
   end
 
-  def create(id, peer, canonical_uri) do
-    add_to_instance_circle(id, canonical_uri)
-
+  defp create(id, peer, canonical_uri) do
     repo().insert_or_ignore(%Peered{
       id: id,
       peer: peer,
@@ -169,7 +172,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
           Bonfire.Boundaries.Blocks.is_blocked?(id_or_uri, block_type, opts)
       end
     else
-      with {:ok, peered} <- get_or_create(id_or_uri) |> debug("found or created a Peered") do
+      with {:ok, peered} <- get_or_create(id_or_uri, opts) |> debug("Peered found or created?") do
         is_blocked?(peered, block_type, opts)
       else
         other ->

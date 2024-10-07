@@ -22,7 +22,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
   test "private mention and reply", context do
     # context |> info("context")
     post1_attrs = %{
-      post_content: %{html_body: "#{context[:remote][:username]} try out federated at mention"}
+      post_content: %{
+        html_body: "#{context[:remote][:username]} try out federated at private mention 10"
+      }
     }
 
     post2_attrs = %{post_content: %{html_body: "try out federated mentions-only"}}
@@ -73,7 +75,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
 
       # %{edges: [feed_entry | _]} = feed
       post1remote = List.first(feed).activity.object
-      auto_assert true <- post1remote.post_content.html_body =~ "try out federated at mention"
+
+      auto_assert true <-
+                    post1remote.post_content.html_body =~
+                      "try out federated at private mention 10"
 
       Logger.metadata(action: info("make a mentions-only reply on remote"))
 

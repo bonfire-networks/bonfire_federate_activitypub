@@ -17,6 +17,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
   alias Bonfire.Me.Users
 
   # TODO: check that user's posts also get auto-deleted
+  # FIXME
   test "delete a user and it gets deleted on follower's on a remote instance",
        context do
     local_user = context[:local][:user]

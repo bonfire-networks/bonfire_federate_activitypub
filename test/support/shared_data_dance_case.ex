@@ -6,9 +6,12 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
   alias Bonfire.Common.TestInstanceRepo
 
   setup_all tags do
+    info("Start with a DanceTest")
+
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
     on_exit(fn ->
+      info("Done with a DanceTest")
       # this callback needs to checkout its own connection since it
       # runs in its own process
       # :ok = Ecto.Adapters.SQL.Sandbox.checkout(repo())

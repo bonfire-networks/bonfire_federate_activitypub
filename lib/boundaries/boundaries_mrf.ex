@@ -4,6 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   use Arrows
   require ActivityPub.Config
   import Untangle
+  import Bonfire.Federate.ActivityPub
   alias ActivityPub.MRF
   alias Bonfire.Boundaries
   alias Bonfire.Federate.ActivityPub.AdapterUtils
@@ -598,6 +599,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     block_types = Boundaries.Blocks.types_blocked(check_block_types)
 
     rejects = rejects_regex(block_types)
+
+    actor = actor |> repo().maybe_preload(character: [:peered])
 
     object_blocked?(
       block_types,

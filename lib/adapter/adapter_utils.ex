@@ -322,8 +322,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_local_character_by_ap_id(ap_id, local_instance \\ nil) when is_binary(ap_id) do
+    # FIXME: this is fragile as doesn't support hostname/port changes
+    local_instance = debug(local_instance || ap_base_url())
+
     username =
-      String.trim_leading(ap_id, (local_instance || ap_base_url()) <> "/actors/")
+      String.trim_leading(ap_id, "#{local_instance}/actors/")
       |> debug("username?")
 
     if username != ap_id and !is_local_collection_or_built_in?(ap_id),
@@ -1024,7 +1027,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # maybe save a Peer for instance and Peered URI
       Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
         user_etc,
-        actor.data["id"]
+        actor.data["id"],
+        type: :actor
       )
 
       maybe_add_aliases(user_etc, e(actor, :data, "alsoKnownAs", nil))

@@ -238,6 +238,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   end
 
   describe "if I ghosted a remote user they will not be able to interact with me or with my content" do
+    # FIXME
     test "Nothing I post privately will be shown to them from now on", context do
       alice_local = context[:local][:user]
       bob_remote = context[:remote][:user]

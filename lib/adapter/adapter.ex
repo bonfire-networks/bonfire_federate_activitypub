@@ -228,6 +228,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
           [:update_local_actor, :update],
           [user_etc, params]
         )
+
+      other ->
+        error(other, "Could not find actor to update")
     end
   end
 

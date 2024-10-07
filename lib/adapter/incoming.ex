@@ -365,16 +365,19 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         # maybe save a Peer for instance and Peered URI
         Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
           pointable_object_id,
-          ap_obj_id
+          ap_obj_id,
+          type: :object
         )
 
         # object = ActivityPub.Object.normalize(object)
+        old_pointer_id = e(object, :pointer_id, nil)
+        object_id = id(object)
         # FIXME
-        if object &&
-             (is_nil(object.pointer_id) or
-                object.pointer_id != pointable_object_id),
+        if object_id &&
+             (is_nil(old_pointer_id) or
+                old_pointer_id != pointable_object_id),
            do:
-             ActivityPub.Object.update_existing(object.id, %{
+             ActivityPub.Object.update_existing(object_id, %{
                pointer_id: pointable_object_id
              })
              |> info("pointer_id update")

@@ -13,6 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
 
   alias Bonfire.Posts
 
+  # TODO
   test "cross-instance flagging", context do
     # context |> info("context")
 
@@ -57,10 +58,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
 
     assert %{edges: feed} =
              Bonfire.Social.FeedActivities.feed(:notifications, current_user: local_admin)
+             |> repo().maybe_preload(activity: [:object])
 
-    a_remote = List.first(feed).activity
-    assert a_remote.verb_id == "71AGSPAM0RVNACCEPTAB1E1TEM"
-    flagged_post = a_remote.object
-    assert flagged_post.post_content.html_body =~ "try federated flagging"
+    %{activity: %{verb_id: verb_id, object: object} = a_remote} = List.first(feed)
+    assert verb_id == "71AGSPAM0RVNACCEPTAB1E1TEM"
+    assert object.post_content.html_body =~ "try federated flagging"
   end
 end
