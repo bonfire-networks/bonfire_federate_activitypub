@@ -31,6 +31,13 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     end
   end
 
+  def get_by_id(id) when is_binary(id) do
+    from(p in Peer,
+      where: p.id == ^id
+    )
+    |> repo().single()
+  end
+
   def get_by_domain(canonical_uri) when is_binary(canonical_uri) do
     from(p in Peer,
       where: p.display_hostname == ^canonical_uri

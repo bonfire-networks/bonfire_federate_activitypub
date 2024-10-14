@@ -581,30 +581,50 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
          q |> debug(),
          ap_base_url() |> debug()
        ) do
-      log("AP - get_or_fetch_and_create_by_uri - assume remote with URI : " <> q)
-
       # TODO: cleanup
-      case ActivityPub.Federator.Fetcher.fetch_object_from_id(q, opts)
-           |> debug("fetch_object_from_id result") do
-        {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
-          {:ok, pointable}
+      case URI.parse(q) do
+        %{path: path, host: host} = uri when is_nil(path) or path == "/" ->
+          log("AP - get_or_fetch_and_create_by_uri - assume remote instance with URI : " <> q)
 
-        {:ok, %{pointer_id: _pointer_id} = ap_object} ->
-          return_pointable(ap_object)
+          with {:error, _} <- Bonfire.Federate.ActivityPub.Instances.get_by_domain(host),
+               %{} <-
+                 ActivityPub.Instances.scrape_nodeinfo(uri) ||
+                   error(:not_found, "Could not find nodeinfo"),
+               {:ok, instance} <-
+                 Bonfire.Federate.ActivityPub.Instances.get_or_create(
+                   uri
+                   |> Map.put(:scheme, "https")
+                   |> Map.put(:path, nil)
+                   |> URI.to_string()
+                 ) do
+            {:ok, instance}
+          end
 
-        {:ok, %ActivityPub.Actor{} = actor} ->
-          return_pointable(actor)
+        _ ->
+          log("AP - get_or_fetch_and_create_by_uri - assume remote object with URI : " <> q)
 
-        {:ok, %ActivityPub.Object{} = object} ->
-          # FIXME? for non-actors
-          return_pointable(object)
+          case ActivityPub.Federator.Fetcher.fetch_object_from_id(q, opts)
+               |> debug("fetch_object_from_id result") do
+            {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
+              {:ok, pointable}
 
-        # {{:ok, object}, _actor} -> {:ok, object}
-        {:ok, object} ->
-          {:ok, object}
+            {:ok, %{pointer_id: _pointer_id} = ap_object} ->
+              return_pointable(ap_object)
 
-        e ->
-          error(e)
+            {:ok, %ActivityPub.Actor{} = actor} ->
+              return_pointable(actor)
+
+            {:ok, %ActivityPub.Object{} = object} ->
+              # FIXME? for non-actors
+              return_pointable(object)
+
+            # {{:ok, object}, _actor} -> {:ok, object}
+            {:ok, object} ->
+              {:ok, object}
+
+            e ->
+              error(e)
+          end
       end
     else
       log("AP - uri - get_character_by_ap_id: assume local : " <> q)
