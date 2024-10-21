@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
+defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceGhostFeedsTest do
   use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
   alias ActivityPub.Config
@@ -42,19 +42,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.GhostFeedsTest do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     # |> debug
     ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
-
-    recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-
-    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post,
-             current_user: recipient
-           )
-  end
-
-  test "show in feeds an incoming Note with ghosted actor" do
-    {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
-    assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
-    Bonfire.Boundaries.Blocks.block(user, :ghost, :instance_wide)
 
     recipient = fake_user!(@local_actor)
     {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])

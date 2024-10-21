@@ -34,7 +34,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
     assert Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
 
-    assert Bonfire.Federate.ActivityPub.Instances.is_blocked?(instance, :silence,
+    assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
              current_user: local_user
            )
 
@@ -64,14 +64,30 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     local_user = fake_user!(@local_actor)
     {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
-    assert {:ok, instance} = Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
-    # |> debug
+    {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+    assert {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
+
+    assert {:ok, instance} =
+             Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
+             |> debug("inssstance")
+
+    assert Bonfire.Boundaries.Circles.is_encircled_by?(remote_user, instance)
 
     assert Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
 
-    assert Bonfire.Federate.ActivityPub.Instances.is_blocked?(instance, :silence,
+    assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
              current_user: local_user
            )
+
+    assert Bonfire.Federate.ActivityPub.Peered.actor_blocked?(remote_user, :silence,
+             current_user: local_user
+           )
+
+    # refute Bonfire.Boundaries.can?(local_user, :read, post) 
+
+    # assert Bonfire.Boundaries.Blocks.is_blocked?(remote_user, :silence,
+    #          current_user: local_user
+    #        ) 
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, local_user)
   end
@@ -84,7 +100,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
     assert Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
 
-    assert Bonfire.Federate.ActivityPub.Instances.is_blocked?(instance, :silence,
+    assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
              current_user: local_user
            )
 

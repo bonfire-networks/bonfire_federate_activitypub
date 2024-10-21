@@ -11,6 +11,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   @behaviour MRF
 
+  @filter_for_verbs ["Create", "Accept"]
+
   @impl true
   def filter(activity, is_local?) do
     info(activity, "to filter")
@@ -206,8 +208,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp instance_blocked_in_config?(%{host: actor_host} = _actor_uri, rejects) do
     MRF.subdomain_match?(rejects, actor_host)
 
-    # || Bonfire.Federate.ActivityPub.Instances.is_blocked?(actor_uri, :any, :instance_wide)
-    # ^ NOTE: no need to check the instance block in DB here because that's being handled by Peered.is_blocked? triggered by Actors.is_blocked? via actor_or_instance_blocked?
+    # || Bonfire.Federate.ActivityPub.Instances.instance_blocked?(actor_uri, :any, :instance_wide)
+    # ^ NOTE: no need to check the instance block in DB here because that's being handled by Peered.actor_blocked? triggered by Actors.is_blocked? via actor_or_instance_blocked?
   end
 
   defp actor_or_instance_blocked?(
@@ -224,13 +226,16 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     local_author_ids =
       local_author_ids
-      |> Enum.map(&(elem(&1, 1) |> uid()))
+      |> Enum.map(
+        &elem(&1, 1)
+        # |> uid()
+      )
       |> debug("local_author_ids")
 
-    # || Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
+    # || Bonfire.Federate.ActivityPub.Peered.actor_blocked?(actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
     # |> debug()
     MRF.subdomain_match?(rejects, clean_url) ||
-      Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor || actor_uri, block_types,
+      Bonfire.Federate.ActivityPub.Peered.actor_blocked?(actor || actor_uri, block_types,
         user_ids: local_author_ids
       )
   end
@@ -249,13 +254,13 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
            local_recipient_ids,
            is_local?
          ) do
-      %{type: "Create"} = filtered ->
+      %{type: verb} = filtered when verb in @filter_for_verbs ->
         apply_filtered_recipients(filtered, activity, is_local?)
 
-      %{"type" => "Create"} = filtered ->
+      %{"type" => verb} = filtered when verb in @filter_for_verbs ->
         apply_filtered_recipients(filtered, activity, is_local?)
 
-      %{data: %{"type" => "Create"}} = filtered ->
+      %{data: %{"type" => verb}} = filtered when verb in @filter_for_verbs ->
         apply_filtered_recipients(filtered, activity, is_local?)
 
       filtered ->
@@ -488,10 +493,9 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          is_local?
        ) do
     recipient_actor =
-      ed(recipient, :ap_id, nil) || ed(recipient, "id", nil) || e(recipient, :data, "id", nil) ||
-        recipient
-
-    # |> debug("uri")
+      (ed(recipient, :ap_id, nil) || ed(recipient, "id", nil) || e(recipient, :data, "id", nil) ||
+         recipient)
+      |> debug("recipient_actor")
 
     debug(is_local?, "is_local???")
 
@@ -501,7 +505,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
       author_ids =
         local_author_ids
-        |> Enum.map(&(elem(&1, 1) |> uid()))
+        |> Enum.map(
+          &elem(&1, 1)
+          # |> uid()
+        )
 
       {by_characters, actor_to_check} =
         if is_local? do
@@ -521,7 +528,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         end
         |> debug("by_characters & actor_to_check")
 
-      #  || Bonfire.Federate.ActivityPub.Peered.is_blocked?(recipient_actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
+      #  || Bonfire.Federate.ActivityPub.Peered.actor_blocked?(recipient_actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
       MRF.subdomain_match?(rejects, recipient_actor_uri.host)
       |> debug(
         "filter '#{recipient_actor_uri.host}' blocked #{inspect(block_types)} instance in config?"
@@ -530,7 +537,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         |> debug(
           "filter '#{clean_recipient_actor_uri}' blocked #{inspect(block_types)} actor in config?"
         ) ||
-        Bonfire.Federate.ActivityPub.Peered.is_blocked?(actor_to_check, block_types,
+        Bonfire.Federate.ActivityPub.Peered.actor_blocked?(actor_to_check, block_types,
           user_ids: by_characters
         )
         |> debug(

@@ -34,8 +34,14 @@ defmodule Bonfire.Federate.ActivityPub.MRFPerUserTest do
     test "there's a local activity with per-user ghosted instance as recipient" do
       local_user = fake_user!(@local_actor)
 
-      Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
+      {:ok, instance} =
+        Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
+
+      Bonfire.Boundaries.Blocks.block(instance, :ghost, current_user: local_user)
+
+      assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :ghost,
+               current_user: local_user
+             )
 
       local_activity =
         local_activity_json(local_user, [@remote_actor, ActivityPub.Config.public_uri()])

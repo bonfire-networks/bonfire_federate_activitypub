@@ -25,10 +25,18 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
 
       {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
 
-      remote_user
-      |> e(:character, :peered, :peer_id, nil)
-      # |> debug
-      |> Bonfire.Boundaries.Blocks.block(:ghost, current_user: local_user)
+      assert instance_id =
+               (e(remote_user, :character, :peered, :peer, nil) ||
+                  e(remote_user, :character, :peered, :peer_id, nil))
+               |> debug("instance_idd")
+
+      Bonfire.Boundaries.Blocks.block(instance_id, :ghost, current_user: local_user)
+
+      assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance_id, :ghost,
+               current_user: local_user
+             )
+
+      debug("STAAART Follow")
 
       refute match?(
                {:ok, local_user},

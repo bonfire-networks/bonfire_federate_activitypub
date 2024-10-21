@@ -362,13 +362,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def all_actors(activity) do
     actors =
-      ([e(activity, "actor", nil)] ++
-         [e(activity, "object", "actor", nil)] ++
-         [e(activity, "object", "attributedTo", nil)])
+      ([ed(activity, "actor", nil)] ++
+         [ed(activity, "object", "actor", nil)] ++
+         [ed(activity, "object", "attributedTo", nil)])
       |> List.flatten()
       |> filter_empty(nil)
-
-    # |> debug
+      |> debug("found actors")
 
     # for actors themselves
     (actors || [activity])
@@ -379,7 +378,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     # |> debug
     # |> Enum.uniq()
     |> Enum.uniq_by(&id_or_object_id/1)
-    |> debug()
+    |> debug("final actors")
   end
 
   def all_recipients(activity, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
@@ -392,7 +391,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   defp all_fields(activity, fields) do
     fields
     # |> debug
-    |> Enum.map(&id_or_object_id(e(activity, &1, nil)))
+    |> Enum.map(&id_or_object_id(ed(activity, &1, nil)))
     # |> debug
     |> List.flatten()
     |> filter_empty([])
@@ -485,13 +484,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enum.uniq()
     # |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
     # |> debug("before local_actor_ids")
-    |> Enum.map(&maybe_pointer_id_for_ap_id/1)
+    |> Enum.map(&maybe_pointer_for_ap_id/1)
     |> filter_empty([])
   end
 
-  def maybe_pointer_id_for_ap_id(ap_id) do
-    case ActivityPub.Actor.get_cached(ap_id: ap_id) do
-      {:ok, %{pointer: pointer}} when not is_nil(pointer) ->
+  def maybe_pointer_for_ap_id(ap_id) do
+    case ActivityPub.Object.get_cached(ap_id: ap_id) |> repo().maybe_preload(:pointer) do
+      {:ok, %{pointer: %{id: _} = pointer}} ->
         {ap_id, pointer}
 
       {:ok, %{pointer_id: pointer_id}} when not is_nil(pointer_id) ->
@@ -584,7 +583,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # TODO: cleanup
       case URI.parse(q) do
         %{path: path, host: host} = uri when is_nil(path) or path == "/" ->
-          log("AP - get_or_fetch_and_create_by_uri - assume remote instance with URI : " <> q)
+          log("AP - get_or_fetch_and_create_by_uri - assume remote instance with URI: " <> q)
 
           with {:error, _} <- Bonfire.Federate.ActivityPub.Instances.get_by_domain(host),
                %{} <-
@@ -870,7 +869,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       aliases =
         case e(user_etc, :character, :aliases, [])
-             |> Enum.map(&(e(&1, :object, :character, nil) || e(&1, :object, nil)))
+             |> Enum.map(&(ed(&1, :object, :character, nil) || ed(&1, :object, nil)))
              |> Enum.reject(&is_nil/1) do
           [] ->
             %{}
@@ -986,7 +985,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       uri = Bonfire.Common.URIs.canonical_url(o)
 
       maybe_attach_property_value(
-        e(o, :metadata, "label", nil) || e(o, :media_type, nil) || e(o, :username, nil) ||
+        ed(o, :metadata, "label", nil) || ed(o, :media_type, nil) || ed(o, :username, nil) ||
           URIs.display_url(uri),
         uri
       )
@@ -1018,20 +1017,34 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                     maybe_apply_or(
                       character_module,
                       [:create_remote, :create],
-                      %{
-                        character: %{
-                          username: username
+                      [
+                        %{
+                          character: %{
+                            username: username
+                          },
+                          profile: %{
+                            name: name,
+                            summary: actor.data["summary"],
+                            location: e(actor.data["location"], "name", nil)
+                          },
+                          peered: %{
+                            peer_id: peer.id,
+                            # peer: peer,
+                            canonical_uri: actor.data["id"]
+                          }
                         },
-                        profile: %{
-                          name: name,
-                          summary: actor.data["summary"],
-                          location: e(actor.data["location"], "name", nil)
-                        },
-                        peered: %{
-                          peer_id: peer.id,
-                          canonical_uri: actor.data["id"]
-                        }
-                      },
+                        [
+                          local: false,
+                          #  FIXME: don't query again (Instances.get_or_create already has)
+                          custom_circles: [
+                            silence_my_instance:
+                              Extend.maybe_module(Bonfire.Boundaries.Circles).get_or_create_stereotype_circle(
+                                peer,
+                                :silence_me
+                              )
+                          ]
+                        ]
+                      ],
                       # FIXME: should not depend on Users for fallback
                       &Bonfire.Me.Users.create_remote/1
                     ),
@@ -1050,6 +1063,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         actor.data["id"],
         type: :actor
       )
+      |> debug("saved peered")
 
       maybe_add_aliases(user_etc, e(actor, :data, "alsoKnownAs", nil))
 

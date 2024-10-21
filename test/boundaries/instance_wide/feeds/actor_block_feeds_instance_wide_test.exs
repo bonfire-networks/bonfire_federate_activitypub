@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
+defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorBlockFeedsTest do
   use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
   alias ActivityPub.Config
@@ -38,17 +38,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
     assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, recipient)
   end
 
-  test "does not show in feeds a Post for an incoming Note with blocked instance" do
-    Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
-    # |> debug
-    ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
-
-    recipient = fake_user!(@local_actor)
-    assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-    # feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    # refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
-  end
-
   test "does not show in feeds a Post for an incoming Note with blocked actor" do
     {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
@@ -58,17 +47,5 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.BlockFeedsTest do
     assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
     # feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
     # refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
-  end
-
-  test "hides a Post in feed from a remote instance that was blocked later" do
-    recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-
-    Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
-    # |> debug
-    ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
-
-    feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, current_user: recipient)
   end
 end

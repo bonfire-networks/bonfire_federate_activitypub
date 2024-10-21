@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest do
+defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceFeedsInstanceWideTest do
   use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
   alias ActivityPub.Config
@@ -36,16 +36,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
   #   assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
   # end
 
-  test "does not accept an incoming Note from a silenced instance" do
-    Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
-    # |> debug
-    ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
-
-    recipient = fake_user!(@local_actor)
-    assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-    # refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
-  end
-
   test "does not accept an incoming Note with silenced actor" do
     {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
@@ -54,16 +44,5 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsInstanceWideTest d
     recipient = fake_user!(@local_actor)
     assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
     # refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
-  end
-
-  test "hides a Post in feeds from a remote instance that was silenced later" do
-    recipient = fake_user!(@local_actor)
-    {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-
-    Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
-    # |> debug
-    ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
-
-    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
   end
 end

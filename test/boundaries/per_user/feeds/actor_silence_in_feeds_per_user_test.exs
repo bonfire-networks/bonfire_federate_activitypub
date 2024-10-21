@@ -53,7 +53,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     refute Bonfire.Social.FeedActivities.feed_contains?(:my, post, local_user)
   end
 
-  test "does not show in any feeds an incoming Note from a per-user silenced actor" do
+  test "does not show an incoming Note in any feeds when viewed by the user who silenced the actor" do
     local_user = fake_user!(@local_actor)
     {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
@@ -76,7 +76,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, another_local_user)
   end
 
-  test "does not show in any feeds an incoming Note from an actor that was per-user silenced later on" do
+  test "does not show an incoming Note in any feeds when viewed by the user who silenced the actor after the fact" do
     local_user = fake_user!(@local_actor)
     {:ok, remote_user} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     assert {:ok, user} = Bonfire.Me.Users.by_username(remote_user.username)
@@ -90,7 +90,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
     assert %{edges: []} = Bonfire.Social.FeedActivities.feed(feed_id, local_user)
 
     another_local_user = fake_user!()
-    # check that we do show it to others
-    refute Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, another_local_user)
+    # check that we do still show it to others
+    assert Bonfire.Social.FeedActivities.feed_contains?(feed_id, post, another_local_user)
   end
 end

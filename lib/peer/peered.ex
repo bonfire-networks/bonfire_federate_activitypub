@@ -84,12 +84,12 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     if not String.starts_with?(canonical_uri, base_url) do
       do_get_or_create(canonical_uri, opts[:id], opts[:type])
     else
-      warn("Skip creating a Peered for local URI: #{canonical_uri}")
+      error(canonical_uri, "We do not create a Peered for local URI")
 
-      maybe_username = String.replace_leading(canonical_uri, base_url <> "/pub/actors/", "")
+      # maybe_username = String.replace_leading(canonical_uri, base_url <> "/pub/actors/", "")
 
-      if not String.contains?(maybe_username, "/"),
-        do: Bonfire.Me.Characters.by_username(maybe_username)
+      # if not String.contains?(maybe_username, "/"),
+      #   do: Bonfire.Me.Characters.by_username(maybe_username)
     end
   end
 
@@ -146,26 +146,25 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     })
   end
 
-  def is_blocked?(peered, block_type \\ :any, opts \\ [])
+  def actor_blocked?(peered, block_type \\ :any, opts \\ [])
 
-  def is_blocked?(%Peered{} = peered, block_type, opts) do
+  def actor_blocked?(%Peered{} = peered, block_type, opts) do
     # |> debug
     peered = repo().maybe_preload(peered, :peer)
-    peer = Map.get(peered, :peer)
     # check if either of instance or actor is blocked
-    is_blocked_peer_or_peered?(peer, peered, block_type, opts)
+    is_blocked_peer_or_peered?(peered, block_type, opts)
   end
 
   # just check the instance if that's all we have
-  def is_blocked?(%Peer{} = peer, block_type, opts) do
-    Instances.is_blocked?(peer, block_type, opts)
-    |> info("instance blocked? ")
+  def actor_blocked?(%Peer{} = peer, block_type, opts) do
+    Instances.instance_blocked?(peer, block_type, opts)
+    |> info("we got an instance instead - blocked? ")
   end
 
-  def is_blocked?(id_or_uri, block_type, opts) when is_binary(id_or_uri) do
+  def actor_blocked?(id_or_uri, block_type, opts) when is_binary(id_or_uri) do
     if is_uid?(id_or_uri) do
       with {:ok, peered} <- get(id_or_uri) |> debug("existing Peered") do
-        is_blocked?(peered, block_type, opts)
+        actor_blocked?(peered, block_type, opts)
       else
         other ->
           error(other, "could not find a Peered, maybe it's just a local user?")
@@ -173,7 +172,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
       end
     else
       with {:ok, peered} <- get_or_create(id_or_uri, opts) |> debug("Peered found or created?") do
-        is_blocked?(peered, block_type, opts)
+        actor_blocked?(peered, block_type, opts)
       else
         other ->
           error(other, "could not find or create a Peered, assuming not blocked")
@@ -182,11 +181,11 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     end
   end
 
-  def is_blocked?(%URI{} = uri, block_type, opts) do
-    URI.to_string(uri) |> is_blocked?(block_type, opts)
+  def actor_blocked?(%URI{} = uri, block_type, opts) do
+    URI.to_string(uri) |> actor_blocked?(block_type, opts)
   end
 
-  def is_blocked?(%{peered: _} = object, block_type, opts) do
+  def actor_blocked?(%{peered: _} = object, block_type, opts) do
     # FIXME: why force?
     object =
       repo().preload(object, [peered: [:peer]], force: true)
@@ -197,30 +196,62 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     # |> debug("fooooopts")
 
     peered = Map.get(object, :peered) || %{}
-    peer = Map.get(peered, :peer)
+    peered = repo().maybe_preload(peered, :peer)
     # check if either of instance or actor is blocked
-    is_blocked_peer_or_peered?(peer, peered, block_type, opts)
+    is_blocked_peer_or_peered?(peered, block_type, opts)
   end
 
   # fallback to just check the instance if that's all we have
-  def is_blocked?(%{id: _} = character, block_type, opts) do
+  def actor_blocked?(%ActivityPub.Actor{pointer_id: id} = character, block_type, opts) do
+    if id,
+      do:
+        Bonfire.Boundaries.Blocks.is_blocked?(id, block_type, opts)
+        |> info("Actor blocked? "),
+      else: debug(nil, "no pointer to check for Actor")
+  end
+
+  def actor_blocked?(%{id: _} = character, block_type, opts) do
     Bonfire.Boundaries.Blocks.is_blocked?(character, block_type, opts)
     |> info("character blocked? ")
   end
 
-  def is_blocked?(list, block_type, opts) when is_list(list) do
-    true in Enum.map(list, &is_blocked?(&1, block_type, opts))
+  def actor_blocked?(list, block_type, opts) when is_list(list) do
+    true in Enum.map(list, &actor_blocked?(&1, block_type, opts))
   end
 
-  def is_blocked?(_, _, _) do
+  def actor_blocked?(_, _, _) do
     nil
   end
 
-  defp is_blocked_peer_or_peered?(peer, peered, block_type, opts) do
-    (not is_nil(peer) and Instances.is_blocked?(peer, block_type, opts))
-    |> debug("firstly, check if instance blocked? #{inspect(peer)}") ||
-      (peered not in [nil, %{}] and
-         Bonfire.Boundaries.Blocks.is_blocked?(peered, block_type, opts))
-      |> debug("now check if actor blocked? #{inspect(peered)}")
+  # defp is_blocked_peer_or_peered?(peer, peered, block_type, opts) do
+  #   (not is_nil(peer) and Instances.instance_blocked?(peer, block_type, opts))
+  #   |> debug("firstly, check if instance blocked? #{inspect(peer)}") ||
+  #     (peered not in [nil, %{}] and
+  #        Bonfire.Boundaries.Blocks.is_blocked?(peered, block_type, opts))
+  #     |> debug("now check if actor blocked? #{inspect(peered)}")
+  # end
+
+  defp is_blocked_peer_or_peered?(peered, _block_type, _opts)
+       when peered in [nil, %{}] do
+    debug(peered, "no actor provided")
+    false
+  end
+
+  defp is_blocked_peer_or_peered?(%{peer: peer} = peered, block_type, opts)
+       when peer not in [nil, %{}] do
+    if Instances.instance_blocked?(peer, block_type, opts) do
+      true
+      |> debug("Instance blocked: #{inspect(peer)}")
+    else
+      Bonfire.Boundaries.Blocks.is_blocked?(peered, block_type, opts)
+      |> debug("Actor blocked? #{inspect(peered)}")
+    end
+  end
+
+  defp is_blocked_peer_or_peered?(peered, block_type, opts) do
+    debug(peered, "no instance associated with actor")
+
+    Bonfire.Boundaries.Blocks.is_blocked?(peered, block_type, opts)
+    |> debug("Actor blocked? #{inspect(peered)}")
   end
 end

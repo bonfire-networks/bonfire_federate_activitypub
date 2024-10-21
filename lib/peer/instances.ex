@@ -11,6 +11,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   alias Bonfire.Common.Utils
   alias Bonfire.Common.URIs
   alias Bonfire.Common.Extend
+  alias Bonfire.Common.Types
 
   def list do
     repo().many(list_query())
@@ -25,9 +26,13 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     |> order_by(desc: :id)
   end
 
-  def get(canonical_uri) when is_binary(canonical_uri) do
-    with %URI{} = instance_url <- URIs.base_url(canonical_uri) do
-      do_get(instance_url)
+  def get(id_or_canonical_uri) when is_binary(id_or_canonical_uri) do
+    if Types.is_uid?(id_or_canonical_uri) do
+      get_by_id(id_or_canonical_uri)
+    else
+      with %URI{} = instance_url <- URIs.base_url(id_or_canonical_uri) do
+        get_by_instance_url(instance_url)
+      end
     end
   end
 
@@ -46,7 +51,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     |> repo().single()
   end
 
-  defp do_get(instance_url) do
+  defp get_by_instance_url(instance_url) do
     repo().single(peer_url_query(instance_url))
   end
 
@@ -56,7 +61,14 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
     # TODO: maybe Peer should be a mixin so it can have the same ID as the Circle representing it?
 
-    repo().insert(Peer.changeset(%Peer{}, %{ap_base_uri: instance_url, display_hostname: host}))
+    with {:ok, peer} <-
+           repo().insert(
+             Peer.changeset(%Peer{}, %{ap_base_uri: instance_url, display_hostname: host})
+           ) do
+      Extend.maybe_module(Bonfire.Boundaries.Circles).create_stereotype_circle(peer, :silence_me)
+
+      {:ok, peer}
+    end
   end
 
   defp peer_url_query(url) do
@@ -95,17 +107,27 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
       |> debug()
 
     if host do
+      #  FIXME: what about instances with a specific port?
       instance_url =
         "#{uri.scheme}://#{host}"
         |> debug()
 
-      case do_get(instance_url) do
+      # TODO: use get_by_domain instead?
+      case get_by_instance_url(instance_url) do
         {:ok, peer} ->
           debug(instance_url, "instance already exists")
 
           get_or_create_instance_circle(host)
           |> warn(
             "TEMPORARY: create a circle for instance (remove this in future, since doing it when a Peer is first created should be enough)"
+          )
+
+          Extend.maybe_module(Bonfire.Boundaries.Circles).get_or_create_stereotype_circle(
+            peer,
+            :silence_me
+          )
+          |> warn(
+            "TEMPORARY: create a silencing circle for instance (remove this in future, since doing it when a Peer is first created should be enough)"
           )
 
           {:ok, peer}
@@ -122,33 +144,53 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
   def get_or_create_instance_circle(host) do
     if module = Extend.maybe_module(Bonfire.Boundaries.Circles) do
-      module.get_or_create(
+      with {:ok, instance_circle} <-
+             module.get_or_create(
+               host,
+               Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
+             ) do
+        # module.get_or_create_stereotype_circle(instance_circle, :silence_me)
+
+        {:ok, instance_circle}
+      end
+    end
+  end
+
+  def get_instance_circle(host) do
+    if module = Extend.maybe_module(Bonfire.Boundaries.Circles) do
+      module.get_by_name(
         host,
         Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
       )
     end
   end
 
-  def is_blocked?(peered, block_type \\ :any, opts \\ [])
+  def instance_blocked?(peered, block_type \\ :any, opts \\ [])
 
-  def is_blocked?(uri, block_type, opts) when is_binary(uri) do
-    get_or_create(uri)
-    |> debug(uri)
-    ~> is_blocked?(block_type, opts)
-  end
-
-  def is_blocked?(%Peer{display_hostname: display_hostname} = peer, block_type, opts) do
-    with {:ok, circle} <- get_or_create_instance_circle(display_hostname) do
-      Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
+  def instance_blocked?(uri, block_type, opts) when is_binary(uri) do
+    with {:ok, peer} <- get(uri) do
+      instance_blocked?(peer, block_type, opts)
+    else
+      _ ->
+        false
     end
   end
 
-  def is_blocked?(%Bonfire.Data.ActivityPub.Peered{} = peered, block_type, opts) do
-    # just in case
-    Bonfire.Federate.ActivityPub.Peered.is_blocked?(peered, block_type, opts)
+  def instance_blocked?(%Peer{display_hostname: display_hostname} = peer, block_type, opts) do
+    with {:ok, circle} <- get_instance_circle(display_hostname) |> debug("instance_circle") do
+      Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
+    else
+      _ ->
+        false
+    end
   end
 
-  def is_blocked?(%Bonfire.Data.AccessControl.Circle{} = circle, block_type, opts) do
+  def instance_blocked?(%Bonfire.Data.ActivityPub.Peered{} = peered, block_type, opts) do
+    # just in case
+    Bonfire.Federate.ActivityPub.Peered.actor_blocked?(peered, block_type, opts)
+  end
+
+  def instance_blocked?(%Bonfire.Data.AccessControl.Circle{} = circle, block_type, opts) do
     Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
   end
 end
