@@ -420,7 +420,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
        when is_atom(module) and not is_nil(module) do
     info("AP - handle_activity_with module: #{module}")
 
-    with {:ok, %{id: pointable_object_id} = pointable_object} <-
+    with {:ok, %struct{id: pointable_object_id} = pointable_object} <-
            Utils.maybe_apply(
              module,
              :ap_receive_activity,
@@ -432,7 +432,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       # ActivityPub.Object.update_existing(activity, %{pointer_id: pointable_object_id})
       # object = ActivityPub.Object.normalize(object)
 
-      id = Types.uid(pointable_object_id)
+      id =
+        if struct not in [ActivityPub.Object, ActivityPub.Actor],
+          do:
+            Types.uid(pointable_object_id)
+            |> debug("uiid")
 
       if id && e(activity, :data, "type", nil) not in ["Update", "Delete"] do
         ActivityPub.Object.update_existing(Enums.id(activity) || Enums.id(object), %{

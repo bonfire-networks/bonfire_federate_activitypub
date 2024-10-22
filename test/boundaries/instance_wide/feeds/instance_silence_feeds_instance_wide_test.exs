@@ -46,9 +46,9 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
     # refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
   end
 
-  # TODO: figure out how to apply instance-wide instance boundaries
   test "hides a Post in feeds from a remote instance that was silenced later" do
     recipient = fake_user!(@local_actor)
+    bob = fake_user!(@local_actor)
     {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
     {:ok, instance} = Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
@@ -62,5 +62,13 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
            )
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, bob)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post)
+
+    # we show it once again
+    assert Bonfire.Boundaries.Blocks.unblock(instance, :silence, :instance_wide)
+    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
+    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, bob)
+    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post)
   end
 end

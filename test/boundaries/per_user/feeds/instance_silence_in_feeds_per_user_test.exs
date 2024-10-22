@@ -73,6 +73,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
     assert Bonfire.Boundaries.Circles.is_encircled_by?(remote_user, instance)
 
+    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, local_user)
+
     assert Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
 
     assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
@@ -90,6 +92,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     #        ) 
 
     refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, local_user)
+
+    # we show it once again
+    assert Bonfire.Boundaries.Blocks.unblock(instance, :silence, current_user: local_user)
+    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, local_user)
   end
 
   test "does not show in any feeds a Post for an incoming Note from a previously per-user silenced instance" do
