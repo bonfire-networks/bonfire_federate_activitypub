@@ -555,10 +555,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     do: get_or_fetch_and_create_by_uri(url, opts)
 
   def get_by_url_ap_id_or_username(string, opts) when is_binary(string) do
-    if validate_url(string) do
-      get_or_fetch_and_create_by_uri(string, opts)
+    with {:ok, uri} <- Bonfire.Common.URIs.validate_uri(string) |> debug("uri?") do
+      get_or_fetch_and_create_by_uri(URI.to_string(uri), opts)
     else
-      get_or_fetch_and_create_by_username(string, opts)
+      _ ->
+        get_or_fetch_and_create_by_username(string, opts)
     end
   end
 
@@ -586,8 +587,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           log("AP - get_or_fetch_and_create_by_uri - assume remote instance with URI: " <> q)
 
           with {:error, _} <- Bonfire.Federate.ActivityPub.Instances.get_by_domain(host),
-               %{} <-
-                 ActivityPub.Instances.scrape_nodeinfo(uri) ||
+               ret when ret == true or is_map(ret) <-
+                 opts[:add_all_domains_as_instances] || ActivityPub.Instances.scrape_nodeinfo(uri) ||
                    error(:not_found, "Could not find nodeinfo"),
                {:ok, instance} <-
                  Bonfire.Federate.ActivityPub.Instances.get_or_create(
@@ -712,16 +713,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     # |>
     # nope? let's try and find them from their ap id
     # |> debug
-  end
-
-  def validate_url(str) do
-    uri = URI.parse(str)
-
-    case uri do
-      %URI{scheme: nil} -> false
-      %URI{host: nil} -> false
-      _uri -> true
-    end
   end
 
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
