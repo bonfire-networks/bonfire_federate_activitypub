@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   import Bonfire.Federate.ActivityPub
   import Ecto.Query
   alias Bonfire.Data.ActivityPub.Peer
-  alias Bonfire.Common.Utils
+  # alias Bonfire.Common.Utils
   alias Bonfire.Common.URIs
   alias Bonfire.Common.Extend
   alias Bonfire.Common.Types
@@ -176,7 +176,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     end
   end
 
-  def instance_blocked?(%Peer{display_hostname: display_hostname} = peer, block_type, opts) do
+  def instance_blocked?(%Peer{display_hostname: display_hostname} = _peer, block_type, opts) do
     with {:ok, circle} <- get_instance_circle(display_hostname) |> debug("instance_circle") do
       Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
     else

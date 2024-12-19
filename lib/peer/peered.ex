@@ -202,7 +202,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   # fallback to just check the instance if that's all we have
-  def actor_blocked?(%ActivityPub.Actor{pointer_id: id} = character, block_type, opts) do
+  def actor_blocked?(%ActivityPub.Actor{pointer_id: id} = _actor, block_type, opts) do
     if id,
       do:
         Bonfire.Boundaries.Blocks.is_blocked?(id, block_type, opts)

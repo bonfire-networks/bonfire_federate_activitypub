@@ -68,7 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
   defp prepare_and_queue(subject, verb, thing, opts)
 
-  defp prepare_and_queue(_subject, verb, %{__struct__: type, id: id} = character, _opts)
+  defp prepare_and_queue(_subject, verb, %{__struct__: type, id: _id} = character, _opts)
        when verb in [:update, :edit] and type in @types_characters do
     # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
     push_actor_update(character)
@@ -194,7 +194,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
   # delete anything else
   defp push_delete(_other, subject, %{id: id} = _thing, opts) do
-    with %{} = object <-
+    with %{} = subject <- ActivityPub.Actor.get_cached!(pointer: subject),
+         %{} = object <-
            opts[:ap_object] ||
              ActivityPub.Object.get_cached!(pointer: id) do
       ActivityPub.delete(
@@ -202,7 +203,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         true,
         opts ++
           [
-            subject: AdapterUtils.the_ap_id(ActivityPub.Actor.get_cached!(pointer: subject)),
+            subject: AdapterUtils.the_ap_id(subject),
             bcc: opts[:ap_bcc]
           ]
       )

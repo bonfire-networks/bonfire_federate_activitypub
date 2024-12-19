@@ -253,16 +253,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       when is_binary(id) do
     if pointer_id = uid(id) do
       Bonfire.Common.Needles.get(pointer_id, opts)
-      ~> get_character(skip: :id)
+      ~> get_character(opts ++ [skip: :id])
     else
       error(id, "Expected a UID, attempt fallback to `get_character/1`")
-      get_character(id, skip: :id)
+      get_character(id, opts ++ [skip: :id])
     end
   end
 
   def get_character_by_id(other, opts) do
     error(other, "Dunno how to look for character, attempt fallback to `get_character/1`")
-    get_character(other, skip: :id)
+    get_character(other, opts ++ [skip: :id])
   end
 
   def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
@@ -546,7 +546,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_by_url_ap_id_or_username(q, opts \\ [])
 
   def get_by_url_ap_id_or_username("@" <> username, opts),
-    do: get_or_fetch_and_create_by_username(username, opts)
+    do: get_or_fetch_and_create_by_username(username)
 
   def get_by_url_ap_id_or_username("http:" <> _ = url, opts),
     do: get_or_fetch_and_create_by_uri(url, opts)
@@ -559,11 +559,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       get_or_fetch_and_create_by_uri(URI.to_string(uri), opts)
     else
       _ ->
-        get_or_fetch_and_create_by_username(string, opts)
+        get_or_fetch_and_create_by_username(string)
     end
   end
 
-  def get_or_fetch_and_create_by_username(q, opts \\ []) when is_binary(q) do
+  def get_or_fetch_and_create_by_username(q) when is_binary(q) do
     if String.contains?(q, "@") do
       log("AP - get_cached_or_fetch(username: : " <> q)
 
@@ -647,7 +647,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{pointer: %{id: _} = pointable} ->
         {:ok, pointable}
 
-      %{pointer_id: id, data: %{"type" => "Tombstone"}} ->
+      %{pointer_id: _id, data: %{"type" => "Tombstone"}} ->
         {:error, :not_found}
 
       %{pointer_id: id, data: %{"type" => type}}
@@ -818,7 +818,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       when struct == Bonfire.Data.AccessControl.Circle or type == "Circle",
       do: nil
 
-  def format_actor(%{id: pointer_id} = user_etc, type) do
+  def format_actor(%{id: _pointer_id} = user_etc, type) do
     user_etc =
       repo().maybe_preload(
         user_etc,
@@ -1383,10 +1383,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     )
   end
 
-  defp create_service_character(
-         service_character_id \\ service_character_id(),
-         service_character_username \\ service_character_username()
-       ) do
-    Bonfire.Me.Users.create_service_character(service_character_id, service_character_username)
-  end
+  # defp create_service_character(
+  #        service_character_id \\ service_character_id(),
+  #        service_character_username \\ service_character_username()
+  #      ) do
+  #   Bonfire.Me.Users.create_service_character(service_character_id, service_character_username)
+  # end
 end

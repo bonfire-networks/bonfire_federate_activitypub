@@ -4,7 +4,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
 
   defp main(base_uri) do
     app_name = Bonfire.Application.name() |> String.capitalize()
-    instance = Application.get_env(:activity_pub, :instance)
+    # instance = Application.get_env(:activity_pub, :instance)
     base_url = Bonfire.Common.URIs.base_url(base_uri)
 
     %{
@@ -101,7 +101,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
 
   def show(conn, _) do
     base_uri = Bonfire.Common.URIs.base_uri(conn)
-    base_url = Bonfire.Common.URIs.base_url(base_uri)
+    # base_url = Bonfire.Common.URIs.base_url(base_uri)
 
     json(
       conn,

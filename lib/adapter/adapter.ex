@@ -54,7 +54,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   defp get_followers(character) do
-    Bonfire.Social.Graph.Follows.all_subjects_by_object(character)
+    maybe_apply(Bonfire.Social.Graph.Follows, :all_subjects_by_object, [character],
+      fallback_return: []
+    )
     # |> debug()
     |> Enum.map(&id(&1))
   end
@@ -67,7 +69,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_following_local_ids(actor) do
     with {:ok, character} <- Characters.by_username(actor.username) do
-      Bonfire.Social.Graph.Follows.all_objects_by_subject(character)
+      maybe_apply(Bonfire.Social.Graph.Follows, :all_objects_by_subject, [character],
+        fallback_return: []
+      )
       |> Enum.map(&id(&1))
     end
   end
@@ -377,7 +381,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_publish_object(%{} = object, manually_fetching?) do
     object
     # |> info()
-    |> Outgoing.maybe_federate(nil, :create, ..., manually_fetching?: true)
+    |> Outgoing.maybe_federate(nil, :create, ..., manually_fetching?)
   end
 
   def get_or_create_service_actor() do
