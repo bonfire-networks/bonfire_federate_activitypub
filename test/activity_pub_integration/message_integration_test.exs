@@ -101,7 +101,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
       feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
 
       refute =
-        Bonfire.Social.FeedActivities.feed_contains?(feed_id, message, current_user: recipient)
+        Bonfire.Social.FeedLoader.feed_contains?(feed_id, message, current_user: recipient)
     end
 
     test "rejects a Message for an incoming private Note for a user with federation disabled" do

@@ -106,7 +106,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_follower)
     # assert List.first(feed).activity.object.post_content.html_body =~
     #          post_attrs.post_content.html_body
-    assert FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+    assert Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_follower
            )
 

@@ -96,7 +96,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       end)
 
       # on local instance, alice_local should not see the post
-      refute FeedActivities.feed_contains?(:local, attrs, current_user: alice_local)
+      refute Bonfire.Social.FeedLoader.feed_contains?(:local, attrs, current_user: alice_local)
       # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: alice_local)
       # # assert feed is empty
       # auto_assert true <- Enum.empty?(feed)
@@ -175,7 +175,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       end)
 
       # on local instance, alice_local should not see the post
-      refute FeedActivities.feed_contains?(:notifications, attrs, current_user: alice_local)
+      refute Bonfire.Social.FeedLoader.feed_contains?(:notifications, attrs,
+               current_user: alice_local
+             )
+
       # assert %{edges: feed} =
       #          Bonfire.Social.FeedActivities.feed(:notifications, current_user: alice_local)
 
@@ -226,7 +229,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       end)
 
       # on local instance, alice_local should not see the post
-      refute FeedActivities.feed_contains?(:inbox, attrs, current_user: alice_local)
+      refute Bonfire.Social.FeedLoader.feed_contains?(:inbox, attrs, current_user: alice_local)
       # assert %{edges: feed} =
       #          Bonfire.Social.FeedActivities.feed(:inbox, current_user: alice_local)
       # # assert feed is empty
@@ -283,7 +286,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
-        refute FeedActivities.feed_contains?(:my, attrs, current_user: bob_remote)
+        refute Bonfire.Social.FeedLoader.feed_contains?(:my, attrs, current_user: bob_remote)
 
         # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
         # # assert feed is empty
@@ -334,7 +337,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
-        refute FeedActivities.feed_contains?(:notifications, attrs, current_user: bob_remote)
+        refute Bonfire.Social.FeedLoader.feed_contains?(:notifications, attrs,
+                 current_user: bob_remote
+               )
+
         # assert %{edges: feed} =
         #          Bonfire.Social.FeedActivities.feed(:notifications, current_user: bob_remote)
         # # assert feed is empty
@@ -378,7 +384,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
-        refute FeedActivities.feed_contains?(:inbox, attrs, current_user: bob_remote)
+        refute Bonfire.Social.FeedLoader.feed_contains?(:inbox, attrs, current_user: bob_remote)
         # assert %{edges: feed} =
         #          Bonfire.Social.FeedActivities.feed(:inbox, current_user: bob_remote)
         # # assert feed is empty
@@ -441,7 +447,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
     # on remote instance, bob_remote should see the post
     TestInstanceRepo.apply(fn ->
-      assert FeedActivities.feed_contains?(:my, attrs, current_user: bob_remote)
+      assert Bonfire.Social.FeedLoader.feed_contains?(:my, attrs, current_user: bob_remote)
 
       #   assert %Paginator.Page{edges: [feed_entry | _]} =
       #          Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)

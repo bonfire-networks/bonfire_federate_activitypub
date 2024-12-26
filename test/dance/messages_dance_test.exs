@@ -125,7 +125,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
       action: info("check that reply with mention was federated and is in OP's messages")
     )
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(
+    assert Bonfire.Social.FeedLoader.feed_contains?(
              messages,
              message3_attrs.post_content.html_body
            ),
@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
              Bonfire.Messages.list(local_user)
              |> debug("feeeedlocal")
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(
+    assert Bonfire.Social.FeedLoader.feed_contains?(
              messages,
              message5_attrs.post_content.html_body
            ),

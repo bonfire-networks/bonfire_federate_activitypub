@@ -33,7 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorGhostFeedsTest do
   #   recipient = fake_user!(@local_actor)
   #   {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
-  #   assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post,
+  #   assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post,
   #            current_user: recipient
   #          )
   # end
@@ -46,8 +46,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorGhostFeedsTest do
     recipient = fake_user!(@local_actor)
     {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post,
-             current_user: recipient
-           )
+    assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, current_user: recipient)
   end
 end

@@ -33,7 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
   #   recipient = fake_user!(@local_actor)
   #   {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
-  #   assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
+  #   assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, recipient)
   # end
 
   test "does not accept an incoming Note from a silenced instance" do
@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
 
     recipient = fake_user!(@local_actor)
     assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-    # refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
+    # refute Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, recipient)
   end
 
   test "hides a Post in feeds from a remote instance that was silenced later" do
@@ -61,14 +61,14 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
              :instance_wide
            )
 
-    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
-    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, bob)
-    refute Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, recipient)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, bob)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post)
 
     # we show it once again
     assert Bonfire.Boundaries.Blocks.unblock(instance, :silence, :instance_wide)
-    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, recipient)
-    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post, bob)
-    assert Bonfire.Social.FeedActivities.feed_contains?(:activity_pub, post)
+    assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, recipient)
+    assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, bob)
+    assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post)
   end
 end

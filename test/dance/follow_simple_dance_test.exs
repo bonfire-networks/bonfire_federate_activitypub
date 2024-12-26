@@ -69,7 +69,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
 
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
-    assert FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+    assert Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_follower
            )
 

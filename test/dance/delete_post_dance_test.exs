@@ -38,7 +38,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
     post_attrs = %{post_content: %{html_body: "try deletion of federated post"}}
 
     # make sure we're starting with clean slate
-    refute Bonfire.Social.FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+    refute Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_user
            )
 
@@ -64,7 +64,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
 
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+    assert Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_user
            )
 
@@ -73,7 +73,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
       {:ok, _} = Objects.delete(remote_post, current_user: remote_user)
     end)
 
-    refute Bonfire.Social.FeedActivities.feed_contains?(:my, post_attrs.post_content.html_body,
+    refute Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_user
            )
   end

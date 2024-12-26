@@ -79,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_like)
                |> debug("like_pointer")
 
-      assert Bonfire.Social.FeedActivities.feed_contains?(
+      assert Bonfire.Social.FeedLoader.feed_contains?(
                :notifications,
                [activity: like_pointer.activity],
                current_user: user
@@ -107,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
 
       assert {:ok, like_pointer} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_like)
 
-      refute Bonfire.Social.FeedActivities.feed_contains?(
+      refute Bonfire.Social.FeedLoader.feed_contains?(
                :notifications,
                [activity: like_pointer.activity],
                current_user: user

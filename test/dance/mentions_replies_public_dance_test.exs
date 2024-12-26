@@ -125,7 +125,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
       action: info("check that reply 31 with mention was federated and is in instance feed")
     )
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(
+    assert Bonfire.Social.FeedLoader.feed_contains?(
              instance_feed,
              msg31
            )
@@ -135,12 +135,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
         info("check that reply 44 and 55 without mention are federated and in instance feed")
     )
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(
+    assert Bonfire.Social.FeedLoader.feed_contains?(
              instance_feed,
              post44_attrs.post_content.html_body
            )
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(
+    assert Bonfire.Social.FeedLoader.feed_contains?(
              instance_feed,
              post55_attrs.post_content.html_body
            )
@@ -157,7 +157,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
       action: info("check that reply 31 with mention was federated and is in OP's feed")
     )
 
-    assert Bonfire.Social.FeedActivities.feed_contains?(
+    assert Bonfire.Social.FeedLoader.feed_contains?(
              my_feed,
              msg31
            )

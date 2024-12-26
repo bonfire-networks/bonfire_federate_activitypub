@@ -80,7 +80,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
       assert {:ok, %Boost{} = boost_pointer} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
 
-      assert Bonfire.Social.FeedActivities.feed_contains?(
+      assert Bonfire.Social.FeedLoader.feed_contains?(
                :notifications,
                [activity: boost_pointer.activity],
                current_user: user
@@ -109,7 +109,7 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
       assert {:ok, boost_pointer} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
 
-      refute Bonfire.Social.FeedActivities.feed_contains?(
+      refute Bonfire.Social.FeedLoader.feed_contains?(
                :notifications,
                [activity: boost_pointer.activity],
                current_user: user

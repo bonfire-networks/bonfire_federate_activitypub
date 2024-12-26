@@ -63,7 +63,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
     post_id =
-      Bonfire.Social.FeedActivities.feed_contains?(
+      Bonfire.Social.FeedLoader.feed_contains?(
         :my,
         post_attrs.post_content.html_body,
         current_user: local_user
@@ -83,6 +83,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
 
     Logger.metadata(action: info("check post deletion was federated"))
 
-    refute Bonfire.Social.FeedActivities.feed_contains?(:my, post_id, current_user: local_user)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:my, post_id, current_user: local_user)
   end
 end
