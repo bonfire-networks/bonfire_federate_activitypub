@@ -17,6 +17,11 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     repo().many(list_query())
   end
 
+  def list_by_domains(canonical_uris) do
+    query_by_domain(canonical_uris)
+    |> repo().many()
+  end
+
   def list_paginated(opts) do
     repo().many_paginated(list_query(), opts)
   end
@@ -43,11 +48,22 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     |> repo().single()
   end
 
-  def get_by_domain(canonical_uri) when is_binary(canonical_uri) do
+  defp query_by_domain(canonical_uri) when is_binary(canonical_uri) do
     from(p in Peer,
       where: p.display_hostname == ^canonical_uri
     )
+
     # |> repo().maybe_where_ilike("ap_base_uri", canonical_uri, "%//")
+  end
+
+  defp query_by_domain(canonical_uri) when is_list(canonical_uri) do
+    from(p in Peer,
+      where: p.display_hostname in ^canonical_uri
+    )
+  end
+
+  def get_by_domain(canonical_uri) when is_binary(canonical_uri) do
+    query_by_domain(canonical_uri)
     |> repo().single()
   end
 
