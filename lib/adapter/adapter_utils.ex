@@ -16,7 +16,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   import Untangle
 
   @service_character_id "1ACT1V1TYPVBREM0TESFETCHER"
-  @service_character_username "fediverse_user"
+  @service_character_username "Federation Bot"
+  def service_character_username, do: @service_character_username
+  def service_character_id, do: @service_character_id
 
   def public_uri(), do: ActivityPub.Config.public_uri()
 
@@ -1369,18 +1371,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  # @service_character_id
-  def service_character_id, do: Bonfire.Me.Users.remote_fetcher_id()
-  def service_character_username, do: @service_character_username
-
   def get_or_create_service_character(
         service_character_id \\ service_character_id(),
         service_character_username \\ service_character_username()
       ) do
-    Bonfire.Me.Users.get_or_create_service_character(
+    maybe_apply(Bonfire.Me.Users, :get_or_create_service_character, [
       service_character_id,
       service_character_username
-    )
+    ])
   end
 
   # defp create_service_character(

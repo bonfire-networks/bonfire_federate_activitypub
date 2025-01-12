@@ -7,6 +7,14 @@ defmodule Bonfire.Federate.ActivityPub do
   import Untangle
   alias Bonfire.Common.Config
   alias Bonfire.Common.Settings
+  alias Bonfire.Common.Utils
+
+  # TODO: make these configurable/extensible
+  def do_not_federate_user_ids,
+    do: [
+      Utils.maybe_apply(Bonfire.Social, :automod_id, [], fallback_return: nil),
+      Bonfire.Federate.ActivityPub.AdapterUtils.service_character_id()
+    ]
 
   def repo, do: Config.repo()
 
