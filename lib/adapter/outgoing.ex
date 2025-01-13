@@ -87,13 +87,20 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         )
 
         cond do
-          Extend.module_enabled?(module) and function_exported?(module, :ap_publish_activity, 3) ->
+          !Extend.module_enabled?(module) ->
+            preparation_error(
+              "Federation module #{module} was disabled, for verb {#{inspect(verb)}, #{object_type}}",
+              [verb, local_object]
+            )
+
+          function_exported?(module, :ap_publish_activity, 3) ->
             Utils.maybe_apply(
               module,
               :ap_publish_activity,
               [subject, verb, local_object],
               current_user: subject,
-              fallback_fun: &preparation_error/2
+              fallback_fun: &preparation_error/2,
+              force_module: true
             )
 
           true ->
@@ -102,7 +109,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
               :ap_publish_activity,
               [verb, local_object],
               current_user: subject,
-              fallback_fun: &preparation_error/2
+              fallback_fun: &preparation_error/2,
+              force_module: true
             )
         end
         |> debug("donz")
