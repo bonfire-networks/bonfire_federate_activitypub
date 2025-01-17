@@ -55,6 +55,42 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     end)
   end
 
+  @tag :test_instance
+  test "a local-only or private post cannot be fetched from AP API",
+       context do
+    user = context[:local][:user]
+
+    Logger.metadata(action: "create local-only post 1")
+    attrs = %{post_content: %{html_body: "local-only post 1"}}
+    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "local")
+
+    canonical_url =
+      Bonfire.Common.URIs.canonical_url(post)
+      |> info("canonical_url")
+
+    Logger.metadata(action: "create private post 2")
+    attrs2 = %{post_content: %{html_body: "private post 2"}}
+    {:ok, post2} = Posts.publish(current_user: user, post_attrs: attrs2, boundary: "mentions")
+
+    friendly_url =
+      (Bonfire.Common.URIs.base_url() <> Bonfire.Common.URIs.path(post2))
+      |> info("friendly_url")
+
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: "fetch post 1 by canonical_url")
+
+      assert {:error, :not_found} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+               |> repo().maybe_preload(:post_content)
+
+      Logger.metadata(action: "fetch post 2 by friendly_url")
+
+      assert {:error, :not_found} =
+               AdapterUtils.get_by_url_ap_id_or_username(friendly_url)
+               |> repo().maybe_preload(:post_content)
+    end)
+  end
+
   test "can federate edits",
        context do
     user = context[:local][:user]
