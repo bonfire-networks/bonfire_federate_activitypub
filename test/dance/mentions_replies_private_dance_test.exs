@@ -150,7 +150,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     )
 
     assert %{edges: feed} =
-             Bonfire.Social.FeedActivities.feed(:fediverse, current_user: local_user)
+             Bonfire.Social.FeedActivities.feed(:remote, current_user: local_user)
              |> debug("remotefeed")
 
     assert Bonfire.Social.FeedLoader.feed_contains?(
