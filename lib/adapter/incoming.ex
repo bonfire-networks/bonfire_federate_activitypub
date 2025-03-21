@@ -6,7 +6,6 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   # import AdapterUtils, only: [log: 1]
-  # alias Bonfire.Search.Indexer
   # alias Bonfire.Federate.ActivityPub.Adapter
   # alias Bonfire.Data.ActivityPub.Peered
 
@@ -177,7 +176,6 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     with {:ok, actor} <- ActivityPub.Actor.get_cached(ap_id: ap_id),
          {:ok, actor} <-
            Bonfire.Federate.ActivityPub.Adapter.update_remote_actor(actor) do
-      # Indexer.maybe_index_object(actor)
       {:ok, actor}
     end
   end
