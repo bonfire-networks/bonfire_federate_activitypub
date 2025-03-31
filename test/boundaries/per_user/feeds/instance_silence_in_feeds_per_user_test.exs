@@ -21,9 +21,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
   #   {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
   #   |> debug("ppppooost")
 
-  #   feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
   #   # |> debug()
-  #   assert Bonfire.Social.FeedLoader.feed_contains?(feed_id, post, local_user)
+  #   assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
   # end
 
   test "does not show in my_feed an incoming Note from a per-user silenced instance (from an actor I am not following)" do
@@ -73,7 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
     assert Bonfire.Boundaries.Circles.is_encircled_by?(remote_user, instance)
 
-    assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, local_user)
+    assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
 
     assert Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
 
@@ -91,11 +90,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     #          current_user: local_user
     #        ) 
 
-    refute Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, local_user)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
 
     # we show it once again
     assert Bonfire.Boundaries.Blocks.unblock(instance, :silence, current_user: local_user)
-    assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, local_user)
+    assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
   end
 
   test "does not show in any feeds a Post for an incoming Note from a previously per-user silenced instance" do
@@ -112,6 +111,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
 
     {:ok, post} = receive_remote_activity_to([local_user, ActivityPub.Config.public_uri()])
 
-    refute Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, local_user)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
   end
 end

@@ -33,7 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceFeedsInstanceWideT
   #   recipient = fake_user!(@local_actor)
   #   {:ok, post} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
 
-  #   assert Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, recipient)
+  #   assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, recipient)
   # end
 
   test "does not accept an incoming Note with silenced actor" do
@@ -43,6 +43,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceFeedsInstanceWideT
 
     recipient = fake_user!(@local_actor)
     assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-    # refute Bonfire.Social.FeedLoader.feed_contains?(:activity_pub, post, recipient)
+    # refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, recipient)
   end
 end

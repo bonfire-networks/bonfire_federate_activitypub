@@ -36,8 +36,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceBlockFeedsTest do
 
     recipient = fake_user!(@local_actor)
     assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
-    # feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-    # refute Bonfire.Social.FeedLoader.feed_contains?(feed_id, post, current_user: recipient)
+    # refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, current_user: recipient)
   end
 
   # duplicate of silencing
@@ -49,7 +48,6 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceBlockFeedsTest do
   #   # |> debug
   #   ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
 
-  #   feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-  #   refute Bonfire.Social.FeedLoader.feed_contains?(feed_id, post, current_user: recipient)
+  #   refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, current_user: recipient)
   # end
 end

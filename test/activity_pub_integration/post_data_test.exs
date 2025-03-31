@@ -188,11 +188,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       assert post.post_content.html_body =~ params.object["content"]
 
-      feed_id =
-        Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-        |> debug("feeeed")
-
-      assert Bonfire.Social.FeedLoader.feed_contains?(feed_id, post)
+      assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post)
 
       # debug(feed_entry)
     end
@@ -219,9 +215,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       assert post.post_content.html_body =~ params.object["content"]
 
-      feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-
-      assert Bonfire.Social.FeedLoader.feed_contains?(feed_id, post)
+      assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post)
 
       assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, post,
                current_user: recipient
@@ -257,11 +251,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       assert post.post_content.html_body =~ params.object["content"]
 
-      feed_id =
-        Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-        |> debug("feeeed")
-
-      assert Bonfire.Social.FeedLoader.feed_contains?(feed_id, post)
+      assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post)
 
       refute Bonfire.Social.FeedLoader.feed_contains?(:notifications, post,
                current_user: recipient
