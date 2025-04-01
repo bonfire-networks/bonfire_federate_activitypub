@@ -27,6 +27,8 @@ defmodule Bonfire.Federate.ActivityPub.ChannelCase do
 
       # The default endpoint for testing
       @endpoint Application.compile_env!(:bonfire, :endpoint_module)
+
+      @moduletag :federation
     end
   end
 

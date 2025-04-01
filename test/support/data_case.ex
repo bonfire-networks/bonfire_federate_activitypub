@@ -28,6 +28,8 @@ defmodule Bonfire.Federate.ActivityPub.DataCase do
       import Bonfire.Federate.ActivityPub.DataHelpers
       alias Bonfire.Federate.ActivityPub.Simulate
       import Bonfire.Federate.ActivityPub
+
+      @moduletag :federation
     end
   end
 

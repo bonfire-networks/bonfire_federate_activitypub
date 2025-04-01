@@ -36,6 +36,8 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
 
       # The default endpoint for testing
       @endpoint Application.compile_env!(:bonfire, :endpoint_module)
+
+      @moduletag :federation
     end
   end
 
