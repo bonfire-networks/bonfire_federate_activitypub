@@ -39,7 +39,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def is_local?(thing, opts) do
     if is_binary(thing) do
-      Bonfire.Common.Needles.one(thing, skip_boundary_check: true)
+      if opts[:preload_if_needed] != false do
+        Bonfire.Common.Needles.one(thing, skip_boundary_check: true)
+      else
+        thing
+      end
     else
       thing
     end
@@ -112,7 +116,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         if opts[:preload_if_needed] != false do
           preload_peered(object)
           |> warn(
-            "preloaded peered info (should try always doing this in original query to avoid n+1)"
+            "preloaded peered info (should try always doing this in original query to avoid N plus 1)"
           )
           |> is_local?(preload_if_needed: false)
         else
