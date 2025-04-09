@@ -122,7 +122,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             {:ok, activity, object}
 
           :ignore ->
-            debug("Ignore outgoing federation")
+            debug("Ignoring outgoing federation")
             :ignore
 
           e ->
