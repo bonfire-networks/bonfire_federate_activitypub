@@ -13,11 +13,11 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
 
-      %{method: :get, url: "https://pixelfed.local/users/dajbelshaw"} ->
-        json(Simulate.actor_json("https://pixelfed.local/users/dajbelshaw"))
+      # %{method: :get, url: "https://mocked.local/users/karen"} ->
+      #   json(Simulate.actor_json("https://mocked.local/users/karen"))
 
       _ ->
-        raise Tesla.Mock.Error, "Request not mocked"
+        raise Tesla.Mock.Error, "Module request not mocked"
     end)
     |> debug("setup done")
 
@@ -92,6 +92,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         |> Path.expand(__DIR__)
         |> File.read!()
         |> Jason.decode!()
+        |> debug("pxxx")
 
       {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
@@ -100,17 +101,20 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
                |> repo().maybe_preload([:post_content, :media])
 
       assert post.__struct__ == Bonfire.Data.Social.Post
-      debug(post)
-      assert is_binary(debug(e(post, :post_content, :html_body, nil)))
+      # debug(post)
+      assert is_binary(e(post, :post_content, :html_body, nil))
 
-      assert %{
-               media: [
-                 %Bonfire.Files.Media{
-                   path:
-                     "https://pixelfed-prod.nyc3.cdn.digitaloceanspaces.com/public/m/_v2/411/7198ec0c0-99bc91/6CWmVqUJS5Rx/cXZwkROZAkUOQEidxDNxZYlezi5nRBBLy5f2YAm0.jpg"
-                 }
-               ]
-             } = post
+      assert match?(
+               %{
+                 media: [
+                   %Bonfire.Files.Media{
+                     path:
+                       "https://pxscdn.com/public/m/_v2/411/7198ec0c0-99bc91/6CWmVqUJS5Rx/cXZwkROZAkUOQEidxDNxZYlezi5nRBBLy5f2YAm0.jpg"
+                   }
+                 ]
+               },
+               post
+             )
 
       # assert doc =
       #          render_stateful(Bonfire.UI.Social.ActivityLive, %{

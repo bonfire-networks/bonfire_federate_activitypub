@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
 
@@ -72,10 +71,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowSimpleTest do
     assert Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_follower
            )
-
-    # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_follower)
-    # assert List.first(feed).activity.object.post_content.html_body =~
-    #          post_attrs.post_content.html_body
 
     Logger.metadata(action: info("unfollow"))
     assert {:ok, unfollow} = Follows.unfollow(local_follower, followed_on_local)

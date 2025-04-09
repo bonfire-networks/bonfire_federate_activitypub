@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  alias Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   # use SharedDataDanceCase
 
@@ -19,7 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
   use Mneme
 
   setup_all tags do
-    Bonfire.Common.Test.Interactive.setup_test_repo(tags)
+    # Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
     [
       local:
@@ -103,9 +102,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
 
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
-    # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_follower)
-    # assert List.first(feed).activity.object.post_content.html_body =~
-    #          post_attrs.post_content.html_body
     assert Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_follower
            )

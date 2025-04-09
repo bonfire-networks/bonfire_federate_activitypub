@@ -892,7 +892,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       location = e(user_etc, :profile, :location, nil)
 
       # TODO: actual update time?
-      updated_at = NaiveDateTime.utc_now()
+      updated_at = NaiveDateTime.utc_now(Calendar.ISO)
 
       data =
         %{
@@ -1043,7 +1043,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                         ]
                       ],
                       # FIXME: should not depend on Users for fallback
-                      &Bonfire.Me.Users.create_remote/1
+                      &Bonfire.Me.Users.create_remote/2
                     ),
                   {:ok, _object} <-
                     ActivityPub.Object.update_existing(actor.id, %{

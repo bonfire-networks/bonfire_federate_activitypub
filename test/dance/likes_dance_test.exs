@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.LikesTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
 
@@ -41,11 +40,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.LikesTest do
       Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
     TestInstanceRepo.apply(fn ->
-      assert %{edges: feed} =
-               Bonfire.Social.FeedActivities.feed(:notifications, current_user: remote_user)
+      assert activity =
+               Bonfire.Social.FeedLoader.feed_contains?(:notifications, "try federated @ mention",
+                 current_user: remote_user
+               )
 
-      post1remote = List.first(feed).activity.object
-      assert post1remote.post_content.html_body =~ "try federated @ mention"
+      post1remote = activity.object
 
       Logger.metadata(action: info("like it"))
       Bonfire.Social.Likes.like(remote_user, post1remote)
@@ -53,12 +53,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.LikesTest do
 
     Logger.metadata(action: info("check that like was federated and is in OP's feed"))
 
-    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_user)
+    assert a_remote =
+             Bonfire.Social.FeedLoader.feed_contains?(:my, "try federated @ mention",
+               current_user: local_user
+             )
 
-    a_remote = List.first(feed).activity
     # assert a_remote.verb.verb == "Like"
     assert a_remote.verb_id == "11KES1ND1CATEAM11DAPPR0VA1"
-    liked_post = a_remote.object
-    assert liked_post.post_content.html_body =~ "try federated @ mention"
   end
 end

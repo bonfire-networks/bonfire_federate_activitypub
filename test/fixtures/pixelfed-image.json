@@ -39,9 +39,9 @@
 	"inReplyTo": null,
 	"published": "2021-12-01T09:02:13+00:00",
 	"url": "https://pixelfed.local/p/dajbelshaw/371584017931323759",
-	"attributedTo": "https://pixelfed.local/users/dajbelshaw",
+	"attributedTo": "https://mocked.local/users/karen",
 	"to": ["https://www.w3.org/ns/activitystreams#Public"],
-	"cc": ["https://pixelfed.local/users/dajbelshaw/followers"],
+	"cc": ["https://mocked.local/users/karen/followers"],
 	"sensitive": false,
 	"attachment": [
 		{

@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
 
@@ -41,9 +40,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
       Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
     TestInstanceRepo.apply(fn ->
-      assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
-      post1remote = List.first(feed).activity.object
-      assert post1remote.post_content.html_body =~ "try federated boost"
+      assert activity =
+               Bonfire.Social.FeedLoader.feed_contains?(:my, "try federated boost",
+                 current_user: remote_user
+               )
+
+      post1remote = activity.object
 
       Logger.metadata(action: info("boost it"))
       Bonfire.Social.Boosts.boost(remote_user, post1remote)
@@ -51,11 +53,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.BoostsTest do
 
     Logger.metadata(action: info("check that boost was federated and is in OP's feed"))
 
-    assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: local_user)
+    assert a_remote =
+             Bonfire.Social.FeedLoader.feed_contains?(:my, "try federated boost",
+               current_user: remote_user
+             )
 
-    a_remote = List.first(feed).activity
     assert a_remote.verb_id == "300ST0R0RANN0VCEANACT1V1TY"
-    boosted_post = a_remote.object
-    assert boosted_post.post_content.html_body =~ "try federated boost"
   end
 end

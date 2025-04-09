@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
   @moduletag :mneme
@@ -69,8 +68,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
       assert %{edges: feed} = Messages.list(remote_user)
       auto_assert %Bonfire.Data.Social.Message{} <- List.first(feed)
 
-      # feed = Bonfire.Social.FeedActivities.feed(:inbox, current_user: remote_user)
-      # auto_assert true <- match?(%{edges: [feed_entry | _]}, feed)
       # debug("post 1 wasn't federated to instance of mentioned actor")
 
       # %{edges: [feed_entry | _]} = feed
@@ -121,13 +118,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
 
     Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
 
-    assert %{edges: feed} =
-             Bonfire.Social.FeedActivities.feed(:my, current_user: local_user) |> debug("feeeed")
-
-    Enum.each(
-      feed,
-      &refute(&1.activity.object.post_content.html_body =~ post2_attrs.post_content.html_body)
-    )
+    refute Bonfire.Social.FeedLoader.feed_contains?(:my, post2_attrs.post_content.html_body,
+             current_user: local_user
+           )
+           |> debug("feeeed")
 
     Logger.metadata(
       action: info("check that reply with mention was federated and is in OP's feed")

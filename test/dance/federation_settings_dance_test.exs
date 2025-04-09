@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
 
@@ -86,10 +85,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
       current_user(Settings.put([:activity_pub, :user_federating], false, current_user: user))
 
     TestInstanceRepo.apply(fn ->
-      assert {:error, e} =
-               ActivityPub.Federator.Fetcher.fetch_object_from_id(context[:local][:canonical_url])
-
-      auto_assert "Remote response with HTTP 403: this instance is not currently federating" <- e
+      auto_assert {:error,
+                   "Remote response with HTTP 403: this instance is not currently federating"} <-
+                    ActivityPub.Federator.Fetcher.fetch_object_from_id(
+                      context[:local][:canonical_url]
+                    )
 
       # AdapterUtils.get_or_fetch_and_create_by_uri(context[:local][:canonical_url])
     end)

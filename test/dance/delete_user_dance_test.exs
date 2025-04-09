@@ -1,6 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
+
   import Mneme
   @moduletag :test_instance
 

@@ -283,15 +283,11 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       assert post.post_content.html_body =~ params.object["content"]
 
-      feed_id = Bonfire.Social.Feeds.named_feed_id(:activity_pub)
-
-      assert %{edges: [feed_entry]} =
-               Bonfire.Social.FeedActivities.feed_with_object(feed_id, post,
-                 current_user: recipient
-               )
+      assert activity =
+               Bonfire.Social.FeedLoader.feed_contains?(:remote, post, current_user: recipient)
 
       date =
-        feed_entry.activity.object_id
+        activity.object_id
         |> DatesTimes.date_from_pointer()
         |> DateTime.to_iso8601()
         # it has sprouted a milliseconds field and won't print identically

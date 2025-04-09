@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
 
@@ -21,6 +20,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
   test "public mention and reply", context do
     # context |> info("context")
 
+    local_user = context[:local][:user]
+    # |> info("local_user")
+
+    remote_ap_id =
+      context[:remote][:canonical_url]
+      |> info("remote_ap_id")
+
     msg11 = "try out federated public at mention 11"
 
     post11_attrs = %{
@@ -33,27 +39,21 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
 
     post31_attrs = %{
       post_content: %{
-        html_body: "#{context[:remote][:username]} #{msg31}"
+        html_body: "#{context[:local][:username]} #{msg31}"
       }
     }
 
     post44_attrs = %{post_content: %{html_body: "try out federated reply-only 44"}}
     post55_attrs = %{post_content: %{html_body: "try out federated reply 55 in thread"}}
 
-    local_user = context[:local][:user]
-    # |> info("local_user")
-    local_ap_id =
-      Bonfire.Me.Characters.character_url(local_user)
-      |> info("local_ap_id")
-
     {:ok, post11} =
       Posts.publish(current_user: local_user, post_attrs: post11_attrs, boundary: "public")
 
     # error(post11.activity.tagged)
 
-    remote_ap_id =
-      context[:remote][:canonical_url]
-      |> info("remote_ap_id")
+    local_ap_id =
+      Bonfire.Me.Characters.character_url(local_user)
+      |> info("local_ap_id")
 
     # Logger.metadata(action: info("init remote_on_local"))
     # assert {:ok, remote_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
@@ -66,14 +66,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
     TestInstanceRepo.apply(fn ->
       remote_user = context[:remote][:user]
 
-      feed = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
+      assert activity =
+               Bonfire.Social.FeedLoader.feed_contains?(:my, msg11, current_user: remote_user)
 
-      assert match?(%{edges: [feed_entry | _]}, feed)
-
-      %{edges: [feed_entry | _]} = feed
-      post11remote = feed_entry.activity.object
-
-      assert post11remote.post_content.html_body =~ msg11
+      post11remote = activity.object
 
       Logger.metadata(action: info("make a reply on remote"))
 
@@ -118,8 +114,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
     assert %{edges: instance_feed} =
              Bonfire.Social.FeedActivities.feed(:explore, current_user: local_user, limit: 10)
 
-    assert %{edges: my_feed} =
-             Bonfire.Social.FeedActivities.feed(:my, current_user: local_user, limit: 20)
+    assert %{edges: notifications} =
+             Bonfire.Social.FeedActivities.feed(:notifications,
+               current_user: local_user,
+               limit: 20
+             )
 
     Logger.metadata(
       action: info("check that reply 31 with mention was federated and is in instance feed")
@@ -145,20 +144,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
              post55_attrs.post_content.html_body
            )
 
-    Logger.metadata(action: info("check that reply-only 27 is NOT in OP's feed"))
+    Logger.metadata(action: info("check that reply-only 27 is NOT in OP's notifications"))
 
-    Enum.each(
-      my_feed,
-      &refute(&1.activity.object.post_content.html_body =~ post27_attrs.post_content.html_body)
-    )
+    refute Bonfire.Social.FeedLoader.feed_contains?(
+             notifications,
+             post27_attrs.post_content.html_body
+           )
 
     # FIXME
     Logger.metadata(
-      action: info("check that reply 31 with mention was federated and is in OP's feed")
+      action: info("check that reply 31 with mention was federated and is in OP's notifications")
     )
 
     assert Bonfire.Social.FeedLoader.feed_contains?(
-             my_feed,
+             notifications,
              msg31
            )
   end

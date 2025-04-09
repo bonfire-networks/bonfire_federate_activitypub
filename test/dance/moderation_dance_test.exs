@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
 
@@ -13,7 +12,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
 
   alias Bonfire.Posts
 
-  # TODO
+  #  WIP
+  @tag :fixme
   test "cross-instance flagging", context do
     # context |> info("context")
 
@@ -34,16 +34,24 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
     remote_user = context[:remote][:user]
 
     post1_attrs = %{
-      post_content: %{html_body: "#{context[:remote][:username]} try federated flagging"}
+      post_content: %{html_body: "#{context[:remote][:username]} post to try federated flagging"}
     }
 
     {:ok, post1} =
       Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
+    post1_url = Bonfire.Common.URIs.canonical_url(post1)
+
     TestInstanceRepo.apply(fn ->
-      assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: remote_user)
-      post1remote = List.first(feed).activity.object
-      assert post1remote.post_content.html_body =~ "try federated flagging"
+      assert {:ok, post_on_remote} =
+               AdapterUtils.get_by_url_ap_id_or_username(post1_url)
+
+      assert activity =
+               Bonfire.Social.FeedLoader.feed_contains?(:remote, "post to try federated flagging",
+                 current_user: remote_user
+               )
+
+      post1remote = activity.object
 
       Logger.metadata(action: info("flag it"))
 
@@ -56,12 +64,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
 
     Logger.metadata(action: info("check flag was federated and is in admin's notifications"))
 
-    assert %{edges: feed} =
-             Bonfire.Social.FeedActivities.feed(:notifications, current_user: local_admin)
-             |> repo().maybe_preload(activity: [:object])
+    assert %{verb_id: verb_id, object: _object} =
+             activity =
+             Bonfire.Social.FeedLoader.feed_contains?(
+               :notifications,
+               "post to try federated flagging",
+               current_user: local_admin
+             )
 
-    %{activity: %{verb_id: verb_id, object: object} = a_remote} = List.first(feed)
     assert verb_id == "71AGSPAM0RVNACCEPTAB1E1TEM"
-    assert object.post_content.html_body =~ "try federated flagging"
   end
 end

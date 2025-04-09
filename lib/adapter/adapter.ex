@@ -77,9 +77,6 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def external_followers_for_activity(actor, activity_data) do
-    # debug(actor)
-    # debug(activity_data)
-
     with ap_object when is_binary(ap_object) <-
            e(activity_data, "object", "id", nil) || e(activity_data, "object", nil),
          {:ok, object} <-
@@ -87,10 +84,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          object when is_binary(object) or is_struct(object) <-
            e(object, :pointer, nil) || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-
-           character_id_from_actor(actor),
+           character_id_from_actor(actor) |> debug("character_id_from_actor"),
          followers when is_list(followers) and followers != [] <-
            get_followers(character)
-           |> debug("followers")
+           |> debug("got_followers")
            |> Enum.reject(&AdapterUtils.is_local?/1)
            |> debug("remote followers"),
          granted_followers when is_list(granted_followers) and granted_followers != [] <-
@@ -102,17 +99,19 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
        |> Enum.map(&Map.take(&1, [:subject_id]))
        |> debug("post_grants")
        |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject_id))
-       |> filter_empty([])
-       |> debug("bcc actors based on grants")}
+       |> filter_empty([])}
     else
       [] ->
-        debug("No remote followers or grants")
+        debug(actor, "No remote followers or grants")
         {:ok, []}
 
       e ->
         warn(e, "Could not find the object or actor?")
+        debug(actor, "actor")
+        debug(activity_data, "activity")
         {:ok, []}
     end
+    |> debug("bcc actors based on grants")
   end
 
   def get_actor_by_id(id) when is_binary(id) do

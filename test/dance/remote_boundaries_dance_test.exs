@@ -1,6 +1,5 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
-  use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
   @moduletag :mneme
@@ -97,9 +96,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on local instance, alice_local should not see the post
       refute Bonfire.Social.FeedLoader.feed_contains?(:local, attrs, current_user: alice_local)
-      # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: alice_local)
-      # # assert feed is empty
-      # auto_assert true <- Enum.empty?(feed)
     end
 
     test "i'll be able to view their profile or read post via direct link", context do
@@ -178,12 +174,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       refute Bonfire.Social.FeedLoader.feed_contains?(:notifications, attrs,
                current_user: alice_local
              )
-
-      # assert %{edges: feed} =
-      #          Bonfire.Social.FeedActivities.feed(:notifications, current_user: alice_local)
-
-      # # assert feed is empty
-      # assert a_remote = Enum.empty?(feed)
     end
 
     test "i'll not see any DM from them", context do
@@ -230,10 +220,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on local instance, alice_local should not see the post
       refute Bonfire.Social.FeedLoader.feed_contains?(:my, attrs, current_user: alice_local)
-      # assert %{edges: feed} =
-      #          Bonfire.Social.FeedActivities.feed(:inbox, current_user: alice_local)
-      # # assert feed is empty
-      # auto_assert true <- Enum.empty?(feed)
     end
 
     test "I'll not be able to follow them" do
@@ -241,31 +227,29 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   end
 
   describe "if I ghosted a remote user they will not be able to interact with me or with my content" do
-    # FIXME
     test "Nothing I post privately will be shown to them from now on", context do
       alice_local = context[:local][:user]
       bob_remote = context[:remote][:user]
 
       alice_local_ap_id = context[:local][:canonical_url]
-      bob_remote_ap_id = context[:local][:canonical_url]
+      bob_remote_ap_id = context[:remote][:canonical_url]
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
 
       # on remote instance, bob_remote follows alice
       TestInstanceRepo.apply(fn ->
-        {:ok, local_on_remote} =
+        {:ok, alice_on_remote} =
           Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
             alice_local_ap_id
           )
 
-        auto_assert {:ok, _} <-
-                      Follows.follow(bob_remote, local_on_remote)
+        auto_assert {:ok, _} <- Follows.follow(bob_remote, alice_on_remote)
 
         # auto_assert {:error, :not_found} <-
-        #               Follows.accept_from(bob_remote, current_user: local_on_remote)
+        #               Follows.accept_from(bob_remote, current_user: alice_on_remote)
 
-        auto_assert true <- Follows.following?(bob_remote, local_on_remote)
+        auto_assert true <- Follows.following?(bob_remote, alice_on_remote)
       end)
 
       # alice ghosts bob_remote
@@ -274,8 +258,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
                       current_user: alice_local
                     )
 
-      attrs = "try out federated post 271"
-      post_attrs = %{post_content: %{html_body: attrs}}
+      text = "try out federated post 271"
+      post_attrs = %{post_content: %{html_body: text}}
 
       {:ok, post} =
         Posts.publish(
@@ -286,24 +270,16 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
-        refute Bonfire.Social.FeedLoader.feed_contains?(:my, attrs, current_user: bob_remote)
-
-        # assert %{edges: feed} = Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
-        # # assert feed is empty
-        # auto_assert false <- Enum.empty?(feed)
+        refute Bonfire.Social.FeedLoader.feed_contains?(:my, text, current_user: bob_remote)
       end)
     end
-
-    # This is irrelevant - already tested
-    # test "They may still be able to see things I post publicly.", context do
-    # end
 
     test "I won't be able to @ mention them.", context do
       alice_local = context[:local][:user]
       bob_remote = context[:remote][:user]
 
       alice_local_ap_id = context[:local][:canonical_url]
-      bob_remote_ap_id = context[:local][:canonical_url]
+      bob_remote_ap_id = context[:remote][:canonical_url]
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
@@ -340,11 +316,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
         refute Bonfire.Social.FeedLoader.feed_contains?(:notifications, attrs,
                  current_user: bob_remote
                )
-
-        # assert %{edges: feed} =
-        #          Bonfire.Social.FeedActivities.feed(:notifications, current_user: bob_remote)
-        # # assert feed is empty
-        # assert a_remote = Enum.empty?(feed)
       end)
     end
 
@@ -353,7 +324,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       bob_remote = context[:remote][:user]
 
       alice_local_ap_id = context[:local][:canonical_url]
-      bob_remote_ap_id = context[:local][:canonical_url]
+      bob_remote_ap_id = context[:remote][:canonical_url]
 
       {:ok, bob_remote_user_on_local} =
         Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
@@ -385,10 +356,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
       # on remote instance, bob_remote should not see the post
       TestInstanceRepo.apply(fn ->
         refute Bonfire.Social.FeedLoader.feed_contains?(:my, attrs, current_user: bob_remote)
-        # assert %{edges: feed} =
-        #          Bonfire.Social.FeedActivities.feed(:inbox, current_user: bob_remote)
-        # # assert feed is empty
-        # assert a_remote = Enum.empty?(feed)
       end)
     end
 
@@ -415,7 +382,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
     bob_remote = context[:remote][:user]
 
     alice_local_ap_id = context[:local][:canonical_url]
-    bob_remote_ap_id = context[:local][:canonical_url]
+    bob_remote_ap_id = context[:remote][:canonical_url]
 
     {:ok, bob_remote_user_on_local} =
       Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(bob_remote_ap_id)
@@ -448,16 +415,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
     # on remote instance, bob_remote should see the post
     TestInstanceRepo.apply(fn ->
       assert Bonfire.Social.FeedLoader.feed_contains?(:my, attrs, current_user: bob_remote)
-
-      #   assert %Paginator.Page{edges: [feed_entry | _]} =
-      #          Bonfire.Social.FeedActivities.feed(:my, current_user: bob_remote)
-      #          |> debug("bob feed")
-
-      # post1remote = feed_entry.activity.object
-
-      # auto_assert true <-
-      #               post1remote.post_content.html_body =~
-      #                 "try out federated post with circle containing remote users"
     end)
   end
 end

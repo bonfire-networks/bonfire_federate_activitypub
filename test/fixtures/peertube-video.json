@@ -1,294 +1,4 @@
 {
-	"type": "Create",
-	"id": "https://mocked.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/activity",
-	"actor": "https://mocked.local/users/karen",
-	"object": {
-		"type": "Video",
-		"id": "https://mocked.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6",
-		"name": "Vu du 20/02/21 : \"Planète Mars 2050\"",
-		"duration": "PT385S",
-		"uuid": "abece3c3-b9c6-47f4-8040-f3eed8c602e6",
-		"tag": [
-			{
-				"type": "Hashtag",
-				"name": "France3"
-			},
-			{
-				"type": "Hashtag",
-				"name": "lezapping"
-			}
-		],
-		"category": {
-			"identifier": "11",
-			"name": "News & Politics"
-		},
-		"language": {
-			"identifier": "fr",
-			"name": "French"
-		},
-		"views": 5,
-		"sensitive": false,
-		"waitTranscoding": false,
-		"isLiveBroadcast": false,
-		"liveSaveReplay": null,
-		"permanentLive": null,
-		"state": 1,
-		"commentsEnabled": true,
-		"downloadEnabled": false,
-		"published": "2021-02-20T17:04:54.278Z",
-		"originallyPublishedAt": "2021-02-19T23:00:00.000Z",
-		"updated": "2021-02-21T20:01:11.189Z",
-		"mediaType": "text/markdown",
-		"content": "Un regard impertinent et libre, orchestré par Patrick Menais et son équipe, sur le monde de l’image.\r\n\r\nEn avant-première du lundi au samedi à 17h00 sur Facebook, Twitter et YouTube.\r\n\r\nDu lundi au samedi à 20h00 sur France 3.\r\n\r\nhttps://www.facebook.com/vufrancetv\r\nhttps://twitter.com/VuFrancetv",
-		"support": "Suivre VU :\r\n- Twitter : https://twitter.com/vufrancetv\r\n- Facebook :https://www.facebook.com/vufrancetv/\r\n- Site : https://www.france.tv/france-3/vu/",
-		"subtitleLanguage": [],
-		"icon": [
-			{
-				"type": "Image",
-				"url": "https://peertube.local/static/thumbnails/abece3c3-b9c6-47f4-8040-f3eed8c602e6.jpg",
-				"mediaType": "image/jpeg",
-				"width": 223,
-				"height": 122
-			},
-			{
-				"type": "Image",
-				"url": "https://peertube.local/lazy-static/previews/abece3c3-b9c6-47f4-8040-f3eed8c602e6.jpg",
-				"mediaType": "image/jpeg",
-				"width": 850,
-				"height": 480
-			}
-		],
-		"url": [
-			{
-				"type": "Link",
-				"mediaType": "text/html",
-				"href": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6"
-			},
-			{
-				"type": "Link",
-				"mediaType": "application/x-mpegURL",
-				"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/master.m3u8",
-				"tag": [
-					{
-						"type": "Infohash",
-						"name": "00bfce9595e1655d8696b60e19ca25c34be5fa63"
-					},
-					{
-						"type": "Infohash",
-						"name": "256c21b65d5e0f944b4b79d8e0cbc55c9d906807"
-					},
-					{
-						"type": "Infohash",
-						"name": "fcd981098c484d0e328927c8fb21ecf986880b7e"
-					},
-					{
-						"type": "Infohash",
-						"name": "f7e01ac566e9fef91cd22514e6c3c256af7a9f5f"
-					},
-					{
-						"type": "Infohash",
-						"name": "42b421fc44d0dceb45ac3f6f6419b07fd570a232"
-					},
-					{
-						"type": "Infohash",
-						"name": "f876c6d6d49ce618a880ca223df54cb29f4b4bfd"
-					},
-					{
-						"type": "Link",
-						"name": "sha256",
-						"mediaType": "application/json",
-						"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/segments-sha256.json"
-					},
-					{
-						"type": "Link",
-						"mediaType": "video/mp4",
-						"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-fragmented.mp4",
-						"height": 1080,
-						"size": 57888169,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"rel": ["metadata", "video/mp4"],
-						"mediaType": "application/json",
-						"href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570040",
-						"height": 1080,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent",
-						"href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-hls.torrent",
-						"height": 1080
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
-						"href": "magnet:?xs=https%3A%2F%2Fpeertube.stream%2Fstatic%2Ftorrents%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-hls.torrent&xt=urn:btih:68af82ebcd9df8335e407b755f38f5fd39c8a6a4&dn=Vu+du+20%2F02%2F21+%3A+%22Plan%C3%A8te+Mars+2050%22&tr=wss%3A%2F%2Fpeertube.stream%3A443%2Ftracker%2Fsocket&tr=https%3A%2F%2Fpeertube.stream%2Ftracker%2Fannounce&ws=https%3A%2F%2Fpeertube.stream%2Fstatic%2Fstreaming-playlists%2Fhls%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-1080-fragmented.mp4",
-						"height": 1080
-					},
-					{
-						"type": "Link",
-						"mediaType": "video/mp4",
-						"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-720-fragmented.mp4",
-						"height": 720,
-						"size": 45165123,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"rel": ["metadata", "video/mp4"],
-						"mediaType": "application/json",
-						"href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570056",
-						"height": 720,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent",
-						"href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-720-hls.torrent",
-						"height": 720
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
-						"href": "magnet:?xs=https%3A%2F%2Fpeertube.stream%2Fstatic%2Ftorrents%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-720-hls.torrent&xt=urn:btih:8450928a4ffb2a4c5f927a163487c48c05f6e700&dn=Vu+du+20%2F02%2F21+%3A+%22Plan%C3%A8te+Mars+2050%22&tr=wss%3A%2F%2Fpeertube.stream%3A443%2Ftracker%2Fsocket&tr=https%3A%2F%2Fpeertube.stream%2Ftracker%2Fannounce&ws=https%3A%2F%2Fpeertube.stream%2Fstatic%2Fstreaming-playlists%2Fhls%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-720-fragmented.mp4",
-						"height": 720
-					},
-					{
-						"type": "Link",
-						"mediaType": "video/mp4",
-						"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-480-fragmented.mp4",
-						"height": 480,
-						"size": 29618534,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"rel": ["metadata", "video/mp4"],
-						"mediaType": "application/json",
-						"href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570042",
-						"height": 480,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent",
-						"href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-480-hls.torrent",
-						"height": 480
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
-						"href": "magnet:?xs=https%3A%2F%2Fpeertube.stream%2Fstatic%2Ftorrents%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-480-hls.torrent&xt=urn:btih:39e11181db5f376aa78c94bffcb9ccf2f4bca715&dn=Vu+du+20%2F02%2F21+%3A+%22Plan%C3%A8te+Mars+2050%22&tr=wss%3A%2F%2Fpeertube.stream%3A443%2Ftracker%2Fsocket&tr=https%3A%2F%2Fpeertube.stream%2Ftracker%2Fannounce&ws=https%3A%2F%2Fpeertube.stream%2Fstatic%2Fstreaming-playlists%2Fhls%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-480-fragmented.mp4",
-						"height": 480
-					},
-					{
-						"type": "Link",
-						"mediaType": "video/mp4",
-						"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-360-fragmented.mp4",
-						"height": 360,
-						"size": 21771466,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"rel": ["metadata", "video/mp4"],
-						"mediaType": "application/json",
-						"href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570043",
-						"height": 360,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent",
-						"href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-360-hls.torrent",
-						"height": 360
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
-						"href": "magnet:?xs=https%3A%2F%2Fpeertube.stream%2Fstatic%2Ftorrents%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-360-hls.torrent&xt=urn:btih:c33aa52822528e29ffd1a615ebe40450e4c61452&dn=Vu+du+20%2F02%2F21+%3A+%22Plan%C3%A8te+Mars+2050%22&tr=wss%3A%2F%2Fpeertube.stream%3A443%2Ftracker%2Fsocket&tr=https%3A%2F%2Fpeertube.stream%2Ftracker%2Fannounce&ws=https%3A%2F%2Fpeertube.stream%2Fstatic%2Fstreaming-playlists%2Fhls%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-360-fragmented.mp4",
-						"height": 360
-					},
-					{
-						"type": "Link",
-						"mediaType": "video/mp4",
-						"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-240-fragmented.mp4",
-						"height": 240,
-						"size": 14856165,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"rel": ["metadata", "video/mp4"],
-						"mediaType": "application/json",
-						"href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570057",
-						"height": 240,
-						"fps": 25
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent",
-						"href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-240-hls.torrent",
-						"height": 240
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
-						"href": "magnet:?xs=https%3A%2F%2Fpeertube.stream%2Fstatic%2Ftorrents%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-240-hls.torrent&xt=urn:btih:157e4cc3e9f15c06e995d6c3388539fdda312771&dn=Vu+du+20%2F02%2F21+%3A+%22Plan%C3%A8te+Mars+2050%22&tr=wss%3A%2F%2Fpeertube.stream%3A443%2Ftracker%2Fsocket&tr=https%3A%2F%2Fpeertube.stream%2Ftracker%2Fannounce&ws=https%3A%2F%2Fpeertube.stream%2Fstatic%2Fstreaming-playlists%2Fhls%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-240-fragmented.mp4",
-						"height": 240
-					},
-					{
-						"type": "Link",
-						"mediaType": "video/mp4",
-						"href": "https://peertube.local/static/streaming-playlists/hls/abece3c3-b9c6-47f4-8040-f3eed8c602e6/abece3c3-b9c6-47f4-8040-f3eed8c602e6-0-fragmented.mp4",
-						"height": 0,
-						"size": 6248765,
-						"fps": 0
-					},
-					{
-						"type": "Link",
-						"rel": ["metadata", "video/mp4"],
-						"mediaType": "application/json",
-						"href": "https://peertube.local/api/v1/videos/abece3c3-b9c6-47f4-8040-f3eed8c602e6/metadata/570041",
-						"height": 0,
-						"fps": 0
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent",
-						"href": "https://peertube.local/static/torrents/abece3c3-b9c6-47f4-8040-f3eed8c602e6-0-hls.torrent",
-						"height": 0
-					},
-					{
-						"type": "Link",
-						"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
-						"href": "magnet:?xs=https%3A%2F%2Fpeertube.stream%2Fstatic%2Ftorrents%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-0-hls.torrent&xt=urn:btih:abc8dc58903d18cf7ec0c0cef92cc5ffe5cb0b5c&dn=Vu+du+20%2F02%2F21+%3A+%22Plan%C3%A8te+Mars+2050%22&tr=wss%3A%2F%2Fpeertube.stream%3A443%2Ftracker%2Fsocket&tr=https%3A%2F%2Fpeertube.stream%2Ftracker%2Fannounce&ws=https%3A%2F%2Fpeertube.stream%2Fstatic%2Fstreaming-playlists%2Fhls%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6%2Fabece3c3-b9c6-47f4-8040-f3eed8c602e6-0-fragmented.mp4",
-						"height": 0
-					}
-				]
-			}
-		],
-		"likes": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/likes",
-		"dislikes": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/dislikes",
-		"shares": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/announces",
-		"comments": "https://peertube.local/videos/watch/abece3c3-b9c6-47f4-8040-f3eed8c602e6/comments",
-		"attributedTo": [
-			{
-				"type": "Person",
-				"id": "https://peertube.local/accounts/createurs"
-			},
-			{
-				"type": "Group",
-				"id": "https://peertube.local/video-channels/vu"
-			}
-		],
-		"to": ["https://www.w3.org/ns/activitystreams#Public"],
-		"cc": ["https://peertube.local/accounts/createurs/followers"]
-	},
-	"to": ["https://www.w3.org/ns/activitystreams#Public"],
-	"cc": ["https://peertube.local/accounts/createurs/followers"],
 	"@context": [
 		"https://www.w3.org/ns/activitystreams",
 		"https://w3id.org/security/v1",
@@ -297,14 +7,14 @@
 		},
 		{
 			"pt": "https://joinpeertube.org/ns#",
-			"sc": "http://schema.org#",
+			"sc": "http://schema.org/",
 			"Hashtag": "as:Hashtag",
-			"uuid": "sc:identifier",
 			"category": "sc:category",
 			"licence": "sc:license",
 			"subtitleLanguage": "sc:subtitleLanguage",
 			"sensitive": "as:sensitive",
 			"language": "sc:inLanguage",
+			"identifier": "sc:identifier",
 			"isLiveBroadcast": "sc:isLiveBroadcast",
 			"liveSaveReplay": {
 				"@type": "sc:Boolean",
@@ -314,10 +24,34 @@
 				"@type": "sc:Boolean",
 				"@id": "pt:permanentLive"
 			},
+			"latencyMode": {
+				"@type": "sc:Number",
+				"@id": "pt:latencyMode"
+			},
 			"Infohash": "pt:Infohash",
-			"Playlist": "pt:Playlist",
-			"PlaylistElement": "pt:PlaylistElement",
+			"tileWidth": {
+				"@type": "sc:Number",
+				"@id": "pt:tileWidth"
+			},
+			"tileHeight": {
+				"@type": "sc:Number",
+				"@id": "pt:tileHeight"
+			},
+			"tileDuration": {
+				"@type": "sc:Number",
+				"@id": "pt:tileDuration"
+			},
+			"aspectRatio": {
+				"@type": "sc:Float",
+				"@id": "pt:aspectRatio"
+			},
+			"uuid": {
+				"@type": "sc:identifier",
+				"@id": "pt:uuid"
+			},
 			"originallyPublishedAt": "sc:datePublished",
+			"uploadDate": "sc:uploadDate",
+			"hasParts": "sc:hasParts",
 			"views": {
 				"@type": "sc:Number",
 				"@id": "pt:views"
@@ -333,18 +67,6 @@
 			"fps": {
 				"@type": "sc:Number",
 				"@id": "pt:fps"
-			},
-			"startTimestamp": {
-				"@type": "sc:Number",
-				"@id": "pt:startTimestamp"
-			},
-			"stopTimestamp": {
-				"@type": "sc:Number",
-				"@id": "pt:stopTimestamp"
-			},
-			"position": {
-				"@type": "sc:Number",
-				"@id": "pt:position"
 			},
 			"commentsEnabled": {
 				"@type": "sc:Boolean",
@@ -370,10 +92,6 @@
 				"@id": "as:dislikes",
 				"@type": "@id"
 			},
-			"playlists": {
-				"@id": "pt:playlists",
-				"@type": "@id"
-			},
 			"shares": {
 				"@id": "as:shares",
 				"@type": "@id"
@@ -382,6 +100,483 @@
 				"@id": "as:comments",
 				"@type": "@id"
 			}
+		},
+		{
+			"ptlc": "urn:peertube-plugin-livechat",
+			"peertubeLiveChat": {
+				"@id": "ptlc:peertubeLiveChat",
+				"@type": "@json"
+			}
 		}
-	]
-}
+	],
+	"to": [
+		"https://www.w3.org/ns/activitystreams#Public"
+	],
+	"cc": [
+		"https://peertube.linuxrocks.local/accounts/fediforum/followers"
+	],
+	"type": "Video",
+	"id": "https://peertube.linuxrocks.local/videos/watch/954da380-e233-41d9-b0c4-c0a68dabfb08",
+	"name": "Demo: Bonfire",
+	"duration": "PT374S",
+	"uuid": "954da380-e233-41d9-b0c4-c0a68dabfb08",
+	"category": {
+		"identifier": "15",
+		"name": "Science & Technology"
+	},
+	"licence": {
+		"identifier": "1",
+		"name": "CC BY 4.0"
+	},
+	"language": {
+		"identifier": "en",
+		"name": "English"
+	},
+	"views": 23,
+	"sensitive": false,
+	"waitTranscoding": true,
+	"state": 1,
+	"commentsEnabled": true,
+	"downloadEnabled": true,
+	"published": "2023-11-07T02:37:42.094Z",
+	"originallyPublishedAt": null,
+	"updated": "2024-03-19T21:08:24.172Z",
+	"tag": [],
+	"mediaType": "text/markdown",
+	"content": "Demo of Bonfire",
+	"support": null,
+	"subtitleLanguage": [],
+	"icon": [
+		{
+			"type": "Image",
+			"url": "https://peertube.linuxrocks.local/lazy-static/thumbnails/c4a7c59d-ea0e-4238-ac79-a7960c57dc47.jpg",
+			"mediaType": "image/jpeg",
+			"width": 280,
+			"height": 157
+		},
+		{
+			"type": "Image",
+			"url": "https://peertube.linuxrocks.local/lazy-static/previews/18628f58-06fd-4787-9035-d4c67d8e210e.jpg",
+			"mediaType": "image/jpeg",
+			"width": 850,
+			"height": 480
+		}
+	],
+	"aspectRatio": null,
+	"url": [
+		{
+			"type": "Link",
+			"mediaType": "text/html",
+			"href": "https://peertube.linuxrocks.local/videos/watch/954da380-e233-41d9-b0c4-c0a68dabfb08"
+		},
+		{
+			"type": "Link",
+			"mediaType": "video/mp4",
+			"href": "https://peertube.linuxrocks.local/static/web-videos/39a9890f-a115-40c9-a8a4-c4d2d286ef27-1440.mp4",
+			"height": 1440,
+			"width": null,
+			"size": 122124107,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"rel": [
+				"metadata",
+				"video/mp4"
+			],
+			"mediaType": "application/json",
+			"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248589",
+			"height": 1440,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent",
+			"href": "https://peertube.linuxrocks.local/lazy-static/torrents/cd1aabe0-9cec-4cff-81ee-b1096ad4364c-1440.torrent",
+			"height": 1440,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+			"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2Fcd1aabe0-9cec-4cff-81ee-b1096ad4364c-1440.torrent&xt=urn:btih:ab828d68f85e38e31c91670aea3076e498f5ec42&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fweb-videos%2F39a9890f-a115-40c9-a8a4-c4d2d286ef27-1440.mp4",
+			"height": 1440,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "video/mp4",
+			"href": "https://peertube.linuxrocks.local/static/web-videos/580a2f60-7e1c-48de-8379-0c5418168731-1080.mp4",
+			"height": 1080,
+			"width": null,
+			"size": 36470631,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"rel": [
+				"metadata",
+				"video/mp4"
+			],
+			"mediaType": "application/json",
+			"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248595",
+			"height": 1080,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent",
+			"href": "https://peertube.linuxrocks.local/lazy-static/torrents/6ad8fef5-70af-4af4-bcf3-11fcaf8e7c05-1080.torrent",
+			"height": 1080,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+			"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2F6ad8fef5-70af-4af4-bcf3-11fcaf8e7c05-1080.torrent&xt=urn:btih:d02386860eaf48efbd4003f94494e300c2ecf7c7&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fweb-videos%2F580a2f60-7e1c-48de-8379-0c5418168731-1080.mp4",
+			"height": 1080,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "video/mp4",
+			"href": "https://peertube.linuxrocks.local/static/web-videos/7d4a1acd-ccd6-4565-aa73-c09f07ae72b5-720.mp4",
+			"height": 720,
+			"width": null,
+			"size": 26339229,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"rel": [
+				"metadata",
+				"video/mp4"
+			],
+			"mediaType": "application/json",
+			"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248593",
+			"height": 720,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent",
+			"href": "https://peertube.linuxrocks.local/lazy-static/torrents/f08fc23b-00a1-44a0-bad8-7f2784f09929-720.torrent",
+			"height": 720,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+			"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2Ff08fc23b-00a1-44a0-bad8-7f2784f09929-720.torrent&xt=urn:btih:dc1389958e7cbf88556b15c610533ce60766ca0f&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fweb-videos%2F7d4a1acd-ccd6-4565-aa73-c09f07ae72b5-720.mp4",
+			"height": 720,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "video/mp4",
+			"href": "https://peertube.linuxrocks.local/static/web-videos/bf17d7de-a0ab-4947-a059-0bf5d5f9e918-480.mp4",
+			"height": 480,
+			"width": null,
+			"size": 21445226,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"rel": [
+				"metadata",
+				"video/mp4"
+			],
+			"mediaType": "application/json",
+			"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248591",
+			"height": 480,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent",
+			"href": "https://peertube.linuxrocks.local/lazy-static/torrents/fd39f46d-0e7b-4bb1-99e4-d8366e528e68-480.torrent",
+			"height": 480,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+			"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2Ffd39f46d-0e7b-4bb1-99e4-d8366e528e68-480.torrent&xt=urn:btih:18d8e02e4b55d23016788be93f6cd17a79eb5dc4&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fweb-videos%2Fbf17d7de-a0ab-4947-a059-0bf5d5f9e918-480.mp4",
+			"height": 480,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "video/mp4",
+			"href": "https://peertube.linuxrocks.local/static/web-videos/b162b6ee-318a-40f2-a59e-e219d4836141-360.mp4",
+			"height": 360,
+			"width": null,
+			"size": 19179833,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"rel": [
+				"metadata",
+				"video/mp4"
+			],
+			"mediaType": "application/json",
+			"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248592",
+			"height": 360,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent",
+			"href": "https://peertube.linuxrocks.local/lazy-static/torrents/7204389f-35ce-45cf-b2b0-b9b4cf76db01-360.torrent",
+			"height": 360,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+			"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2F7204389f-35ce-45cf-b2b0-b9b4cf76db01-360.torrent&xt=urn:btih:307b2438f89924fcddc8cbd7371290059b0cbff7&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fweb-videos%2Fb162b6ee-318a-40f2-a59e-e219d4836141-360.mp4",
+			"height": 360,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "video/mp4",
+			"href": "https://peertube.linuxrocks.local/static/web-videos/b01b5b72-553a-4dfb-8c1c-4e743b176c05-240.mp4",
+			"height": 240,
+			"width": null,
+			"size": 17407279,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"rel": [
+				"metadata",
+				"video/mp4"
+			],
+			"mediaType": "application/json",
+			"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248594",
+			"height": 240,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent",
+			"href": "https://peertube.linuxrocks.local/lazy-static/torrents/2ba6e2c4-06e1-485f-9b60-fa08e2634ddd-240.torrent",
+			"height": 240,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+			"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2F2ba6e2c4-06e1-485f-9b60-fa08e2634ddd-240.torrent&xt=urn:btih:403f0ba412479ed401fb4758de6700b3a2d7da71&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fweb-videos%2Fb01b5b72-553a-4dfb-8c1c-4e743b176c05-240.mp4",
+			"height": 240,
+			"width": null,
+			"fps": 25
+		},
+		{
+			"type": "Link",
+			"mediaType": "application/x-mpegURL",
+			"href": "https://peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/68e9e63c-396d-43f5-b490-fcb6af4c568d-master.m3u8",
+			"tag": [
+				{
+					"type": "Infohash",
+					"name": "f158e721441c5f2a47639fd7e734933802571746"
+				},
+				{
+					"type": "Infohash",
+					"name": "1d3ad7f473d4e3aaa568a5b2d7c49645085f4eea"
+				},
+				{
+					"type": "Infohash",
+					"name": "4256660a322ecd70de65b9a48e8b448936f29f12"
+				},
+				{
+					"type": "Infohash",
+					"name": "3fbeeddc50cf9cc1452e76da99e92a3c58cbfe0a"
+				},
+				{
+					"type": "Infohash",
+					"name": "f61cf330139b5953cd088a53db2f6e609185760a"
+				},
+				{
+					"type": "Infohash",
+					"name": "d874447031ecb8e495d0761030d8d0d5faa9f539"
+				},
+				{
+					"type": "Link",
+					"name": "sha256",
+					"mediaType": "application/json",
+					"href": "https://peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/7e2e647e-ef30-4194-b2d5-823cdc6fe4c1-segments-sha256.json"
+				},
+				{
+					"type": "Link",
+					"mediaType": "video/mp4",
+					"href": "https://peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/1dd846d5-b655-4b48-9059-79830b2b6952-1440-fragmented.mp4",
+					"height": 1440,
+					"width": null,
+					"size": 44997646,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"rel": [
+						"metadata",
+						"video/mp4"
+					],
+					"mediaType": "application/json",
+					"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248590",
+					"height": 1440,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent",
+					"href": "https://peertube.linuxrocks.local/lazy-static/torrents/addb8725-61c9-4a44-83ae-ce39a8d8f7f5-1440-hls.torrent",
+					"height": 1440,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+					"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2Faddb8725-61c9-4a44-83ae-ce39a8d8f7f5-1440-hls.torrent&xt=urn:btih:36190e0b3554f755cb7584b91baec5c4fb493d65&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fstreaming-playlists%2Fhls%2F954da380-e233-41d9-b0c4-c0a68dabfb08%2F1dd846d5-b655-4b48-9059-79830b2b6952-1440-fragmented.mp4",
+					"height": 1440,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "video/mp4",
+					"href": "https://peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/a3f5cbbd-9ca9-4e6a-9be3-84ffca3b86e9-1080-fragmented.mp4",
+					"height": 1080,
+					"width": null,
+					"size": 36434037,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"rel": [
+						"metadata",
+						"video/mp4"
+					],
+					"mediaType": "application/json",
+					"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248600",
+					"height": 1080,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent",
+					"href": "https://peertube.linuxrocks.local/lazy-static/torrents/9518566b-8837-44ee-8000-da35eaada639-1080-hls.torrent",
+					"height": 1080,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+					"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2F9518566b-8837-44ee-8000-da35eaada639-1080-hls.torrent&xt=urn:btih:469927258a029707bf8a1a0cf38f463a0b0f855e&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fstreaming-playlists%2Fhls%2F954da380-e233-41d9-b0c4-c0a68dabfb08%2Fa3f5cbbd-9ca9-4e6a-9be3-84ffca3b86e9-1080-fragmented.mp4",
+					"height": 1080,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "video/mp4",
+					"href": "https://peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/b1f319b2-11ed-4c35-b6f5-68821e877079-720-fragmented.mp4",
+					"height": 720,
+					"width": null,
+					"size": 26301779,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"rel": [
+						"metadata",
+						"video/mp4"
+					],
+					"mediaType": "application/json",
+					"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248598",
+					"height": 720,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent",
+					"href": "https://peertube.linuxrocks.local/lazy-static/torrents/35e4fe0b-d71b-43ee-8c31-3374702c8b1f-720-hls.torrent",
+					"height": 720,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+					"href": "magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2F35e4fe0b-d71b-43ee-8c31-3374702c8b1f-720-hls.torrent&xt=urn:btih:bb7f2aa0528d63ebe9515e7ff7941c0e1ee47188&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fstreaming-playlists%2Fhls%2F954da380-e233-41d9-b0c4-c0a68dabfb08%2Fb1f319b2-11ed-4c35-b6f5-68821e877079-720-fragmented.mp4",
+					"height": 720,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "video/mp4",
+					"href": "https://peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/e8513ec5-3eee-4a25-a2a5-b2e8645a8ffd-480-fragmented.mp4",
+					"height": 480,
+					"width": null,
+					"size": 21406392,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"rel": [
+						"metadata",
+						"video/mp4"
+					],
+					"mediaType": "application/json",
+					"href": "https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248596",
+					"height": 480,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent",
+					"href": "https://peertube.linuxrocks.local/lazy-static/torrents/2cd767f5-53e6-4e11-8316-21627b16655e-480-hls.torrent",
+					"height": 480,
+					"width": null,
+					"fps": 25
+				},
+				{
+					"type": "Link",
+					"mediaType": "application/x-bittorrent;x-scheme-handler/magnet",
+					"href":"magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2F2cd767f5-53e6-4e11-8316-21627b16655e-480-hls.torrent&xt=urn:btih:e0bc0e962beac2933453a64d388290c0c9125fc5&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fstreaming-playlists%2Fhls%2F954da380-e233-41d9-b0c4-c0a68dabfb08%2Fe8513ec5-3eee-4a* Connection #0 to host peertube.linuxrocks.local left intact25-a2a5-b2e8645a8ffd-480-fragmented.mp4", "height":480,"width":null,"fps":25},
+					
+					{"type":"Link","mediaType":"video/mp4","href":"https: //peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/55a86dc2-df2a-4188-8f97-91c77af5cf5e-360-fragmented.mp4","height":360,"width":null,"size":19140727,"fps":25},
+					
+					{"type":"Link","rel":["metadata","video/mp4"],"mediaType":"application/json","href":"https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248597","height":360,"width":null,"fps":25},
+						
+						{"type":"Link","mediaType":"application/x-bittorrent","href":"https://peertube.linuxrocks.local/lazy-static/torrents/ba7d5e66-75b0-4dad-9dab-325576be9af1-360-hls.torrent","height":360,"width":null,"fps":25},
+						
+						{"type":"Link","mediaType":"application/x-bittorrent;x-scheme-handler/magnet","href":"magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2Fba7d5e66-75b0-4dad-9dab-325576be9af1-360-hls.torrent&xt=urn:btih:ae957f356240aefc74b5120618b748d75d646121&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fstreaming-playlists%2Fhls%2F954da380-e233-41d9-b0c4-c0a68dabfb08%2F55a86dc2-df2a-4188-8f97-91c77af5cf5e-360-fragmented.mp4","height":360,"width":null,"fps":25},
+						
+						{"type":"Link","mediaType":"video/mp4","href":"https://peertube.linuxrocks.local/static/streaming-playlists/hls/954da380-e233-41d9-b0c4-c0a68dabfb08/05c98960-3b21-45db-80dd-2f1d758e00d9-240-fragmented.mp4","height":240,"width":null,"size":17367949,"fps":25},{"type":"Link","rel":["metadata","video/mp4"],"mediaType":"application/json","href":"https://peertube.linuxrocks.local/api/v1/videos/954da380-e233-41d9-b0c4-c0a68dabfb08/metadata/2248599","height":240,"width":null,"fps":25},{"type":"Link","mediaType":"application/x-bittorrent","href":"https://peertube.linuxrocks.local/lazy-static/torrents/e98265a5-a1a6-42c7-9c14-cc256eed47f8-240-hls.torrent","height":240,"width":null,"fps":25},{"type":"Link","mediaType":"application/x-bittorrent;x-scheme-handler/magnet","href":"magnet:?xs=https%3A%2F%2Fpeertube.linuxrocks.local%2Flazy-static%2Ftorrents%2Fe98265a5-a1a6-42c7-9c14-cc256eed47f8-240-hls.torrent&xt=urn:btih:38c03aefe77013b8f8db8f833d57001a97606a6c&dn=Demo%3A+Bonfire&tr=https%3A%2F%2Fpeertube.linuxrocks.local%2Ftracker%2Fannounce&tr=wss%3A%2F%2Fpeertube.linuxrocks.local%3A443%2Ftracker%2Fsocket&ws=https%3A%2F%2Fpeertube.linuxrocks.local%2Fstatic%2Fstreaming-playlists%2Fhls%2F954da380-e233-41d9-b0c4-c0a68dabfb08%2F05c98960-3b21-45db-80dd-2f1d758e00d9-240-fragmented.mp4","height":240,"width":null,"fps":25}]},{"type":"Link","name":"tracker-http","rel":["tracker","http"],"href":"https://peertube.linuxrocks.local/tracker/announce"},{"type":"Link","name":"tracker-websocket","rel":["tracker","websocket"],"href":"wss://peertube.linuxrocks.local:443/tracker/socket"}],"likes":"https://peertube.linuxrocks.local/videos/watch/954da380-e233-41d9-b0c4-c0a68dabfb08/likes","dislikes":"https://peertube.linuxrocks.local/videos/watch/954da380-e233-41d9-b0c4-c0a68dabfb08/dislikes","shares":"https://peertube.linuxrocks.local/videos/watch/954da380-e233-41d9-b0c4-c0a68dabfb08/announces","comments":"https://peertube.linuxrocks.local/videos/watch/954da380-e233-41d9-b0c4-c0a68dabfb08/comments","hasParts":"https://peertube.linuxrocks.local/videos/watch/954da380-e233-41d9-b0c4-c0a68dabfb08/chapters","attributedTo":[{"type":"Person","id":"https://peertube.linuxrocks.local/accounts/fediforum"},{"type":"Group","id":"https://peertube.linuxrocks.local/video-channels/fediforum_september_2023"}],"isLiveBroadcast":false,"liveSaveReplay":null,"permanentLive":null,"latencyMode":null}

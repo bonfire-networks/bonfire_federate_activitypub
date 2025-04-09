@@ -67,7 +67,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
 
     debug_object_acls(post)
 
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(:remote, local_user)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
 
     another_local_user = fake_user!()
     # check that we do show it to others
@@ -83,7 +83,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceActorFeedsPerUserTest d
 
     Bonfire.Boundaries.Blocks.block(user, :silence, current_user: local_user)
 
-    assert %{edges: []} = Bonfire.Social.FeedActivities.feed(:remote, local_user)
+    refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
 
     another_local_user = fake_user!()
     # check that we do still show it to others
