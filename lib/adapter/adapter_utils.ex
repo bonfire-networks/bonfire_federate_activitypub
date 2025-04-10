@@ -5,6 +5,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   import Bonfire.Federate.ActivityPub
   alias Needle.Pointer
   alias ActivityPub.Actor
+  alias ActivityPub.Object
   alias Bonfire.Data.ActivityPub.Peered
   alias Bonfire.Me.Users
   # alias Bonfire.Social.Threads
@@ -183,24 +184,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_character(%struct{id: _} = character, _opts) when struct not in [Actor, Pointer] do
-    {:ok, repo().maybe_preload(character, [:actor, :character, :profile])}
+    {:ok, repo().maybe_preload(character, [:actor, :settings, :profile, character: [:peered]])}
   end
 
   def get_character(%{pointer: %{id: _} = pointer}, _opts) do
-    {:ok, repo().maybe_preload(pointer, [:actor, :profile, character: [:peered]])}
+    {:ok, repo().maybe_preload(pointer, [:actor, :settings, :profile, character: [:peered]])}
   end
 
   def get_character(%{pointer_id: pointer_id}, opts) when is_binary(pointer_id) do
     skip?(:id, opts) || get_character_by_id(pointer_id, opts)
   end
 
-  def get_character(%{id: pointer_id} = object, opts) when is_binary(pointer_id) do
+  def get_character(%struct{id: pointer_id} = object, opts)
+      when is_binary(pointer_id) and struct not in [Actor, Object] do
     if opts[:skip] != :id do
       get_character_by_id(pointer_id, opts)
     else
       case object do
         %Pointer{} ->
-          {:ok, repo().maybe_preload(object, [:actor, :profile, character: [:peered]])}
+          {:ok, repo().maybe_preload(object, [:actor, :settings, :profile, character: [:peered]])}
 
         _ when is_struct(object) ->
           {:ok, object}
@@ -949,7 +951,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             updated_at
             |> NaiveDateTime.to_iso8601()
         }
-        |> debug("data")
+
+      # |> debug("data")
 
       %Actor{
         id: user_etc.id,
@@ -1035,9 +1038,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                           #  FIXME: don't query again (Instances.get_or_create already has)
                           custom_circles: [
                             silence_my_instance:
-                              Extend.maybe_module(Bonfire.Boundaries.Circles).get_or_create_stereotype_circle(
-                                peer,
-                                :silence_me
+                              ok_unwrap(
+                                Extend.maybe_module(Bonfire.Boundaries.Circles).get_or_create_stereotype_circle(
+                                  peer,
+                                  :silence_me
+                                )
                               )
                           ]
                         ]

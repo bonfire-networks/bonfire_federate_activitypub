@@ -13,7 +13,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.UsersTest do
   alias Bonfire.Posts
   alias Bonfire.Social.Graph.Follows
 
-  @tag :test_instance
   test "can lookup actors from AP API with username, AP ID and with friendly URL",
        _context do
     # lookup 3 separate users to be sure
@@ -33,6 +32,24 @@ defmodule Bonfire.Federate.ActivityPub.Dance.UsersTest do
 
     assert object.profile.name == remote[:user].profile.name
     assert object.profile.location == remote[:user].profile.location
+  end
+
+  describe "webfinger request" do
+    test "works for fqns" do
+      remote = fancy_fake_user_on_test_instance()
+
+      {:ok, result} = ActivityPub.Federator.WebFinger.finger(remote[:username])
+
+      assert is_map(result)
+    end
+
+    test "works for ap_ids" do
+      remote = fancy_fake_user_on_test_instance()
+      # {:ok, ap_actor} = Actor.get_cached(username: actor.username)
+
+      {:ok, result} = ActivityPub.Federator.WebFinger.finger(remote[:canonical_url])
+      assert is_map(result)
+    end
   end
 
   test "If a remote user is created, a circle is created (if doesn't already exist) and the user is added to it",
