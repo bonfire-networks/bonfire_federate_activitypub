@@ -57,7 +57,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       "AP - fetch the #{activity.data["id"]} activity's target_id data from URI when we only have an AP ID: #{target_id}"
     )
 
-    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(target_id,
+    case fetch_final_object(target_id,
            return_tombstones: e(activity.data, "type", nil) == "Delete"
          ) do
       {:ok, target} ->
@@ -88,7 +88,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         e(activity.data, "object", "type", nil) == "Tombstone"
 
     # info(activity, "activity")
-    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id,
+    case fetch_final_object(object_id,
            return_tombstones: is_deleted?
          ) do
       {:ok, object} ->
@@ -117,7 +117,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     # info(activity, "activity")
     for object_id <- object_ids do
       with {:ok, o} <-
-             ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id,
+             fetch_final_object(object_id,
                return_tombstones: e(activity.data, "type", nil) == "Delete"
              ) do
         o
@@ -228,7 +228,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
             "type" => activity_type
           }
         } = activity,
-        object
+        object_or_objects
       )
       when is_binary(activity_type) do
     info("AP Match#2 - by activity_type only: #{activity_type}")
@@ -239,9 +239,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type),
              actor,
              activity,
-             object
+             object_or_objects
            ) do
-      receive_activity_fallback(activity, object, actor)
+      receive_activity_fallback(activity, object_or_objects, actor)
     end
   end
 
@@ -268,6 +268,21 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     info("AP no match - receive_activity_fallback")
 
     receive_activity_fallback(activity, object)
+  end
+
+  defp fetch_final_object(object_id, opts) do
+    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id, opts) do
+      # support receiving an activity when we're expecting an object (eg for a flag or a like)
+      {:ok, %{data: %{"type" => "Create", "object" => actual_object_id}}}
+      when is_binary(actual_object_id) and actual_object_id != object_id ->
+        fetch_final_object(actual_object_id, opts)
+
+      {:ok, object} ->
+        {:ok, object}
+
+      other ->
+        error(other)
+    end
   end
 
   defp receive_activity_fallback(activity, object, actor \\ nil) do

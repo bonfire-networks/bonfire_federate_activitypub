@@ -199,6 +199,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       actor_or_instance_blocked?(block_types, local_author_ids, uri, object, rejects)
   end
 
+  defp object_blocked?(block_types, local_author_ids, rejects, objects) when is_list(objects) do
+    Enum.any?(objects, &object_blocked?(block_types, local_author_ids, rejects, &1))
+  end
+
   defp object_blocked?(_, _, _, canonical_uri) do
     warn(canonical_uri, "no valid URI")
     # raise "no valid URI"
