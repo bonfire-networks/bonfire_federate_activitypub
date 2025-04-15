@@ -97,6 +97,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         receive_activity(activity, object)
         |> debug("received activity on #{repo()}...")
 
+      {:error, :not_found} ->
+        if is_deleted? do
+          receive_activity(activity, object_id)
+          |> debug("received deletion activity on #{repo()}...")
+        else
+          error(object_id, "Could not fetch the activity's object")
+        end
+
       e ->
         error(e)
     end

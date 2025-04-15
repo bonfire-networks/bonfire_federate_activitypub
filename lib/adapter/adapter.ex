@@ -16,6 +16,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias Bonfire.Federate.ActivityPub.Incoming
   alias Bonfire.Federate.ActivityPub.Outgoing
   alias ActivityPub.Actor
+  alias ActivityPub.Object
 
   import Bonfire.Federate.ActivityPub
   import Untangle
@@ -249,6 +250,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     AdapterUtils.get_or_fetch_character_by_ap_id(actor)
     |> debug("character pre-update")
     |> update_remote_actor(actor)
+  end
+
+  def update_remote_actor(%struct{} = actor, params) when struct in [Actor, Object] do
+    AdapterUtils.get_or_fetch_character_by_ap_id(actor)
+    |> debug("character pre-update")
+    |> update_remote_actor(params)
   end
 
   def update_remote_actor(%{} = character, %{data: data}),
