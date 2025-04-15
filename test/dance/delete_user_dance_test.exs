@@ -84,7 +84,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
     assert {:error, :not_found} = Users.by_id(Enums.id(remote_on_local))
     assert {:error, :not_found} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
-    Logger.metadata(action: info("check post deletion was federated"))
+    Logger.metadata(action: info("check user's posts were deleted too"))
 
     refute Bonfire.Social.FeedLoader.feed_contains?(:my, post_id, current_user: local_user)
   end

@@ -8,6 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
   import Bonfire.Common.Config, only: [repo: 0]
   import Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
+  alias ActivityPub.Tests.ObanHelpers
+
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
@@ -72,6 +74,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeletePostTest do
       Logger.metadata(action: info("delete the post"))
       {:ok, _} = Objects.delete(remote_post, current_user: remote_user)
     end)
+
+    ObanHelpers.perform_all()
+
+    Logger.metadata(action: info("check post deletion was federated"))
 
     refute Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,
              current_user: local_user

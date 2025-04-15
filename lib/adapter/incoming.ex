@@ -80,11 +80,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       )
       when is_binary(object_id) do
     is_deleted? =
-      e(activity.data, "type", nil) in ["Delete", "Tombstone"] or
-        e(activity.data, "object", "type", nil) == "Tombstone"
+      e(activity.data, "type", nil) in ["Delete", "Tombstone"]
 
-    if is_deleted? do
-      debug("AP - deletion, we skip re-fetching the object as that is done elsewhere #{repo()}")
+    if is_deleted? and
+         (object_id == e(activity.data, "actor", nil) or
+            e(activity.data, "formerType", nil) in ActivityPub.Config.supported_actor_types()) do
+      debug(
+        "AP - actor deletion, we skip re-fetching the object as that is done elsewhere #{repo()}"
+      )
 
       receive_activity(activity, object_id)
       |> debug("received deletion activity on #{repo()}...")
@@ -496,12 +499,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     {:no_federation_module_match, :ignore}
   end
 
-  defp activity_character(%{data: %{"type" => "Tombstone"}} = actor) do
+  defp activity_character(%{data: %{"type" => type, "actor" => actor}})
+       when type in ["Delete", "Tombstone"] do
     AdapterUtils.get_character(actor, skip_boundary_check: true)
   end
 
-  defp activity_character(%{data: %{"type" => type, "actor" => actor}})
-       when type in ["Delete", "Tombstone"] do
+  defp activity_character(%{data: %{"type" => "Tombstone"}} = actor) do
     AdapterUtils.get_character(actor, skip_boundary_check: true)
   end
 
