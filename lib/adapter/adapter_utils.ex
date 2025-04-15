@@ -16,6 +16,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   require ActivityPub.Config
   import Untangle
 
+  # TODO: refactor, clean up, and split into more logical modules
+
   @service_character_id "1ACT1V1TYPVBREM0TESFETCHER"
   @service_character_username "Federation Bot"
   def service_character_username, do: @service_character_username
@@ -277,9 +279,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     local_instance = ap_base_url()
 
     case get_actor_by_ap_id(ap_id, local_instance) do
-      nil ->
-        debug(ap_id, "assume looking up a local character")
-        get_local_character_by_ap_id(ap_id, local_instance)
+      {:error, :not_found} ->
+        debug(ap_id, "could not find AP Actor, check if we have a Peered linking to a character")
+
+        Bonfire.Federate.ActivityPub.Peered.get(ap_id)
+        |> return_pointable()
 
       actor ->
         actor
@@ -402,11 +406,34 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enum.map(&id_or_object_id(ed(activity, &1, nil)))
     # |> debug
     |> List.flatten()
+    |> cleanup_list()
+  end
+
+  defp cleanup_list(list) do
+    list
     |> filter_empty([])
     |> Enum.uniq()
   end
 
+  def ids_or_object_ids(list) do
+    list
+    |> Enum.map(&id_or_object_id(&1))
+    |> cleanup_list()
+  end
+
+  def id_or_object_id(nil) do
+    nil
+  end
+
+  def id_or_object_id(%{ap_id: id}) when is_binary(id) do
+    id
+  end
+
   def id_or_object_id(%{"id" => id}) when is_binary(id) do
+    id
+  end
+
+  def id_or_object_id(%{data: %{"id" => id}}) when is_binary(id) do
     id
   end
 
@@ -416,14 +443,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def id_or_object_id(id) when is_binary(id) do
     id
-  end
-
-  def id_or_object_id(objects) when is_list(objects) do
-    Enum.map(objects, &id_or_object_id/1)
-  end
-
-  def id_or_object_id(nil) do
-    nil
   end
 
   def id_or_object_id(%{character: %{peered: %{canonical_uri: id}}}) when is_binary(id) do
@@ -461,6 +480,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def id_or_object_id(%{peered: %Ecto.Association.NotLoaded{}} = object) do
     error(object, "peered not preloaded, so could not find AP ID")
     nil
+  end
+
+  def id_or_object_id(objects) when is_list(objects) do
+    ids_or_object_ids(objects)
   end
 
   def id_or_object_id(other) do
@@ -538,7 +561,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # FIXME: this should not query the AP db
       # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
       ActivityPub.Actor.get_cached(ap_id: ap_id)
-      |> info("got by ap_id")
+      |> debug("got by ap_id")
     else
       debug(ap_id, "assume looking up a local character")
       get_local_actor_by_ap_id(ap_id)
@@ -682,10 +705,17 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       _ when is_binary(fetched) ->
         if is_uid?(fetched) do
-          get_character_by_id(fetched)
+          get_character_by_id(fetched, opts)
         else
-          error(fetched, "Don't know how to find this object")
+          get_character(fetched, opts)
+          # error(fetched, "Don't know how to find this object")
         end
+
+      %Peered{
+        id: pointer_id
+      } ->
+        # TODO: can we reuse the Peered in the final object instead of having to preload it again?
+        get_character_by_id(pointer_id, opts)
 
       # nope? let's try and find them from their ap id
       %ActivityPub.Actor{} ->

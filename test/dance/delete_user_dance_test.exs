@@ -8,6 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
   import Bonfire.Common.Config, only: [repo: 0]
   import Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
+  alias ActivityPub.Tests.ObanHelpers
+
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
@@ -62,19 +64,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.DeleteUserTest do
 
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
-    post_id =
-      Bonfire.Social.FeedLoader.feed_contains?(
-        :my,
-        post_attrs.post_content.html_body,
-        current_user: local_user
-      )
-
-    assert post_id
+    assert post_id =
+             Bonfire.Social.FeedLoader.feed_contains?(
+               :my,
+               post_attrs.post_content.html_body,
+               current_user: local_user
+             )
 
     TestInstanceRepo.apply(fn ->
-      Logger.metadata(action: info("delete!"))
+      Logger.metadata(action: info("delete user on remote"))
       {:ok, _} = Users.enqueue_delete(remote_user)
     end)
+
+    Logger.metadata(action: info("run queued deletion on local"))
+    ObanHelpers.perform_all()
 
     Logger.metadata(action: info("check user deletion was federated"))
 

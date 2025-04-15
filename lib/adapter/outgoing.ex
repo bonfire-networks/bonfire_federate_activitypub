@@ -75,7 +75,25 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   defp prepare_and_queue(subject, :delete, thing, opts) do
-    push_delete(Types.object_type(thing), subject, thing, opts)
+    case push_delete(Types.object_type(thing), subject, thing, opts)
+         |> debug("result of push_delete") do
+      {:ok, del} ->
+        {:ok, del}
+
+      # temp workaround
+      [ok: del] ->
+        {:ok, del}
+
+      # none pushed?
+      [] ->
+        :ignore
+
+      :ignore ->
+        :ignore
+
+      {:error, reason} ->
+        error(reason, "Failed to delete")
+    end
   end
 
   defp prepare_and_queue(subject, verb, %{__struct__: object_type} = local_object, _opts) do
@@ -180,7 +198,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp push_delete(Bonfire.Data.Identity.User, _subject, %{} = user, opts) do
     # TODO: is this broken?
     with %{} = actor <- opts[:ap_object] || AdapterUtils.character_to_actor(user) do
-      ActivityPub.delete(actor, true, opts ++ [bcc: opts[:ap_bcc]])
+      ActivityPub.delete(
+        actor,
+        true,
+        opts ++ [bcc: AdapterUtils.ids_or_object_ids(opts[:ap_bcc])]
+      )
     end
   end
 
@@ -194,9 +216,13 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         opts ++
           [
             subject: AdapterUtils.the_ap_id(ActivityPub.Actor.get_cached!(pointer: subject)),
-            bcc: opts[:ap_bcc]
+            bcc: AdapterUtils.ids_or_object_ids(opts[:ap_bcc])
           ]
       )
+    else
+      e ->
+        preparation_error("Could not find the AP actor to delete", e)
+        :ignore
     end
   end
 
@@ -212,7 +238,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         opts ++
           [
             subject: AdapterUtils.the_ap_id(subject),
-            bcc: opts[:ap_bcc]
+            bcc: AdapterUtils.ids_or_object_ids(opts[:ap_bcc])
           ]
       )
     else

@@ -79,34 +79,42 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         } = activity
       )
       when is_binary(object_id) do
-    info(
-      "AP - fetch the #{activity.data["id"]} activity's object data from URI when we only have an AP ID: #{object_id}"
-    )
-
     is_deleted? =
       e(activity.data, "type", nil) in ["Delete", "Tombstone"] or
         e(activity.data, "object", "type", nil) == "Tombstone"
 
-    # info(activity, "activity")
-    case fetch_final_object(object_id,
-           return_tombstones: is_deleted?
-         ) do
-      {:ok, object} ->
-        debug(object, "fetched object")
+    if is_deleted? do
+      debug("AP - deletion, we skip re-fetching the object as that is done elsewhere #{repo()}")
 
-        receive_activity(activity, object)
-        |> debug("received activity on #{repo()}...")
+      receive_activity(activity, object_id)
+      |> debug("received deletion activity on #{repo()}...")
+    else
+      info(
+        "AP - fetch the #{activity.data["id"]} activity's object data from URI when we only have an AP ID: #{object_id}"
+      )
 
-      {:error, :not_found} ->
-        if is_deleted? do
-          receive_activity(activity, object_id)
-          |> debug("received deletion activity on #{repo()}...")
-        else
+      # info(activity, "activity")
+      case fetch_final_object(object_id,
+             return_tombstones: is_deleted?
+           ) do
+        {:ok, object} ->
+          debug(object, "fetched object")
+
+          receive_activity(activity, object)
+          |> debug("received activity on #{repo()}...")
+
+        {:error, :not_found} ->
+          # if is_deleted? do
+          #   receive_activity(activity, object_id)
+          #   |> debug("received deletion activity on #{repo()}...")
+          # else
           error(object_id, "Could not fetch the activity's object")
-        end
 
-      e ->
-        error(e)
+        # end
+
+        e ->
+          error(e)
+      end
     end
   end
 
@@ -199,14 +207,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(activity_type) and is_binary(object_type) do
     info("AP Match#1 - with activity_type and object_type: #{activity_type} & #{object_type}")
 
-    with {:ok, actor} <- activity_character(activity) |> info("activity_character"),
+    with {:ok, subject} <- activity_character(activity) |> info("activity_character"),
          {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(
                {activity_type, object_type}
              )
              |> info("AP attempt #1.1 - with activity_type and object_type"),
-             actor,
+             subject,
              activity,
              object
            ),
@@ -214,7 +222,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type)
              |> info("AP attempt #1.2 - with activity_type"),
-             actor,
+             subject,
              activity,
              object
            ),
@@ -222,11 +230,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type)
              |> info("AP attempt #1.3 - with object_type"),
-             actor,
+             subject,
              activity,
              object
            ) do
-      receive_activity_fallback(activity, object, actor)
+      receive_activity_fallback(activity, object, subject)
     end
   end
 
@@ -241,15 +249,23 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(activity_type) do
     info("AP Match#2 - by activity_type only: #{activity_type}")
 
-    with {:ok, actor} <- activity_character(activity),
+    with {:ok, subject} <- activity_character(activity),
+         # For actor deletion: check if we only have an ap_id for the object, and if it matches the subject's ap_id, and if so use subject as object 
+         subject_as_object =
+           if(
+             is_binary(object_or_objects) and
+               object_or_objects ==
+                 (e(activity.data, "actor", "id", nil) || e(activity.data, "actor", nil)),
+             do: subject
+           ),
          {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type),
-             actor,
+             subject,
              activity,
-             object_or_objects
+             subject_as_object || object_or_objects
            ) do
-      receive_activity_fallback(activity, object_or_objects, actor)
+      receive_activity_fallback(activity, subject_as_object || object_or_objects, subject)
     end
   end
 
@@ -260,15 +276,15 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(object_type) do
     info("AP Match#3 - by object_type only: #{object_type}")
 
-    with {:ok, actor} <- activity_character(activity),
+    with {:ok, subject} <- activity_character(activity),
          {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type),
-             actor,
+             subject,
              activity,
              object
            ) do
-      receive_activity_fallback(activity, object, actor)
+      receive_activity_fallback(activity, object, subject)
     end
   end
 
@@ -293,7 +309,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     end
   end
 
-  defp receive_activity_fallback(activity, object, actor \\ nil) do
+  defp receive_activity_fallback(activity, object, subject \\ nil) do
     module = Application.get_env(:bonfire, :federation_fallback_module)
 
     if module do
@@ -301,7 +317,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       # module.create(actor, activity, object)
       handle_activity_with(
         {:ok, module},
-        actor,
+        subject,
         activity,
         object
       )
@@ -480,12 +496,21 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     {:no_federation_module_match, :ignore}
   end
 
-  defp activity_character(%{"actor" => actor}) do
-    activity_character(actor)
+  defp activity_character(%{data: %{"type" => "Tombstone"}} = actor) do
+    AdapterUtils.get_character(actor, skip_boundary_check: true)
+  end
+
+  defp activity_character(%{data: %{"type" => type, "actor" => actor}})
+       when type in ["Delete", "Tombstone"] do
+    AdapterUtils.get_character(actor, skip_boundary_check: true)
   end
 
   defp activity_character(%{data: %{} = data}) do
     activity_character(data)
+  end
+
+  defp activity_character(%{"actor" => actor}) do
+    activity_character(actor)
   end
 
   defp activity_character(%{"id" => actor}) when is_binary(actor) do
