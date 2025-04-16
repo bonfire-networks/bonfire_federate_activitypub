@@ -50,13 +50,13 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
 
     ActivityPub.Utils.cache_clear()
 
-    Bonfire.Common.Repo.config()
-    |> Keyword.take([:name, :database, :hostname, :port, :username])
-    |> debug("LOCAL DB CONFIG")
+    # Bonfire.Common.Repo.config()
+    # |> Keyword.take([:name, :database, :hostname, :port, :username])
+    # |> debug("LOCAL DB CONFIG")
 
-    TestInstanceRepo.config()
-    |> Keyword.take([:name, :database, :hostname, :port, :username])
-    |> debug("REMOTE DB CONFIG")
+    # TestInstanceRepo.config()
+    # |> Keyword.take([:name, :database, :hostname, :port, :username])
+    # |> debug("REMOTE DB CONFIG")
 
     TestInstanceRepo.apply(fn ->
       ActivityPub.Utils.cache_clear()
