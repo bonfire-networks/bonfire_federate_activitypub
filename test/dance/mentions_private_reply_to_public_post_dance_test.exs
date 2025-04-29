@@ -1,8 +1,9 @@
-defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
+defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
-  @moduletag :mneme
+  # @moduletag :mneme
+  # use Mneme
 
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
@@ -15,22 +16,25 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
   alias Bonfire.Social.Graph.Follows
   alias Bonfire.Boundaries.{Circles, Acls, Grants}
   alias Bonfire.Messages
-  use Mneme
 
   @moduletag :test_instance
-  test "private mention and reply", context do
+  test "private reply to public post create a Post rather than a DM", context do
     # context |> info("context")
+    post1_text = "try out federated at public mention 100"
+
     post1_attrs = %{
       post_content: %{
-        html_body: "#{context[:remote][:username]} try out federated at private mention 10"
+        html_body: "#{context[:remote][:username]} #{post1_text}"
       }
     }
 
     post2_attrs = %{post_content: %{html_body: "try out federated mentions-only"}}
 
+    post3_text = "try out federated reply with mention 200"
+
     post3_attrs = %{
       post_content: %{
-        html_body: "#{context[:local][:username]} try out federated reply with mention"
+        html_body: "#{context[:local][:username]} #{post3_text}"
       }
     }
 
@@ -45,7 +49,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
       |> info("local_ap_id")
 
     {:ok, post1} =
-      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "mentions")
+      Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
     # error(post1.activity.tagged)
 
@@ -57,24 +61,28 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     # assert {:ok, remote_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
     debug(post1.activity)
-    auto_assert %ActivityPub.Object{} <- post1.activity.federate_activity_pub
+    assert %ActivityPub.Object{} = post1.activity.federate_activity_pub
 
-    auto_assert true <-
-                  List.first(post1.activity.federate_activity_pub.data["cc"]) == remote_ap_id
+    assert true =
+             List.first(post1.activity.federate_activity_pub.data["cc"]) == remote_ap_id
 
     ## work on test instance
     TestInstanceRepo.apply(fn ->
       remote_user = context[:remote][:user]
-      assert %{edges: feed} = Messages.list(remote_user)
-      assert %Bonfire.Data.Social.Message{} = List.first(feed)
+
+      %{edges: feed} = Bonfire.Social.FeedLoader.feed(:notifications, current_user: remote_user)
+
+      assert activity =
+               Bonfire.Social.FeedLoader.feed_contains?(feed, post1_text,
+                 current_user: local_user
+               )
+
+      assert post1remote = activity.object
+      Bonfire.Common.Types.object_type(post1remote) == Bonfire.Data.Social.Post
 
       # debug("post 1 wasn't federated to instance of mentioned actor")
 
       # %{edges: [feed_entry | _]} = feed
-      post1remote = List.first(feed).activity.object
-
-      assert post1remote.post_content.html_body =~
-               "try out federated at private mention 10"
 
       Logger.metadata(action: info("make a mentions-only reply on remote"))
 
@@ -100,7 +108,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
         Posts.publish(
           current_user: remote_user,
           post_attrs: post4_attrs |> Map.put(:reply_to_id, uid(post1remote)),
-          boundary: "public"
+          boundary: "mentions"
         )
 
       Logger.metadata(action: info("make a reply in thread on remote"))
@@ -109,7 +117,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
         Posts.publish(
           current_user: remote_user,
           post_attrs: post5_attrs |> Map.put(:reply_to_id, uid(post4)),
-          boundary: "public"
+          boundary: "mentions"
         )
     end)
 
@@ -117,20 +125,22 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
 
     Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
 
-    refute Bonfire.Social.FeedLoader.feed_contains?(:my, post2_attrs.post_content.html_body,
+    %{edges: feed} = Bonfire.Social.FeedLoader.feed(:notifications, current_user: local_user)
+
+    refute Bonfire.Social.FeedLoader.feed_contains?(feed, post2_attrs.post_content.html_body,
              current_user: local_user
            )
-           |> debug("feeeed")
 
     Logger.metadata(
       action: info("check that reply with mention was federated and is in OP's feed")
     )
 
-    assert %{edges: feed} = Messages.list(local_user)
-    auto_assert %Bonfire.Data.Social.Message{} <- List.first(feed)
-    post3remote = List.first(feed).activity.object
+    assert activity =
+             Bonfire.Social.FeedLoader.feed_contains?(feed, post3_text, current_user: local_user)
 
-    assert post3remote.post_content.html_body =~ "try out federated reply with mention"
+    assert post3remote = activity.object
+
+    Bonfire.Common.Types.object_type(post3remote) == Bonfire.Data.Social.Post
 
     # assert Bonfire.Social.FeedLoader.feed_contains?(
     #          feed,
@@ -139,25 +149,59 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     #  "reply with mention is NOT in OP's feed"
 
     Logger.metadata(
-      action: info("check that reply without mention was federated and is in fediverse feed")
+      action: info("ccheck that replies without mention were federated and are in fediverse feed")
     )
 
     assert %{edges: feed} =
              Bonfire.Social.FeedActivities.feed(:remote, current_user: local_user)
-             |> debug("remotefeed")
 
-    assert Bonfire.Social.FeedLoader.feed_contains?(
+    #  |> debug("remotefeed")
+
+    assert activity =
+             Bonfire.Social.FeedLoader.feed_contains?(
+               feed,
+               post4_attrs.post_content.html_body
+             )
+
+    assert post4remote = activity.object
+
+    Bonfire.Common.Types.object_type(post4remote) == Bonfire.Data.Social.Post
+
+    #  "if the post is public, the actor we are replying to should be CCed even if not mentioned"
+
+    assert activity =
+             Bonfire.Social.FeedLoader.feed_contains?(
+               feed,
+               post5_attrs.post_content.html_body
+             )
+
+    assert post5remote = activity.object
+
+    Bonfire.Common.Types.object_type(post5remote) == Bonfire.Data.Social.Post
+
+    #  "if the post is public, the actor who started the thread should be CCed even if not mentioned"
+
+    Logger.metadata(
+      action: info("check that replies were federated but are not visible to others")
+    )
+
+    assert %{edges: feed} =
+             Bonfire.Social.FeedActivities.feed(:remote, current_user: fake_user!())
+
+    #  |> debug("remotefeed")
+
+    refute Bonfire.Social.FeedLoader.feed_contains?(feed, post2_attrs.post_content.html_body)
+
+    refute Bonfire.Social.FeedLoader.feed_contains?(feed, post3_text)
+
+    refute Bonfire.Social.FeedLoader.feed_contains?(
              feed,
              post4_attrs.post_content.html_body
            )
 
-    #  "if the post is public, the actor we are replying to should be CCed even if not mentioned"
-
-    assert Bonfire.Social.FeedLoader.feed_contains?(
+    refute Bonfire.Social.FeedLoader.feed_contains?(
              feed,
              post5_attrs.post_content.html_body
            )
-
-    #  "if the post is public, the actor who started the thread should be CCed even if not mentioned"
   end
 end
