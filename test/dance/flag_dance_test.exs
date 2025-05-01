@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
+defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
@@ -12,8 +12,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
 
   alias Bonfire.Posts
 
-  #  WIP
-  @tag :fixme
   test "cross-instance flagging", context do
     # context |> info("context")
 
