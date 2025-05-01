@@ -296,7 +296,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert date == params.object["published"]
     end
 
-    test "creates a reply for an incoming note with a reply" do
+    test "creates a reply for an incoming note" do
       {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
@@ -329,6 +329,48 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       {:ok, reply_activity} = ActivityPub.create(reply_params)
 
       assert {:ok, reply} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(reply_activity)
+
+      assert reply.replied.reply_to_id == post.id
+    end
+
+    test "creates a private reply for an incoming public note" do
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      recipient = fake_user!()
+      recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
+
+      to = [
+        recipient_actor.ap_id,
+        ActivityPub.Config.public_uri()
+      ]
+
+      params = remote_activity_json(actor, to)
+
+      {:ok, activity} = ActivityPub.create(params)
+
+      assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+
+      to = [
+        recipient_actor.ap_id
+      ]
+
+      reply_object = %{
+        "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),
+        "content" => "content",
+        "type" => "Note",
+        "inReplyTo" => activity.object.data["id"]
+      }
+
+      reply_params = %{
+        actor: actor,
+        object: reply_object,
+        to: to,
+        context: nil
+      }
+
+      {:ok, reply_activity} = ActivityPub.create(reply_params)
+
+      assert {:ok, %Bonfire.Data.Social.Post{} = reply} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(reply_activity)
 
       assert reply.replied.reply_to_id == post.id
     end

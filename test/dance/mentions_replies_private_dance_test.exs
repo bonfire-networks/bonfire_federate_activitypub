@@ -22,20 +22,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     # context |> info("context")
     post1_attrs = %{
       post_content: %{
-        html_body: "#{context[:remote][:username]} try out federated at private mention 10"
+        html_body: "#{context[:remote][:username]} try out federated at private mention 11"
       }
     }
 
-    post2_attrs = %{post_content: %{html_body: "try out federated mentions-only"}}
+    post2_attrs = %{post_content: %{html_body: "try out federated mentions-only 21"}}
 
     post3_attrs = %{
       post_content: %{
-        html_body: "#{context[:local][:username]} try out federated reply with mention"
+        html_body: "#{context[:local][:username]} try out federated reply with mention 31"
       }
     }
 
-    post4_attrs = %{post_content: %{html_body: "try out federated reply-only"}}
-    post5_attrs = %{post_content: %{html_body: "try out federated reply in thread"}}
+    post4_attrs = %{post_content: %{html_body: "try out federated reply-only 41"}}
+    post5_attrs = %{post_content: %{html_body: "try out federated reply in thread 51"}}
 
     local_user = context[:local][:user]
 
@@ -74,7 +74,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
       post1remote = List.first(feed).activity.object
 
       assert post1remote.post_content.html_body =~
-               "try out federated at private mention 10"
+               "try out federated at private mention 11"
 
       Logger.metadata(action: info("make a mentions-only reply on remote"))
 
@@ -126,15 +126,26 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
       action: info("check that reply with mention was federated and is in OP's feed")
     )
 
-    assert %{edges: feed} = Messages.list(local_user)
-    auto_assert %Bonfire.Data.Social.Message{} <- List.first(feed)
-    post3remote = List.first(feed).activity.object
+    # assert %{edges: feed} = Messages.list(local_user)
+    # auto_assert %Bonfire.Data.Social.Message{} <- List.first(feed)
+    # post3remote = List.first(feed).activity.object
+    # assert post3remote.post_content.html_body =~ "try out federated reply with mention 31"
 
-    assert post3remote.post_content.html_body =~ "try out federated reply with mention"
+    %{edges: feed} = Bonfire.Social.FeedLoader.feed(:notifications, current_user: local_user)
+
+    assert activity =
+             Bonfire.Social.FeedLoader.feed_contains?(
+               feed,
+               "try out federated reply with mention 31",
+               current_user: local_user
+             )
+
+    assert post3remote = activity.object
+    Bonfire.Common.Types.object_type(post3remote) == Bonfire.Data.Social.Post
 
     # assert Bonfire.Social.FeedLoader.feed_contains?(
     #          feed,
-    #          "try out federated reply with mention"
+    #          "try out federated reply with mention 31"
     #        )
     #  "reply with mention is NOT in OP's feed"
 

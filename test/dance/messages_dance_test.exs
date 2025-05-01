@@ -82,15 +82,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
           message2_attrs |> Map.put(:reply_to_id, uid(message1remote))
         )
 
-      Logger.metadata(action: info("make a reply with TO on remote"))
-
-      {:ok, message3} =
-        Messages.send(
-          remote_user,
-          message3_attrs |> Map.put(:reply_to_id, uid(message1remote)),
-          local_on_remote
-        )
-
       Logger.metadata(action: info("attempt a message in thread without TO on remote"))
 
       {:error, _} =
@@ -107,18 +98,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
           message5_attrs |> Map.put(:reply_to_id, uid(message1remote)),
           local_on_remote
         )
+
+      Logger.metadata(action: info("make a reply with TO on remote"))
+
+      {:ok, message3} =
+        Messages.send(
+          remote_user,
+          message3_attrs |> Map.put(:reply_to_id, uid(message1remote)),
+          local_on_remote
+        )
     end)
 
     ## back to primary instance
 
-    Logger.metadata(action: info("check that reply-only is NOT in OP's messages"))
-
     assert %{edges: messages} = Bonfire.Messages.list(local_user) |> debug("feeeed")
-
-    Enum.each(
-      messages,
-      &refute(&1.activity.object.post_content.html_body =~ message2_attrs.post_content.html_body)
-    )
 
     Logger.metadata(
       action: info("check that reply with mention was federated and is in OP's messages")
@@ -130,13 +123,16 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
            ),
            "reply with mention should be in OP's messages"
 
+    Logger.metadata(action: info("check that reply-only is NOT in OP's messages"))
+
+    refute Bonfire.Social.FeedLoader.feed_contains?(
+             messages,
+             message2_attrs.post_content.html_body
+           )
+
     Logger.metadata(
       action: info("check that reply without mention was federated and is in local messages")
     )
-
-    assert %{edges: messages} =
-             Bonfire.Messages.list(local_user)
-             |> debug("feeeedlocal")
 
     assert Bonfire.Social.FeedLoader.feed_contains?(
              messages,

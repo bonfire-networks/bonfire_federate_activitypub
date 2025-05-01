@@ -62,6 +62,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ModerationDanceTest do
     Logger.metadata(action: info("make sure the incoming flag in queue was processed"))
     Oban.drain_queue(queue: :federator_incoming)
 
+    Logger.metadata(action: info("check flag was federated"))
+
+    flags =
+      Bonfire.Social.Flags.list(
+        scope: :instance,
+        current_user: local_admin
+      )
+
+    assert Bonfire.Social.FeedLoader.feed_contains?(
+             flags,
+             "post to try federated flagging",
+             current_user: local_admin
+           )
+
     Logger.metadata(action: info("check flag was federated and is in admin's notifications"))
 
     assert %{verb_id: verb_id, object: _object} =
