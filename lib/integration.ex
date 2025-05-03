@@ -5,8 +5,8 @@ defmodule Bonfire.Federate.ActivityPub do
   @moduledoc "./README.md" |> File.stream!() |> Enum.drop(1) |> Enum.join()
 
   import Untangle
-  alias Bonfire.Common.Config
-  alias Bonfire.Common.Settings
+  use Bonfire.Common.Config
+  use Bonfire.Common.Settings
   alias Bonfire.Common.Utils
 
   # TODO: make these configurable/extensible

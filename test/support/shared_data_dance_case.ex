@@ -20,7 +20,7 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
       use Bonfire.Common.Utils
 
       alias Bonfire.Federate.ActivityPub.Simulate
-      alias Bonfire.Common.Config
+      use Bonfire.Common.Config
 
       # The default endpoint for testing
       @endpoint Application.compile_env!(:bonfire, :endpoint_module)

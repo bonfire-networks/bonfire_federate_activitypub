@@ -1,6 +1,6 @@
 defmodule Bonfire.API.MastoCompatible.InstanceController do
   use Bonfire.UI.Common.Web, :controller
-  alias Bonfire.Common.Config
+  use Bonfire.Common.Config
 
   defp main(base_uri) do
     app_name = Bonfire.Application.name() |> String.capitalize()

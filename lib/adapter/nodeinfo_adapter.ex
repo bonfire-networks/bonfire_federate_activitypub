@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
   @behaviour Nodeinfo.Adapter
   import Bonfire.Common.Utils
-  alias Bonfire.Common.Config
+  use Bonfire.Common.Config
 
   def base_url() do
     Bonfire.Common.URIs.base_url()

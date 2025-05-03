@@ -2,8 +2,8 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
   use Bonfire.Federate.ActivityPub.DataCase
   use Mneme
 
-  alias Bonfire.Common.Config
-  alias Bonfire.Common.Settings
+  use Bonfire.Common.Config
+  use Bonfire.Common.Settings
 
   setup_all do
     orig = Config.get([:activity_pub, :instance, :federating])
