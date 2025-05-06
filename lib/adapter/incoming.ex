@@ -371,7 +371,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       pointer_id =
         with published when is_binary(published) <-
                object.data["published"] || activity.data["published"] do
-          DatesTimes.maybe_generate_ulid(published)
+          DatesTimes.generate_ulid_if_past(published)
         else
           _ -> nil
         end
