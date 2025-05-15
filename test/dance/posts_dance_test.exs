@@ -165,4 +165,59 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
       # TODO: find a way to get these edits too?
     end)
   end
+
+  @tag :test_instance
+  test "handles requests with non-standard Accept headers gracefully",
+       context do
+    user = context[:local][:user]
+
+    Logger.metadata(action: "create public post")
+    attrs = %{post_content: %{html_body: "test content for bot request"}}
+    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+    canonical_url =
+      Bonfire.Common.URIs.canonical_url(post)
+      |> info("canonical_url")
+
+    # Simulate a bot request with HTML-only Accept headers
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: "test fetch with unsupported Accept header")
+
+      # First verify the post exists and can be properly accessed with ActivityPub compatible headers
+      assert {:ok, _object} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+               |> repo().maybe_preload(:post_content)
+
+      # Now test the actual HTTP request with bot-like headers
+      # Use the existing HTTP client in TestInstanceRepo to make a request
+      # with headers similar to what a bot would send
+      Logger.metadata(action: "simulate bot request with HTML Accept header")
+
+      # Use TestInstanceRepo's HTTP client to make a request with bot-like headers
+      case ActivityPub.Federator.HTTP.get(
+             canonical_url,
+             [
+               {"accept",
+                "text/html, application/rss+xml, application/atom+xml, text/xml, text/rss+xml, application/xhtml+xml"},
+               {"user-agent", "Mozilla/5.0 (compatible; SomeBot/1.0; +http://example.com/bot)"}
+             ]
+           ) do
+        # We want this to succeed with some appropriate response
+        # not crash with Phoenix.NotAcceptableError
+        {:ok, %{status: status, body: body}} ->
+          # The status should be a valid HTTP status (likely 200 OK)
+          # and not crash the application
+          assert status in 200..299
+          # We should get some kind of valid response, even if it's
+          # a simplified representation or a redirect
+          assert is_binary(body)
+
+        {:error, error} ->
+          # If there is an error, it shouldn't be a crash
+          # but a proper error handling
+          refute error == :not_acceptable
+          refute is_exception(error)
+      end
+    end)
+  end
 end
