@@ -207,8 +207,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         } = activity,
         %{data: %{"type" => object_type}} = object
       )
-      when is_binary(activity_type) and is_binary(object_type) do
-    info("AP Match#1 - with activity_type and object_type: #{activity_type} & #{object_type}")
+      when is_binary(activity_type) and (is_binary(object_type) or is_list(object_type)) do
+    info(object_type, "AP Match#1 - with activity_type: #{activity_type} and object_type:")
 
     with {:ok, subject} <- activity_character(activity) |> info("activity_character"),
          {:no_federation_module_match, _} <-
@@ -276,8 +276,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         activity,
         %{data: %{"type" => object_type}} = object
       )
-      when is_binary(object_type) do
-    info("AP Match#3 - by object_type only: #{object_type}")
+      when is_binary(object_type) or is_list(object_type) do
+    info(object_type, "AP Match#3 - by object_type only")
 
     with {:ok, subject} <- activity_character(activity),
          {:no_federation_module_match, _} <-

@@ -62,7 +62,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         is_local?(thing, opts)
 
       %{id: @service_character_id} ->
-        false
+        if opts[:exclude_service_character], do: true, else: false
 
       %{is_local: true} ->
         true
@@ -77,10 +77,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         false
 
       %{creator_id: @service_character_id} ->
-        false
+        if opts[:exclude_service_character], do: true, else: false
 
       %{creator: %{id: @service_character_id}} ->
-        false
+        if opts[:exclude_service_character], do: true, else: false
 
       %{creator: %{peered: %Peered{}}} ->
         false
@@ -89,10 +89,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         false
 
       %{created: %{creator_id: @service_character_id}} ->
-        false
+        if opts[:exclude_service_character], do: true, else: false
 
       %{created: %{creator: %{id: @service_character_id}}} ->
-        false
+        if opts[:exclude_service_character], do: true, else: false
 
       %{created: %{creator: %{peered: %Peered{}}}} ->
         false
