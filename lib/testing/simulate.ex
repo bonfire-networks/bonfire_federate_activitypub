@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
       },
       "inbox" => "https://mocked.local/users/karen/inbox",
       "manuallyApprovesFollowers" => false,
-      "name" => "叶恋 (妹)",
+      "name" => "test user",
       "outbox" => "https://mocked.local/users/karen/outbox",
       "preferredUsername" => "karen",
       "publicKey" => %{
@@ -52,7 +52,7 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
           "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5FUojZbzUpD6L1Kof1gr\nh7GMSKd/N36FiekhhyDBAhtXgwEFgUWkiGLyDrNPP6RFFD/37FuZlq9JWSAonEHL\nbE4freE/FcuBP84AWQl/ZEm8BPCYVlHwALFEo13Gxg/VMetN37By0H7O7Lmb5JV4\nVgujqMaoNss03fwZARGd0LMLokN5KJExt7e1bsAqZOvI/xOBF1XlSRiHkco4OUGZ\nYjhoNbCKQtL995hGo14JlNd3QZI5RcBU47SqEuUYvgJXlyrVEKpqozBsFpGkh4/+\n9ck31bG50V3mLTL2SUthUdX9r8DgJVsxFYSb/rRMyPcCZAH8RD3FJH5deRtH1KJy\n7wIDAQAB\n-----END PUBLIC KEY-----\n\n"
       },
       "summary" =>
-        "Zakladatelka mocked.local, vývojářka Pleromy a MoodleNetu, kočička. Umím mňoukat v pěti jazycích a Super Metroid dohraju tak za hodinu. A dělám dobrý kari. <a class=\"hashtag\" data-tag=\"kawen\" href=\"https://mocked.local/tag/kawen\" rel=\"tag ugc\">#kawen</a>​",
+        "This is just a test user. <a class=\"hashtag\" data-tag=\"kawen\" href=\"https://mocked.local/tag/kawen\" rel=\"tag ugc\">#kawen</a>​",
       "tag" => [],
       "type" => "Person",
       "url" => "https://mocked.local/@karen"
