@@ -60,7 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
         |> Map.put("to", recipient_actor)
 
       {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
-      # |> flood("handled")
+      # |> debug("handled")
 
       assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
