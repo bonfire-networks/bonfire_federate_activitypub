@@ -35,6 +35,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       System.get_env("AP_BASE_PATH", "/pub")
   end
 
+  def is_public?(ap_activity, ap_object) do
+    case {e(ap_object, :public, nil), e(ap_activity, :public, nil)} do
+      {true, true} -> true
+      {nil, true} -> true
+      {true, nil} -> true
+      _ -> false
+    end
+    |> debug()
+  end
+
   def is_local?(thing, opts \\ [])
 
   def is_local?(thing, preload_if_needed) when is_boolean(preload_if_needed),
@@ -393,8 +403,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> debug("final actors")
   end
 
-  def all_recipients(activity, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
-    activity
+  def all_known_recipient_characters(activity_data, object_data) do
+    (all_recipients(activity_data) ++ all_recipients(object_data))
+    |> List.delete(public_uri())
+    |> debug("recipients ap_ids")
+    |> Enum.map(fn ap_id ->
+      with {:ok, user} <- Bonfire.Me.Users.by_ap_id(ap_id) do
+        {ap_id, user |> repo().maybe_preload(:settings)}
+      else
+        _ ->
+          nil
+      end
+    end)
+    |> filter_empty([])
+    |> Enum.uniq()
+    |> debug()
+  end
+
+  def all_recipients(activity_or_object, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
+    (e(activity_or_object, :data, nil) || activity_or_object)
     # |> debug
     |> all_fields(fields)
     |> debug()
@@ -1418,6 +1445,27 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       service_character_id,
       service_character_username
     ])
+  end
+
+  def incoming_boundary_circles(activity, object, is_public? \\ nil) do
+    is_public? =
+      case is_public? do
+        nil -> is_public?(activity, object)
+        _ -> is_public?
+      end
+
+    all_known_recipient_characters(activity, object)
+    |> recipients_boundary_circles(is_public?)
+  end
+
+  def recipients_boundary_circles(recipients, is_public?) do
+    to_circles =
+      if(is_public?, do: [:guest], else: []) ++
+        Enum.map(recipients || [], fn {_, character} ->
+          if Bonfire.Federate.ActivityPub.federating?(character), do: id(character)
+        end)
+
+    {if(is_public?, do: "public_remote", else: "custom"), to_circles}
   end
 
   # defp create_service_character(
