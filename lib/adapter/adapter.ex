@@ -406,7 +406,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_publish_object(%{} = object, manually_fetching?) do
     object
     # |> info()
-    |> Outgoing.maybe_federate(nil, :create, ..., manually_fetching?)
+    |> Outgoing.maybe_federate(nil, :create, ..., manually_fetching?: manually_fetching?)
   end
 
   def get_or_create_service_actor() do
