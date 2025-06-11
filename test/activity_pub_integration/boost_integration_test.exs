@@ -25,7 +25,6 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
       attrs = %{
         post_content: %{
           summary: "summary",
-          name: "name",
           html_body: "<p>epic html message</p>"
         }
       }

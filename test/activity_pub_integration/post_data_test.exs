@@ -21,7 +21,6 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       attrs = %{
         post_content: %{
           summary: "summary",
-          name: "name",
           html_body: "<p>epic html message</p>"
         }
       }
@@ -107,7 +106,6 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       attrs = %{
         post_content: %{
           summary: "summary",
-          name: "name",
           html_body: "<p>epic html message</p>"
         }
       }

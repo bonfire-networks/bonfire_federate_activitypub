@@ -16,7 +16,6 @@ defmodule Bonfire.Federate.ActivityPub.LocalityChecksTest do
       attrs = %{
         post_content: %{
           summary: "summary",
-          name: "name",
           html_body: "<p>epic html message</p>"
         }
       }
