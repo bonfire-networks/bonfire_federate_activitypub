@@ -359,7 +359,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          local_recipient_ids,
          is_local?
        ) do
-    case activity[field] do
+    case ed(activity, field, nil) || ed(activity, "object", field, nil) do
       recipients when is_list(recipients) and recipients != [] ->
         Map.put(
           activity,

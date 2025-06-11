@@ -70,5 +70,26 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
       assert {:error, _} = Bonfire.Social.Objects.read(media.id)
       assert {:ok, _} = Bonfire.Social.Objects.read(media.id, current_user: recipient)
     end
+
+    test "funkwhale audio object" do
+      data =
+        "../fixtures/funkwhale_create_audio.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+
+      assert {:ok, media} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+
+      assert media.__struct__ == Bonfire.Files.Media
+
+      assert media.path ==
+               "https://funkwhale.local/api/v1/listen/3901e5d8-0445-49d5-9711-e096cf32e515/?upload=42342395-0208-4fee-a38d-259a6dae0871&download=false"
+
+      assert media.media_type == "audio/ogg"
+
+      assert {:ok, _} = Bonfire.Social.Objects.read(media.id)
+    end
   end
 end
