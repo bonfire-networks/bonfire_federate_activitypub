@@ -3,7 +3,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
   use Bonfire.Common.Config
 
   defp main(base_uri) do
-    app_name = Bonfire.Application.name() |> String.capitalize()
+    app_name = Bonfire.Application.name_and_flavour() |> String.capitalize()
     # instance = Application.get_env(:activity_pub, :instance)
     base_url = Bonfire.Common.URIs.base_url(base_uri)
 
