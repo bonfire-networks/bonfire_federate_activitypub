@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       )
     end
 
-    test "Post publishing works" do
+    test "creates a Note for short posts" do
       user = fake_user!()
       attrs = %{post_content: %{html_body: "content"}}
 
@@ -53,6 +53,24 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       # debug(ap_activity)
       assert ap_activity.object.data["content"] =~ post.post_content.html_body
+      assert ap_activity.object.data["type"] == "Note"
+    end
+
+    test "creates an Article for long posts with a title" do
+      user = fake_user!()
+
+      attrs = %{
+        post_content: %{name: "title", html_body: String.duplicate("very long content ", 100)}
+      }
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      # debug(ap_activity)
+      assert ap_activity.object.data["content"] =~ post.post_content.html_body
+      assert ap_activity.object.data["type"] == "Article"
+      assert ap_activity.object.data["preview"]["type"] == "Note"
     end
 
     test "Outgoing federated can be disabled by each user" do
