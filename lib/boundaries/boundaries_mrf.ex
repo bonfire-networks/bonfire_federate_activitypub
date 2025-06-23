@@ -309,7 +309,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     activity
     |> filter_recipients_field(
-      :to,
+      "to",
       block_types,
       rejects,
       local_author_ids,
@@ -317,7 +317,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      :cc,
+      "cc",
       block_types,
       rejects,
       local_author_ids,
@@ -325,7 +325,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      :bto,
+      "bto",
       block_types,
       rejects,
       local_author_ids,
@@ -333,7 +333,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      :bcc,
+      "bcc",
       block_types,
       rejects,
       local_author_ids,
@@ -341,7 +341,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      :audience,
+      "audience",
       block_types,
       rejects,
       local_author_ids,

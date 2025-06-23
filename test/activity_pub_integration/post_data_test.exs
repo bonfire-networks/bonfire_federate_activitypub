@@ -68,7 +68,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
       # debug(ap_activity)
-      assert ap_activity.object.data["content"] =~ post.post_content.html_body
+      assert (ap_activity.object.data["content"] || ap_activity.object.data["summary"]) =~
+               post.post_content.html_body
+
       assert ap_activity.object.data["type"] == "Article"
       assert ap_activity.object.data["preview"]["type"] == "Note"
     end

@@ -516,7 +516,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     activity_character(actor)
   end
 
-  defp activity_character(%{"id" => actor}) when is_binary(actor) do
+  defp activity_character(%{"id" => actor, "type" => type})
+       when ActivityPub.Config.is_in(type, :supported_actor_types) == true and is_binary(actor) do
     activity_character(actor)
   end
 

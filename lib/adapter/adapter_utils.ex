@@ -386,7 +386,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     actors =
       ([ed(activity, "actor", nil)] ++
          [ed(activity, "object", "actor", nil)] ++
-         [ed(activity, "object", "attributedTo", nil)])
+         [ed(activity, "object", "attributedTo", nil)] ++
+         [ed(activity, "attributedTo", nil)])
       |> List.flatten()
       |> filter_empty(nil)
       |> debug("found actors")

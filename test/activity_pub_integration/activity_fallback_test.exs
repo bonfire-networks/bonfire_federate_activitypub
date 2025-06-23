@@ -39,6 +39,25 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
     end
 
+    test "Question object is recorded as APActivity" do
+      data =
+        "../fixtures/poll_attachment.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+
+      assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+
+      assert activity.__struct__ == Bonfire.Data.Social.APActivity
+      assert is_list(activity.json["oneOf"])
+      assert activity.json["type"] == "Question"
+      assert is_binary(activity.json["content"])
+
+      assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
+    end
+
     test "non-public object with Custom Type is recorded as private APActivity" do
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
