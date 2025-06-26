@@ -309,7 +309,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
     activity
     |> filter_recipients_field(
-      "to",
+      :to,
       block_types,
       rejects,
       local_author_ids,
@@ -317,7 +317,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      "cc",
+      :cc,
       block_types,
       rejects,
       local_author_ids,
@@ -325,7 +325,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      "bto",
+      :bto,
       block_types,
       rejects,
       local_author_ids,
@@ -333,7 +333,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      "bcc",
+      :bcc,
       block_types,
       rejects,
       local_author_ids,
@@ -341,7 +341,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_local?
     )
     |> filter_recipients_field(
-      "audience",
+      :audience,
       block_types,
       rejects,
       local_author_ids,
@@ -357,9 +357,11 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          rejects,
          local_author_ids,
          local_recipient_ids,
-         is_local?
+         is_local?,
+         recursing \\ false
        ) do
-    case ed(activity, field, nil) || ed(activity, "object", field, nil) do
+    case Enums.maybe_get(activity, field, nil) ||
+           Enums.maybe_get(e(activity, "object", %{}), field, nil) do
       recipients when is_list(recipients) and recipients != [] ->
         Map.put(
           activity,
@@ -391,18 +393,38 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         )
 
       _ ->
-        if is_atom(field),
-          do:
-            filter_recipients_field(
-              activity,
-              to_string(field),
-              block_types,
-              rejects,
-              local_author_ids,
-              local_recipient_ids,
-              is_local?
-            ),
-          else: activity
+        if !recursing do
+          cond do
+            is_atom(field) ->
+              filter_recipients_field(
+                activity,
+                to_string(field),
+                block_types,
+                rejects,
+                local_author_ids,
+                local_recipient_ids,
+                is_local?,
+                true
+              )
+
+            is_binary(field) ->
+              if atom_field = Types.maybe_to_atom!(field) do
+                filter_recipients_field(
+                  activity,
+                  atom_field,
+                  block_types,
+                  rejects,
+                  local_author_ids,
+                  local_recipient_ids,
+                  is_local?,
+                  true
+                )
+              end
+
+            true ->
+              nil
+          end
+        end || activity
     end
   end
 

@@ -2,6 +2,7 @@
 defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Untangle
   import Bonfire.Federate.ActivityPub
+  use Bonfire.Common.E
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Common
