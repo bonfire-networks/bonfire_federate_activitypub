@@ -68,6 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
         current_user: local_admin
       )
 
+    # FIXME
     assert Bonfire.Social.FeedLoader.feed_contains?(
              flags,
              "post to try federated flagging",

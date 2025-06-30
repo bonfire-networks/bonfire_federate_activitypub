@@ -467,4 +467,43 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         Bonfire.Federate.ActivityPub.federating?()
     end
   end
+
+  def transform_outgoing(data, target_host \\ nil, target_actor_id \\ nil)
+
+  def transform_outgoing(%{"image" => image} = data, target_host, target_actor_id)
+      when not is_nil(image) and image != [] and
+             (is_binary(target_host) or is_binary(target_actor_id)) do
+    # debug(data, "img transform_outgoing")
+    data
+    |> Map.put(
+      "image",
+      maybe_apply(
+        Bonfire.Files,
+        :ap_transform_url,
+        [image, target_host, target_actor_id],
+        fallback_return: image
+      )
+    )
+  end
+
+  def transform_outgoing(%{"attachment" => attachment} = data, target_host, target_actor_id)
+      when not is_nil(attachment) and attachment != [] and
+             (is_binary(target_host) or is_binary(target_actor_id)) do
+    # debug(data, "att transform_outgoing")
+    data
+    |> Map.put(
+      "attachment",
+      maybe_apply(
+        Bonfire.Files,
+        :ap_transform_url,
+        [attachment, target_host, target_actor_id],
+        fallback_return: attachment
+      )
+    )
+  end
+
+  def transform_outgoing(data, _, _) do
+    # debug(data, "WIP transform_outgoing")
+    data
+  end
 end
