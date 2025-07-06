@@ -220,4 +220,66 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
       end
     end)
   end
+
+  @tag :test_instance
+  test "incoming CW on remote posts is recognised",
+       context do
+    local_user = context[:local][:user]
+
+    Logger.metadata(action: "create post with CW and summary")
+
+    attrs_with_summary = %{
+      sensitive: true,
+      post_content: %{
+        html_body: "This is sensitive content that should be hidden",
+        summary: "Content Warning: Sensitive Topic"
+      }
+    }
+
+    {:ok, post_with_summary} =
+      Posts.publish(current_user: local_user, post_attrs: attrs_with_summary, boundary: "public")
+
+    Logger.metadata(action: "create post with CW but no summary")
+
+    attrs_no_summary = %{
+      sensitive: true,
+      post_content: %{
+        html_body: "Another sensitive post without explicit summary"
+      }
+    }
+
+    {:ok, post_no_summary} =
+      Posts.publish(current_user: local_user, post_attrs: attrs_no_summary, boundary: "public")
+
+    canonical_url_with_summary = Bonfire.Common.URIs.canonical_url(post_with_summary)
+    canonical_url_no_summary = Bonfire.Common.URIs.canonical_url(post_no_summary)
+
+    # Back to local instance to verify CW recognition
+    Logger.metadata(action: "verify CW posts are properly imported on remote instance")
+
+    # Get the remote posts' URLs
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: "fetch remote CW posts on remote instance")
+
+      assert {:ok, fetched_post_with_summary} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url_with_summary)
+               |> repo().maybe_preload(:post_content)
+
+      assert {:ok, fetched_post_no_summary} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url_no_summary)
+               |> repo().maybe_preload(:post_content)
+
+      assert fetched_post_with_summary.post_content.summary == "Content Warning: Sensitive Topic"
+
+      assert fetched_post_with_summary.post_content.html_body =~
+               "This is sensitive content that should be hidden"
+
+      assert fetched_post_with_summary.sensitive.is_sensitive == true
+
+      assert fetched_post_no_summary.post_content.html_body =~
+               "Another sensitive post without explicit summary"
+
+      assert fetched_post_no_summary.sensitive.is_sensitive == true
+    end)
+  end
 end

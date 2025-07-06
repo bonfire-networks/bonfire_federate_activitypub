@@ -1,0 +1,70 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        {
+            "ostatus": "http://ostatus.org#",
+            "atomUri": "ostatus:atomUri",
+            "inReplyToAtomUri": "ostatus:inReplyToAtomUri",
+            "conversation": "ostatus:conversation",
+            "sensitive": "as:sensitive",
+            "toot": "http://joinmastodon.org/ns#",
+            "votersCount": "toot:votersCount"
+        }
+    ],
+    "id": "https://mocked.local/users/karen/statuses/114800379424129152/activity",
+    "type": "Create",
+    "actor": "https://mocked.local/users/karen",
+    "published": "2025-07-05T11:26:13Z",
+    "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+        "https://mocked.local/users/karen/followers"
+    ],
+    "object": {
+        "id": "https://mocked.local/users/karen/statuses/114800379424129152",
+        "type": "Note",
+        "summary": "US politics, history",
+        "inReplyTo": null,
+        "published": "2025-07-05T11:26:13Z",
+        "url": "https://mocked.local/@dajb/114800379424129152",
+        "attributedTo": "https://mocked.local/users/karen",
+        "to": [
+            "https://www.w3.org/ns/activitystreams#Public"
+        ],
+        "cc": [
+            "https://mocked.local/users/karen/followers"
+        ],
+        "sensitive": true,
+        "atomUri": "https://mocked.local/users/karen/statuses/114800379424129152",
+        "inReplyToAtomUri": null,
+        "conversation": "tag:mocked.local,2025-07-05:objectId=171144301:objectType=Conversation",
+        "content": "main content goes here",
+        "contentMap": {
+            "en": "main content goes here"
+        },
+        "updated": "2025-07-05T11:26:27Z",
+        "attachment": [],
+        "tag": [],
+        "replies": {
+            "id": "https://mocked.local/users/karen/statuses/114800379424129152/replies",
+            "type": "Collection",
+            "first": {
+                "type": "CollectionPage",
+                "next": "https://mocked.local/users/karen/statuses/114800379424129152/replies?only_other_accounts=true\u0026page=true",
+                "partOf": "https://mocked.local/users/karen/statuses/114800379424129152/replies",
+                "items": []
+            }
+        },
+        "likes": {
+            "id": "https://mocked.local/users/karen/statuses/114800379424129152/likes",
+            "type": "Collection",
+            "totalItems": 0
+        },
+        "shares": {
+            "id": "https://mocked.local/users/karen/statuses/114800379424129152/shares",
+            "type": "Collection",
+            "totalItems": 2
+        }
+    }
+}

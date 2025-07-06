@@ -1,9 +1,10 @@
 defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
+  use Bonfire.Common.Repo
   import Tesla.Mock
   import Untangle
   alias Bonfire.Posts
-  use Bonfire.Common.Repo
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
@@ -15,6 +16,13 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
 
       # %{method: :get, url: "https://mocked.local/users/karen"} ->
       #   json(Simulate.actor_json("https://mocked.local/users/karen"))
+
+      # %{method: :get, url: "https://mocked.local/users/karen/statuses/114800379424129152/activity"} ->
+      # "../fixtures/mastodon-post-activity-with-cw.json"
+      # |> Path.expand(__DIR__)
+      # |> File.read!()
+      # |> json()
+      # # |> Jason.decode!()
 
       _ ->
         raise Tesla.Mock.Error, "Module request not mocked"
@@ -92,7 +100,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         |> Path.expand(__DIR__)
         |> File.read!()
         |> Jason.decode!()
-        |> debug("pxxx")
+
+      # |> debug("pxxx")
 
       {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
@@ -124,6 +133,34 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
 
       # assert doc
       #        |> debug
+    end
+
+    test "process mastodon activity with content warning" do
+      # url = "https://mocked.local/users/karen/statuses/114800379424129152/activity"
+
+      data =
+        "../fixtures/mastodon-post-activity-with-cw.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      # |> debug("pxxx")
+
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+
+      assert {:ok, post} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+               |> repo().maybe_preload([:post_content, :sensitive])
+
+      assert post.__struct__ == Bonfire.Data.Social.Post
+      assert is_binary(e(post, :post_content, :html_body, nil))
+
+      # Check that content warning/summary is preserved
+      s = e(post, :post_content, :summary, nil)
+      assert is_binary(s) and s != ""
+
+      # Post should be marked as sensitive when it has a content warning
+      assert post.sensitive.is_sensitive == true
     end
   end
 end

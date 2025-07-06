@@ -6,12 +6,6 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
   use Bonfire.Common.Repo
 
   setup_all do
-    data =
-      "../fixtures/peertube-video.json"
-      |> Path.expand(__DIR__)
-      |> File.read!()
-      |> Jason.decode!()
-
     mock_global(fn
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))
