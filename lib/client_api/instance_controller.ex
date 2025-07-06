@@ -2,6 +2,14 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
   use Bonfire.UI.Common.Web, :controller
   use Bonfire.Common.Config
 
+  # # Add Oaskit controller macros
+  # use Oaskit.Controller
+
+  # # Add the validation plug
+  # plug Oaskit.Plugs.ValidateRequest
+
+  # use_operation :show, "InstanceController.show"
+
   defp main(base_uri) do
     app_name = Bonfire.Application.name_and_flavour() |> String.capitalize()
     # instance = Application.get_env(:activity_pub, :instance)
