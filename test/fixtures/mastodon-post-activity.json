@@ -24,7 +24,6 @@
     "object": {
         "id": "https://mocked.local/users/karen/statuses/114800379424129152",
         "type": "Note",
-        "summary": "US politics, history",
         "inReplyTo": null,
         "published": "2025-07-05T11:26:13Z",
         "url": "https://mocked.local/@dajb/114800379424129152",
@@ -35,7 +34,6 @@
         "cc": [
             "https://mocked.local/users/karen/followers"
         ],
-        "sensitive": true,
         "atomUri": "https://mocked.local/users/karen/statuses/114800379424129152",
         "inReplyToAtomUri": null,
         "conversation": "tag:mocked.local,2025-07-05:objectId=171144301:objectType=Conversation",
@@ -45,7 +43,20 @@
         },
         "updated": "2025-07-05T11:26:27Z",
         "attachment": [],
-        "tag": [],
+        "tag": [
+            {
+                "type": "Hashtag",
+                "name": "#first_hashtag"
+            },
+            {
+                "type": "Hashtag",
+                "name": "#test"
+            },
+            {
+                "type": "Hashtag",
+                "name": "#tests"
+            }
+        ],
         "replies": {
             "id": "https://mocked.local/users/karen/statuses/114800379424129152/replies",
             "type": "Collection",
