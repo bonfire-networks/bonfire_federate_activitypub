@@ -68,6 +68,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
         current_user: local_admin
       )
 
+    assert flags != []
+
     # FIXME
     assert Bonfire.Social.FeedLoader.feed_contains?(
              flags,

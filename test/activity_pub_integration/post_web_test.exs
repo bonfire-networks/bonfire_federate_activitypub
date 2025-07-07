@@ -148,7 +148,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       assert is_nil(e(original_post, :post_content, :summary, nil)) or
                e(original_post, :post_content, :summary, nil) == ""
 
-      assert original_post.sensitive.is_sensitive == false
+      assert e(original_post, :sensitive, :is_sensitive, nil) == nil
 
       # Now process an Update activity that adds a content warning
       {:ok, update_data} =

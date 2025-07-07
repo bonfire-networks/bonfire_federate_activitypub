@@ -299,11 +299,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # end
   end
 
-  def ap_activity!(%{activity: %{federate_activity_pub: activity}}) do
+  def ap_activity!(%{activity: %{federate_activity_pub: activity}}) when not is_nil(activity) do
     ap_activity!(activity)
   end
 
-  def ap_activity!(%{federate_activity_pub: activity}) do
+  def ap_activity!(%{federate_activity_pub: activity}) when not is_nil(activity) do
     ap_activity!(activity)
   end
 
