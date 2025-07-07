@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
   import Tesla.Mock
 
-  alias Bonfire.Posts
+  # alias Bonfire.Posts
 
   setup_all do
     mock_global(fn
@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
     end
 
-    test "Question object is recorded as APActivity" do
+    test "Question object is recorded as APActivity, and doesn't create duplicates" do
       data =
         "../fixtures/poll_attachment.json"
         |> Path.expand(__DIR__)
@@ -56,6 +56,13 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert is_binary(activity.json["content"])
 
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
+
+      # Second fetch of the same data
+      assert {:ok, activity2} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+
+      # Should return the same activity, not create a duplicate
+      assert activity.id == activity2.id
+      assert activity.json["id"] == activity2.json["id"]
     end
 
     test "non-public object with Custom Type is recorded as private APActivity" do

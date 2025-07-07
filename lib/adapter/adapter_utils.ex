@@ -406,6 +406,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def all_known_recipient_characters(activity_data, object_data) do
     (all_recipients(activity_data) ++ all_recipients(object_data))
+    |> debug("all ap_ids")
     |> List.delete(public_uri())
     |> debug("recipients ap_ids")
     |> Enum.map(fn ap_id ->
@@ -425,16 +426,17 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     (e(activity_or_object, :data, nil) || activity_or_object)
     # |> debug
     |> all_fields(fields)
-    |> debug()
+    |> debug("all_recipients")
+    |> List.flatten()
+    |> cleanup_list()
+    |> debug("cleaned_recipients")
   end
 
   defp all_fields(activity, fields) do
     fields
+    |> Enum.map(&id_or_object_id(ed(activity, &1, nil) |> debug("ed for #{&1}")))
+
     # |> debug
-    |> Enum.map(&id_or_object_id(ed(activity, &1, nil)))
-    # |> debug
-    |> List.flatten()
-    |> cleanup_list()
   end
 
   defp cleanup_list(list) do

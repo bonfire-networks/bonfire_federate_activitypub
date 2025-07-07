@@ -313,7 +313,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   end
 
   defp receive_activity_fallback(activity, object, subject \\ nil) do
-    module = Application.get_env(:bonfire, :federation_fallback_module)
+    module =
+      Application.get_env(:bonfire, :federation_fallback_module, Bonfire.Social.APActivities)
 
     if module do
       info("AP - handling activity with fallback module")
@@ -360,29 +361,33 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
          %{data: %{"type" => verb}} = activity,
          object
        )
-       when is_atom(module) and not is_nil(module) and verb in @creation_verbs do
-    info(character, "character")
-    ap_obj_id = object.data["id"]
+       when is_atom(module) and not is_nil(module) and
+              (verb in @creation_verbs or
+                 ActivityPub.Config.is_in(verb, :supported_intransitive_types) == true) do
+    ap_obj_id = e(object, :data, "id", nil) || e(activity, :data, "id", nil)
 
     if ap_obj_id && Bonfire.Common.Needles.exists?(ap_obj_id) do
-      error(ap_obj_id, "Already exists locally")
+      warn(ap_obj_id, "Already exists locally")
       Bonfire.Common.Needles.get(ap_obj_id, skip_boundary_check: true)
     else
       pointer_id =
         with published when is_binary(published) <-
-               object.data["published"] || activity.data["published"] do
+               e(object, :data, "published", nil) || e(activity, :data, "published", nil) do
           DatesTimes.generate_ulid_if_past(published)
         else
           _ -> nil
         end
 
-      # DatesTimes.date_from_pointer(pointer_id) |> info("date from pointer")
+      # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
 
       info(
         "AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect(pointer_id)} using #{module}"
       )
 
-      # info(object)
+      # debug(character, "character")
+      # debug(object)
+
+      previous_pointer_id = e(object, :pointer_id, nil)
 
       with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
              Utils.maybe_apply(
@@ -390,8 +395,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
                :ap_receive_activity,
                [
                  character,
-                 activity,
-                 Map.merge(object, %{pointer_id: pointer_id})
+                 if(not is_map(object),
+                   do: Map.merge(activity, %{pointer_id: pointer_id}),
+                   else: activity
+                 ),
+                 if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
                ],
                no_argument_rescue: true,
                fallback_fun: &no_federation_module_match/2
@@ -410,17 +418,16 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         )
 
         # object = ActivityPub.Object.normalize(object)
-        old_pointer_id = e(object, :pointer_id, nil)
-        object_id = id(object)
-        # FIXME
+        object_id = id(object) || id(activity)
+        # FIXME?
         if object_id &&
-             (is_nil(old_pointer_id) or
-                old_pointer_id != pointable_object_id),
+             (is_nil(previous_pointer_id) or
+                previous_pointer_id != pointable_object_id),
            do:
              ActivityPub.Object.update_existing(object_id, %{
                pointer_id: pointable_object_id
              })
-             |> info("pointer_id update")
+             |> debug("pointer_id update")
 
         {:ok, pointable_object}
       else
@@ -442,7 +449,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
          object
        )
        when is_atom(module) and not is_nil(module) and verb in ["Accept", "Reject"] do
-    info("AP - handle_activity related to another activity module: #{module}")
+    info(
+      "AP - Accept/Reject (related to another activity) handle_activity_with module: #{module}"
+    )
 
     with {:ok, %{id: _pointable_object_id} = pointable_object} <-
            Utils.maybe_apply(
@@ -458,7 +467,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   defp handle_activity_with({:ok, module}, character, activity, object)
        when is_atom(module) and not is_nil(module) do
-    info("AP - handle_activity_with module: #{module}")
+    info(activity, "AP - generic handle_activity_with module: #{module}")
 
     with {:ok, %struct{id: pointable_object_id} = pointable_object} <-
            Utils.maybe_apply(

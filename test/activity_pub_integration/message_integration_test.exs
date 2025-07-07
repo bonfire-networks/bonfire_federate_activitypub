@@ -82,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
       params =
         remote_activity_json_with_mentions(actor, recipient_actor)
-        |> info("json!")
+        |> debug("json!")
 
       {:ok, activity} = ActivityPub.create(params)
 

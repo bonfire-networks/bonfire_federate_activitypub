@@ -257,7 +257,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
            local_author_ids,
            local_recipient_ids,
            is_local?
-         ) do
+         )
+         |> debug("with_filtered_recipients") do
       %{type: verb} = filtered when verb in @filter_for_verbs ->
         apply_filtered_recipients(filtered, activity, is_local?)
 
