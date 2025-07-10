@@ -1,0 +1,27 @@
+{
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "type": "Arrive",
+    "location": {
+        "id": "https://mocked.local/relation/7950480",
+        "type": [
+            "Place",
+            "geojson:Feature"
+        ],
+        "name": "Canton de Melbourne"
+    },
+    "to": {
+        "id": "as:Public",
+        "type": "Collection",
+        "nameMap": {
+            "en": "Public"
+        }
+    },
+    "id": "https://mocked.local/arrive/9lt7vKoZItLS5WYULIBkr",
+    "actor": {
+        "id": "https://mocked.local/users/karen",
+        "type": "Person",
+        "name": "evan"
+    },
+    "updated": "2025-07-10T03:45:34.496Z",
+    "published": "2025-07-10T03:45:34.496Z"
+}

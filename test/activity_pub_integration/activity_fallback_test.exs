@@ -92,5 +92,26 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert {:error, _} = Bonfire.Social.Objects.read(activity.id)
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id, current_user: recipient)
     end
+
+    test "Arrive activity is recorded as public APActivity" do
+      data =
+        "../fixtures/places-arrive.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+
+      assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+
+      assert activity.__struct__ == Bonfire.Data.Social.APActivity
+      assert activity.json["type"] == "Arrive"
+      assert is_map(activity.json["location"])
+      assert activity.json["location"]["type"] == ["Place", "geojson:Feature"]
+      assert activity.json["location"]["name"] == "Canton de Melbourne"
+
+      # Should be public since "to" contains "as:Public" collection
+      assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
+    end
   end
 end

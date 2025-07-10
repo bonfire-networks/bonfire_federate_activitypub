@@ -24,6 +24,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def service_character_id, do: @service_character_id
 
   def public_uri(), do: ActivityPub.Config.public_uri()
+  def public_uris(), do: ActivityPub.Config.public_uris()
 
   def log(l) do
     # if Bonfire.Common.Config.get(:log_federation), do:
@@ -360,10 +361,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def is_local_collection_or_built_in?("https://www.w3.org/ns/activitystreams#Public"),
     do: true
 
-  def is_local_collection_or_built_in?(ap_id),
-    do: is_local_collection?(ap_id)
+  def is_local_collection_or_built_in?(ap_id) when is_binary(ap_id),
+    do: is_local_collection?(ap_id) || ActivityPub.Utils.has_as_public?(ap_id)
 
-  def is_local_collection?(ap_id),
+  def is_local_collection_or_built_in?(ap_id),
+    do: ActivityPub.Utils.has_as_public?(ap_id)
+
+  def is_local_collection?(ap_id) when is_binary(ap_id),
     do: String.ends_with?(ap_id, ["/followers", "/following", "/outbox", "/inbox"])
 
   def the_ap_id(%{ap_id: ap_id}) when is_binary(ap_id) do
@@ -407,7 +411,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def all_known_recipient_characters(activity_data, object_data) do
     (all_recipients(activity_data) ++ all_recipients(object_data))
     |> debug("all ap_ids")
-    |> List.delete(public_uri())
+    |> Enum.reject(&(&1 in public_uris()))
     |> debug("recipients ap_ids")
     |> Enum.map(fn ap_id ->
       with {:ok, user} <- Bonfire.Me.Users.by_ap_id(ap_id) do
@@ -1230,54 +1234,54 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def determine_recipients(actor, comment) do
-    determine_recipients(actor, comment, [public_uri()], [
-      actor.data["followers"]
-    ])
-  end
+  # def determine_recipients(actor, comment) do
+  #   determine_recipients(actor, comment, [public_uri()], [
+  #     actor.data["followers"]
+  #   ])
+  # end
 
-  def determine_recipients(actor, comment, parent) do
-    if(is_map(parent) and Map.has_key?(parent, :id)) do
-      case ActivityPub.Actor.get_cached(pointer: parent.id) do
-        {:ok, parent_actor} ->
-          determine_recipients(
-            actor,
-            comment,
-            [parent_actor.ap_id, public_uri()],
-            [
-              actor.data["followers"]
-            ]
-          )
+  # def determine_recipients(actor, comment, parent) do
+  #   if(is_map(parent) and Map.has_key?(parent, :id)) do
+  #     case ActivityPub.Actor.get_cached(pointer: parent.id) do
+  #       {:ok, parent_actor} ->
+  #         determine_recipients(
+  #           actor,
+  #           comment,
+  #           [parent_actor.ap_id, public_uri()],
+  #           [
+  #             actor.data["followers"]
+  #           ]
+  #         )
 
-        _ ->
-          determine_recipients(actor, comment)
-      end
-    else
-      determine_recipients(actor, comment)
-    end
-  end
+  #       _ ->
+  #         determine_recipients(actor, comment)
+  #     end
+  #   else
+  #     determine_recipients(actor, comment)
+  #   end
+  # end
 
-  def determine_recipients(_actor, _comment, to, cc) do
-    # this doesn't feel very robust
-    # to =
-    #   unless is_nil(get_in_reply_to(comment)) do
-    #     # FIXME: replace with correct call
-    #     participants =
-    #       Threads.list_comments_in_thread(comment.thread)
-    #       |> Enum.map(fn comment -> comment.creator_id end)
-    #       |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1))
-    #       |> Enum.filter(fn actor -> actor end)
-    #       |> Enum.map(fn actor -> actor.ap_id end)
+  # def determine_recipients(_actor, _comment, to, cc) do
+  #   # this doesn't feel very robust
+  #   # to =
+  #   #   unless is_nil(get_in_reply_to(comment)) do
+  #   #     # FIXME: replace with correct call
+  #   #     participants =
+  #   #       Threads.list_comments_in_thread(comment.thread)
+  #   #       |> Enum.map(fn comment -> comment.creator_id end)
+  #   #       |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1))
+  #   #       |> Enum.filter(fn actor -> actor end)
+  #   #       |> Enum.map(fn actor -> actor.ap_id end)
 
-    #     (participants ++ to)
-    #     |> Enum.dedup()
-    #     |> List.delete(Map.get(Actor.get_cached!(pointer: actor.id), :ap_id))
-    #   else
-    #     to
-    #   end
+  #   #     (participants ++ to)
+  #   #     |> Enum.dedup()
+  #   #     |> List.delete(Map.get(Actor.get_cached!(pointer: actor.id), :ap_id))
+  #   #   else
+  #   #     to
+  #   #   end
 
-    {to, cc}
-  end
+  #   {to, cc}
+  # end
 
   def get_in_reply_to(comment) do
     reply_to_id = Map.get(comment, :reply_to_id)
