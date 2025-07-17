@@ -2,12 +2,12 @@
     "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Arrive",
     "location": {
-        "id": "https://mocked.local/relation/7950480",
+        "id": "https://mocked.local/relation/27005",
         "type": [
             "Place",
             "geojson:Feature"
         ],
-        "name": "Canton de Melbourne"
+        "name": "CERN - Site de Meyrin"
     },
     "to": {
         "id": "as:Public",

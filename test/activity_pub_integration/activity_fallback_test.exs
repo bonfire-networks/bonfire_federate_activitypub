@@ -9,6 +9,10 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))
 
+      # %{url: "https://mocked.local/relation/27005"} ->
+
+      # NOTE: already mocked in AP lib
+
       env ->
         apply(ActivityPub.Test.HttpRequestMock, :request, [env])
     end)
@@ -93,12 +97,14 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id, current_user: recipient)
     end
 
-    test "Arrive activity is recorded as public APActivity" do
+    test "Arrive activity is recorded as public APActivity with processed location" do
       data =
-        "../fixtures/places-arrive.json"
+        "../fixtures/place-arrive.json"
         |> Path.expand(__DIR__)
         |> File.read!()
         |> Jason.decode!()
+
+      location_id = "https://mocked.local/relation/27005"
 
       {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
@@ -106,12 +112,74 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
 
       assert activity.__struct__ == Bonfire.Data.Social.APActivity
       assert activity.json["type"] == "Arrive"
-      assert is_map(activity.json["location"])
+      assert is_map(debug(activity.json["location"], "location"))
       assert activity.json["location"]["type"] == ["Place", "geojson:Feature"]
-      assert activity.json["location"]["name"] == "Canton de Melbourne"
+
+      # assert activity.json["location"]["name"] == "CERN - Site de Meyrin" # name removed in favour or pointing to the location object
+      assert location_id == activity.json["location"]["id"]
+      assert location_pointer_id = activity.json["location"]["pointer_id"]
 
       # Should be public since "to" contains "as:Public" collection
-      assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
+      assert {:ok, arrive_pointer} =
+               Bonfire.Social.Objects.read(activity.id)
+               |> repo().maybe_preload(:activity)
+
+      # Check if the nested location object was processed and fetched/created
+
+      assert {:ok, location_bonfire_object} =
+               Bonfire.Geolocate.Geolocations.one(id: location_pointer_id)
+
+      # assert {:ok, _location_bonfire_object} = Bonfire.Social.Objects.read(location_pointer_id) # FIXME
+
+      # Test the AP pointer preloading functionality      
+      loaded_activity =
+        Bonfire.Social.Activities.activity_preloads(
+          arrive_pointer,
+          preload: [:with_subject]
+        )
+
+      loaded_activity =
+        Bonfire.Social.Activities.activity_preloads(
+          loaded_activity,
+          current_user: e(arrive_pointer, :activity, :subject, nil)
+        )
+
+      # Check if the location was enriched with the loaded object
+      location_object = loaded_activity.json["location"]["pointer"]
+      assert is_map(location_object)
+      assert location_object.id == activity.json["location"]["pointer_id"]
+      # assert location_object.json["name"] == "CERN - Site de Meyrin"
+      assert location_object.name == "CERN - Site de Meyrin"
+
+      # Try to get the location object from ActivityPub.Object
+      case ActivityPub.Object.get_cached(ap_id: location_id) do
+        {:ok, location_object} ->
+          # Location was processed and stored as a separate object
+          assert location_object.data["type"] == ["Place", "geojson:Feature"]
+          assert location_object.data["name"] == "CERN - Site de Meyrin"
+
+        # assert location_pointer_id == location_object.pointer_id
+        # NOTE: is the pointer_id on the Create activity instead of the object? 
+
+        {:error, :not_found} ->
+          flunk("Location object not found via AP ID?")
+
+        other ->
+          flunk("Unexpected result when looking for location object: #{inspect(other)}")
+      end
+
+      #  case ActivityPub.Object.get_cached(pointer: location_pointer_id) do
+      #   {:ok, location_object} ->
+      #     # Location was processed and stored as a separate object
+      #     assert location_object.data["type"] == ["Place", "geojson:Feature"]
+      #     assert location_object.data["name"] == "CERN - Site de Meyrin"
+
+      #   {:error, :not_found} -> # FIXME!
+      #     flunk("Location object not found via pointer?")
+
+      #   other ->
+      #     flunk("Unexpected result when looking for location object: #{inspect(other)}")
+      # end
     end
   end
 end

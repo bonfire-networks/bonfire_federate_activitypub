@@ -31,6 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
 
       use Bonfire.Common.Utils
 
+      import Bonfire.Federate.ActivityPub
       alias Bonfire.Federate.ActivityPub.Simulate
       use Bonfire.Common.Config
 
