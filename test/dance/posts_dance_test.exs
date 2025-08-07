@@ -263,11 +263,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
 
       assert {:ok, fetched_post_with_summary} =
                AdapterUtils.get_by_url_ap_id_or_username(canonical_url_with_summary)
-               |> repo().maybe_preload(:post_content)
+               |> repo().maybe_preload([:post_content, :sensitive])
 
       assert {:ok, fetched_post_no_summary} =
                AdapterUtils.get_by_url_ap_id_or_username(canonical_url_no_summary)
-               |> repo().maybe_preload(:post_content)
+               |> repo().maybe_preload([:post_content, :sensitive])
 
       assert fetched_post_with_summary.post_content.summary == "Content Warning: Sensitive Topic"
 
@@ -280,6 +280,70 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
                "Another sensitive post without explicit summary"
 
       assert fetched_post_no_summary.sensitive.is_sensitive == true
+    end)
+  end
+
+  # TODO
+  @tag :test_instance
+  test "federates post with custom emoji correctly", context do
+    me = context[:local][:user]
+
+    label = "test custom emoji"
+    shortcode = ":test:"
+
+    {:ok, context} =
+      Bonfire.Files.EmojiUploader.add_emoji(
+        me,
+        Bonfire.Files.Simulation.icon_file(),
+        label,
+        shortcode
+      )
+
+    me = current_user(context)
+
+    assert emoji =
+             Bonfire.Common.Settings.get([:custom_emoji, shortcode], nil, me)
+             |> flood("emoji")
+
+    emoji_url = emoji[:url] || Bonfire.Common.Media.emoji_url(emoji)
+
+    # Use the shortcode in a post
+    attrs = %{post_content: %{html_body: "Hello #{shortcode} world!"}}
+    {:ok, post} = Posts.publish(current_user: me, post_attrs: attrs, boundary: "public")
+
+    canonical_url =
+      Bonfire.Common.URIs.canonical_url(post)
+      |> info("canonical_url")
+
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: "fetch post with custom emoji by canonical_url")
+
+      assert {:ok, object} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+               |> repo().maybe_preload(:post_content)
+               |> flood("remote post")
+
+      # Check that the federated post content includes the emoji shortcode and NOT its image representation
+      assert object.post_content.html_body =~ shortcode
+      # assert object.post_content.html_body =~ emoji_url
+
+      # Fetch the AP JSON to double-check for emoji tags
+      {:ok, %{status: 200, body: body}} =
+        ActivityPub.Federator.HTTP.get(
+          canonical_url,
+          [{"accept", "application/activity+json"}]
+        )
+
+      ap_json = Jason.decode!(body)
+
+      # Check for tags with type Emoji or emoji urls
+      emoji_tags =
+        (ap_json["tag"] || [])
+        |> Enum.filter(fn tag ->
+          is_map(tag) and tag["type"] == "Emoji" and String.contains?(tag, emoji_url)
+        end)
+
+      assert length(emoji_tags) > 0
     end)
   end
 end
