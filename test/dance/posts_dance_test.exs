@@ -303,7 +303,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
 
     assert emoji =
              Bonfire.Common.Settings.get([:custom_emoji, shortcode], nil, me)
-             |> flood("emoji")
+             |> debug("emoji")
 
     emoji_url = emoji[:url] || Bonfire.Common.Media.emoji_url(emoji)
 
@@ -321,7 +321,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
       assert {:ok, object} =
                AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
                |> repo().maybe_preload(:post_content)
-               |> flood("remote post")
+               |> debug("remote post")
 
       # Check that the federated post content includes the emoji shortcode and NOT its image representation
       assert object.post_content.html_body =~ shortcode
