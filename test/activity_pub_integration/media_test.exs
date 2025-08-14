@@ -3,7 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
   import Tesla.Mock
 
   alias Bonfire.Posts
-  use Bonfire.Common.Repo
+  # use Bonfire.Common.Repo
 
   setup_all do
     mock_global(fn

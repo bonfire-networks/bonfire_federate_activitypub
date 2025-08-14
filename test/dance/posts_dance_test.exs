@@ -283,8 +283,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     end)
   end
 
-  # TODO
-  @tag :test_instance
+  # should federate with the emoji tag, not the image
+  @tag :fixme
   test "federates post with custom emoji correctly", context do
     me = context[:local][:user]
 

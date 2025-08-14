@@ -1,6 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
-  use Bonfire.Common.Repo
+  # use Bonfire.Common.Repo
   import Tesla.Mock
   import Untangle
   alias Bonfire.Posts
@@ -113,7 +113,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
           |> Map.put("sensitive", true)
           |> Map.put("summary", "politics")
         end)
-        |> ActivityPub.Federator.Transformer.handle_incoming()
+        |> ActivityPub.Federator.Transformer.handle_incoming(fetch_collection: false)
 
       assert {:ok, post} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
@@ -138,7 +138,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         |> File.read!()
         |> Jason.decode!()
 
-      {:ok, original} = ActivityPub.Federator.Transformer.handle_incoming(original_data)
+      {:ok, original} =
+        ActivityPub.Federator.Transformer.handle_incoming(original_data, fetch_collection: false)
 
       assert {:ok, original_post} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(original)
@@ -195,7 +196,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
           |> Map.put("summary", "politics")
         end)
 
-      {:ok, original} = ActivityPub.Federator.Transformer.handle_incoming(original_data)
+      {:ok, original} =
+        ActivityPub.Federator.Transformer.handle_incoming(original_data, fetch_collection: false)
 
       assert {:ok, original_post} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(original)
@@ -246,7 +248,9 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         |> File.read!()
         |> Jason.decode!()
 
-      {:ok, original} = ActivityPub.Federator.Transformer.handle_incoming(original_data)
+      {:ok, original} =
+        ActivityPub.Federator.Transformer.handle_incoming(original_data, fetch_collection: false)
+
       # |> debug("normalized")
 
       assert {:ok, original_post} =

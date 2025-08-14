@@ -88,6 +88,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
           post_attrs: post31_attrs |> Map.put(:reply_to_id, uid(post11remote)),
           boundary: "public"
         )
+        |> debug("post31created")
 
       Logger.metadata(action: info("make a reply without mention on remote"))
 
@@ -112,7 +113,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
     Logger.metadata(action: info("load local feeds"))
 
     assert %{edges: instance_feed} =
-             Bonfire.Social.FeedActivities.feed(:explore, current_user: local_user, limit: 10)
+             Bonfire.Social.FeedActivities.feed(:remote, current_user: local_user, limit: 10)
 
     assert %{edges: notifications} =
              Bonfire.Social.FeedActivities.feed(:notifications,
@@ -121,17 +122,17 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
              )
 
     Logger.metadata(
-      action: info("check that reply 31 with mention was federated and is in instance feed")
+      action: info("check that reply 31 with mention was federated and is in remote feed")
     )
 
     assert Bonfire.Social.FeedLoader.feed_contains?(
              instance_feed,
              msg31
-           )
+           ),
+           "reply 31 with mention should have federated and be in remote feed"
 
     Logger.metadata(
-      action:
-        info("check that reply 44 and 55 without mention are federated and in instance feed")
+      action: info("check that reply 44 and 55 without mention are federated and in remote feed")
     )
 
     assert Bonfire.Social.FeedLoader.feed_contains?(
