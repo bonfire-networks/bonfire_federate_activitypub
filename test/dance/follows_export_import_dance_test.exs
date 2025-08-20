@@ -80,7 +80,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowsExportImportTest do
       # Pass user ID instead of user struct to avoid JSON encoding issues
       assert %{ok: 3} =
                Import.import_from_csv_file(:following, remote_user.id, csv_path)
-               |> flood("import_result")
+               |> debug("import_result")
 
       # Verify follows were imported correctly
       Logger.metadata(action: info("verify imported follows"))
