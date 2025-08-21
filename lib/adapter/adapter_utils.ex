@@ -553,8 +553,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> filter_empty([])
   end
 
+  def fetch_pointer_for_ap_id(ap_id) do
+    ActivityPub.Object.get_cached(ap_id: ap_id) |> repo().maybe_preload(:pointer)
+  end
+
   def maybe_pointer_for_ap_id(ap_id) do
-    case ActivityPub.Object.get_cached(ap_id: ap_id) |> repo().maybe_preload(:pointer) do
+    case fetch_pointer_for_ap_id(ap_id) do
       {:ok, %{pointer: %{id: _} = pointer}} ->
         {ap_id, pointer}
 
@@ -568,6 +572,50 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           _ ->
             nil
         end
+    end
+  end
+
+  def get_or_fetch_pointable_by_ap_id(actor_or_ap_id) do
+    local_instance = ap_base_url()
+
+    with {:error, :not_found} <-
+           fetch_pointer_for_ap_id(actor_or_ap_id)
+           |> return_pointable(),
+         ap_id when is_binary(ap_id) <- the_ap_id(actor_or_ap_id) || {:error, :not_found} do
+      if String.starts_with?(ap_id, local_instance) do
+        debug(ap_id, "detected local URI, attempting to parse")
+
+        cond do
+          # Handle local actor URIs like /pub/actors/username
+          String.contains?(ap_id, "/actors/") ->
+            username = String.trim_leading(ap_id, "#{local_instance}/actors/")
+            debug(username, "extracted username from local actor URI")
+            get_character_by_username(username)
+
+          # Handle local object URIs like /pub/objects/ULID
+          String.contains?(ap_id, "/objects/") ->
+            object_id = String.trim_leading(ap_id, "#{local_instance}/objects/")
+            debug(object_id, "extracted object ID from local object URI")
+
+            if object_id = uid(object_id) do
+              Bonfire.Common.Needles.get(object_id, skip_boundary_check: true)
+            else
+              {:error, :not_found}
+            end
+
+          # Fallback for other local URIs
+          true ->
+            debug(ap_id, "local URI but unknown format")
+            {:error, :not_found}
+        end
+      else
+        debug(ap_id, "assume fetching remote object")
+        # FIXME: this should not query the AP db
+        # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
+        ActivityPub.Object.get_cached_or_fetch(ap_id: ap_id)
+        |> info("got by ap_id")
+        |> return_pointable()
+      end
     end
   end
 
@@ -692,8 +740,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           end
       end
     else
-      log("AP - uri - get_character_by_ap_id: assume local : " <> q)
-      get_or_fetch_character_by_ap_id(q)
+      log("AP - uri : assume local : " <> q)
+      get_or_fetch_pointable_by_ap_id(q)
     end
   end
 
@@ -767,7 +815,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         {:ok, fetched}
 
       {:error, :not_found} ->
-        error(fetched, "no Pointable found for")
+        error(opts, "no Pointable found, with opts")
+        {:error, :not_found}
+
+      nil ->
+        error(opts, "expected an object, but got nil, with opts")
         {:error, :not_found}
 
       other ->
