@@ -162,7 +162,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           }
         } = activity
       ) do
-    info("AP - case #1 when the object comes to us embeded in the activity")
+    info("AP - case #1 when the object comes to us embedded in the activity")
 
     receive_activity(activity, object)
   end
