@@ -110,7 +110,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
     # Verify we have Create and Announce activities
     create_activities = Enum.filter(activities, &(&1["type"] == "Create"))
     announce_activities = Enum.filter(activities, &(&1["type"] == "Announce"))
-    flood(announce_activities, "exported announce activities with dates")
+    debug(announce_activities, "exported announce activities with dates")
 
     assert length(create_activities) >= 4
     assert length(announce_activities) >= 1
