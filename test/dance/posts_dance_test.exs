@@ -346,4 +346,83 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
       assert length(emoji_tags) > 0
     end)
   end
+
+  @tag :test_instance
+  test "federates link previews and uses them without re-fetching (based on FEP-e232)",
+       context do
+    user = context[:local][:user]
+
+    # Use an external URL that should generate a link preview
+    external_url = "https://developer.mozilla.org/en-US/docs/Web/API/"
+
+    # Create a post that includes a link to the external URL
+    Logger.metadata(action: "create post with external link that should generate preview")
+    link_content = "Check out this interesting article: #{external_url}"
+    attrs = %{post_content: %{html_body: link_content}}
+
+    {:ok, post_with_link} =
+      Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+    canonical_url =
+      Bonfire.Common.URIs.canonical_url(post_with_link)
+      |> info("post_with_link_url")
+
+    # Verify link preview was generated locally
+    Logger.metadata(action: "verify link preview exists locally")
+    post_with_preview = repo().maybe_preload(post_with_link, [:media])
+    assert length(post_with_preview.media || []) > 0
+
+    # Test federation to remote instance
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: "fetch post with link preview on remote instance")
+
+      assert {:ok, remote_post} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+               |> repo().maybe_preload([:post_content, :media])
+
+      # Verify the content includes the link
+      assert remote_post.post_content.html_body =~ external_url
+
+      # Verify link preview was federated (not re-fetched)
+      assert length(remote_post.media || []) > 0
+      link_preview = List.first(remote_post.media)
+
+      # Handle trailing slash differences in URL comparison
+      assert String.trim_trailing(link_preview.path, "/") ==
+               String.trim_trailing(external_url, "/")
+
+      # Fetch the ActivityPub JSON to verify FEP-e232 compliance
+      Logger.metadata(action: "verify FEP-e232 Object Links in ActivityPub JSON")
+
+      {:ok, %{status: 200, body: body}} =
+        ActivityPub.Federator.HTTP.get(
+          canonical_url,
+          [{"accept", "application/activity+json"}]
+        )
+
+      ap_json = Jason.decode!(body)
+
+      # Verify FEP-e232 Link tags are present for external URLs
+      link_tags =
+        (ap_json["tag"] || [])
+        |> Enum.filter(fn tag ->
+          # For external URLs, mediaType might be different (e.g., text/html)
+          is_map(tag) and
+            tag["type"] == "Link" and
+            String.trim_trailing(tag["href"], "/") == String.trim_trailing(external_url, "/") and
+            is_binary(tag["mediaType"])
+        end)
+
+      assert length(link_tags) > 0
+
+      link_tag = List.first(link_tags)
+
+      assert String.trim_trailing(link_tag["href"], "/") ==
+               String.trim_trailing(external_url, "/")
+
+      assert link_tag["type"] == "Link"
+      assert is_binary(link_tag["name"])
+      assert link_tag["name"] =~ "Web API"
+    end)
+  end
 end

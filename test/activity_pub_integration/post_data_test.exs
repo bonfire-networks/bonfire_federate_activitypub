@@ -11,6 +11,9 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
+
+      %{method: :get, url: "https://developer.mozilla.org/en-US/docs/Web/API/"} ->
+        %Tesla.Env{status: 200, body: "<title>Web API</title>"}
     end)
 
     :ok
@@ -209,6 +212,59 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post)
 
       # debug(feed_entry)
+    end
+
+    test "creates a Post for an incoming public Note with link and fetches link metadata" do
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+
+      to = [
+        ActivityPub.Config.public_uri()
+      ]
+
+      # Create a Note with a link but no attachment/preview
+      content = "Check out this great link: "
+      link_url = "https://developer.mozilla.org/en-US/docs/Web/API/"
+      content_with_link = "#{content} #{link_url}"
+
+      object = %{
+        "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),
+        "content" => content_with_link,
+        "type" => "Note",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "attributedTo" => actor.ap_id,
+        "to" => to
+      }
+
+      params = %{
+        actor: actor,
+        object: object,
+        to: to,
+        context: nil
+      }
+
+      {:ok, activity} = ActivityPub.create(params)
+
+      assert actor.data["id"] == activity.data["actor"]
+      assert activity.object.data["content"] =~ link_url
+
+      assert {:ok, post} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               |> repo().maybe_preload([:post_content, :media])
+
+      assert post.post_content.html_body =~ content
+      assert post.post_content.html_body =~ link_url
+
+      # Verify that link preview metadata was fetched locally
+      assert length(post.media || []) > 0
+
+      link_preview =
+        List.first(post.media)
+        |> debug("link_preview")
+
+      assert String.trim_trailing(link_preview.path, "/") == String.trim_trailing(link_url, "/")
+      assert e(link_preview.metadata, "other", "title", nil) =~ "Web API"
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post)
     end
 
     test "creates a Post and notifies mentioned users for an incoming public Note" do
