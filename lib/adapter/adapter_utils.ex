@@ -659,7 +659,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_by_url_ap_id_or_username(q, opts \\ [])
 
   def get_by_url_ap_id_or_username("@" <> username, opts),
-    do: get_or_fetch_and_create_by_username(username)
+    do: get_or_fetch_and_create_by_username(username, opts)
 
   def get_by_url_ap_id_or_username("http:" <> _ = url, opts),
     do: get_or_fetch_and_create_by_uri(url, opts)
@@ -672,15 +672,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       get_or_fetch_and_create_by_uri(URI.to_string(uri), opts)
     else
       _ ->
-        get_or_fetch_and_create_by_username(string)
+        get_or_fetch_and_create_by_username(string, opts)
     end
   end
 
-  def get_or_fetch_and_create_by_username(q) when is_binary(q) do
+  def get_or_fetch_and_create_by_username(q, opts \\ []) when is_binary(q) do
     if String.contains?(q, "@") do
       log("AP - get_cached_or_fetch(username: : " <> q)
 
-      ActivityPub.Actor.get_cached_or_fetch(username: q)
+      ActivityPub.Actor.get_cached_or_fetch([username: q], opts)
       ~> return_pointable()
     else
       log("AP - get_character_by_username: " <> q)

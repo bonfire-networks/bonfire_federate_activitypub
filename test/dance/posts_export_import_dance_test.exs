@@ -18,6 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
     # Set up users
     local_user = context[:local][:user]
     remote_user = context[:remote][:user]
+    other_user = fancy_fake_user!("OtherLocalUser")
 
     remote_ap_id =
       context[:remote][:canonical_url]
@@ -32,6 +33,37 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
       Posts.publish(
         current_user: local_user,
         post_attrs: %{post_content: %{html_body: "My first post for migration test"}},
+        boundary: "public"
+      )
+
+    # Create nested replies to post1 to test thread import
+    {:ok, %{id: reply1_id}} =
+      Posts.publish(
+        current_user: other_user[:user],
+        post_attrs: %{
+          post_content: %{html_body: "This is a reply to my first post"},
+          reply_to_id: post1.id
+        },
+        boundary: "public"
+      )
+
+    {:ok, %{id: _reply2_id}} =
+      Posts.publish(
+        current_user: other_user[:user],
+        post_attrs: %{
+          post_content: %{html_body: "This is a nested reply"},
+          reply_to_id: reply1_id
+        },
+        boundary: "public"
+      )
+
+    {:ok, %{id: _another_reply_id}} =
+      Posts.publish(
+        current_user: other_user[:user],
+        post_attrs: %{
+          post_content: %{html_body: "Another reply to the original post"},
+          reply_to_id: post1.id
+        },
         boundary: "public"
       )
 
@@ -66,8 +98,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
       )
 
     # Create a boost of another user's post
-    other_user = fancy_fake_user!("OtherUser")
-
     {:ok, other_post} =
       Posts.publish(
         current_user: other_user[:user],
@@ -121,24 +151,38 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
 
     modified_activities =
       Enum.map(activities, fn activity ->
-        if activity["type"] == "Create" and
-             get_in(activity, ["object", "content"]) =~ "My second post with outdated content" do
-          put_in(activity, ["object", "content"], modified_content)
-        else
-          activity
-        end
+        if activity["type"] == "Create" do
+          cond do
+            get_in(activity, ["object", "content"]) =~ "My first post for migration test" ->
+              # make this activity not be embedded to test fetching fallback
+              put_in(activity, ["object"], get_in(activity, ["object", "id"]))
+
+            get_in(activity, ["object", "content"]) =~ "My second post with outdated content" ->
+              put_in(activity, ["object", "content"], modified_content)
+
+            true ->
+              nil
+          end
+        end || activity
       end)
 
     outbox_data = Map.put(outbox_data, "orderedItems", modified_activities)
 
-    # Assert that the modification worked
+    # Assert that the modifications worked
+
     assert Enum.any?(outbox_data["orderedItems"], fn activity ->
              activity["type"] == "Create" and
-               get_in(activity, ["object", "content"]) == modified_content
+               e(activity, "object", "content", nil) == modified_content
            end),
            "Should have found the modified content in the exported JSON before import"
 
-    # Write the modified JSON back
+    assert Enum.any?(outbox_data["orderedItems"], fn activity ->
+             activity["type"] == "Create" and
+               is_binary(get_in(activity, ["object"]))
+           end),
+           "Should have found the modified non-embedded object in the exported JSON before import"
+
+    # Write the modified JSON back (NOTE: should not be necessary if we just use outbox_data directly)
     # File.write!(json_path, Jason.encode!(modified_outbox))
     # Parse the exported JSON to verify structure
     # {:ok, outbox_data} = File.read(json_path) |> elem(1) |> Jason.decode()
@@ -149,6 +193,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
     mention_post_url = Bonfire.Common.URIs.canonical_url(mention_post)
     hashtag_post_url = Bonfire.Common.URIs.canonical_url(hashtag_post)
     other_post_url = Bonfire.Common.URIs.canonical_url(other_post)
+    # reply1_url = Bonfire.Common.URIs.canonical_url(reply1)
+    # reply2_url = Bonfire.Common.URIs.canonical_url(reply2)
+    # another_reply_url = Bonfire.Common.URIs.canonical_url(another_reply)
 
     # Set up remote instance and import
     TestInstanceRepo.apply(fn ->
@@ -174,7 +221,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
       {:ok, remote_hashtag_post} = AdapterUtils.get_or_fetch_and_create_by_uri(hashtag_post_url)
       {:ok, remote_other_post} = AdapterUtils.get_or_fetch_and_create_by_uri(other_post_url)
 
-      # Check that the remote user has boosted the imported activities
+      # Check that the remote user has boosted the imported activities (their own posts/activities)
       assert Boosts.boosted?(remote_user, remote_post1)
       assert Boosts.boosted?(remote_user, remote_post2)
       assert Boosts.boosted?(remote_user, remote_mention_post)
@@ -232,6 +279,34 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
       other_post_boost_date = Boosts.date_last_boosted(remote_user, remote_other_post)
       assert other_post_boost_date.year == 2024
       assert other_post_boost_date.month == 3
+
+      Logger.metadata(action: info("verify reply thread is pulled in"))
+
+      %{edges: remote_feed} =
+        Bonfire.Social.FeedLoader.feed(:remote,
+          current_user: remote_user,
+          limit: 20,
+          preload: [:with_post_content]
+        )
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(
+               remote_feed,
+               "This is a reply to my first post",
+               current_user: remote_user
+             ),
+             "Reply1 content should be available in remote feed"
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(remote_feed, "This is a nested reply",
+               current_user: remote_user
+             ),
+             "Reply2 content should be available in remote feed"
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(
+               remote_feed,
+               "Another reply to the original post",
+               current_user: remote_user
+             ),
+             "Another_reply content should be available in remote feed"
     end)
 
     # Verify boosts were not federated (check that remote_user did not boost other_post from local instance perspective)
