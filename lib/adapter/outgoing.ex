@@ -44,9 +44,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             subject_local?) do
       prepare_and_queue(subject, verb, thing, opts)
     else
-      info(
+      flood(
         thing,
-        "Skip (re)federating out '#{verb}' activity by remote actor '#{Types.uid(subject)}'=#{subject_local?}, or remote object '#{Types.uid(thing)}'=#{thing_local?}"
+        "Skip (re)federating out '#{verb}' activity | federate_outgoing?=#{federate_outgoing?} | by actor '#{Types.uid(subject)}' local?=#{subject_local?} | object '#{Types.uid(thing)}' local?=#{thing_local?}"
       )
 
       :ignore
@@ -97,9 +97,13 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  defp prepare_and_queue(subject, verb, %{__struct__: object_type} = local_object, _opts) do
-    case Bonfire.Federate.ActivityPub.FederationModules.federation_module({verb, object_type}) do
-      {:ok, module} when is_atom(module) ->
+  defp prepare_and_queue(subject, verb, %{__struct__: struct_type} = local_object, opts) do
+    object_type = Types.object_type(local_object) || struct_type
+
+    case opts[:federation_module] ||
+           Bonfire.Federate.ActivityPub.FederationModules.federation_module({verb, object_type})
+           |> Utils.ok_unwrap() do
+      module when is_atom(module) and not is_nil(module) ->
         info(
           module,
           "Federate.ActivityPub - delegating to module to handle verb '#{verb}' for object type #{object_type}"
@@ -141,7 +145,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             {:ok, activity, object}
 
           :ignore ->
-            debug("Ignoring outgoing federation")
+            flood("Ignoring outgoing federation")
             :ignore
 
           e ->
@@ -157,7 +161,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         # TODO: fallback to creating a Note for unknown types that have a post content, Profile or Named?
 
         preparation_error(
-          "No FederationModules or SchemaModules was defined for verb {#{inspect(verb)}, #{object_type}}",
+          "No FederationModules or SchemaModules were defined for verb {#{inspect(verb)}, #{object_type}}",
           [verb, local_object]
         )
     end
@@ -168,7 +172,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, [_subject, verb, %{__struct__: object_type, id: id} = object]) do
-    error(
+    err(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
     )
@@ -177,7 +181,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, [_subject, verb, object]) do
-    error(
+    err(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
     )
@@ -186,7 +190,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, object) do
-    error(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
+    err(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
 
     :ignore
   end

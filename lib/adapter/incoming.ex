@@ -63,7 +63,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       {:ok, target} ->
         debug(target, "fetched target")
 
-        receive_activity(Map.update(activity, :data, %{}, &Map.put(&1, "target", target)))
+        receive_activity(
+          Map.update(activity, :data, %{"target" => target}, &Map.put(&1, "target", target))
+        )
         |> debug("received activity on #{repo()}...")
 
       _ ->
