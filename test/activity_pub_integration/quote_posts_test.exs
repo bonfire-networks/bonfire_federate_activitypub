@@ -2,6 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
   use Bonfire.Federate.ActivityPub.DataCase
   import Tesla.Mock
   alias Bonfire.Posts
+  alias Bonfire.Social.Quotes
   use Mneme
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
@@ -29,6 +30,8 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     %{
       user: user,
       original_post: original_post,
+      discussion_url: Bonfire.Common.URIs.base_url("/discussion/" <> id(original_post)),
+      post_url: Bonfire.Common.URIs.base_url("/post/" <> id(original_post)),
       original_url: original_url,
       actor: actor,
       to: to
@@ -232,7 +235,7 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert List.first(quote_tags).id == context.original_post.id
   end
 
-  test "creates valid local quote post", context do
+  test "directly creates valid local quote post when boundaries allow", context do
     # Create a local quote post
     quote_attrs = %{
       post_content: %{
@@ -262,7 +265,61 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert Bonfire.Social.FeedLoader.feed_contains?(:local, quote_post)
   end
 
-  test "makes a request to quote a local post", context do
+  test "creates quote post with post URL format", context do
+    # Create a local quote post using the post URL format
+    quote_attrs = %{
+      post_content: %{
+        html_body: "Great post! #{context.post_url}"
+      }
+    }
+
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: context.user,
+        post_attrs: quote_attrs,
+        boundary: "public"
+      )
+      |> repo().maybe_preload([:post_content, :tags, :media])
+
+    # Verify the quote post was created correctly
+    assert quote_post.post_content.html_body =~ "Great post!"
+    assert [] = quote_post.media
+
+    # Verify quote relationship via tags
+    quote_tags = Bonfire.Social.Tags.list_tags_quote(quote_post)
+    assert quote_tags != []
+    quote_tag = List.first(quote_tags)
+    assert quote_tag.id == context.original_post.id
+  end
+
+  test "creates quote post with discussion URL format", context do
+    # Create a local quote post using the discussion URL format
+    quote_attrs = %{
+      post_content: %{
+        html_body: "Great discussion! #{context.discussion_url}"
+      }
+    }
+
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: context.user,
+        post_attrs: quote_attrs,
+        boundary: "public"
+      )
+      |> repo().maybe_preload([:post_content, :tags, :media])
+
+    # Verify the quote post was created correctly
+    assert quote_post.post_content.html_body =~ "Great discussion!"
+    assert [] = quote_post.media
+
+    # Verify quote relationship via tags
+    quote_tags = Bonfire.Social.Tags.list_tags_quote(quote_post)
+    assert quote_tags != []
+    quote_tag = List.first(quote_tags)
+    assert quote_tag.id == context.original_post.id
+  end
+
+  test "makes a request to quote a local post when boundaries don't directly allow quoting (but allow requesting)", context do
     # Create a local quote post
     quote_attrs = %{
       post_content: %{
@@ -290,9 +347,42 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert quote_tags == []
 
     # verify a Request was created to quote the original post
-    assert {:ok, _} =
-             Bonfire.Social.Requests.get(other_user, id(quote_post), context.original_post)
+    assert  Quotes.requested?(other_user, id(quote_post), context.original_post)
 
     # Bonfire.Boundaries.Debug.debug_object_acls(context.original_post)
+  end
+
+  test "skips quote creation when user doesn't have permission to request", context do
+    # Block the other user from the original post's creator
+    other_user = fake_user!()
+    
+    # Create boundaries that don't allow the other user to request quotes
+    {:ok, _} = Bonfire.Boundaries.Blocks.block(context.user, other_user)
+
+    quote_attrs = %{
+      post_content: %{
+        html_body: "Great post! #{context.original_url}"
+      }
+    }
+
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: other_user,
+        post_attrs: quote_attrs,
+        boundary: "public"
+      )
+      |> repo().maybe_preload([:post_content, :tags, :media])
+
+    # Verify the post was created correctly but without quote relationship
+    assert quote_post.post_content.html_body =~ "Great post!"
+    quote_tags = Bonfire.Social.Tags.list_tags_quote(quote_post)
+    assert quote_tags == []
+
+
+    # Verify no request was created either
+    refute Quotes.requested?(other_user, quote_post, context.original_post)
+
+
+        assert [] = quote_post.media
   end
 end
