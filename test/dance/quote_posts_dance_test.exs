@@ -26,8 +26,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
     remote_ap_id = context[:remote][:canonical_url]
 
-    {:ok, remote_user_on_local} =
-      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(remote_ap_id)
+    # {:ok, remote_user_on_local} =
+    #   Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(remote_ap_id)
 
     # create a local circle with remote user in it
     # {:ok, circle} = Bonfire.Boundaries.Circles.create(local_user, %{named: %{name: "trusted friends"}})
@@ -142,9 +142,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
     refute quotes_post(local_remote_quote, original_post)
 
     assert {:ok, local_remote_quote} =
-             Quotes.accept_quote_from(remote_user_on_local, original_post,
-               current_user: local_user
-             )
+             Quotes.accept_quote(local_remote_quote, original_post, current_user: local_user)
              |> flood("Accepted quote request")
 
     assert quotes_post(local_remote_quote, original_post)
