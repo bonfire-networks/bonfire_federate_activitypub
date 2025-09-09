@@ -30,8 +30,8 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     %{
       user: user,
       original_post: original_post,
-      discussion_url: Bonfire.Common.URIs.base_url("/discussion/" <> id(original_post)),
-      post_url: Bonfire.Common.URIs.base_url("/post/" <> id(original_post)),
+      discussion_url: Bonfire.Common.URIs.based_url("/discussion/" <> id(original_post)),
+      post_url: Bonfire.Common.URIs.based_url("/post/" <> id(original_post)),
       original_url: original_url,
       actor: actor,
       to: to
@@ -319,7 +319,8 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert quote_tag.id == context.original_post.id
   end
 
-  test "makes a request to quote a local post when boundaries don't directly allow quoting (but allow requesting)", context do
+  test "makes a request to quote a local post when boundaries don't directly allow quoting (but allow requesting)",
+       context do
     # Create a local quote post
     quote_attrs = %{
       post_content: %{
@@ -347,7 +348,12 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert quote_tags == []
 
     # verify a Request was created to quote the original post
-    assert  Quotes.requested?(other_user, id(quote_post), context.original_post)
+    assert Quotes.requested?(other_user, id(quote_post), context.original_post)
+
+    # Verify the request appears in the quoted post creator's notifications
+    assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, "This is my original content",
+             current_user: context.user
+           )
 
     # Bonfire.Boundaries.Debug.debug_object_acls(context.original_post)
   end
@@ -355,9 +361,9 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
   test "skips quote creation when user doesn't have permission to request", context do
     # Block the other user from the original post's creator
     other_user = fake_user!()
-    
-    # Create boundaries that don't allow the other user to request quotes
-    {:ok, _} = Bonfire.Boundaries.Blocks.block(context.user, other_user)
+
+    # Define boundaries that don't allow the other user to request quotes
+    {:ok, _} = Bonfire.Boundaries.Blocks.block(other_user, current_user: context.user)
 
     quote_attrs = %{
       post_content: %{
@@ -378,11 +384,9 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     quote_tags = Bonfire.Social.Tags.list_tags_quote(quote_post)
     assert quote_tags == []
 
-
     # Verify no request was created either
     refute Quotes.requested?(other_user, quote_post, context.original_post)
 
-
-        assert [] = quote_post.media
+    assert [] = quote_post.media
   end
 end

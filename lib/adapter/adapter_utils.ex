@@ -596,14 +596,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           # Handle local object URIs like /pub/objects/ULID
           # TODO: make this better and extensible
           String.contains?(ap_id, ["/objects/", "/post/", "/discussion/"]) ->
-            object_id = trim_ap_prefix(ap_id, local_ap_url)
-              |> flood("extracted object ID from local object URI")
-
-            if object_id = uid(object_id) do
-              Bonfire.Common.Needles.get(object_id, skip_boundary_check: true)
-            else
+            if object_id =
+                 trim_object_prefix(ap_id, local_instance, local_ap_url)
+                 |> flood("extracted object ID from local object URI") do
+              if object_id = uid(String.trim_trailing(object_id, "#")) do
+                Bonfire.Common.Needles.get(object_id, skip_boundary_check: true)
+              end
+            end ||
               {:error, :not_found}
-            end
 
           # Fallback for other local URIs
           true ->
@@ -621,16 +621,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  defp trim_ap_prefix(ap_id, local_ap_url) do
+  defp trim_object_prefix(url, local_instance, local_ap_url) do
     objects_prefix = "#{local_ap_url}/objects/"
-    post_prefix = "#{local_ap_url}/post/"
-    discussion_prefix = "#{local_ap_url}/discussion/"
-    
-    case ap_id do
+    post_prefix = "#{local_instance}/post/"
+    discussion_prefix = "#{local_instance}/discussion/"
+
+    case url do
       ^objects_prefix <> rest -> rest
       ^post_prefix <> rest -> rest
       ^discussion_prefix <> rest -> rest
-      _ -> ap_id
+      _ -> nil
     end
   end
 
