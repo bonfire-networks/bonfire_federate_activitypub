@@ -596,12 +596,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           # Handle local object URIs like /pub/objects/ULID
           # TODO: make this better and extensible
           String.contains?(ap_id, ["/objects/", "/post/", "/discussion/"]) ->
-            object_id =
-              String.trim_leading(ap_id, [
-                "#{local_ap_url}/objects/",
-                "#{local_ap_url}/post/",
-                "#{local_ap_url}/discussion/"
-              ])
+            object_id = trim_ap_prefix(ap_id, local_ap_url)
               |> flood("extracted object ID from local object URI")
 
             if object_id = uid(object_id) do
@@ -623,6 +618,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         |> debug("got by ap_id")
         |> return_pointable()
       end
+    end
+  end
+
+  defp trim_ap_prefix(ap_id, local_ap_url) do
+    objects_prefix = "#{local_ap_url}/objects/"
+    post_prefix = "#{local_ap_url}/post/"
+    discussion_prefix = "#{local_ap_url}/discussion/"
+    
+    case ap_id do
+      ^objects_prefix <> rest -> rest
+      ^post_prefix <> rest -> rest
+      ^discussion_prefix <> rest -> rest
+      _ -> ap_id
     end
   end
 
