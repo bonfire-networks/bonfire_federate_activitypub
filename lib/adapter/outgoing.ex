@@ -85,8 +85,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       [ok: del] ->
         {:ok, del}
 
-      # none pushed?
       [] ->
+        flood("No delete activity was pushed")
         :ignore
 
       :ignore ->
@@ -145,7 +145,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             {:ok, activity, object}
 
           :ignore ->
-            flood("Ignoring outgoing federation")
+            flood("Ignored outgoing federation")
             :ignore
 
           e ->
@@ -172,7 +172,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, [_subject, verb, %{__struct__: object_type, id: id} = object]) do
-    err(
+    flood(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
     )
@@ -181,7 +181,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, [_subject, verb, object]) do
-    err(
+    flood(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
     )
@@ -190,13 +190,13 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, object) do
-    err(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
+    flood(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
 
     :ignore
   end
 
   defp push_delete(Bonfire.Data.Identity.Account, _subject, _, _opts) do
-    debug("do not federate deletion of account, since that's an internal construct")
+    flood("do not federate deletion of account, since that's an internal construct")
     :ignore
   end
 
@@ -321,5 +321,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
   def ap_activity!({:ok, activity, _object}) do
     ap_activity!(activity)
+  end
+
+  def ap_activity!(other) do
+    err(other, "Could not extract AP activity")
   end
 end

@@ -347,7 +347,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     end)
   end
 
-  @tag :test_instance
+  # see https://github.com/bonfire-networks/bonfire-app/issues/1541
+  @tag :todo
   test "federates link previews and uses them without re-fetching (based on FEP-e232)",
        context do
     user = context[:local][:user]

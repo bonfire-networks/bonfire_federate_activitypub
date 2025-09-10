@@ -89,7 +89,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-      assert_raise(FunctionClauseError, fn ->
+      assert_raise(RuntimeError, fn ->
         Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
         |> debug
       end)
@@ -102,7 +102,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "mentions")
 
-      assert_raise(FunctionClauseError, fn ->
+      assert_raise(RuntimeError, fn ->
         Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
         |> debug
       end)
@@ -259,7 +259,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       link_preview =
         List.first(post.media)
-        |> debug("link_preview")
+        |> flood("link_preview")
 
       assert String.trim_trailing(link_preview.path, "/") == String.trim_trailing(link_url, "/")
       assert e(link_preview.metadata, "other", "title", nil) =~ "Web API"

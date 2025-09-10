@@ -733,7 +733,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           log("AP - get_or_fetch_and_create_by_uri - assume remote object with URI : " <> q)
 
           case ActivityPub.Federator.Fetcher.fetch_object_from_id(q, opts)
-               |> debug("fetch_object_from_id result") do
+               |> flood("fetch_object_from_id result") do
             {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
               {:ok, pointable}
 
