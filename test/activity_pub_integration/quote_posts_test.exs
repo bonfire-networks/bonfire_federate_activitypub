@@ -49,12 +49,12 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
         "object" => quote_object,
         "published" => DateTime.utc_now() |> DateTime.to_iso8601()
       }
-      |> flood("quote post create activity")
+      |> debug("quote post create activity")
 
     # Use handle_incoming to trigger the transformer
     {:ok, activity} =
       ActivityPub.Federator.Transformer.handle_incoming(create_activity)
-      |> flood("processed quote post activity")
+      |> debug("processed quote post activity")
 
     {:ok, quote_post} =
       Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)

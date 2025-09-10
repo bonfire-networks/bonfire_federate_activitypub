@@ -143,7 +143,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
     assert {:ok, local_remote_quote} =
              Quotes.accept_quote(local_remote_quote, original_post, current_user: local_user)
-             |> flood("Accepted quote request")
+             |> debug("Accepted quote request")
 
     assert quotes_post(local_remote_quote, original_post)
 

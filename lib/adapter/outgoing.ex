@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             subject_local?) do
       prepare_and_queue(subject, verb, thing, opts)
     else
-      flood(
+      debug(
         thing,
         "Skip (re)federating out '#{verb}' activity | federate_outgoing?=#{federate_outgoing?} | by actor '#{Types.uid(subject)}' local?=#{subject_local?} | object '#{Types.uid(thing)}' local?=#{thing_local?}"
       )
@@ -86,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         {:ok, del}
 
       [] ->
-        flood("No delete activity was pushed")
+        debug("No delete activity was pushed")
         :ignore
 
       :ignore ->
@@ -145,7 +145,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             {:ok, activity, object}
 
           :ignore ->
-            flood("Ignored outgoing federation")
+            debug("Ignored outgoing federation")
             :ignore
 
           e ->
@@ -172,7 +172,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, [_subject, verb, %{__struct__: object_type, id: id} = object]) do
-    flood(
+    debug(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
     )
@@ -181,7 +181,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, [_subject, verb, object]) do
-    flood(
+    debug(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
     )
@@ -190,13 +190,13 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, object) do
-    flood(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
+    debug(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
 
     :ignore
   end
 
   defp push_delete(Bonfire.Data.Identity.Account, _subject, _, _opts) do
-    flood("do not federate deletion of account, since that's an internal construct")
+    debug("do not federate deletion of account, since that's an internal construct")
     :ignore
   end
 

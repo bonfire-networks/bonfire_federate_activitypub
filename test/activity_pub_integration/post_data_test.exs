@@ -259,7 +259,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       link_preview =
         List.first(post.media)
-        |> flood("link_preview")
+        |> debug("link_preview")
 
       assert String.trim_trailing(link_preview.path, "/") == String.trim_trailing(link_url, "/")
       assert e(link_preview.metadata, "other", "title", nil) =~ "Web API"

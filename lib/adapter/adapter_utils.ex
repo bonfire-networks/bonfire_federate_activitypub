@@ -598,7 +598,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           String.contains?(ap_id, ["/objects/", "/post/", "/discussion/"]) ->
             if object_id =
                  trim_object_prefix(ap_id, local_instance, local_ap_url)
-                 |> flood("extracted object ID from local object URI") do
+                 |> debug("extracted object ID from local object URI") do
               if object_id = uid(String.trim_trailing(object_id, "#")) do
                 Bonfire.Common.Needles.get(object_id, skip_boundary_check: true)
               end
@@ -733,7 +733,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           log("AP - get_or_fetch_and_create_by_uri - assume remote object with URI : " <> q)
 
           case ActivityPub.Federator.Fetcher.fetch_object_from_id(q, opts)
-               |> flood("fetch_object_from_id result") do
+               |> debug("fetch_object_from_id result") do
             {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
               {:ok, pointable}
 

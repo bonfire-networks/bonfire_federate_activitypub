@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         {:reject, e}
 
       :ignore ->
-        flood("Activity will not be federated")
+        debug("Activity will not be federated")
         # {:ignore, "Activity will not be federated"}
         :ignore
 
@@ -287,7 +287,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       {:ok, filtered}
     else
       if is_local? do
-        flood(
+        debug(
           activity,
           "do not federate local activity because it has no recipients or they were all filtered"
         )
