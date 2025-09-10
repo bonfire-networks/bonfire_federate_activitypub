@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Federate.ActivityPub.Outgoing do
+  use Arrows
   import Untangle
   import Bonfire.Federate.ActivityPub
   use Bonfire.Common.E
@@ -102,7 +103,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
     case opts[:federation_module] ||
            Bonfire.Federate.ActivityPub.FederationModules.federation_module({verb, object_type})
-           |> Utils.ok_unwrap() do
+           |> from_ok() do
       module when is_atom(module) and not is_nil(module) ->
         info(
           module,

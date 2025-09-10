@@ -190,7 +190,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       {:ok, unfollow_activity} =
         ActivityPub.unfollow(%{actor: ap_follower, object: ap_followed, local: false})
-        |> info("unfollow_activity")
+        |> debug("unfollow_activity")
 
       Bonfire.Federate.ActivityPub.Incoming.receive_activity(unfollow_activity)
       refute Bonfire.Social.Graph.Follows.following?(follower, followed)

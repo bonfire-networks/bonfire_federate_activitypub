@@ -868,7 +868,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_object_or_actor_by_ap_id!(ap_id) when is_binary(ap_id) do
     log("AP - get_object_or_actor_by_ap_id! : " <> ap_id)
     # FIXME?
-    ok_unwrap(ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id)) ||
+    from_ok(ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id)) ||
       ActivityPub.Object.get_cached!(ap_id: ap_id) || ap_id
   end
 
@@ -1180,7 +1180,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                           #  FIXME: don't query again (Instances.get_or_create already has)
                           custom_circles: [
                             silence_my_instance:
-                              ok_unwrap(
+                              from_ok(
                                 Extend.maybe_module(Bonfire.Boundaries.Circles).get_or_create_stereotype_circle(
                                   peer,
                                   :silence_me
