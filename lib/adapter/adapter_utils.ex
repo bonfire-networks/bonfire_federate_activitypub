@@ -779,26 +779,44 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{pointer_id: _id, data: %{"type" => "Tombstone"}} ->
         {:error, :not_found}
 
-      %{pointer_id: id, data: %{"type" => type}}
+      %{pointer_id: id, local: local?, data: %{"type" => type}}
       when is_binary(id) and ActivityPub.Config.is_in(type, :supported_actor_types) ->
         with {:error, :not_found} <- get_character_by_id(id) do
           # in case the local pointer was deleted
-          create_remote_actor(fetched)
+          if local? do
+            error(fetched, "local actor not found by username")
+            {:error, :not_found}
+          else
+            debug(fetched, "create remote actor by username")
+            create_remote_actor(fetched)
+          end
         end
 
-      %{pointer_id: id} when is_binary(id) ->
-        with {:error, :not_found} <- return_pointer(id, opts) do
+      %{pointer_id: id, local: local?} when is_binary(id) ->
+        with {:error, :not_found} <-
+               return_pointer(id, opts ++ [skip_boundary_check: true]) |> debug("return_pointer") do
           # in case the local pointer was deleted
-          debug(fetched, "re-create pointer for remote")
-          Incoming.receive_activity(fetched)
+          if local? do
+            error(fetched, "local pointer not found by id")
+            {:error, :not_found}
+          else
+            debug(fetched, "re-create pointer for remote")
+            Incoming.receive_activity(fetched)
+          end
         end
 
-      %ActivityPub.Actor{username: username} when is_binary(username) ->
+      %ActivityPub.Actor{username: username, local: local?} when is_binary(username) ->
         debug("we have a username")
 
         with {:error, :not_found} <-
                get_character_by_username(ActivityPub.Actor.format_username(fetched)) do
-          create_remote_actor(fetched)
+          if local? do
+            error(fetched, "local actor not found by username")
+            {:error, :not_found}
+          else
+            debug(fetched, "create remote actor by username")
+            create_remote_actor(fetched)
+          end
         end
 
       _ when is_binary(fetched) ->
@@ -819,11 +837,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %ActivityPub.Actor{} ->
         create_remote_actor(fetched)
 
-      %ActivityPub.Object{data: %{"type" => type}}
+      %ActivityPub.Object{data: %{"type" => type}, local: false}
       when ActivityPub.Config.is_in(type, :supported_actor_types) ->
         create_remote_actor(fetched)
 
-      %ActivityPub.Object{} ->
+      %ActivityPub.Object{local: false} ->
         debug(fetched, "re-create pointer for remote object")
         Incoming.receive_activity(fetched)
 
@@ -834,6 +852,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         ~> return_pointable(opts)
 
       %{id: _} ->
+        debug(fetched, "got some other object")
         {:ok, fetched}
 
       {:error, :not_found} ->
