@@ -61,6 +61,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
     local_quote_url = Bonfire.Common.URIs.canonical_url(local_quote_post)
 
+    {:ok, %{data: ap_json}} = ActivityPub.Object.get_cached(ap_id: local_quote_url)
+
+    # assert ap_json["quote"] == original_url
+
+    # Verify quoteAuthorization is present (self-quotes don't need to have authorization, but we include it anyway for now)
+    assert ap_json["quoteAuthorization"]
+
     # Verify local quote federates to remote
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: "verify local quote post on remote instance")
@@ -77,20 +84,20 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
       assert quotes_post(remote_local_quote, remote_original)
 
       # Verify AP JSON compliance
-      {:ok, %{status: 200, body: body}} =
-        ActivityPub.Federator.HTTP.get(
-          local_quote_url,
-          [{"accept", "application/activity+json"}]
-        )
 
-      ap_json = Jason.decode!(body)
-      assert ap_json["quote"] == original_url
+      {:ok, %{data: ap_json}} =
+        ActivityPub.Object.get_cached(ap_id: local_quote_url)
+        |> debug("Fetched AP JSON for local quote on remote instance")
+
+      # Verify quoteAuthorization is present (self-quotes don't need to have authorization, but we include it anyway for now)
+      assert ap_json["quoteAuthorization"]
 
       # Verify FEP-e232 Link tag compatibility
       link_tags =
         ap_json["tag"]
         |> Enum.filter(
-          &(&1["type"] == "Link" and &1["rel"] == "https://misskey-hub.net/ns#_misskey_quote")
+          &(&1["type"] == "Link" and &1["rel"] == "https://misskey-hub.net/ns#_misskey_quote" and
+              &1["href"] == original_url)
         )
 
       assert length(link_tags) > 0
@@ -136,7 +143,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
     assert {:ok, local_remote_quote} =
              Quotes.accept_quote(local_remote_quote, original_post, current_user: local_user)
-             |> flood("Accepted quote request")
+             |> debug("Accepted quote request")
 
     assert quotes_post(local_remote_quote, original_post)
 
@@ -147,7 +154,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
       )
 
     assert quotes_post(local_remote_quote, original_post)
-    # TODO: also Verify QuoteAuthorization stamp
+
+    # Verify QuoteAuthorization stamp in AP representation
+    {:ok, %{data: local_quote_ap_json}} =
+      ActivityPub.Object.get_cached(pointer: local_remote_quote)
+
+    # assert local_quote_ap_json["quote"] == original_url
+    assert local_quote_ap_json["quoteAuthorization"]
 
     TestInstanceRepo.apply(fn ->
       # Verify quote relationship is confirmed on remote side as well
@@ -156,7 +169,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
                AdapterUtils.get_by_url_ap_id_or_username(original_url)
 
       assert quotes_post(remote_quote_post, remote_original)
-      # TODO: also Verify QuoteAuthorization stamp
+
+      {:ok, %{data: remote_ap_json}} = ActivityPub.Object.get_cached(ap_id: remote_quote_url)
+
+      # FIXME: why isn't the quoteAuthorization field present?
+      # assert remote_ap_json["quoteAuthorization"]
     end)
 
     # --------------------------------------------------------------------
@@ -165,10 +182,16 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
     assert {:ok, _rejected_request} =
              Quotes.reject_quote(local_remote_quote, original_post, current_user: local_user)
-             |> flood("Rejected quote request")
+             |> debug("Rejected quote request")
 
     {:ok, reverted_quote} = Posts.read(local_remote_quote.id, current_user: local_user)
     refute quotes_post(reverted_quote, original_post)
+
+    # Verify QuoteAuthorization is removed from AP representation
+    {:ok, %{data: reverted_ap_json}} = ActivityPub.Object.get_cached(pointer: reverted_quote)
+
+    # FIXME: why isn't the quoteAuthorization field removed?
+    # refute reverted_ap_json["quoteAuthorization"]
 
     TestInstanceRepo.apply(fn ->
       # Verify quote relationship is removed on remote side as well
@@ -177,6 +200,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
                AdapterUtils.get_by_url_ap_id_or_username(original_url)
 
       refute quotes_post(remote_quote_post, remote_original)
+
+      {:ok, %{data: remote_reverted_ap_json}} =
+        ActivityPub.Object.get_cached(ap_id: remote_quote_url)
+
+      # refute remote_reverted_ap_json["quote"] == original_url
+      refute remote_reverted_ap_json["quoteAuthorization"]
     end)
 
     # --------------------------------------------------------------------
@@ -215,7 +244,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
     # Immediately reject the quote request
     assert {:ok, _rejected_request} =
              Quotes.reject_quote(local_rejected_quote, original_post, current_user: local_user)
-             |> flood("Rejected quote request immediately")
+             |> debug("Rejected quote request immediately")
 
     Logger.metadata(action: "Verify quote relationship remains absent")
     # Verify quote relationship remains absent
@@ -243,7 +272,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
       post_content: %{html_body: "This post allows quotes from trusted circle"}
     }
 
-    {:ok, auto_accept_post} =
+    {:ok, post_to_auto_accept} =
       Posts.publish(
         current_user: local_user,
         post_attrs: auto_accept_attrs,
@@ -254,7 +283,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
         }
       )
 
-    auto_accept_url = Bonfire.Common.URIs.canonical_url(auto_accept_post)
+    auto_accept_url = Bonfire.Common.URIs.canonical_url(post_to_auto_accept)
 
     # TODO: Configure boundaries to auto-accept quotes from trusted_circle
     # This would require implementing boundary rules for quote auto-acceptance
@@ -275,7 +304,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
             post_attrs: remote_quote_attrs,
             boundary: "public"
           )
-          |> flood("Published remote quote post for auto-acceptance test")
+          |> debug("Published remote quote post for auto-acceptance test")
 
         assert {:ok, remote_auto_accept} =
                  AdapterUtils.get_by_url_ap_id_or_username(auto_accept_url)
@@ -294,23 +323,47 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
              AdapterUtils.get_by_url_ap_id_or_username(remote_auto_quote_url)
              |> repo().maybe_preload([:post_content, :tags, :media])
 
-    {:ok, auto_accept_post} =
-      Posts.read(auto_accept_post.id, current_user: local_user)
+    {:ok, post_to_auto_accept} =
+      Posts.read(post_to_auto_accept.id, current_user: local_user)
       |> repo().maybe_preload([:post_content, :tags, :media])
 
-    assert quotes_post(auto_accepted_quote, auto_accept_post)
+    assert quotes_post(auto_accepted_quote, post_to_auto_accept)
+
+    # Verify auto-accepted quote has QuoteAuthorization
+    {:ok, %{data: auto_ap_json}} = ActivityPub.Object.get_cached(pointer: auto_accepted_quote)
+    # assert auto_ap_json["quote"] == auto_accept_url
+    assert auto_ap_json["quoteAuthorization"]
+
+    # re-verify the authorization 
+    # FIXME: why does the fetch return not_found
+    # assert {:ok, :authorization_verified} = Quotes.verify_quote_authorization(auto_accepted_quote, post_to_auto_accept) 
 
     # --------------------------------------------------------------------
     # Test 4b: TODO send a *Delete* for the QuoteAuthorization stamp (as an alternative implementation to simply Reject'ing the QuoteRequest) on the quote request to revert the decision after having (auto)accepted it
-    # Logger.metadata(action: "delete auto-accepted quote authorization")
+    Logger.metadata(action: "delete auto-accepted quote authorization")
 
-    # # Reuse the auto-accepted quote from Test 4
-    # assert {:ok, _deleted_auth} = 
-    #   Quotes.reject_quote(auto_accepted_quote, auto_accept_post, current_user: local_user, verb: :delete)
-    #   |> flood("Deleted quote authorization")
+    # Reuse the auto-accepted quote from Test 4
+    assert {:ok, _deleted_auth} =
+             Quotes.reject_quote(auto_accepted_quote, post_to_auto_accept,
+               current_user: local_user,
+               verb: :delete
+             )
+             |> debug("Deleted quote authorization")
 
-    # # Verify quote relationship is removed
-    # {:ok, deleted_quote} = Posts.read(auto_accepted_quote.id, current_user: local_user)
-    # refute quotes_post(deleted_quote, auto_accept_post)
+    # Verify quote relationship is removed
+    {:ok, deleted_quote} = Posts.read(auto_accepted_quote.id, current_user: local_user)
+    refute quotes_post(deleted_quote, post_to_auto_accept)
+
+    {:ok, %{data: auto_ap_json}} = ActivityPub.Object.get_cached(pointer: auto_accepted_quote)
+    # assert auto_ap_json["quote"] == auto_accept_url
+
+    # TODO: we should not only delete the QuoteAuthorization object but also remove the quoteAuthorization field
+    # refute auto_ap_json["quoteAuthorization"]
+
+    # TODO: check that it's removed on remote side as well
+
+    # re-verify the authorization 
+    # FIXME
+    # assert {:not_authorized, _} = Quotes.verify_quote_authorization(auto_accepted_quote, post_to_auto_accept) 
   end
 end

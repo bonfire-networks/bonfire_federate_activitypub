@@ -263,6 +263,31 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert quote_tag.id == context.original_post.id
 
     assert Bonfire.Social.FeedLoader.feed_contains?(:local, quote_post)
+
+    ## Check ActivityPub representation to verify quote handling
+
+    # Fetch the ActivityPub JSON representation
+    {:ok, %{data: ap_json}} =
+      ActivityPub.Object.get_cached(pointer: quote_post)
+      |> debug("ActivityPub object for local quote post")
+
+    # Verify the quote field is present
+    assert ap_json["quote"] == context.original_url
+
+    # When user quotes their own post no authorization stamp is required, but we currently add one anyway
+    assert ap_json["quoteAuthorization"]
+
+    # Verify FEP-e232 Link tag compatibility
+    link_tags =
+      (ap_json["tag"] || [])
+      |> Enum.filter(fn tag ->
+        is_map(tag) and
+          tag["type"] == "Link" and
+          tag["rel"] == "https://misskey-hub.net/ns#_misskey_quote" and
+          tag["href"] == context.original_url
+      end)
+
+    assert length(link_tags) > 0
   end
 
   test "creates quote post with post URL format", context do
@@ -349,6 +374,7 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
 
     # verify a Request was created to quote the original post
     assert Quotes.requested?(other_user, id(quote_post), context.original_post)
+    assert {:ok, _request} = Quotes.requested(quote_post, context.original_post)
 
     # Verify the request appears in the quoted post creator's notifications
     assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, "This is my original content",
@@ -356,6 +382,31 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
            )
 
     # Bonfire.Boundaries.Debug.debug_object_acls(context.original_post)
+
+    ## Check ActivityPub representation to verify quote is not included when not yet approved
+
+    # Fetch the ActivityPub JSON representation
+    {:ok, %{data: ap_json}} =
+      ActivityPub.Object.get_cached(pointer: quote_post)
+      |> debug("ActivityPub object for local quote post")
+
+    # Verify the quote field is NOT present
+    refute ap_json["quote"] == context.original_url
+
+    # When user quotes their own post no authorization stamp is required, but we currently add one anyway
+    refute ap_json["quoteAuthorization"]
+
+    # Verify FEP-e232 Link tag compatibility
+    link_tags =
+      (ap_json["tag"] || [])
+      |> Enum.filter(fn tag ->
+        is_map(tag) and
+          tag["type"] == "Link" and
+          tag["rel"] == "https://misskey-hub.net/ns#_misskey_quote" and
+          tag["href"] == context.original_url
+      end)
+
+    refute length(link_tags) > 0
   end
 
   test "skips quote creation when user doesn't have permission to request", context do
@@ -388,5 +439,30 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     refute Quotes.requested?(other_user, quote_post, context.original_post)
 
     assert [] = quote_post.media
+
+    ## Check ActivityPub representation to verify quote is not included 
+
+    # Fetch the ActivityPub JSON representation
+    {:ok, %{data: ap_json}} =
+      ActivityPub.Object.get_cached(pointer: quote_post)
+      |> debug("ActivityPub object for local quote post")
+
+    # Verify the quote field is NOT present
+    refute ap_json["quote"] == context.original_url
+
+    # When user quotes their own post no authorization stamp is required, but we currently add one anyway
+    refute ap_json["quoteAuthorization"]
+
+    # Verify FEP-e232 Link tag compatibility
+    link_tags =
+      (ap_json["tag"] || [])
+      |> Enum.filter(fn tag ->
+        is_map(tag) and
+          tag["type"] == "Link" and
+          tag["rel"] == "https://misskey-hub.net/ns#_misskey_quote" and
+          tag["href"] == context.original_url
+      end)
+
+    refute length(link_tags) > 0
   end
 end
