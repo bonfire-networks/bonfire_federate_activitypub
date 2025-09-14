@@ -224,7 +224,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       # Create a Note with a link but no attachment/preview
       content = "Check out this great link: "
       link_url = "https://developer.mozilla.org/en-US/docs/Web/API/"
-      content_with_link = "#{content} #{link_url}"
+      content_with_link = "#{content} <a href=\"#{link_url}\">a link</a>"
 
       object = %{
         "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),
