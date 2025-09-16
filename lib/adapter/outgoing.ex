@@ -124,6 +124,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
               [subject, verb, local_object],
               current_user: subject,
               fallback_fun: &preparation_error/2,
+              on_error: :err,
               force_module: true
             )
 
@@ -134,6 +135,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
               [verb, local_object],
               current_user: subject,
               fallback_fun: &preparation_error/2,
+              on_error: :err,
               force_module: true
             )
         end
@@ -169,11 +171,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   defp prepare_and_queue(_subject, verb, object, _) do
-    preparation_error("Unrecognised object for AP publisher", [verb, object])
+    err("Unrecognised object for AP publisher", [verb, object])
   end
 
   def preparation_error(error, [_subject, verb, %{__struct__: object_type, id: id} = object]) do
-    debug(
+    err(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
     )
@@ -182,7 +184,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, [_subject, verb, object]) do
-    debug(
+    err(
       object,
       "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
     )
@@ -191,7 +193,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def preparation_error(error, object) do
-    debug(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
+    err(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
 
     :ignore
   end

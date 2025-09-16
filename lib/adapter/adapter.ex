@@ -370,15 +370,29 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def get_redirect_url(%{username: username}) when is_binary(username),
-    do: get_redirect_url(username) |> debug()
+    do: get_url_by_username(username)
+
+  def get_redirect_url(%{pointer: %{id: id} = pointable}),
+    do: URIs.path(pointable)
 
   def get_redirect_url(%{pointer_id: id}) when is_binary(id),
-    do: get_redirect_url(id) |> debug()
+    do: URIs.path(id)
+
+  def get_redirect_url(%{object: %{id: id} = object}),
+    do: get_redirect_url(object)
+
+  def get_redirect_url(%{data: %{"object" => object}}) when not is_nil(object) do
+    with {:ok, object} <- Object.get_cached(ap_id: object) do
+      get_redirect_url(object)
+    else
+      _e -> nil
+    end
+  end
 
   def get_redirect_url(%{data: %{"id" => id}}) when is_binary(id),
-    do: get_redirect_url(id) |> debug()
+    do: get_redirect_url(id)
 
-  def get_redirect_url(%{} = object), do: URIs.path(object) |> debug()
+  def get_redirect_url(%{} = object), do: URIs.path(object)
 
   def get_redirect_url(other) do
     error(other, "Param not recognised")
