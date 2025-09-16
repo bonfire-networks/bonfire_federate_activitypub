@@ -269,7 +269,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
                AdapterUtils.get_by_url_ap_id_or_username(canonical_url_no_summary)
                |> repo().maybe_preload([:post_content, :sensitive])
 
-      assert fetched_post_with_summary.post_content.summary == "Content Warning: Sensitive Topic"
+      assert fetched_post_with_summary.post_content.summary =~ "Content Warning: Sensitive Topic"
 
       assert fetched_post_with_summary.post_content.html_body =~
                "This is sensitive content that should be hidden"

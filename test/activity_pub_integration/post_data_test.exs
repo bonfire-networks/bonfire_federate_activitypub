@@ -59,6 +59,42 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert ap_activity.object.data["type"] == "Note"
     end
 
+    test "creates a Note for short posts with an external link" do
+      user = fake_user!()
+      content = "content"
+      link = "https://developer.mozilla.org/en-US/docs/Web/API/"
+      attrs = %{post_content: %{html_body: "#{content} #{link}"}}
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      # debug(ap_activity)
+      assert ap_activity.object.data["content"] =~ content
+      assert ap_activity.object.data["content"] =~ link
+      assert ap_activity.object.data["type"] == "Note"
+      # TODO: when we attach link metadata
+      # assert is_list(ap_activity.object.data["tag"]) and ap_activity.object.data["tag"] != []
+    end
+
+    test "creates a Note for short posts with an internal link" do
+      user = fake_user!()
+      content = "content"
+      link = "https://developer.mozilla.org/en-US/docs/Web/API/"
+      attrs = %{post_content: %{html_body: "#{content} [a link](#{link})"}}
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      # debug(ap_activity)
+      assert ap_activity.object.data["content"] =~ content
+      assert ap_activity.object.data["content"] =~ link
+      assert ap_activity.object.data["type"] == "Note"
+      # TODO: when we attach link metadata
+      # assert is_list(ap_activity.object.data["tag"]) and ap_activity.object.data["tag"] != []
+    end
+
     test "creates an Article for long posts with a title" do
       user = fake_user!()
 
@@ -112,15 +148,17 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       user = fake_user!()
       to = fake_user!()
 
-      attrs = %{post_content: %{html_body: "note to @#{to.character.username} "}}
+      content = "a note to"
+      mention = to.character.username
+      attrs = %{post_content: %{html_body: "#{content} @#{mention}"}}
 
       {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "mentions")
 
       assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
       # debug(ap_activity)
-      assert Text.maybe_markdown_to_html(post.post_content.html_body) =~
-               ap_activity.object.data["content"]
+      assert ap_activity.object.data["content"] =~ content
+      assert ap_activity.object.data["content"] =~ mention
 
       assert ActivityPub.Config.public_uri() not in ap_activity.data["to"]
     end

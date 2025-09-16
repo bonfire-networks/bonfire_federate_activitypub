@@ -293,8 +293,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       {:error, :not_found} ->
         debug(ap_id, "could not find AP Actor, check if we have a Peered linking to a character")
 
-        Bonfire.Federate.ActivityPub.Peered.get(ap_id)
-        |> return_pointable()
+        get_pointable_by_peered_ap_id(ap_id)
 
       actor ->
         actor
@@ -356,6 +355,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       do:
         username
         |> get_character_by_username()
+  end
+
+  def get_pointable_by_peered_ap_id(ap_id) do
+    Bonfire.Federate.ActivityPub.Peered.get(ap_id)
+    |> return_pointable()
   end
 
   def is_local_collection_or_built_in?("https://www.w3.org/ns/activitystreams#Public"),
@@ -820,6 +824,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         end
 
       _ when is_binary(fetched) ->
+        # TODO: support non-characters too
         if is_uid?(fetched) do
           get_character_by_id(fetched, opts)
         else
@@ -850,6 +855,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
         ActivityPub.Federator.Transformer.handle_incoming(params)
         ~> return_pointable(opts)
+
+      %ActivityPub.Object{local: _true, data: %{"id" => ap_id}} ->
+        debug(fetched, "local object with no pointer_id")
+        get_pointable_by_peered_ap_id(ap_id)
+
+      %ActivityPub.Object{local: _true} ->
+        error(fetched, "local object with no pointer_id")
 
       %{id: _} ->
         debug(fetched, "got some other object")
