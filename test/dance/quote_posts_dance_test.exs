@@ -141,6 +141,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
     assert local_remote_quote.post_content.html_body =~ "Remote user quoting the same post"
     refute quotes_post(local_remote_quote, original_post)
 
+    # FIXME: Could not find the request to accept
     assert {:ok, local_remote_quote} =
              Quotes.accept_quote(local_remote_quote, original_post, current_user: local_user)
              |> debug("Accepted quote request")

@@ -485,8 +485,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def transform_outgoing(data, target_host \\ nil, target_actor_id \\ nil)
 
   def transform_outgoing(%{"image" => image} = data, target_host, target_actor_id)
-      when not is_nil(image) and image != [] and
-             (is_binary(target_host) or is_binary(target_actor_id)) do
+      when not is_nil(image) and image != [] do
     # debug(data, "img transform_outgoing")
     data
     |> Map.put(
@@ -501,8 +500,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   def transform_outgoing(%{"attachment" => attachment} = data, target_host, target_actor_id)
-      when not is_nil(attachment) and attachment != [] and
-             (is_binary(target_host) or is_binary(target_actor_id)) do
+      when not is_nil(attachment) and attachment != [] do
     # debug(data, "att transform_outgoing")
     data
     |> Map.put(
