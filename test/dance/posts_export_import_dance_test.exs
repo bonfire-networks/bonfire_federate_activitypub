@@ -10,7 +10,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Social.Graph.Follows
-  alias Bonfire.Social.Graph.Import
+  alias Bonfire.Social.Import
   alias Bonfire.Posts
   alias Bonfire.Social.Boosts
 
