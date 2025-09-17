@@ -116,7 +116,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
     end
 
     @tag :test_instance
-    test " Remote post requesting to quote local post, which needs to manually accept the request ",
+    test "Remote post requesting to quote local post, which needs to manually accept the request, and later manually rejects it instead",
          context do
       local_user = context[:local][:user]
       remote_ap_id = context[:remote][:canonical_url]
@@ -192,8 +192,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
         {:ok, %{data: remote_ap_json}} = ActivityPub.Object.get_cached(ap_id: remote_quote_url)
 
-        # FIXME: why isn't the quoteAuthorization field present?
-        # assert remote_ap_json["quoteAuthorization"]
+        # check that the quoteAuthorization field is removed
+        assert remote_ap_json["quoteAuthorization"]
       end)
 
       # --------------------------------------------------------------------
@@ -210,8 +210,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
       # Verify QuoteAuthorization is removed from AP representation
       {:ok, %{data: reverted_ap_json}} = ActivityPub.Object.get_cached(pointer: reverted_quote)
 
-      # FIXME: why isn't the quoteAuthorization field removed?
-      # refute reverted_ap_json["quoteAuthorization"]
+      # check that the quoteAuthorization field is removed
+      refute reverted_ap_json["quoteAuthorization"]
 
       TestInstanceRepo.apply(fn ->
         # Verify quote relationship is removed on remote side as well
@@ -230,7 +230,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
     end
 
     @tag :test_instance
-    test " Remote post requesting to quote local post, and then immediately (manually) Reject it",
+    test "Remote post requesting to quote local post, and then immediately (manually) reject it, before changing their mind and accepting it, and then finally just deleting the authorization",
          context do
       local_user = context[:local][:user]
       remote_ap_id = context[:remote][:canonical_url]
@@ -239,7 +239,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
       # --------------------------------------------------------------------
       # Test 3: Remote post requesting to quote local post, and then immediately (manually) Reject it
-      remote_rejected_quote_url =
+      {remote_quote_post, remote_rejected_quote_url} =
         TestInstanceRepo.apply(fn ->
           remote_user = context[:remote][:user]
 
@@ -256,7 +256,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
               boundary: "public"
             )
 
-          Bonfire.Common.URIs.canonical_url(remote_quote_post)
+          {remote_quote_post, Bonfire.Common.URIs.canonical_url(remote_quote_post)}
         end)
 
       Logger.metadata(action: "Verify remote quote federates to local")
@@ -279,6 +279,44 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
       # Verify quote relationship remains absent
       {:ok, still_rejected_quote} = Posts.read(local_rejected_quote.id, current_user: local_user)
       refute quotes_post(still_rejected_quote, original_post)
+
+      # Test 3b: now re-authorize the quote, then delete the quoteAuthorization without federating the deletion just to test if when re-verifying the quote it gets deleted again
+
+      assert {:ok, now_accepted_quote} =
+               Quotes.accept_quote(still_rejected_quote, original_post, current_user: local_user)
+               |> debug("Accepted quote request")
+
+      assert quotes_post(now_accepted_quote, original_post)
+
+      {:ok, %{data: ap_json}} =
+        ActivityPub.Object.get_cached(pointer: now_accepted_quote)
+
+      assert ap_json["quoteAuthorization"]
+
+      {:ok, object} =
+        ActivityPub.Object.get_cached(ap_id: ap_json["quoteAuthorization"])
+        |> flood("auth object")
+
+      ActivityPub.Object.hard_delete(object)
+      |> flood("Hard deleted quoteAuthorization object")
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, remote_original} =
+                 AdapterUtils.get_by_url_ap_id_or_username(original_url)
+
+        # still cached as authorized
+        assert quotes_post(remote_quote_post, remote_original)
+
+        # double check authorization
+        assert {:not_authorized, _} =
+                 Quotes.verify_quote_authorization(remote_quote_post, remote_original)
+
+        {:ok, remote_quote_post} =
+          Posts.read(remote_quote_post.id, current_user: local_user)
+          |> repo().maybe_preload([:post_content, :tags, :media])
+
+        refute quotes_post(remote_quote_post, remote_original)
+      end)
     end
   end
 
