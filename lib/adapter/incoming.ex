@@ -494,6 +494,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           pointer_id: id
         })
       end
+      |> debug("pointer_id update")
 
       {:ok, pointable_object}
     end

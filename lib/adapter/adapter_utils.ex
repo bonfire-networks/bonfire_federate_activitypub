@@ -454,7 +454,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def ids_or_object_ids(list) do
-    list
+    (list || [])
     |> Enum.map(&id_or_object_id(&1))
     |> cleanup_list()
   end
