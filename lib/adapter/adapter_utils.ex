@@ -28,7 +28,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def log(l) do
     # if Bonfire.Common.Config.get(:log_federation), do:
-    Logger.info(inspect(l))
+    # Logger.info(inspect(l))
+    Untangle.log_or_flood(:info, l)
   end
 
   def ap_base_url() do
@@ -36,14 +37,22 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       System.get_env("AP_BASE_PATH", "/pub")
   end
 
-  def is_public?(ap_activity, ap_object) do
-    case {e(ap_object, :public, nil), e(ap_activity, :public, nil)} do
+  def is_public?(%{public: first} = _object, %{public: second} = _activity) do
+    case {first, second} do
       {true, true} -> true
       {nil, true} -> true
       {true, nil} -> true
       _ -> false
     end
     |> debug()
+  end
+
+  def is_public?(%{public: public?} = _object, _) do
+    public? || false
+  end
+
+  def is_public?(_, %{public: public?} = _object) do
+    public? || false
   end
 
   def is_local?(thing, opts \\ [])
@@ -413,10 +422,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def all_known_recipient_characters(activity_data, object_data) do
-    (all_recipients(activity_data) ++ all_recipients(object_data))
-    |> debug("all ap_ids")
+    all_activity_recipients(activity_data, object_data)
     |> Enum.reject(&(&1 in public_uris()))
-    |> debug("recipients ap_ids")
+    |> debug("recipients ap_ids to include")
     |> Enum.map(fn ap_id ->
       with {:ok, user} <- Bonfire.Me.Users.by_ap_id(ap_id) do
         {ap_id, user |> repo().maybe_preload(:settings)}
@@ -425,12 +433,21 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           nil
       end
     end)
-    |> filter_empty([])
     |> Enum.uniq()
+    |> filter_empty([])
     |> debug()
   end
 
-  def all_recipients(activity_or_object, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
+  def all_activity_recipients(
+        activity_data,
+        object_data,
+        fields \\ [:to, :bto, :cc, :bcc, :audience]
+      ) do
+    (all_object_recipients(activity_data) ++ all_object_recipients(object_data))
+    |> debug("all_recipients ap_ids")
+  end
+
+  def all_object_recipients(activity_or_object, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
     (e(activity_or_object, :data, nil) || activity_or_object)
     # |> debug
     |> all_fields(fields)
@@ -993,6 +1010,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  def actor_collection(actor_id, collection) when is_binary(actor_id) and is_binary(collection) do
+    "#{actor_id}/#{collection}"
+  end
+
+  def actor_collection(%{} = character, collection) when is_binary(collection) do
+    actor_id = Bonfire.Common.URIs.canonical_url(character)
+    actor_collection(actor_id, collection)
+  end
+
   def format_actor(user_etc, type \\ "Person")
 
   def format_actor(%struct{}, type)
@@ -1073,10 +1099,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         %{
           "type" => type,
           "id" => id,
-          "inbox" => "#{id}/inbox",
-          "outbox" => "#{id}/outbox",
-          "followers" => "#{id}/followers",
-          "following" => "#{id}/following",
+          "inbox" => actor_collection(id, "inbox"),
+          "outbox" => actor_collection(id, "outbox"),
+          "followers" => actor_collection(id, "followers"),
+          "following" => actor_collection(id, "following"),
           "preferredUsername" => e(user_etc, :character, :username, nil),
           "name" => e(user_etc, :profile, :name, nil) || e(user_etc, :character, :username, nil),
           "summary" => Text.maybe_markdown_to_html(e(user_etc, :profile, :summary, nil)),
@@ -1569,25 +1595,186 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         nil -> is_public?(activity, object)
         _ -> is_public?
       end
+      |> debug("is_public??")
+
+    object = e(object, :data, nil) || object
 
     all_known_recipient_characters(activity, object)
-    |> recipients_boundary_circles(is_public?)
+    |> recipients_boundary_circles(activity, is_public?, object["interactionPolicy"])
   end
 
-  def recipients_boundary_circles(recipients, is_public?) do
+  def recipients_boundary_circles(recipients, activity, is_public?, interaction_policy \\ []) do
     to_circles =
       if(is_public?, do: [:guest], else: []) ++
         Enum.map(recipients || [], fn {_, character} ->
           if Bonfire.Federate.ActivityPub.federating?(character), do: id(character)
-        end)
+        end) ++ ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
 
     {if(is_public?, do: "public_remote", else: "custom"), to_circles}
   end
 
-  # defp create_service_character(
-  #        service_character_id \\ service_character_id(),
-  #        service_character_username \\ service_character_username()
-  #      ) do
-  #   Bonfire.Me.Users.create_service_character(service_character_id, service_character_username)
-  # end
+  @doc """
+  Converts an interaction_policy map to a list of {circle_name, role} tuples.
+
+  Only known verbs and circles are included. Supports multiple circles per verb.
+  Looks up followers/following URLs from the actor object if present.
+
+  Handles the special case: if automaticApproval contains only the author's identifier, this means "nobody can" and emits a negative role for all local users.
+
+  ## Examples
+
+      iex> interaction_policy = %{
+      ...>   "canLike" => %{"automaticApproval" => ["https://www.w3.org/ns/activitystreams#Public"]},
+      ...>   "canReply" => %{"automaticApproval" => "https://example.org/users/someone/followers"},
+      ...>   "canQuote" => %{"automaticApproval" => "https://example.org/users/someone"}
+      ...> }
+      iex> ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+      [ {:guest, :react}, {:followers, :participate}, {:local, :cannot_critique} ]
+  """
+  def ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+      when is_map(interaction_policy) do
+    # Map of known policy verbs to roles
+    verb_role_map = %{
+      "canLike" => :react,
+      "canAnnounce" => :share,
+      "canReply" => :participate,
+      "canQuote" => :critique
+    }
+
+    negative_role_map = %{
+      "canLike" => :cannot_react,
+      "canAnnounce" => :cannot_share,
+      "canReply" => :cannot_participate,
+      "canQuote" => :cannot_critique
+    }
+
+    actor =
+      case e(activity, "actor", nil) || e(activity, :data, "actor", nil) do
+        actor when is_map(actor) ->
+          actor
+
+        actor when is_binary(actor) ->
+          ActivityPub.Actor.get_cached!(ap_id: actor) |> e(:data, nil)
+
+        _ ->
+          nil
+      end
+
+    followers_url = e(actor, "followers", nil)
+    following_url = e(actor, "following", nil)
+    author_id = e(actor, "id", nil)
+    public_uri = ActivityPub.Config.public_uri()
+
+    Enum.flat_map(interaction_policy, fn
+      {policy_verb, %{"automaticApproval" => urls}} ->
+        role = Map.get(verb_role_map, policy_verb)
+        negative_role = Map.get(negative_role_map, policy_verb)
+        urls = List.wrap(urls)
+
+        cond do
+          urls == [author_id] and negative_role ->
+            [{:local, negative_role}]
+
+          role ->
+            Enum.flat_map(urls, fn url ->
+              circle =
+                cond do
+                  url == public_uri -> :local
+                  followers_url && url == followers_url -> :followers
+                  following_url && url == following_url -> :followed
+                  true -> nil
+                end
+
+              if circle, do: [{circle, role}], else: []
+            end)
+
+          true ->
+            []
+        end
+
+      _ ->
+        # TODO: also support denial of manualApproval (but should be per-verb rather than denying :request for all verbs)
+        []
+    end)
+    |> debug("interaction_policy to_circles")
+  end
+
+  def ap_incoming_interaction_policy_to_circle_roles(_, interaction_policy) do
+    debug(interaction_policy, "no valid interaction_policy")
+    []
+  end
+
+  def ap_prepare_outgoing_interaction_policy(subject, object, opts \\ []) do
+    circles_to_check =
+      Bonfire.Boundaries.Circles.list_user_built_ins(subject,
+        include_circles: opts[:include_circles] || [:activity_pub, :followers, :followed]
+      )
+      |> debug("circles to check")
+
+    can_circles_request =
+      Bonfire.Boundaries.filter_circles_who_can(circles_to_check, :request, object,
+        return: :names
+      )
+      |> debug("can request")
+
+    can_request_urls = policy_circles_urls(subject, can_circles_request)
+
+    include_verbs =
+      opts[:include_verbs] ||
+        [{:boost, "Announce"}, {:quote, "Quote"}, {:reply, "Reply"}, {:like, "Like"}]
+
+    actor_id = Bonfire.Common.URIs.canonical_url(subject)
+
+    Enum.reduce(include_verbs, %{}, fn {verb_slug, policy_verb}, acc ->
+      can_circles =
+        Bonfire.Boundaries.filter_circles_who_can(circles_to_check, verb_slug, object,
+          return: :names
+        )
+        |> debug("can #{verb_slug}")
+
+      can_urls = policy_circles_urls(actor_id, can_circles)
+
+      Map.put(
+        acc,
+        "can#{policy_verb}",
+        %{
+          "automaticApproval" => if(can_urls != [], do: can_urls, else: [actor_id])
+        }
+        |> Enums.maybe_put(
+          "manualApproval",
+          # NOTE: currently assuming that we have a request/approve or deny flow only for requests)
+          if policy_verb == "Quote" do
+            if can_urls == [] and can_request_urls == [] do
+              #  nobody can even request 
+              [actor_id]
+            else
+              can_request_urls -- can_urls
+            end
+          end
+        )
+      )
+    end)
+    |> debug("interaction_policy")
+  end
+
+  defp policy_circles_urls(actor_id, circles) do
+    Enum.map(circles, fn
+      :guest ->
+        ActivityPub.Config.public_uri()
+
+      :activity_pub ->
+        ActivityPub.Config.public_uri()
+
+      :followers ->
+        Bonfire.Federate.ActivityPub.AdapterUtils.actor_collection(actor_id, "followers")
+
+      :followed ->
+        Bonfire.Federate.ActivityPub.AdapterUtils.actor_collection(actor_id, "following")
+
+      _ ->
+        nil
+    end)
+    |> Enum.uniq()
+    |> Enum.reject(&is_nil/1)
+  end
 end

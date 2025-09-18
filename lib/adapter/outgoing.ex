@@ -114,7 +114,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
           !Extend.module_enabled?(module) ->
             preparation_error(
               "Federation module #{module} was disabled, for verb {#{inspect(verb)}, #{object_type}}",
-              [verb, local_object]
+              verb,
+              local_object
             )
 
           function_exported?(module, :ap_publish_activity, 3) ->
@@ -165,7 +166,8 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
         preparation_error(
           "No FederationModules or SchemaModules were defined for verb {#{inspect(verb)}, #{object_type}}",
-          [verb, local_object]
+          verb,
+          local_object
         )
     end
   end
@@ -174,26 +176,50 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     err("Unrecognised object for AP publisher", [verb, object])
   end
 
-  def preparation_error(error, [_subject, verb, %{__struct__: object_type, id: id} = object]) do
-    err(
-      object,
-      "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
-    )
-
-    :ignore
-  end
-
   def preparation_error(error, [_subject, verb, object]) do
-    err(
-      object,
-      "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
-    )
-
-    :ignore
+    preparation_error(error, verb, object)
   end
 
   def preparation_error(error, object) do
-    err(object, "Federate.ActivityPub - Unable to federate out - #{error}...")
+    msg = "Federate.ActivityPub - Unable to federate out - #{error}..."
+    err(object, msg)
+
+    :ignore
+  end
+
+  def preparation_error(error, verb, %{__struct__: object_type, id: id} = object) do
+    msg =
+      "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
+
+    if verb in ["Delete", "Update"],
+      do:
+        error(
+          object,
+          msg
+        ),
+      else:
+        err(
+          object,
+          msg
+        )
+
+    :ignore
+  end
+
+  def preparation_error(error, verb, object) do
+    msg = "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
+
+    if verb in ["Delete", "Update"],
+      do:
+        error(
+          object,
+          msg
+        ),
+      else:
+        err(
+          object,
+          msg
+        )
 
     :ignore
   end
@@ -229,7 +255,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       )
     else
       e ->
-        preparation_error("Could not find the AP actor to delete", e)
+        preparation_error("Could not find the AP actor to delete", "Delete", e)
         :ignore
     end
   end
@@ -251,7 +277,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       )
     else
       e ->
-        preparation_error("Could not find the AP object to delete", e)
+        preparation_error("Could not find the AP object to delete", "Delete", e)
         :ignore
     end
   end
@@ -269,7 +295,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       ActivityPub.update(params)
     else
       e ->
-        preparation_error("Error while attempting to federate the update", e)
+        preparation_error("Error while attempting to federate the update", "Update", e)
     end
   end
 
@@ -281,7 +307,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       push_actor_update(actor)
     else
       e ->
-        preparation_error("Error while attempting to find the Actor to update", e)
+        preparation_error("Error while attempting to find the Actor to update", "Update", e)
     end
   end
 

@@ -26,7 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       |> AdapterUtils.local_actor_ids()
       |> debug("local_author_ids")
 
-    recipients = AdapterUtils.all_recipients(activity)
+    recipients = AdapterUtils.all_object_recipients(activity)
 
     local_recipient_ids =
       recipients

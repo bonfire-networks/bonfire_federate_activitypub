@@ -373,7 +373,7 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert quote_tags == []
 
     # verify a Request was created to quote the original post
-    assert Quotes.requested?(other_user, id(quote_post), context.original_post)
+    assert Quotes.requested?(id(quote_post), context.original_post)
     assert {:ok, _request} = Quotes.requested(quote_post, context.original_post)
 
     # Verify the request appears in the quoted post creator's notifications
@@ -407,6 +407,8 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
       end)
 
     refute length(link_tags) > 0
+
+    assert ap_json["interactionPolicy"]["canQuote"]["automaticApproval"]
   end
 
   test "skips quote creation when user doesn't have permission to request", context do
@@ -436,7 +438,7 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert quote_tags == []
 
     # Verify no request was created either
-    refute Quotes.requested?(other_user, quote_post, context.original_post)
+    refute Quotes.requested?(quote_post, context.original_post)
 
     assert [] = quote_post.media
 

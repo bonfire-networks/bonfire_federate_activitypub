@@ -49,7 +49,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
     @tag :test_instance
     test "self-quote works and federates", context do
-      flood(context, "Starting quote posts federation dance tests")
+      debug(context, "Starting quote posts federation dance tests")
       local_user = context[:local][:user]
       remote_ap_id = context[:remote][:canonical_url]
       original_url = context[:original_url]
@@ -295,10 +295,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
       {:ok, object} =
         ActivityPub.Object.get_cached(ap_id: ap_json["quoteAuthorization"])
-        |> flood("auth object")
+        |> debug("auth object")
 
       ActivityPub.Object.hard_delete(object)
-      |> flood("Hard deleted quoteAuthorization object")
+      |> debug("Hard deleted quoteAuthorization object")
 
       TestInstanceRepo.apply(fn ->
         assert {:ok, remote_original} =
@@ -317,6 +317,97 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
         refute quotes_post(remote_quote_post, remote_original)
       end)
+    end
+
+    @tag :test_instance
+    test "remote cannot request to quote when boundaries disallow requesting", context do
+      local_user = context[:local][:user]
+      local_ap_id = context[:local][:canonical_url]
+      remote_ap_id = context[:remote][:canonical_url]
+      remote_user = context[:remote][:user]
+
+      # Create a post with boundaries that allow only guests to critique, but explicitly disallow activity_pub
+      attrs = %{
+        post_content: %{html_body: "No quotes allowed for remote users"}
+      }
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: local_user,
+          post_attrs: attrs,
+          boundary: "public",
+          to_circles: [
+            {:guest, :contribute},
+            # {:activity_pub, :participate},
+            {:activity_pub, :cannot_request}
+          ]
+        )
+
+      post_url = Bonfire.Common.URIs.canonical_url(post)
+
+      # Try to quote from remote
+      remote_quote_url =
+        TestInstanceRepo.apply(fn ->
+          remote_quote_attrs = %{
+            post_content: %{
+              html_body: "Trying to quote a post with no quote permission #{post_url}"
+            }
+          }
+
+          {:ok, remote_quote_post} =
+            Bonfire.Posts.publish(
+              current_user: remote_user,
+              post_attrs: remote_quote_attrs,
+              boundary: "public"
+            )
+
+          {:ok, %{data: ap_json} = ap_object} =
+            ActivityPub.Object.get_cached(ap_id: post_url)
+            |> repo().maybe_preload([:pointer])
+
+          # Should have a valid interactionPolicy denying critique for activity_pub
+          assert %{"canQuote" => %{"automaticApproval" => [author_id]}} =
+                   ap_json["interactionPolicy"]
+
+          assert author_id == local_ap_id
+
+          assert %{"canQuote" => %{"manualApproval" => [author_id]}} =
+                   ap_json["interactionPolicy"]
+
+          assert author_id == local_ap_id
+
+          post = e(ap_object, :pointer, nil) || ap_object.pointer_id
+
+          # Should not have quote relationship
+          refute quotes_post(remote_quote_post, post)
+
+          # Should not have a quote request
+          refute Bonfire.Social.Quotes.requested?(remote_quote_post, post)
+
+          Bonfire.Common.URIs.canonical_url(remote_quote_post)
+        end)
+
+      # Back on local, should have federated the post, but not the quote relationship or request
+      assert {:ok, local_remote_quote} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
+                 remote_quote_url
+               )
+               |> repo().maybe_preload([:post_content, :tags, :media])
+
+      # Should not have quote relationship
+      refute quotes_post(local_remote_quote, post)
+
+      # Should not have a quote request
+      refute Bonfire.Social.Quotes.requested?(local_remote_quote, post)
+
+      # Should not have quoteAuthorization in AP JSON
+      {:ok, %{data: ap_json}} =
+        ActivityPub.Object.get_cached(pointer: local_remote_quote)
+
+      refute ap_json["quoteAuthorization"]
+
+      # Should have an interactionPolicy too
+      assert %{"canQuote" => %{"automaticApproval" => _}} = ap_json["interactionPolicy"]
     end
   end
 
