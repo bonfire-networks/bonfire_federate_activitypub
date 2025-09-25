@@ -366,8 +366,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          is_local?,
          recursing \\ false
        ) do
-    case Enums.get_eager(activity, field, nil) ||
-           Enums.get_eager(e(activity, "object", %{}), field, nil) do
+    case Enums.maybe_get(activity, field, nil) ||
+           Enums.maybe_get(e(activity, "object", %{}), field, nil) do
       recipients when is_list(recipients) and recipients != [] ->
         Map.put(
           activity,
