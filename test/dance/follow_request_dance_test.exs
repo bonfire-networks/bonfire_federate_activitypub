@@ -31,7 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
   end
 
   # https://github.com/bonfire-networks/bonfire-app/issues/537
-  @tag :mneme
+  # @tag :mneme
   test "remote follow on locked-down profile makes a request, which user can accept, which it turns into a follow, and a post federates back to the follower, and unfollow works",
        context do
     local_follower = context[:local][:user]
@@ -51,8 +51,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     request_id = uid(request)
     info(request, "the local request")
 
-    auto_assert false <- Follows.following?(local_follower, followed_on_local)
-    auto_assert true <- Follows.requested?(local_follower, followed_on_local)
+    assert false == Follows.following?(local_follower, followed_on_local)
+    assert true == Follows.requested?(local_follower, followed_on_local)
 
     # this shouldn't be needed if running Oban :inline
     # Bonfire.Common.Config.get([:bonfire, Oban]) |> info("obannn")

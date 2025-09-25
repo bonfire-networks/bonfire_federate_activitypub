@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
-  @moduletag :mneme
+  # @moduletag :mneme
 
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
@@ -57,10 +57,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     # assert {:ok, remote_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
     debug(post1.activity)
-    auto_assert %ActivityPub.Object{} <- post1.activity.federate_activity_pub
+    assert %ActivityPub.Object{} = post1.activity.federate_activity_pub
 
-    auto_assert true <-
-                  List.first(post1.activity.federate_activity_pub.data["cc"]) == remote_ap_id
+    # or remote_ap_id in post1.activity.federate_activity_pub.data["bcc"]
+    assert remote_ap_id in post1.activity.federate_activity_pub.data["cc"] or
+             remote_ap_id in post1.activity.federate_activity_pub.data["bto"]
 
     ## work on test instance
     TestInstanceRepo.apply(fn ->

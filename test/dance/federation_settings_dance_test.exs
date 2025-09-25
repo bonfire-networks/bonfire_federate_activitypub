@@ -30,25 +30,21 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
   end
 
   @tag :test_instance
-  @tag :mneme
+  # @tag :mneme
   test "can disable instance federation entirely", context do
     Config.put([:activity_pub, :instance, :federating], false)
     user = context[:local][:user]
     remote_follower = context[:remote][:user]
 
     # AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
-    auto_assert {:error, "Federation is disabled"} <-
-                  ActivityPub.Federator.Fetcher.fetch_object_from_id(
-                    context[:remote][:canonical_url]
-                  )
+    assert {:error, "Federation is disabled"} =
+             ActivityPub.Federator.Fetcher.fetch_object_from_id(context[:remote][:canonical_url])
 
     TestInstanceRepo.apply(fn ->
       ActivityPub.Utils.cache_clear()
 
-      auto_assert {:error, "Federation is disabled"} <-
-                    ActivityPub.Federator.Fetcher.fetch_object_from_id(
-                      context[:local][:canonical_url]
-                    )
+      assert {:error, "Federation is disabled"} =
+               ActivityPub.Federator.Fetcher.fetch_object_from_id(context[:local][:canonical_url])
     end)
   end
 
@@ -73,7 +69,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
     end)
   end
 
-  @tag :mneme
+  # @tag :mneme
   test "can disable federation entirely for a user", context do
     Config.put([:activity_pub, :instance, :federating], true)
     debug(Config.get([:activity_pub, :instance, :federating]), "askjhdas")
@@ -85,11 +81,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
       current_user(Settings.put([:activity_pub, :user_federating], false, current_user: user))
 
     TestInstanceRepo.apply(fn ->
-      auto_assert {:error,
-                   "Remote response with HTTP 403: this instance is not currently federating"} <-
-                    ActivityPub.Federator.Fetcher.fetch_object_from_id(
-                      context[:local][:canonical_url]
-                    )
+      assert {:error, "Remote response with HTTP 403: this instance is not currently federating"} =
+               ActivityPub.Federator.Fetcher.fetch_object_from_id(context[:local][:canonical_url])
 
       # AdapterUtils.get_or_fetch_and_create_by_uri(context[:local][:canonical_url])
     end)
