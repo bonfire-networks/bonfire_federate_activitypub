@@ -37,24 +37,24 @@
         "atomUri": "https://mocked.local/users/karen/statuses/114800379424129152",
         "inReplyToAtomUri": null,
         "conversation": "tag:mocked.local,2025-07-05:objectId=171144301:objectType=Conversation",
-        "content": "main content goes here",
-        "contentMap": {
-            "en": "main content goes here"
-        },
+        "content": "main content goes here <a href=\"https://mocked.local/tags/first_hashtag\" class=\"mention hashtag\">#first_hashtag</a> <a href=\"https://mocked.local/tags/test\" class=\"mention hashtag\">#test</a>",
         "updated": "2025-07-05T11:26:27Z",
         "attachment": [],
         "tag": [
             {
                 "type": "Hashtag",
-                "name": "#first_hashtag"
+                "name": "#first_hashtag",
+                "href": "https://mocked.local/tags/first_hashtag"
             },
             {
                 "type": "Hashtag",
-                "name": "#test"
+                "name": "#test",
+                "href": "https://mocked.local/tags/test"
             },
             {
                 "type": "Hashtag",
-                "name": "#tests"
+                "name": "#tests",
+                "href": "https://mocked.local/tags/tests"
             }
         ],
         "replies": {
