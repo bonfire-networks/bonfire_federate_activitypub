@@ -77,8 +77,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   defp prepare_and_queue(subject, :delete, thing, opts) do
-    case push_delete(Types.object_type(thing), subject, thing, opts)
-         |> debug("result of push_delete") do
+    case not is_nil(thing) and
+           push_delete(Types.object_type(thing), subject, thing, opts)
+           |> flood("result of push_delete") do
       {:ok, del} ->
         {:ok, del}
 
@@ -88,6 +89,10 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
       [] ->
         debug("No delete activity was pushed")
+        :ignore
+
+      false ->
+        debug("No thing to delete")
         :ignore
 
       :ignore ->
@@ -231,7 +236,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
   defp push_delete(Bonfire.Data.Identity.User, _subject, %{} = user, opts) do
     # TODO: is this broken?
-    with %{} = actor <- opts[:ap_object] || AdapterUtils.character_to_actor(user) do
+    with %{} = actor <-
+           (opts[:ap_object] || AdapterUtils.character_to_actor(user))
+           |> flood("delete_user_actor") do
       ActivityPub.delete(
         actor,
         true,
@@ -243,7 +250,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp push_delete(type, subject, character, opts)
        when type in @types_characters do
     # For Topics, Groups, and other non-user actors
-    with %{} = actor <- opts[:ap_object] || AdapterUtils.character_to_actor(character) do
+    with %{} = actor <-
+           (opts[:ap_object] || AdapterUtils.character_to_actor(character))
+           |> flood("delete_actor") do
       ActivityPub.delete(
         actor,
         true,
@@ -264,8 +273,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp push_delete(_other, subject, %{id: id} = _thing, opts) do
     with %{} = subject <- ActivityPub.Actor.get_cached!(pointer: subject),
          %{} = object <-
-           opts[:ap_object] ||
-             ActivityPub.Object.get_cached!(pointer: id) do
+           (opts[:ap_object] ||
+              ActivityPub.Object.get_cached!(pointer: id))
+           |> flood("delete_object") do
       ActivityPub.delete(
         object,
         true,

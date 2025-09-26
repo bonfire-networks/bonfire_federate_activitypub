@@ -23,6 +23,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def service_character_username, do: @service_character_username
   def service_character_id, do: @service_character_id
 
+  @types_characters Application.compile_env(
+                      :bonfire,
+                      :types_character_schemas,
+                      [
+                        Bonfire.Data.Identity.User,
+                        # CommonsPub.Communities.Community,
+                        # CommonsPub.Collections.Collection,
+                        Bonfire.Data.Identity.Character,
+                        Bonfire.Classify.Category
+                      ]
+                    )
+
   def public_uri(), do: ActivityPub.Config.public_uri()
   def public_uris(), do: ActivityPub.Config.public_uris()
 
@@ -1021,11 +1033,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def format_actor(user_etc, type \\ "Person")
 
-  def format_actor(%struct{}, type)
-      when struct == Bonfire.Data.AccessControl.Circle or type == "Circle",
-      do: nil
-
-  def format_actor(%{id: _pointer_id} = user_etc, type) do
+  def format_actor(%struct{id: _pointer_id} = user_etc, type) when struct in @types_characters do
     user_etc =
       repo().maybe_preload(
         user_etc,
@@ -1171,6 +1179,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         error(user_etc, "Could not find remote Actor")
       end
     end
+  end
+
+  def format_actor(%struct{}, type) do
+    warn(struct, "unsupported character type for format_actor to type #{type}")
+    nil
+  end
+
+  def format_actor(struct, type) do
+    warn(struct, "unsupported character type for format_actor to type #{type}")
+    nil
   end
 
   defp alias_actor_ids(aliases) when is_list(aliases) and aliases != [],
