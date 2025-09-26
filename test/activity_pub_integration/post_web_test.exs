@@ -256,7 +256,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       assert {:ok, original_post} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(original)
                |> repo().maybe_preload([:post_content, tags: [:named, :character]])
-               |> flood("original_post_created")
+               |> debug("original_post_created")
 
       # Verify original post has the fixture hashtags: #first_hashtag, #test, #tests
       original_hashtags =
