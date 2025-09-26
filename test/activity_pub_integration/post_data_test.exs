@@ -509,5 +509,28 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
                post.activity
              )
     end
+
+    test "object is cached after post creation" do
+      user = fake_user!()
+      attrs = %{post_content: %{html_body: "cache test"}}
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+      {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      pointer_id = post.id
+
+      assert ap_activity.object.pointer_id == pointer_id
+      ap_id = ap_activity.object.data["id"]
+
+      # Check that the cachex keys exist (true = present in cache, false = would hit DB)
+      key_pointer = ActivityPub.Utils.ap_cache_key(:pointer, pointer_id)
+      key_ap_id = ActivityPub.Utils.ap_cache_key(:ap_id, ap_id)
+
+      assert {:ok, true} = Cachex.exists?(:ap_object_cache, key_pointer)
+      assert {:ok, true} = Cachex.exists?(:ap_object_cache, key_ap_id)
+
+      # Double check via get_cached (should hit cache or DB)
+      assert {:ok, _object} = ActivityPub.Object.get_cached(pointer: pointer_id)
+      assert {:ok, _object} = ActivityPub.Object.get_cached(ap_id: ap_id)
+    end
   end
 end

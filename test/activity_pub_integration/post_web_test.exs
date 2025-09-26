@@ -33,6 +33,29 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   end
 
   describe "can" do
+    test "fetch local post from AP API with Pointer ID, even if it has not yet been federated" do
+      user =
+        fake_user!()
+
+      # |> debug("a user")
+
+      attrs = %{post_content: %{html_body: "content"}}
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+      # We don't federate it yet
+      # assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      obj =
+        build_conn()
+        |> get("/pub/objects/#{post.id}")
+        |> response(200)
+        # |> debug
+        |> Jason.decode!()
+
+      assert obj["content"] =~ attrs.post_content.html_body
+    end
+
     test "fetch local post from AP API with Pointer ID, and take into account unindexable setting" do
       user =
         fake_user!()
