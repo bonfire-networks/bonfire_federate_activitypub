@@ -608,7 +608,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def get_or_fetch_pointable_by_ap_id(actor_or_ap_id) do
+  def get_or_fetch_pointable_by_ap_id(actor_or_ap_id, opts \\ []) do
+    opts = opts |> Keyword.put(:triggered_by, "get_or_fetch_pointable_by_ap_id")
+
     local_instance = Adapter.base_url()
     local_ap_url = ap_base_url()
 
@@ -647,7 +649,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         debug(ap_id, "assume fetching remote object")
         # FIXME: this should not query the AP db
         # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-        ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(ap_id)
+        ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(ap_id, opts)
         |> debug("got by ap_id")
         |> return_pointable()
       end
@@ -737,6 +739,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_or_fetch_and_create_by_uri(q, opts \\ []) when is_binary(q) do
+    opts = opts |> Keyword.put(:triggered_by, "get_or_fetch_and_create_by_uri")
+
     # WIP: should support objects, not just characters
     if not String.starts_with?(
          q |> debug("to_fetch"),
@@ -771,14 +775,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
               {:ok, pointable}
 
             {:ok, %{pointer_id: _pointer_id} = ap_object} ->
-              return_pointable(ap_object)
+              return_pointable(ap_object, opts)
 
             {:ok, %ActivityPub.Actor{} = actor} ->
-              return_pointable(actor)
+              return_pointable(actor, opts)
 
             {:ok, %ActivityPub.Object{} = object} ->
               # FIXME? for non-actors
-              return_pointable(object)
+              return_pointable(object, opts)
 
             # {{:ok, object}, _actor} -> {:ok, object}
             {:ok, object} ->
@@ -790,7 +794,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       end
     else
       log("AP - uri : assume local : " <> q)
-      get_or_fetch_pointable_by_ap_id(q)
+      get_or_fetch_pointable_by_ap_id(q, opts)
     end
   end
 

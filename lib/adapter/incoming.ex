@@ -300,7 +300,10 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   end
 
   defp fetch_final_object(object_id, opts) do
-    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(object_id, opts) do
+    case ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(
+           object_id,
+           opts |> Keyword.put(:triggered_by, "Incoming.fetch_final_object")
+         ) do
       # support receiving an activity when we're expecting an object (eg for a flag or a like)
       {:ok, %{data: %{"type" => "Create", "object" => actual_object_id}}}
       when is_binary(actual_object_id) and actual_object_id != object_id ->
