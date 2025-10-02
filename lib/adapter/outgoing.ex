@@ -79,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp prepare_and_queue(subject, :delete, thing, opts) do
     case not is_nil(thing) and
            push_delete(Types.object_type(thing), subject, thing, opts)
-           |> flood("result of push_delete") do
+           |> debug("result of push_delete") do
       {:ok, del} ->
         {:ok, del}
 
@@ -238,7 +238,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # TODO: is this broken?
     with %{} = actor <-
            (opts[:ap_object] || AdapterUtils.character_to_actor(user))
-           |> flood("delete_user_actor") do
+           |> debug("delete_user_actor") do
       ActivityPub.delete(
         actor,
         true,
@@ -252,7 +252,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # For Topics, Groups, and other non-user actors
     with %{} = actor <-
            (opts[:ap_object] || AdapterUtils.character_to_actor(character))
-           |> flood("delete_actor") do
+           |> debug("delete_actor") do
       ActivityPub.delete(
         actor,
         true,
@@ -275,7 +275,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
          %{} = object <-
            (opts[:ap_object] ||
               ActivityPub.Object.get_cached!(pointer: id))
-           |> flood("delete_object") do
+           |> debug("delete_object") do
       ActivityPub.delete(
         object,
         true,
