@@ -1149,7 +1149,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             "sharedInbox" => base_url <> ap_base_path <> "/shared_inbox",
             "oauthAuthorizationEndpoint" => base_url <> "/oauth/authorize",
             "oauthRegistrationEndpoint" => base_url <> "/api/v1/apps",
-            "oauthTokenEndpoint" => base_url <> "/oauth/token"
+            "oauthTokenEndpoint" => base_url <> "/oauth/token",
+            "proxyUrl" => base_url <> ap_base_path <> "/proxy_remote_object"
           },
           # whether user should appear in directories and search engines
           "discoverable" =>
