@@ -287,8 +287,9 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     if ed(filtered, :to, nil) || ed(filtered, :cc, nil) || ed(filtered, :bto, nil) ||
          ed(filtered, :bcc, nil) || ed(filtered, :audience, nil) ||
          e(activity, "publishedDate", nil) || ed(activity, "object", "publishedDate", nil) ||
-         ed(activity, "object", "type", nil) == "Tombstone" do
+         ed(activity, "object", "type", nil) in ["Tombstone", "Place"] do
       # ^ `publishedDate` here is intended as an exception for bookwyrm which doesn't put audience info
+      # TODO: put exceptions in config
       {:ok, filtered}
     else
       if is_local? do
