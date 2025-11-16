@@ -14,17 +14,9 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
 
   def get(id) when is_binary(id) do
     if Types.is_uid?(id) do
-      repo().single(
-        from(p in Peered)
-        |> where([p], p.id == ^id)
-        |> proload(:peer)
-      )
+      get_by_uid(id)
     else
-      repo().single(
-        from(p in Peered)
-        |> where([p], p.canonical_uri == ^id)
-        |> proload(:peer)
-      )
+      get_by_uri(id)
     end
   end
 
@@ -37,11 +29,11 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def get(%{id: pointer_id}) do
-    get(pointer_id)
+    get_by_uid(pointer_id)
   end
 
   def get(%{canonical_uri: canonical_uri}) when is_binary(canonical_uri) do
-    get(canonical_uri)
+    get_by_uri(canonical_uri)
   end
 
   def get(%{"id" => id}) when is_binary(id) do
@@ -49,12 +41,28 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   end
 
   def get(%{"canonicalUrl" => canonical_uri}) when is_binary(canonical_uri) do
-    get(canonical_uri)
+    get_by_uri(canonical_uri)
   end
 
   def get(unknown) do
     warn("Could not get Peered for #{inspect(unknown)}")
     nil
+  end
+
+  def get_by_uid(id) when is_binary(id) do
+    repo().single(
+      from(p in Peered)
+      |> where([p], p.id == ^id)
+      |> proload(:peer)
+    )
+  end
+
+  def get_by_uri(id) when is_binary(id) do
+    repo().single(
+      from(p in Peered)
+      |> where([p], p.canonical_uri == ^id)
+      |> proload(:peer)
+    )
   end
 
   def list do
