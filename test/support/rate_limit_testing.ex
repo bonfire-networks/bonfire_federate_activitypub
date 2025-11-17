@@ -1,4 +1,4 @@
-defmodule Bonfire.Federate.ActivityPub.Web.RateLimit.Testing do
+defmodule Bonfire.Federate.ActivityPub.RateLimit.Testing do
   @moduledoc """
   Testing helper for ActivityPub rate limits using Hammer 7.
 

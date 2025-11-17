@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.RateLimitTest do
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
   import Untangle
-  alias Bonfire.Federate.ActivityPub.Web.RateLimit.Testing
+  alias Bonfire.Federate.ActivityPub.RateLimit.Testing
 
   @moduletag :test_instance
 
