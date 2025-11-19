@@ -142,6 +142,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
 
     Bonfire.Common.Types.object_type(post3remote) == Bonfire.Data.Social.Post
 
+    # Add check: cannot boost mentions-only reply
+    refute Bonfire.Boundaries.can?(local_user, :boost, post3remote)
+    assert Bonfire.Boundaries.can?(local_user, :read, post3remote)
+
+    # FIXME:
+    # assert Bonfire.Boundaries.can?(local_user, :like, post3remote)
+
     # assert Bonfire.Social.FeedLoader.feed_contains?(
     #          feed,
     #          "try out federated reply with mention"
@@ -149,7 +156,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
     #  "reply with mention is NOT in OP's feed"
 
     Logger.metadata(
-      action: info("ccheck that replies without mention were federated and are in fediverse feed")
+      action: info("check that replies without mention were federated and are in fediverse feed")
     )
 
     assert %{edges: feed} =
