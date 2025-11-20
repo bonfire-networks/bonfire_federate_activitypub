@@ -123,6 +123,17 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
               local_object
             )
 
+          function_exported?(module, :ap_publish_activity, 4) ->
+            Utils.maybe_apply(
+              module,
+              :ap_publish_activity,
+              [subject, verb, local_object, opts],
+              current_user: subject,
+              fallback_fun: &preparation_error/2,
+              on_error: :err,
+              force_module: true
+            )
+
           function_exported?(module, :ap_publish_activity, 3) ->
             Utils.maybe_apply(
               module,

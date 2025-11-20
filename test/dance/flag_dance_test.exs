@@ -12,7 +12,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
 
   alias Bonfire.Posts
 
-  test "cross-instance flagging", context do
+  test "cross-instance flagging (with forward: true)", context do
     # context |> info("context")
 
     local_admin = fake_admin!()
@@ -53,7 +53,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
 
       Logger.metadata(action: info("flag it"))
 
-      Bonfire.Social.Flags.flag(remote_user, post1remote)
+      Bonfire.Social.Flags.flag(remote_user, post1remote,
+        forward: true,
+        comment: "federated flag"
+      )
       |> debug("the flaggg")
     end)
 
@@ -70,23 +73,86 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
 
     assert flags != []
 
-    # FIXME
     assert Bonfire.Social.FeedLoader.feed_contains?(
              flags,
              "post to try federated flagging",
              current_user: local_admin
            )
 
+    Logger.metadata(action: info("check flag comment was federated"))
+
+    # Get the flag with preloaded named association to check the comment
+    flags_preloaded =
+      Bonfire.Social.Flags.list_preloaded(
+        scope: :instance,
+        current_user: local_admin
+      )
+
+    assert %{edges: [flag_edge | _]} = flags_preloaded
+
+    assert flag_edge.named.name == "federated flag",
+           "Flag comment should be federated with the flag"
+
     Logger.metadata(action: info("check flag was federated and is in admin's notifications"))
 
-    assert %{verb_id: verb_id, object: _object} =
+    assert %{verb_id: verb_id, object: object} =
              activity =
              Bonfire.Social.FeedLoader.feed_contains?(
                :notifications,
                "post to try federated flagging",
                current_user: local_admin
              )
+             |> repo().maybe_preload(:named)
 
     assert verb_id == "71AGSPAM0RVNACCEPTAB1E1TEM"
+
+    # Verify the comment is also present in the notification activity
+    assert activity.named.name == "federated flag",
+           "Flag comment should be present in admin's notification"
+  end
+
+  test "flag with forward: false (default) does not federate to remote instance", context do
+    local_user = context[:local][:user]
+    remote_user = context[:remote][:user]
+
+    post_attrs = %{
+      post_content: %{html_body: "#{context[:remote][:username]} post - testing no forward"}
+    }
+
+    remote_post_url =
+      TestInstanceRepo.apply(fn ->
+        {:ok, post1} =
+          Posts.publish(current_user: remote_user, post_attrs: post_attrs, boundary: "public")
+
+        Bonfire.Common.URIs.canonical_url(post1)
+      end)
+
+    Logger.metadata(action: info("fetch remote post to local instance"))
+    assert {:ok, post_on_local} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_post_url)
+
+    Logger.metadata(action: info("flag it locally without forward (default behavior)"))
+
+    {:ok, _flag} =
+      Bonfire.Social.Flags.flag(local_user, post_on_local, comment: "local flag only")
+
+    Logger.metadata(action: info("drain federation queues"))
+    Oban.drain_queue(queue: :federator_outgoing)
+    Oban.drain_queue(queue: :ap_incoming)
+
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: info("verify flag was NOT received on remote instance"))
+
+      remote_admin = fake_admin!()
+
+      notifications =
+        Bonfire.Social.FeedActivities.feed(:notifications, current_user: remote_admin)
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(
+               notifications,
+               "testing no forward",
+               current_user: remote_admin
+             ),
+             "Flag should not forward by default (safe by default principle)"
+    end)
   end
 end
