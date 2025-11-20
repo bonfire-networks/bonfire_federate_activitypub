@@ -2,13 +2,19 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
   use Bonfire.UI.Common.Web, :controller
   use Bonfire.Common.Config
 
-  # # Add Oaskit controller macros
-  # use Oaskit.Controller
-
-  # # Add the validation plug
-  # plug Oaskit.Plugs.ValidateRequest
-
-  # use_operation :show, "InstanceController.show"
+  # Mastodon API instance configuration limits
+  @max_featured_tags 1
+  @max_pinned_statuses 1
+  @max_status_chars 500_000
+  @max_media_attachments 20
+  @chars_reserved_per_url 3
+  @image_matrix_limit 16_777_216
+  @video_matrix_limit 2_304_000
+  @video_frame_rate_limit 60
+  @poll_max_options 100
+  @poll_max_chars_per_option 50_000
+  @poll_min_expiration 60
+  @poll_max_expiration 31_536_000
 
   defp main(base_uri) do
     app_name = Bonfire.Application.name_and_flavour() |> String.capitalize()
@@ -44,31 +50,27 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
           "public_key" => nil
         },
         "accounts" => %{
-          # TODO
-          "max_featured_tags" => 1,
-          "max_pinned_statuses" => 1
+          "max_featured_tags" => @max_featured_tags,
+          "max_pinned_statuses" => @max_pinned_statuses
         },
         "statuses" => %{
-          # TODO
-          "max_characters" => 500_000,
-          "max_media_attachments" => 20,
-          "characters_reserved_per_url" => 3
+          "max_characters" => @max_status_chars,
+          "max_media_attachments" => @max_media_attachments,
+          "characters_reserved_per_url" => @chars_reserved_per_url
         },
         "media_attachments" => %{
           "supported_mime_types" => Bonfire.Files.MimeTypes.supported_media() |> Map.keys(),
           "image_size_limit" => Bonfire.Files.ImageUploader.max_file_size(),
           "video_size_limit" => Bonfire.Files.VideoUploader.max_file_size(),
-          # TODO
-          "image_matrix_limit" => 16_777_216,
-          "video_matrix_limit" => 2_304_000,
-          "video_frame_rate_limit" => 60
+          "image_matrix_limit" => @image_matrix_limit,
+          "video_matrix_limit" => @video_matrix_limit,
+          "video_frame_rate_limit" => @video_frame_rate_limit
         },
         "polls" => %{
-          # TODO
-          "max_options" => 100,
-          "max_characters_per_option" => 50_000,
-          "min_expiration" => 60,
-          "max_expiration" => 31_536_000
+          "max_options" => @poll_max_options,
+          "max_characters_per_option" => @poll_max_chars_per_option,
+          "min_expiration" => @poll_min_expiration,
+          "max_expiration" => @poll_max_expiration
         },
         "translation" => %{
           "enabled" => false
