@@ -295,10 +295,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       if is_local? do
         debug(
           activity,
-          "do not federate local activity because it has no recipients or they were all filtered"
+          "try self-addressing local activity because it has no recipients or they were all filtered"
         )
 
-        :ignore
+        maybe_self_address_activity(filtered)
       else
         debug(
           activity,
@@ -308,6 +308,23 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         {:reject,
          "Do not accept incoming federated activity because it has no recipients or they were all filtered"}
       end
+    end
+  end
+
+  # Add the actor as a recipient when no other recipients remain
+  defp maybe_self_address_activity(activity) do
+    actor = AdapterUtils.id_or_object_id(ed(activity, "actor", nil) || ed(activity, :actor, nil))
+
+    if actor do
+      # Use bto (blind to) so it's not visible to others but activity is still processed
+      existing_bto = ed(activity, :bto, nil) || []
+
+      {:ok,
+       activity
+       |> Map.put(:bto, List.wrap(existing_bto) ++ [actor])}
+    else
+      warn(activity, "Could not self-address activity - no actor found")
+      :ignore
     end
   end
 
