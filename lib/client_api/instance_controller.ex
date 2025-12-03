@@ -143,4 +143,14 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
       })
     )
   end
+
+  @doc """
+  Returns custom emojis available on this instance.
+  GET /api/v1/custom_emojis
+  """
+  def custom_emojis(conn, _params) do
+    # TODO: Implement actual emoji fetching from Bonfire.Files.EmojiUploader
+    # For now, return empty array to indicate the endpoint exists but no custom emojis
+    json(conn, [])
+  end
 end
