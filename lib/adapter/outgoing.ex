@@ -96,11 +96,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         :ignore
 
       :ignore ->
-        flood("Ignored delete outgoing federation")
+        debug("Ignored delete outgoing federation")
         :ignore
 
       {:ignore, reason} ->
-        flood(reason, "Ignored delete outgoing federation")
+        debug(reason, "Ignored delete outgoing federation")
         :ignore
 
       {:error, reason} ->
@@ -170,11 +170,11 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
             {:ok, activity, object}
 
           :ignore ->
-            flood("Ignored outgoing federation")
+            debug("Ignored outgoing federation")
             :ignore
 
           {:ignore, reason} ->
-            flood(reason, "Ignored outgoing federation")
+            debug(reason, "Ignored outgoing federation")
             :ignore
 
           e ->
