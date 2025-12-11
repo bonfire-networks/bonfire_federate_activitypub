@@ -385,7 +385,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
       # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
 
-      info(
+      debug(
         "AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect(pointer_id)} using #{module}"
       )
 
@@ -408,8 +408,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
                ],
                no_argument_rescue: true,
                fallback_fun: &no_federation_module_match/2
-             ) do
-        info(
+             )
+             |> debug("attempted creation of remote object") do
+        debug(
           "AP - created remote object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_obj_id}"
         )
 
@@ -421,6 +422,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           ap_obj_id,
           type: :object
         )
+        |> debug("saved canonical uri for peered object")
 
         # object = ActivityPub.Object.normalize(object)
         object_id = id(object) || id(activity)
@@ -437,9 +439,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         {:ok, pointable_object}
       else
         e ->
-          error(
+          debug(e, "Could not create remote object")
+
+          err(
             Errors.error_msg(e),
-            "Could not create activity for #{ap_obj_id}"
+            "Could not create object for #{ap_obj_id}"
           )
 
           # throw({:error, "Could not process incoming activity"})

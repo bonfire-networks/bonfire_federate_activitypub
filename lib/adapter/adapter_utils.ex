@@ -56,7 +56,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       {true, nil} -> true
       _ -> false
     end
-    |> debug()
+
+    # |> debug()
   end
 
   def is_public?(%{public: public?} = _object, _) do
@@ -64,6 +65,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def is_public?(_, %{public: public?} = _object) do
+    public? || false
+  end
+
+  def is_public?(%{public: public?}) do
     public? || false
   end
 
@@ -433,7 +438,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> debug("final actors")
   end
 
-  def all_known_recipient_characters(activity_data, object_data) do
+  def all_known_recipient_characters(activity_data, object_data \\ nil) do
     all_activity_recipients(activity_data, object_data)
     |> Enum.reject(&(&1 in public_uris()))
     |> debug("recipients ap_ids to include")
@@ -452,10 +457,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def all_activity_recipients(
         activity_data,
-        object_data,
+        object_data \\ nil,
         fields \\ [:to, :bto, :cc, :bcc, :audience]
       ) do
-    (all_object_recipients(activity_data) ++ all_object_recipients(object_data))
+    (all_object_recipients(activity_data) ++
+       if(object_data, do: all_object_recipients(object_data), else: []))
     |> debug("all_recipients ap_ids")
   end
 

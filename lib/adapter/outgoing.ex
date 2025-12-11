@@ -38,12 +38,15 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         do: thing_local?,
         else: AdapterUtils.is_local?(subject)
 
-    federate_outgoing? = federate_outgoing?(subject)
+    federate_outgoing? =
+      federate_outgoing?(subject)
+      |> debug("federate_outgoing?")
 
     if (federate_outgoing? == true or (opts[:manually_fetching?] and federate_outgoing? != false)) and
          ((is_nil(subject) and thing_local?) or
             subject_local?) do
       prepare_and_queue(subject, verb, thing, opts)
+      |> debug("prepare_and_queued")
     else
       debug(
         thing,
