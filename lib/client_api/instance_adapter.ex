@@ -1,5 +1,4 @@
-defmodule Bonfire.API.MastoCompatible.InstanceController do
-  use Bonfire.UI.Common.Web, :controller
+defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
   use Bonfire.Common.Config
 
   # Mastodon API instance configuration limits
@@ -79,78 +78,69 @@ defmodule Bonfire.API.MastoCompatible.InstanceController do
     }
   end
 
-  def show(conn, _) do
-    base_uri = Bonfire.Common.URIs.base_uri(conn)
-    # base_url = Bonfire.Common.URIs.base_url(base_uri)
-
-    json(
-      conn,
-      Map.merge(
-        main(base_uri),
-        %{
-          "thumbnail" => Config.get([:ui, :theme, :instance_icon], nil),
-          "background_image" => Config.get([:ui, :theme, :instance_image], nil),
-          "urls" => %{
-            # TODO
-            # "wss://#{base_url}"
-            "streaming_api" => nil
-          },
-          "poll_limits" => %{
-            "max_expiration" => 31_536_000,
-            "max_option_chars" => 50_000,
-            "max_options" => 100,
-            "min_expiration" => 60
-          },
-          "max_toot_chars" => 500_000,
-          "avatar_upload_limit" => 0,
-          "background_upload_limit" => 0,
-          "banner_upload_limit" => 0,
-          "upload_limit" => 0,
-          "stats" => %{
-            "domain_count" => 1,
-            # TODO
-            "status_count" => 1,
-            "user_count" => Bonfire.Me.Users.maybe_count()
-          }
+  def instance(base_uri) do
+    Map.merge(
+      main(base_uri),
+      %{
+        "thumbnail" => Config.get([:ui, :theme, :instance_icon], nil),
+        "background_image" => Config.get([:ui, :theme, :instance_image], nil),
+        "urls" => %{
+          # TODO
+          # "wss://#{base_url}"
+          "streaming_api" => nil
+        },
+        "poll_limits" => %{
+          "max_expiration" => 31_536_000,
+          "max_option_chars" => 50_000,
+          "max_options" => 100,
+          "min_expiration" => 60
+        },
+        "max_toot_chars" => 500_000,
+        "avatar_upload_limit" => 0,
+        "background_upload_limit" => 0,
+        "banner_upload_limit" => 0,
+        "upload_limit" => 0,
+        "stats" => %{
+          "domain_count" => 1,
+          # TODO
+          "status_count" => 1,
+          "user_count" => Bonfire.Me.Users.maybe_count()
         }
-      )
+      }
     )
   end
 
-  def show_v2(conn, _) do
-    main = main(Bonfire.Common.URIs.base_uri(conn))
+  def instance_v2(base_uri) do
+    main = main(base_uri)
 
-    json(
-      conn,
-      Map.merge(main, %{
-        "thumbnail" => %{
-          "url" => Config.get([:ui, :theme, :instance_icon], nil),
-          # "blurhash"=> # TODO
-          "versions" => %{}
-        },
-        "registrations" => %{
-          "enabled" => main["registrations"],
-          "approval_required" => false,
-          "message" => nil
-        },
-        "contact" => %{
-          "email" => main["email"],
-          "account" => nil
-        },
-        "usage" => %{
-          "users" => %{"active_month" => Bonfire.Me.Users.maybe_count()}
-        }
-      })
-    )
+    Map.merge(main, %{
+      "thumbnail" => %{
+        "url" => Config.get([:ui, :theme, :instance_icon], nil),
+        # "blurhash"=> # TODO
+        "versions" => %{}
+      },
+      "registrations" => %{
+        "enabled" => main["registrations"],
+        "approval_required" => false,
+        "message" => nil
+      },
+      "contact" => %{
+        "email" => main["email"],
+        "account" => nil
+      },
+      "usage" => %{
+        "users" => %{"active_month" => Bonfire.Me.Users.maybe_count()}
+      }
+    })
   end
 
   @doc """
   Returns custom emojis available on this instance.
   GET /api/v1/custom_emojis
   """
-  def custom_emojis(conn, _params) do
+  def custom_emojis() do
     # TODO: Implement actual emoji fetching from Bonfire.Files.EmojiUploader
     # For now, return empty array to indicate the endpoint exists but no custom emojis
-    json(conn, [])
+    []
   end
 end
