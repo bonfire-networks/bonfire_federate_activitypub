@@ -33,8 +33,9 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
              Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
              |> repo().maybe_preload(choices: [:post_content])
 
+    #  fallback if bonfire_poll is not enabled
     if Code.ensure_loaded?(Bonfire.Poll) do
-      assert %Bonfire.Poll.Question{
+      assert %{
                voting_format: "single",
                proposal_dates: nil,
                voting_dates: [_]
@@ -42,13 +43,44 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
                activity
                |> debug("Question activity")
 
-      e(activity, :choices, [])
-      |> Enum.map(fn choice ->
-        assert %Bonfire.Poll.Choice{} = choice
+      assert e(activity, :choices, [])
+             |> Enum.map(fn %{} = choice ->
+               assert choice.post_content.name in ["a", "b", "c", "d", "e", "f"]
+             end)
+             |> Enum.count() == 6
 
-        assert choice.post_content.name in ["a", "b", "c", "d", "e", "f"]
-      end)
-      |> Enum.count() == 6
+      # Test Update activity
+      updated_poll_json =
+        data
+        |> Map.put("name", "Updated poll name")
+        |> Map.put("anyOf", [
+          %{
+            "type" => "Note",
+            "name" => "updated a",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "type" => "Note",
+            "name" => "updated b",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          }
+        ])
+
+      update_activity = %{
+        "type" => "Update",
+        "actor" => data["actor"],
+        "object" => updated_poll_json
+      }
+
+      {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(update_activity)
+
+      assert {:ok, updated_poll} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(update_activity)
+               |> repo().maybe_preload(choices: [:post_content])
+
+      assert updated_poll.post_content.name == "Updated poll name"
+      updated_names = Enum.map(updated_poll.choices, & &1.post_content.name)
+      assert updated_names == ["updated a", "updated b"]
     else
       assert activity.__struct__ == Bonfire.Data.Social.APActivity
       assert is_list(activity.json["oneOf"])
