@@ -78,7 +78,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
     }
   end
 
-  def instance(base_uri) do
+  def show(base_uri) do
     Map.merge(
       main(base_uri),
       %{
@@ -110,7 +110,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
     )
   end
 
-  def instance_v2(base_uri) do
+  def show_v2(base_uri) do
     main = main(base_uri)
 
     Map.merge(main, %{
