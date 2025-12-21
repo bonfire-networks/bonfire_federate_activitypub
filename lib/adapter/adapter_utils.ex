@@ -1633,10 +1633,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def recipients_boundary_circles(recipients, activity, is_public?, interaction_policy \\ []) do
+    is_local? = e(activity, :local, nil)
+
     to_circles =
       if(is_public?, do: [:guest], else: []) ++
         Enum.map(recipients || [], fn {_, character} ->
-          if Bonfire.Federate.ActivityPub.federating?(character), do: id(character)
+          if is_local? || Bonfire.Federate.ActivityPub.federating?(character), do: id(character)
         end) ++ ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
 
     {if(is_public?, do: "public_remote", else: "custom"), to_circles}
