@@ -27,10 +27,10 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
       |> File.read!()
       |> Jason.decode!()
 
-    {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+    {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
     assert {:ok, activity} =
-             Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
              |> repo().maybe_preload(choices: [:post_content])
 
     #  fallback if bonfire_poll is not enabled
@@ -38,7 +38,7 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
       assert %{
                voting_format: "single",
                proposal_dates: nil,
-               voting_dates: [_]
+               voting_dates: [_ | _]
              } =
                activity
                |> debug("Question activity")
@@ -53,7 +53,7 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
       updated_poll_json =
         data
         |> Map.put("name", "Updated poll name")
-        |> Map.put("anyOf", [
+        |> Map.put("oneOf", [
           %{
             "type" => "Note",
             "name" => "updated a",
@@ -72,10 +72,10 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
         "object" => updated_poll_json
       }
 
-      {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(update_activity)
+      {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(update_activity)
 
       assert {:ok, updated_poll} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(update_activity)
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
                |> repo().maybe_preload(choices: [:post_content])
 
       assert updated_poll.post_content.name == "Updated poll name"

@@ -441,7 +441,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         e ->
           debug(e, "Could not create remote object")
 
-          err(
+          error(
             Errors.error_msg(e),
             "Could not create object for #{ap_obj_id}"
           )
@@ -476,7 +476,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   defp handle_activity_with({:ok, module}, character, activity, object)
        when is_atom(module) and not is_nil(module) do
-    info(activity, "AP - generic handle_activity_with module: #{module}")
+    info(activity, "AP - handle_activity_with module: #{module}")
 
     with {:ok, %struct{id: pointable_object_id} = pointable_object} <-
            Utils.maybe_apply(

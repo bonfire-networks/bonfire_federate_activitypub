@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   import Tesla.Mock
   import Untangle
   alias Bonfire.Posts
-  alias Bonfire.Federate.ActivityPub.AdapterUtils
+  # alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
@@ -73,7 +73,7 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
 
       {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
-      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      assert {:ok, _ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
 
       obj =
         build_conn()
