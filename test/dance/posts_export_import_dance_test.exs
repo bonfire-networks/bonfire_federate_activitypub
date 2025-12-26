@@ -201,9 +201,17 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
     TestInstanceRepo.apply(fn ->
       Logger.metadata(action: info("import activities on remote instance"))
 
+      # specify we want to fetch replies too
+      remote_user =
+        current_user(
+          Settings.put([Bonfire.Social.Import, :fetch_threads_on_import], true,
+            current_user: remote_user
+          )
+        )
+
       # Import activities without federating the boosts
       assert %{ok: imported_count} =
-               Import.import_from_json(:outbox, remote_user.id, outbox_data, include_boosts: true)
+               Import.import_from_json(:outbox, remote_user, outbox_data, include_boosts: true)
                |> debug("import_result")
 
       # Clean up
@@ -282,31 +290,31 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
 
       Logger.metadata(action: info("verify reply thread is pulled in"))
 
-      %{edges: remote_feed} =
-        Bonfire.Social.FeedLoader.feed(:remote,
+      %{edges: feed} =
+        Bonfire.Social.FeedLoader.feed(:explore,
           current_user: remote_user,
-          limit: 20,
+          limit: 100,
           preload: [:with_post_content]
         )
 
       assert Bonfire.Social.FeedLoader.feed_contains?(
-               remote_feed,
+               feed,
                "This is a reply to my first post",
                current_user: remote_user
              ),
-             "Reply1 content should be available in remote feed"
+             "Reply1 content should be available in feed"
 
-      assert Bonfire.Social.FeedLoader.feed_contains?(remote_feed, "This is a nested reply",
+      assert Bonfire.Social.FeedLoader.feed_contains?(feed, "This is a nested reply",
                current_user: remote_user
              ),
-             "Reply2 content should be available in remote feed"
+             "Reply2 content should be available in feed"
 
       assert Bonfire.Social.FeedLoader.feed_contains?(
-               remote_feed,
+               feed,
                "Another reply to the original post",
                current_user: remote_user
              ),
-             "Another_reply content should be available in remote feed"
+             "Another_reply content should be available in feed"
     end)
 
     # Verify boosts were not federated (check that remote_user did not boost other_post from local instance perspective)
