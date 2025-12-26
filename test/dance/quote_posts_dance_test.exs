@@ -192,7 +192,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
         {:ok, %{data: remote_ap_json}} = ActivityPub.Object.get_cached(ap_id: remote_quote_url)
 
-        # check that the quoteAuthorization field is removed
+        # check that the quoteAuthorization field is present
+        # FIXME
         assert remote_ap_json["quoteAuthorization"]
       end)
 

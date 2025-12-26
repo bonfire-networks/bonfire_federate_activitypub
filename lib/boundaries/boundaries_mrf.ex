@@ -74,6 +74,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     end
   end
 
+  def filter(object, is_local?) when is_boolean(is_local?) do
+    filter(object, is_local: is_local?)
+  end
+
   defp maybe_check_and_filter(
          check_block_type,
          local_author_ids,
