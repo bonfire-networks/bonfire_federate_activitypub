@@ -1063,6 +1063,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             :settings,
             :actor,
             # :tags,
+            :extra_info,
             profile: [:image, :icon],
             character: [
               # FIXME? should we used aliased, aliased, or a cross-reference of both?
@@ -1165,6 +1166,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             ) !=
               true,
           "indexable" => Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user_etc),
+          "keyPackages" => e(user_etc, :extra_info, :info, "keyPackages", nil),
           "updated" =>
             updated_at
             |> NaiveDateTime.to_iso8601()

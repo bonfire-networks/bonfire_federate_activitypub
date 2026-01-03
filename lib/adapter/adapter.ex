@@ -204,16 +204,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
           character
           |> repo().maybe_preload(:actor)
 
-        keys = e(params, :keys, nil) || e(character, :actor, :keys, nil)
+        keys =
+          e(params, :keys, nil) ||
+            e(character, :actor, :keys, nil)
 
         params =
-          params
+          prepare_local_actor_params(character, params)
           |> deep_merge(%{actor: %{id: character.id, signing_key: keys}})
-
-        AdapterUtils.maybe_add_aliases(
-          character,
-          e(params, :also_known_as, nil) || e(params, :data, "alsoKnownAs", nil)
-        )
 
         maybe_apply(
           character_module,
@@ -222,28 +219,23 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         )
 
       {:ok, user_etc} ->
-        user_etc =
-          user_etc
-          |> repo().maybe_preload(character: [:actor])
-
         character_module =
           AdapterUtils.character_module(user_etc)
           |> debug("character_module")
+
+        user_etc =
+          user_etc
+          |> repo().maybe_preload(character: [:actor])
 
         keys =
           e(params, :keys, nil) || e(user_etc, :character, :actor, :keys, nil) ||
             e(user_etc, :actor, :keys, nil)
 
         params =
-          params
+          prepare_local_actor_params(user_etc, params)
           |> deep_merge(%{
             character: %{id: user_etc.id, actor: %{id: user_etc.id, signing_key: keys}}
           })
-
-        AdapterUtils.maybe_add_aliases(
-          user_etc,
-          e(params, :also_known_as, nil) || e(params, :data, "alsoKnownAs", nil)
-        )
 
         # FIXME use federation_module?
         maybe_apply(
@@ -255,6 +247,27 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       other ->
         error(other, "Could not find actor to update")
     end
+  end
+
+  def prepare_local_actor_params(user_etc, params) do
+    data = e(params, :data, nil) || params
+
+    character_module =
+      AdapterUtils.character_module(user_etc)
+      |> debug("character_module")
+
+    key_packages = e(params, :key_packages, nil) || e(data, "keyPackages", nil)
+
+    AdapterUtils.maybe_add_aliases(
+      user_etc,
+      e(params, :also_known_as, nil) || e(data, "alsoKnownAs", nil)
+    )
+
+    if is_nil(key_packages),
+      do: params,
+      else:
+        params
+        |> deep_merge(%{extra_info: %{id: user_etc.id, info: %{"keyPackages" => key_packages}}})
   end
 
   # TODO: refactor & move to Me context(s)?
