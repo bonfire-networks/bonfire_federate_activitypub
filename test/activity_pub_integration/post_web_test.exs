@@ -17,8 +17,16 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       # %{method: :get, url: "https://mocked.local/users/karen"} ->
       #   json(Simulate.actor_json("https://mocked.local/users/karen"))
 
+      %{method: :get, url: "https://mocked.local/users/karen/statuses/114800379424129152"} ->
+        "../fixtures/mastodon-post-object.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> json()
+
+      # |> Jason.decode!()
+
       # %{method: :get, url: "https://mocked.local/users/karen/statuses/114800379424129152/activity"} ->
-      # "../fixtures/mastodon-post-activity-with-cw.json"
+      # "../fixtures/mastodon-post-activity.json"
       # |> Path.expand(__DIR__)
       # |> File.read!()
       # |> json()

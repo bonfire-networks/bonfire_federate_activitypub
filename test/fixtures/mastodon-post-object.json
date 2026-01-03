@@ -1,0 +1,69 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        {
+            "ostatus": "http://ostatus.org#",
+            "atomUri": "ostatus:atomUri",
+            "inReplyToAtomUri": "ostatus:inReplyToAtomUri",
+            "conversation": "ostatus:conversation",
+            "sensitive": "as:sensitive",
+            "toot": "http://joinmastodon.org/ns#",
+            "votersCount": "toot:votersCount"
+        }
+    ],
+    "id": "https://mocked.local/users/karen/statuses/114800379424129152",
+    "type": "Note",
+    "inReplyTo": null,
+    "published": "2025-07-05T11:26:13Z",
+    "url": "https://mocked.local/@dajb/114800379424129152",
+    "attributedTo": "https://mocked.local/users/karen",
+    "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+        "https://mocked.local/users/karen/followers"
+    ],
+    "atomUri": "https://mocked.local/users/karen/statuses/114800379424129152",
+    "inReplyToAtomUri": null,
+    "conversation": "tag:mocked.local,2025-07-05:objectId=171144301:objectType=Conversation",
+    "content": "main content goes here <a href=\"https://mocked.local/tags/first_hashtag\" class=\"mention hashtag\">#first_hashtag</a> <a href=\"https://mocked.local/tags/test\" class=\"mention hashtag\">#test</a>",
+    "updated": "2025-07-05T11:26:27Z",
+    "attachment": [],
+    "tag": [
+        {
+            "type": "Hashtag",
+            "name": "#first_hashtag",
+            "href": "https://mocked.local/tags/first_hashtag"
+        },
+        {
+            "type": "Hashtag",
+            "name": "#test",
+            "href": "https://mocked.local/tags/test"
+        },
+        {
+            "type": "Hashtag",
+            "name": "#tests",
+            "href": "https://mocked.local/tags/tests"
+        }
+    ],
+    "replies": {
+        "id": "https://mocked.local/users/karen/statuses/114800379424129152/replies",
+        "type": "Collection",
+        "first": {
+            "type": "CollectionPage",
+            "next": "https://mocked.local/users/karen/statuses/114800379424129152/replies?only_other_accounts=true\u0026page=true",
+            "partOf": "https://mocked.local/users/karen/statuses/114800379424129152/replies",
+            "items": []
+        }
+    },
+    "likes": {
+        "id": "https://mocked.local/users/karen/statuses/114800379424129152/likes",
+        "type": "Collection",
+        "totalItems": 0
+    },
+    "shares": {
+        "id": "https://mocked.local/users/karen/statuses/114800379424129152/shares",
+        "type": "Collection",
+        "totalItems": 2
+    }
+}
