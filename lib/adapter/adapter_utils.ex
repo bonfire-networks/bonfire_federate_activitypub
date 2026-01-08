@@ -1635,15 +1635,23 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def recipients_boundary_circles(recipients, activity, is_public?, interaction_policy \\ []) do
-    is_local? = e(activity, :local, nil)
+    if is_public? do
+      # For public content, DON'T populate to_circles with recipients
+      # The "public_remote" → "public" preset already grants appropriate access
+      # Only include interaction policies that RESTRICT access (e.g., canReply: followers only)
+      interaction_circles = ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+      {"public_remote", interaction_circles}
+    else
+      # For private/direct content, keep recipient-specific grants
+      is_local? = e(activity, :local, nil)
 
-    to_circles =
-      if(is_public?, do: [:guest], else: []) ++
+      to_circles =
         Enum.map(recipients || [], fn {_, character} ->
           if is_local? || Bonfire.Federate.ActivityPub.federating?(character), do: id(character)
         end) ++ ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
 
-    {if(is_public?, do: "public_remote", else: "custom"), to_circles}
+      {"custom", to_circles}
+    end
   end
 
   @doc """

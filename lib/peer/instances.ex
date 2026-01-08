@@ -214,4 +214,41 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   def instance_blocked?(%Bonfire.Data.AccessControl.Circle{} = circle, block_type, opts) do
     Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
   end
+
+  @doc """
+  Counts users/actors from each instance via `Peered` association.
+  Returns a map of %{peer_id => count}.
+  """
+  def count_users_by_peer_ids(peer_ids) when is_list(peer_ids) and peer_ids != [] do
+    from(p in Bonfire.Data.ActivityPub.Peered,
+      where: p.peer_id in ^peer_ids,
+      group_by: p.peer_id,
+      select: {p.peer_id, count(p.id)}
+    )
+    |> repo().all()
+    |> Map.new()
+  end
+
+  def count_users_by_peer_ids(_), do: %{}
+
+  @doc """
+  Finds the most recent activity timestamp for users from each instance.
+  Returns a map of %{peer_id => datetime}.
+  """
+  def last_activity_by_peer_ids(peer_ids) when is_list(peer_ids) and peer_ids != [] do
+    from(peered in Bonfire.Data.ActivityPub.Peered,
+      join: created in Bonfire.Data.Social.Created,
+      on: created.creator_id == peered.id,
+      where: peered.peer_id in ^peer_ids,
+      group_by: peered.peer_id,
+      select: {peered.peer_id, max(created.id)}
+    )
+    |> repo().all()
+    |> Map.new(fn {peer_id, ulid} ->
+      # Extract timestamp from ULID (ULIDs encode timestamp in first 48 bits)
+      {peer_id, Needle.ULID.timestamp(ulid)}
+    end)
+  end
+
+  def last_activity_by_peer_ids(_), do: %{}
 end
