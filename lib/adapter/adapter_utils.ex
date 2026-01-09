@@ -1639,7 +1639,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # For public content, DON'T populate to_circles with recipients
       # The "public_remote" → "public" preset already grants appropriate access
       # Only include interaction policies that RESTRICT access (e.g., canReply: followers only)
-      interaction_circles = ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+      interaction_circles =
+        ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+
       {"public_remote", interaction_circles}
     else
       # For private/direct content, keep recipient-specific grants
