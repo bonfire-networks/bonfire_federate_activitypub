@@ -6,6 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
   import Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  import Ecto.Query
 
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
@@ -425,4 +426,162 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
   #     assert link_tag["name"] =~ "Web API"
   #   end)
   # end
+
+  @tag :test_instance
+  test "scheduled posts are not federated before scheduled time, but are after", context do
+    local_user = context[:local][:user]
+    remote_user = context[:remote][:user]
+
+    Logger.metadata(action: "remote follows local user before post creation")
+    # Remote follows local user before the post is created
+    TestInstanceRepo.apply(fn ->
+      assert {:ok, followed_on_remote} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(
+                 context[:local][:canonical_url]
+               )
+
+      assert {:ok, %{} = follow} =
+               Bonfire.Social.Graph.Follows.follow(remote_user, followed_on_remote)
+
+      Oban.drain_queue(queue: :federator_outgoing)
+    end)
+
+    Oban.drain_queue(queue: :federator_outgoing)
+
+    assert {:ok, local_actor} =
+             Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(
+               context[:local][:canonical_url]
+             )
+
+    AdapterUtils.get_followers(local_actor, :publish)
+    |> debug("followers of local user before scheduled post")
+
+    # Schedule post for 30 seconds in the future
+
+    scheduled_after =
+      DateTime.utc_now()
+      |> DateTime.add(15, :minute)
+      |> DateTime.to_iso8601()
+
+    scheduled_at =
+      DateTime.utc_now()
+      |> DateTime.add(30, :minute)
+      |> DateTime.to_iso8601()
+      |> debug("input_scheduled_at")
+
+    attrs = %{
+      post_content: %{
+        name: "scheduled post",
+        html_body: "a scheduled post"
+      },
+      scheduled_at: scheduled_at
+    }
+
+    Logger.metadata(action: "create scheduled post and enqueue federation jobs")
+
+    {post, canonical_url} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, post} =
+                 Posts.publish(
+                   current_user: local_user,
+                   post_attrs: attrs,
+                   boundary: "public"
+                 )
+
+        # cannot read it (before scheduled time)
+        assert {:error, :not_found} =
+                 Posts.read(post.id,
+                   current_user: local_user
+                 )
+
+        # Assert job is enqueued with correct scheduled_at
+        assert [] ==
+                 repo().all(
+                   from j in Oban.Job,
+                     where:
+                       (j.worker == "ActivityPub.Federator.Workers.PublisherWorker" and
+                          is_nil(j.scheduled_at)) or
+                         j.scheduled_at < ^scheduled_after
+                 )
+                 |> Enum.map(fn j ->
+                   {:ok, activity} = ActivityPub.Object.get_cached(id: j.args["activity_id"])
+
+                   if e(activity, :data, "object", nil) == "Create" do
+                     if object_id = e(activity, :data, "object", nil) do
+                       {:ok, object} = ActivityPub.Object.get_cached(id: object_id)
+
+                       object
+                       |> debug(
+                         "unexpected federation job for activity schedule for #{inspect(scheduled_at)}"
+                       )
+                     end
+                   end
+                 end)
+                 |> Enum.reject(&is_nil/1)
+
+        # assert [_scheduled_job] =
+        #   repo().all(
+        #     from j in Oban.Job,
+        #       where:
+        #         j.worker == "ActivityPub.Federator.Workers.PublisherWorker" and
+        #           j.scheduled_at >= ^scheduled_after
+        #   )
+
+        # Attempt to drain the Oban queue before scheduled time (should not actually run the job)
+        Oban.drain_queue(queue: :federator_outgoing, with_scheduled: false)
+
+        canonical_url = Bonfire.Common.URIs.canonical_url(post)
+
+        # Check on remote: post should NOT be in feed or fetchable before scheduled time
+        TestInstanceRepo.apply(fn ->
+          Logger.metadata(action: "check scheduled post not in remote feed before scheduled time")
+
+          refute Bonfire.Social.FeedLoader.feed_contains?(:my, "a scheduled post",
+                   current_user: remote_user
+                 )
+
+          Logger.metadata(action: "check scheduled post not fetchable before scheduled time")
+
+          assert {:error, :not_found} =
+                   AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+                   |> repo().maybe_preload(:post_content)
+        end)
+
+        # Wait until after scheduled time
+        Logger.metadata(action: "fast forward to scheduled time and run queue")
+
+        # Drain the Oban queue after scheduled time
+        assert %{failure: 0, success: 1} =
+                 Oban.drain_queue(
+                   queue: :federator_outgoing,
+                   with_scheduled: DateTime.add(DateTime.utc_now(), 60, :minute)
+                 )
+
+        # Drain again to run publish_one
+        assert %{success: 1, failure: 0} = Oban.drain_queue(queue: :federator_outgoing)
+
+        {post, canonical_url}
+      end)
+
+    # Check on remote: post should now be in feed and fetchable
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: "check scheduled post in remote feed after scheduled time")
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:my, "a scheduled post",
+               current_user: remote_user
+             )
+
+      Logger.metadata(action: "check scheduled post fetchable after scheduled time")
+
+      assert {:ok, object} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+               |> repo().maybe_preload(:post_content)
+
+      assert object.post_content.html_body =~ "a scheduled post"
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:my, "a scheduled post",
+               current_user: remote_user
+             )
+    end)
+  end
 end

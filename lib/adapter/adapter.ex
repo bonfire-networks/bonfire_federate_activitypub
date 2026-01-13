@@ -44,33 +44,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # end
   end
 
-  defp character_id_from_actor(actor),
-    do: e(actor, :pointer, nil) || actor.pointer_id || Characters.by_username!(actor.username)
-
-  defp get_followers(actor_or_character, purpose_or_current_actor \\ nil)
-
-  defp get_followers(%Actor{} = actor, purpose_or_current_actor) do
-    # debug(actor)
-    character_id_from_actor(actor)
-    |> debug("character")
-    |> get_followers(purpose_or_current_actor)
-  end
-
-  defp get_followers(character, purpose_or_current_actor) do
-    maybe_apply(
-      Bonfire.Social.Graph.Follows,
-      :all_subjects_by_object,
-      [character, set_list_follow_opts(purpose_or_current_actor)],
-      fallback_return: []
-    )
-    # |> debug()
-    |> Enum.map(&id(&1))
-  end
-
   def get_follower_local_ids(actor, purpose_or_current_actor \\ nil) do
     # debug(actor)
-    get_followers(actor)
-    |> Enum.map(&id(&1))
+    AdapterUtils.get_followers(actor, purpose_or_current_actor, :subject_id_only)
+    |> List.flatten()
+
+    # |> Enum.map(&id(&1))
   end
 
   def get_following_local_ids(%Actor{} = actor, purpose_or_current_actor \\ nil) do
@@ -78,21 +57,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       maybe_apply(
         Bonfire.Social.Graph.Follows,
         :all_objects_by_subject,
-        [character, set_list_follow_opts(purpose_or_current_actor)],
+        [character, AdapterUtils.set_list_follow_opts(purpose_or_current_actor, :object_id_only)],
         fallback_return: []
       )
-      |> Enum.map(&id(&1))
-    end
-  end
+      |> List.flatten()
 
-  defp set_list_follow_opts(purpose_or_current_actor) do
-    case purpose_or_current_actor do
-      %{} -> [current_user: purpose_or_current_actor]
-      :deletion -> [skip_boundary_check: true]
-      :activity -> [skip_boundary_check: true]
-      :publish -> [skip_boundary_check: true]
-      :public -> []
-      _ -> []
+      # |> Enum.map(&id(&1))
     end
   end
 
@@ -104,9 +74,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          object when is_binary(object) or is_struct(object) <-
            e(object, :pointer, nil) || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-
-           character_id_from_actor(actor) |> debug("character_id_from_actor"),
+           AdapterUtils.character_id_from_actor(actor) |> debug("character_id_from_actor"),
          followers when is_list(followers) and followers != [] <-
-           get_followers(character, :activity)
+           AdapterUtils.get_followers(character, :activity)
            |> debug("got_followers")
            |> Enum.reject(&AdapterUtils.is_local?/1)
            |> debug("remote followers"),
@@ -427,6 +397,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def maybe_publish_object(pointer_id, manually_fetching?) when is_binary(pointer_id) do
     Bonfire.Common.Needles.get(pointer_id)
+    |> debug("maybe_publish_object lookup")
     ~> maybe_publish_object(manually_fetching?)
   end
 

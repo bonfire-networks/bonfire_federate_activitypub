@@ -1820,4 +1820,39 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enum.uniq()
     |> Enum.reject(&is_nil/1)
   end
+
+  def get_followers(actor_or_character, purpose_or_current_actor \\ nil, preload \\ nil)
+
+  def get_followers(%Actor{} = actor, purpose_or_current_actor, preload) do
+    # debug(actor)
+    character_id_from_actor(actor)
+    |> debug("character")
+    |> get_followers(purpose_or_current_actor, preload)
+  end
+
+  def get_followers(character, purpose_or_current_actor, preload) do
+    maybe_apply(
+      Bonfire.Social.Graph.Follows,
+      :all_subjects_by_object,
+      [character, set_list_follow_opts(purpose_or_current_actor, preload)],
+      fallback_return: []
+    )
+
+    # |> debug()
+    # |> Enum.map(&id(&1))
+  end
+
+  def character_id_from_actor(actor),
+    do: e(actor, :pointer, nil) || actor.pointer_id || Characters.by_username!(actor.username)
+
+  def set_list_follow_opts(purpose_or_current_actor, preload \\ nil) do
+    case purpose_or_current_actor do
+      %{} -> [current_user: purpose_or_current_actor]
+      :deletion -> [skip_boundary_check: true, preload: preload]
+      :activity -> [skip_boundary_check: true, preload: preload]
+      :publish -> [skip_boundary_check: true, preload: preload]
+      # :public -> [preload: preload]
+      _ -> [preload: preload]
+    end
+  end
 end
