@@ -65,30 +65,30 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
 
     Logger.metadata(action: info("check flag was federated"))
 
-    flags =
-      Bonfire.Social.Flags.list(
-        scope: :instance,
-        current_user: local_admin
-      )
+    # %{edges: flags} =
+    #   Bonfire.Social.Flags.list(
+    #     scope: :instance,
+    #     current_user: local_admin
+    #   )
 
-    assert flags != []
+    # assert flags != []
 
-    assert Bonfire.Social.FeedLoader.feed_contains?(
-             flags,
-             "post to try federated flagging",
-             current_user: local_admin
-           )
+    assert flag_edge =
+             Bonfire.Social.FeedLoader.feed_contains?(
+               :flagged_content,
+               #  flags,
+               "post to try federated flagging",
+               current_user: local_admin
+             )
 
     Logger.metadata(action: info("check flag comment was federated"))
 
-    # Get the flag with preloaded named association to check the comment
-    flags_preloaded =
-      Bonfire.Social.Flags.list_preloaded(
-        scope: :instance,
-        current_user: local_admin
-      )
-
-    assert %{edges: [flag_edge | _]} = flags_preloaded
+    # # Get the flag with preloaded named association to check the comment
+    # %{edges: [flag_edge | _]} = 
+    #   Bonfire.Social.Flags.list_preloaded(
+    #     scope: :instance,
+    #     current_user: local_admin
+    #   )
 
     assert flag_edge.named.name == "federated flag",
            "Flag comment should be federated with the flag"

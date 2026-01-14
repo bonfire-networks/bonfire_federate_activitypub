@@ -317,7 +317,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
     case get_actor_by_ap_id(ap_id, local_instance) do
       {:error, :not_found} ->
-        debug(ap_id, "could not find AP Actor, check if we have a Peered linking to a character")
+        flood(ap_id, "could not find AP Actor, check if we have a Peered linking to a character")
 
         get_pointable_by_peered_ap_id(ap_id)
 
@@ -687,6 +687,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id)
         |> info("got by ap_id")
         |> return_pointable()
+      else
+        error(ap_id, "assume we're looking up a local character")
       end
     end
   end
