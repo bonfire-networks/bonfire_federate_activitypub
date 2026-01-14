@@ -396,7 +396,10 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert post.post_content.html_body =~ params.object["content"]
 
       assert activity =
-               Bonfire.Social.FeedLoader.feed_contains?(:remote, post, current_user: recipient)
+               Bonfire.Social.FeedLoader.feed_contains?(:remote, post,
+                 current_user: recipient,
+                 return: :activity
+               )
 
       date =
         activity.object_id
