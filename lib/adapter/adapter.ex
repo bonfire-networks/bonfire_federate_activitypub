@@ -219,7 +219,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def prepare_local_actor_params(user_etc, params) do
+  defp prepare_local_actor_params(user_etc, params) do
     data = e(params, :data, nil) || params
 
     character_module =
@@ -414,7 +414,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
       _ ->
         with %{} = character <- AdapterUtils.get_or_create_service_character(),
-             %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
+             %ActivityPub.Actor{} = actor <-
+               AdapterUtils.character_to_actor(character) |> debug("service actor"),
+             {:ok, actor} <- ActivityPub.Safety.Keys.ensure_keys_present(actor) do
           {:ok, actor}
         else
           e ->

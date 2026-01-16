@@ -254,13 +254,14 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
           # needs a unique activity ID
           "#{id}/update"
         end)
-        |> ActivityPub.Federator.Transformer.handle_incoming()
+        #  NOTE: already_fetched to avoid refetching the object since we don't have a mock for the updated object
+        |> ActivityPub.Federator.Transformer.handle_incoming(already_fetched: true)
+        |> debug("update_data")
 
       assert {:ok, updated_post} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(update_data)
                |> repo().maybe_preload([:post_content, :sensitive])
-
-      #  |> debug("received_update")
+               |> debug("received_update")
 
       # Check that content warning/summary is removed after update
       s = e(updated_post, :post_content, :summary, nil)

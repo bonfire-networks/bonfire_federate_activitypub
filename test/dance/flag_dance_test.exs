@@ -11,6 +11,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   alias Bonfire.Posts
+  alias Bonfire.Social.Flags
 
   test "cross-instance flagging (with forward: true)", context do
     # context |> info("context")
@@ -58,12 +59,16 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
         comment: "federated flag"
       )
       |> debug("the flaggg")
+
+      assert true == Flags.flagged_object?(post1remote)
     end)
 
     Logger.metadata(action: info("make sure the incoming flag in queue was processed"))
     Oban.drain_queue(queue: :federator_incoming)
 
     Logger.metadata(action: info("check flag was federated"))
+
+    assert true == Flags.flagged_object?(post1)
 
     # %{edges: flags} =
     #   Bonfire.Social.Flags.list(
@@ -80,6 +85,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
                "post to try federated flagging",
                current_user: local_admin
              )
+             |> repo().maybe_preload(:named)
 
     Logger.metadata(action: info("check flag comment was federated"))
 
