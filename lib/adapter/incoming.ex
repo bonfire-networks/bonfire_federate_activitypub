@@ -369,24 +369,44 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
        when is_atom(module) and not is_nil(module) and
               (verb in @creation_verbs or
                  ActivityPub.Config.is_in(verb, :supported_intransitive_types) == true) do
-    ap_obj_id = e(object, :data, "id", nil) || e(activity, :data, "id", nil)
+    ap_obj_id = e(object, :data, "id", nil)
+    ap_activity_id = e(activity, :data, "id", nil)
+    ap_id = ap_obj_id || ap_activity_id
 
-    if ap_obj_id && Bonfire.Common.Needles.exists?(ap_obj_id) do
-      warn(ap_obj_id, "Already exists locally")
-      Bonfire.Common.Needles.get(ap_obj_id, skip_boundary_check: true)
+    if ap_id && Bonfire.Common.Needles.exists?(ap_id) do
+      warn(ap_id, "Already exists locally")
+      Bonfire.Common.Needles.get(ap_id, skip_boundary_check: true)
     else
+      local? = e(activity, :local, false)
+
       pointer_id =
-        with published when is_binary(published) <-
-               e(object, :data, "published", nil) || e(activity, :data, "published", nil) do
-          DatesTimes.generate_ulid_if_past(published)
-        else
-          _ -> nil
-        end
+        if local? do
+          debug("activity is local (prob processed via C2S)")
+
+          # TODO: better architecture, maybe updating these instead of deleting?
+
+          # ActivityPub.Object.hard_delete(activity)
+          # |> debug("deleted incoming activity after processing local C2S activity")
+
+          ActivityPub.Object.hard_delete(object)
+          |> debug("deleted incoming object after processing local C2S activity")
+
+          if pointer_id = AdapterUtils.pointer_id_from_url(ap_id) do
+            # set pointer ID to the same one as was initially created in AP db
+            pointer_id
+          end
+        end ||
+          with published when is_binary(published) <-
+                 e(object, :data, "published", nil) || e(activity, :data, "published", nil) do
+            DatesTimes.generate_ulid_if_past(published)
+          else
+            _ -> nil
+          end
 
       # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
 
       debug(
-        "AP - handle_activity_with OK: #{module} to Create #{ap_obj_id} as #{inspect(pointer_id)} using #{module}"
+        "AP - handle_activity_with OK: #{module} to Create #{ap_id} as #{inspect(pointer_id)} using #{module}"
       )
 
       # debug(character, "character")
@@ -411,7 +431,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              )
              |> debug("attempted creation of remote object") do
         debug(
-          "AP - created remote object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_obj_id}"
+          "AP - created remote object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
         )
 
         # IO.inspect(pointable_object)
@@ -419,22 +439,26 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         # maybe save a Peer for instance and Peered URI
         Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
           pointable_object_id,
-          ap_obj_id,
+          ap_id,
           type: :object
         )
         |> debug("saved canonical uri for peered object")
 
-        # object = ActivityPub.Object.normalize(object)
-        object_id = id(object) || id(activity)
-        # FIXME?
-        if object_id &&
-             (is_nil(previous_pointer_id) or
-                previous_pointer_id != pointable_object_id),
-           do:
-             ActivityPub.Object.update_existing(object_id, %{
-               pointer_id: pointable_object_id
-             })
-             |> debug("pointer_id update")
+        if !local? do
+          # attach created pointer to the object in AP db
+
+          # object = ActivityPub.Object.normalize(object)
+          object_id = id(object) || id(activity)
+          # FIXME?
+          if object_id &&
+               (is_nil(previous_pointer_id) or
+                  previous_pointer_id != pointable_object_id),
+             do:
+               ActivityPub.Object.update_existing(object_id, %{
+                 pointer_id: pointable_object_id
+               })
+               |> debug("pointer_id update")
+        end
 
         {:ok, pointable_object}
       else
@@ -443,7 +467,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
           error(
             Errors.error_msg(e),
-            "Could not create object for #{ap_obj_id}"
+            "Could not create object for #{ap_id}"
           )
 
           # throw({:error, "Could not process incoming activity"})

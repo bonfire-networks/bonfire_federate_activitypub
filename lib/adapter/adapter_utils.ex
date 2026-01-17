@@ -637,12 +637,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           # Handle local object URIs like /pub/objects/ULID
           # TODO: make this better and extensible
           String.contains?(ap_id, ["/objects/", "/post/", "/discussion/"]) ->
-            if object_id =
-                 trim_object_prefix(ap_id, local_instance, local_ap_url)
+            if pointer_id =
+                 pointer_id_from_url(ap_id, local_instance, local_ap_url)
                  |> debug("extracted object ID from local object URI") do
-              if object_id = uid(String.trim_trailing(object_id, "#")) do
-                Bonfire.Common.Needles.get(object_id, skip_boundary_check: true)
-              end
+              Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true)
             end ||
               {:error, :not_found}
 
@@ -658,6 +656,22 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(ap_id, opts)
         |> debug("got by ap_id")
         |> return_pointable()
+      end
+    end
+  end
+
+  def pointer_id_from_url(
+        ap_id,
+        local_instance \\ Adapter.base_url(),
+        local_ap_url \\ ap_base_url()
+      ) do
+    if object_id =
+         trim_object_prefix(ap_id, local_instance, local_ap_url)
+         |> debug("extracted object ID from local object URI") do
+      object_id = String.trim_trailing(object_id, "#")
+      # TODO: use uid instead of ulid if we switch to UUIDs?
+      if Types.is_ulid?(object_id) do
+        object_id
       end
     end
   end

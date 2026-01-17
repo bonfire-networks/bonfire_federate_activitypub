@@ -67,9 +67,13 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
       end
     end)
 
+    # Set a known password for the test user
+    test_password = "test_password_123"
+
     [
-      local: fancy_fake_user!("Local"),
-      remote: fancy_fake_user_on_test_instance()
+      local: fancy_fake_user!("Local", credential: %{password: test_password}),
+      remote: fancy_fake_user_on_test_instance(credential: %{password: test_password}),
+      test_password: test_password
     ]
   end
 end

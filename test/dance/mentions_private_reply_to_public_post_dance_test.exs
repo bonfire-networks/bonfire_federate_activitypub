@@ -188,12 +188,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
 
     #  "if the post is public, the actor who started the thread should be CCed even if not mentioned"
 
-    Logger.metadata(
-      action: info("check that replies were federated but are not visible to others")
-    )
+    Logger.metadata(action: info("check that replies are not visible to others"))
+
+    new_random_user = fake_user!()
 
     assert %{edges: feed} =
-             Bonfire.Social.FeedActivities.feed(:remote, current_user: fake_user!())
+             Bonfire.Social.FeedActivities.feed(:remote, current_user: new_random_user)
 
     #  |> debug("remotefeed")
 
