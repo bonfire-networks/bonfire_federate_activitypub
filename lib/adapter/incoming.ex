@@ -388,8 +388,17 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           # ActivityPub.Object.hard_delete(activity)
           # |> debug("deleted incoming activity after processing local C2S activity")
 
-          ActivityPub.Object.hard_delete(object)
-          |> debug("deleted incoming object after processing local C2S activity")
+          # TEMP workaround
+          if e(object, :data, "type", nil) not in [
+               "PrivateMessage",
+               "PublicMessage",
+               "KeyPackage",
+               "GroupInfo",
+               "Welcome"
+             ] do
+            ActivityPub.Object.hard_delete(object)
+            |> debug("deleted incoming object after processing local C2S activity")
+          end
 
           if pointer_id = AdapterUtils.pointer_id_from_url(ap_id) do
             # set pointer ID to the same one as was initially created in AP db
