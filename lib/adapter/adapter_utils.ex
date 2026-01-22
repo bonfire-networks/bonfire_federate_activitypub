@@ -1204,7 +1204,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         deactivated: false,
         updated_at: updated_at
       }
-      |> flood("actor formatted")
+      |> debug("actor formatted")
     else
       with {:error, :not_found} <- Actor.get_cached(pointer: user_etc),
            {:error, :not_found} <- Actor.get_cached(ap_id: id) do
