@@ -142,4 +142,79 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MessagesTest do
 
     # TODO ^ check that message5 is in the correct thread
   end
+
+  @tag :test_instance
+  test "receiving instance uses embedded object from signed Create without re-fetching",
+       context do
+    local_user = context[:local][:user]
+
+    # Get the local AP actor with signing keys
+    {:ok, local_actor} =
+      ActivityPub.Actor.get_cached(username: local_user.character.username)
+
+    local_actor = ActivityPub.Safety.Keys.add_public_key(local_actor)
+
+    # Get the remote user's AP actor to find their inbox
+    remote_ap_id = context[:remote][:canonical_url]
+
+    {:ok, remote_actor} =
+      ActivityPub.Actor.get_cached_or_fetch(ap_id: remote_ap_id)
+
+    remote_inbox = remote_actor.data["inbox"]
+
+    # Construct a Create activity with an embedded Note.
+    # The object ID points to the local instance but is NEVER persisted,
+    # so if the remote tries to re-fetch it, it will get a 404.
+    fake_object_id =
+      ActivityPub.Web.base_url() <> "/pub/objects/#{Needle.UID.generate()}"
+
+    fake_activity_id =
+      ActivityPub.Web.base_url() <> "/pub/objects/#{Needle.UID.generate()}"
+
+    unique_content = "embedded-only-no-refetch-#{System.unique_integer([:positive])}"
+
+    activity_json =
+      Jason.encode!(%{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => "Create",
+        "id" => fake_activity_id,
+        "actor" => local_actor.data["id"],
+        "to" => [remote_ap_id],
+        "object" => %{
+          "type" => "Note",
+          "id" => fake_object_id,
+          "content" => unique_content,
+          "attributedTo" => local_actor.data["id"],
+          "to" => [remote_ap_id],
+          "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+        },
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+    Logger.metadata(action: "send signed Create with embedded-only object to remote inbox")
+
+    # Send it signed directly to the remote inbox
+    result =
+      ActivityPub.Federator.APPublisher.publish_one(%{
+        json: activity_json,
+        actor: local_actor,
+        inbox: remote_inbox,
+        id: fake_activity_id
+      })
+
+    assert {:ok, %{status: code}} = result
+    assert code in 200..299, "Remote inbox rejected the activity with HTTP #{code}"
+
+    # Verify on the remote that the message was received using the embedded content
+    TestInstanceRepo.apply(fn ->
+      remote_user = context[:remote][:user]
+
+      Logger.metadata(action: "check embedded-only object arrived on remote")
+
+      messages = Bonfire.Messages.list(remote_user)
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(messages, unique_content),
+             "Message with non-fetchable embedded object should arrive via the Create activity"
+    end)
+  end
 end
