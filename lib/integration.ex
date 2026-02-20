@@ -85,7 +85,7 @@ defmodule Bonfire.Federate.ActivityPub do
   end
 
   def federating_default?() do
-    case Process.get(:federating) do
+    case ProcessTree.get(:federating) do
       nil ->
         {:default,
          Bonfire.Common.Extend.module_enabled?(ActivityPub) and

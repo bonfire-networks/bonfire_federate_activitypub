@@ -447,7 +447,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         {ap_id, user |> repo().maybe_preload(:settings)}
       else
         _ ->
-          nil
+          # Try fetching unknown remote actors
+          with {:ok, actor} <- ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id),
+               {:ok, user} <- e(actor, :pointer, nil) || Bonfire.Me.Users.by_ap_id(ap_id) do
+            {ap_id, user |> repo().maybe_preload(:settings)}
+          else
+            _ ->
+              debug(ap_id, "Could not find or fetch recipient")
+              nil
+          end
       end
     end)
     |> Enum.uniq()
@@ -1850,15 +1858,21 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_followers(character, purpose_or_current_actor, preload) do
+    get_followers(character, purpose_or_current_actor, preload, [])
+  end
+
+  def get_followers(%Actor{} = actor, purpose_or_current_actor, preload, extra_opts) do
+    character_id_from_actor(actor)
+    |> get_followers(purpose_or_current_actor, preload, extra_opts)
+  end
+
+  def get_followers(character, purpose_or_current_actor, preload, extra_opts) do
     maybe_apply(
       Bonfire.Social.Graph.Follows,
       :all_subjects_by_object,
-      [character, set_list_follow_opts(purpose_or_current_actor, preload)],
+      [character, set_list_follow_opts(purpose_or_current_actor, preload) ++ extra_opts],
       fallback_return: []
     )
-
-    # |> debug()
-    # |> Enum.map(&id(&1))
   end
 
   def character_id_from_actor(actor),

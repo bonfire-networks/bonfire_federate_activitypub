@@ -379,26 +379,13 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     else
       local? = e(activity, :local, false)
 
+      previous_pointer_id = e(object, :pointer_id, nil)
+
       pointer_id =
         if local? do
           debug("activity is local (prob processed via C2S)")
 
           # TODO: better architecture, maybe updating these instead of deleting?
-
-          # ActivityPub.Object.hard_delete(activity)
-          # |> debug("deleted incoming activity after processing local C2S activity")
-
-          # TEMP workaround
-          if e(object, :data, "type", nil) not in [
-               "PrivateMessage",
-               "PublicMessage",
-               "KeyPackage",
-               "GroupInfo",
-               "Welcome"
-             ] do
-            ActivityPub.Object.hard_delete(object)
-            |> debug("deleted incoming object after processing local C2S activity")
-          end
 
           if pointer_id = AdapterUtils.pointer_id_from_url(ap_id) do
             # set pointer ID to the same one as was initially created in AP db
@@ -408,78 +395,75 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           with published when is_binary(published) <-
                  e(object, :data, "published", nil) || e(activity, :data, "published", nil) do
             DatesTimes.generate_ulid_if_past(published)
+            # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
           else
             _ -> nil
           end
-
-      # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
 
       debug(
         "AP - handle_activity_with OK: #{module} to Create #{ap_id} as #{inspect(pointer_id)} using #{module}"
       )
 
-      # debug(character, "character")
-      # debug(object)
+      fallback_module =
+        Application.get_env(:bonfire, :federation_fallback_module, Bonfire.Social.APActivities)
 
-      previous_pointer_id = e(object, :pointer_id, nil)
-
-      with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
-             Utils.maybe_apply(
-               module,
-               :ap_receive_activity,
-               [
-                 character,
-                 if(not is_map(object),
-                   do: Map.merge(activity, %{pointer_id: pointer_id}),
-                   else: activity
-                 ),
-                 if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
-               ],
-               no_argument_rescue: true,
-               fallback_fun: &no_federation_module_match/2
-             )
-             |> debug("attempted creation of remote object") do
-        debug(
-          "AP - created remote object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
-        )
-
-        # IO.inspect(pointable_object)
-
-        # maybe save a Peer for instance and Peered URI
-        Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
-          pointable_object_id,
-          ap_id,
-          type: :object
-        )
-        |> debug("saved canonical uri for peered object")
-
-        if !local? do
-          # attach created pointer to the object in AP db
-
-          # object = ActivityPub.Object.normalize(object)
-          object_id = id(object) || id(activity)
-          # FIXME?
-          if object_id &&
-               (is_nil(previous_pointer_id) or
-                  previous_pointer_id != pointable_object_id),
-             do:
-               ActivityPub.Object.update_existing(object_id, %{
-                 pointer_id: pointable_object_id
-               })
-               |> debug("pointer_id update")
-        end
-
-        {:ok, pointable_object}
+      if local? and module == fallback_module do
+        # Local C2S with no specific adapter: AP data already stored by Object.insert,
+        # just federate the existing activity directly (no need to create a local APActivity)
+        debug("Local C2S activity going to fallback module, federating existing AP activity")
+        ActivityPub.Federator.publish(activity)
+        {:ok, object || activity}
       else
-        e ->
-          debug(e, "Could not create remote object")
-
-          error(
-            Errors.error_msg(e),
-            "Could not create object for #{ap_id}"
+        with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
+               Utils.maybe_apply(
+                 module,
+                 :ap_receive_activity,
+                 [
+                   character,
+                   if(not is_map(object),
+                     do: Map.merge(activity, %{pointer_id: pointer_id}),
+                     else: activity
+                   ),
+                   if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
+                 ],
+                 no_argument_rescue: true,
+                 fallback_fun: &no_federation_module_match/2
+               )
+               |> debug("attempted creation of object") do
+          debug(
+            "AP - created object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
           )
 
-          # throw({:error, "Could not process incoming activity"})
+          unless local? do
+            # save a Peer for instance and Peered URI (only for remote objects)
+            Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
+              pointable_object_id,
+              ap_id,
+              type: :object
+            )
+            |> debug("saved canonical uri for peered object")
+          end
+
+          # attach the local pointer to the AP object (for both local C2S and remote)
+          maybe_set_pointer_on_ap_object(
+            object,
+            activity,
+            pointable_object_id,
+            previous_pointer_id
+          )
+
+          {:ok, pointable_object}
+        else
+          e ->
+            debug(e, "Could not create object")
+
+            error(
+              Errors.error_msg(e),
+              "Could not create object for #{ap_id}"
+            )
+
+            # throw({:error, "Could not process incoming activity"})
+        end
       end
     end
   end
@@ -602,6 +586,19 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   defp activity_character(actor) do
     error(actor, "AP - could not find an actor in the activity or object")
     {:ok, AdapterUtils.get_or_create_service_character()}
+  end
+
+  defp maybe_set_pointer_on_ap_object(object, activity, pointer_id, previous_pointer_id) do
+    object_id = id(object) || id(activity)
+
+    if object_id &&
+         (is_nil(previous_pointer_id) or
+            previous_pointer_id != pointer_id),
+       do:
+         ActivityPub.Object.update_existing(object_id, %{
+           pointer_id: pointer_id
+         })
+         |> debug("pointer_id update")
   end
 
   def no_federation_module_match(error, attrs \\ nil) do

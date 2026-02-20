@@ -45,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     if (federate_outgoing? == true or (opts[:manually_fetching?] and federate_outgoing? != false)) and
          ((is_nil(subject) and thing_local?) or
             subject_local?) do
-      prepare_and_queue(subject, verb, thing, opts)
+      maybe_prepare_and_queue(subject, verb, thing, opts)
       |> debug("prepare_and_queued")
     else
       debug(
@@ -71,15 +71,15 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # ^ TODO: to disabled only outgoing federation
   end
 
-  defp prepare_and_queue(subject, verb, thing, opts)
+  defp maybe_prepare_and_queue(subject, verb, thing, opts)
 
-  defp prepare_and_queue(_subject, verb, %{__struct__: type, id: _id} = character, _opts)
+  defp maybe_prepare_and_queue(_subject, verb, %{__struct__: type, id: _id} = character, _opts)
        when verb in [:update, :edit] and type in @types_characters do
     # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
     push_actor_update(character)
   end
 
-  defp prepare_and_queue(subject, :delete, thing, opts) do
+  defp maybe_prepare_and_queue(subject, :delete, thing, opts) do
     case not is_nil(thing) and
            push_delete(Types.object_type(thing), subject, thing, opts)
            |> debug("result of push_delete") do
@@ -111,9 +111,44 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  defp prepare_and_queue(subject, verb, %{__struct__: struct_type} = local_object, opts) do
-    object_type = Types.object_type(local_object) || struct_type
+  defp maybe_prepare_and_queue(subject, :create, %{__struct__: struct_type} = local_object, opts) do
+    if c2s_activity = opts[:from_c2s_activity] do
+      # C2S: federate the original AP activity directly instead of re-creating a new object
+      flood(c2s_activity, "Federating original C2S AP activity directly")
+      ActivityPub.Federator.publish(c2s_activity)
+    else
+      # Check if there's already an AP object for this local object (e.g. from C2S),
+      # and if so federate the original data directly instead of re-creating it
+      with {:ok, existing_ap_object} <-
+             ActivityPub.Object.get_cached(pointer: Enums.id(local_object)),
+           %ActivityPub.Object{} = existing_activity <-
+             ActivityPub.Object.get_activity_for_object_ap_id(existing_ap_object.data["id"]) do
+        flood(
+          existing_ap_object,
+          "Federating existing AP activity with original data (e.g. from C2S)"
+        )
 
+        ActivityPub.Federator.publish(existing_activity)
+      else
+        _ ->
+          object_type = Types.object_type(local_object) || struct_type
+          prepare_and_queue(subject, :create, local_object, object_type, opts)
+      end
+    end
+  end
+
+  defp maybe_prepare_and_queue(subject, verb, local_object, opts) do
+    object_type =
+      case local_object do
+        %{__struct__: struct_type} -> Types.object_type(local_object) || struct_type
+        _ -> nil
+      end
+
+    prepare_and_queue(subject, verb, local_object, object_type, opts)
+  end
+
+  defp prepare_and_queue(subject, verb, local_object, object_type, opts)
+       when not is_nil(object_type) do
     case opts[:federation_module] ||
            Bonfire.Federate.ActivityPub.FederationModules.federation_module({verb, object_type})
            |> from_ok() do
@@ -200,7 +235,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  defp prepare_and_queue(_subject, verb, object, _) do
+  defp prepare_and_queue(_subject, verb, object, _, _) do
     err("Unrecognised object for AP publisher", [verb, object])
   end
 

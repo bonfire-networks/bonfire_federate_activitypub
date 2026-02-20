@@ -27,6 +27,14 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     Bonfire.Common.URIs.base_url()
   end
 
+  def get_multi_tenant_context do
+    Bonfire.Common.TestInstanceRepo.get_parent_instance_meta()
+  end
+
+  def set_multi_tenant_context(context) do
+    Bonfire.Common.TestInstanceRepo.set_child_instance(context)
+  end
+
   @doc """
   Process incoming activities
   """
@@ -66,7 +74,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def external_followers_for_activity(actor, activity_data) do
+  def external_followers_for_activity(actor, activity_data, addressed_pointer_ids \\ []) do
     with ap_object when is_binary(ap_object) <-
            e(activity_data, "object", "id", nil) || e(activity_data, "object", nil),
          {:ok, object} <-
@@ -76,8 +84,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          character when is_struct(character) or is_binary(character) <-
            AdapterUtils.character_id_from_actor(actor) |> debug("character_id_from_actor"),
          followers when is_list(followers) and followers != [] <-
-           AdapterUtils.get_followers(character, :activity)
-           |> debug("got_followers")
+           AdapterUtils.get_followers(character, :activity, nil,
+             exclude_ids: addressed_pointer_ids
+           )
+           |> debug("got_followers (excluding already addressed)")
            |> Enum.reject(&AdapterUtils.is_local?/1)
            |> debug("remote followers"),
          granted_followers when is_list(granted_followers) and granted_followers != [] <-
@@ -87,7 +97,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
        #  only positive grants
        |> Enum.filter(& &1.value)
        |> Enum.map(&Map.take(&1, [:subject_id]))
-       |> debug("post_grants")
+       # Skip granted followers already in addressed recipients
+       |> Enum.reject(&(&1.subject_id in addressed_pointer_ids))
+       |> debug("post_grants (excluding already addressed)")
        |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject_id))
        |> filter_empty([])}
     else
