@@ -14,8 +14,20 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
 
+      %{method: :get, url: @remote_actor <> "/followers"} ->
+        json(%{})
+
       # %{method: :get, url: "https://mocked.local/users/karen"} ->
       #   json(Simulate.actor_json("https://mocked.local/users/karen"))
+
+      %{
+        method: :get,
+        url: "https://mocked.local/.well-known/webfinger?resource=https%3A%2F%2Fmocked.local"
+      } ->
+        %Tesla.Env{status: 404, body: ""}
+
+      %{method: :get, url: "https://mocked.local/.well-known/nodeinfo"} ->
+        %Tesla.Env{status: 404, body: ""}
 
       %{method: :get, url: "https://mocked.local/users/karen/statuses/114800379424129152"} ->
         "../fixtures/mastodon-post-object.json"
@@ -123,6 +135,64 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
              |> put_req_header("accept", "application/activity+json")
              |> get("/post/#{post.id}")
              |> redirected_to() =~ "/pub/objects/#{post.id}"
+    end
+
+    test "process remote activity with summary but no sensitive flag infers sensitive" do
+      data =
+        "../fixtures/mastodon-post-activity.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      {:ok, data} =
+        data
+        |> Map.update("object", %{}, fn object ->
+          object
+          # summary present but no sensitive property
+          |> Map.delete("sensitive")
+          |> Map.put("summary", "content warning text")
+        end)
+        |> ActivityPub.Federator.Transformer.handle_incoming(fetch_collection: false)
+
+      assert {:ok, post} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+               |> repo().maybe_preload([:post_content, :sensitive])
+
+      assert post.__struct__ == Bonfire.Data.Social.Post
+
+      # Summary should be preserved
+      assert e(post, :post_content, :summary, nil) == "content warning text"
+
+      # Should be inferred as sensitive from summary presence
+      assert post.sensitive.is_sensitive == true
+    end
+
+    test "process remote activity with summary and sensitive: false respects explicit flag" do
+      data =
+        "../fixtures/mastodon-post-activity.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      {:ok, data} =
+        data
+        |> Map.update("object", %{}, fn object ->
+          object
+          # explicitly not sensitive, even with summary
+          |> Map.put("sensitive", false)
+          |> Map.put("summary", "just a note")
+        end)
+        |> ActivityPub.Federator.Transformer.handle_incoming(fetch_collection: false)
+
+      assert {:ok, post} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+               |> repo().maybe_preload([:post_content, :sensitive])
+
+      # Summary should be preserved
+      assert e(post, :post_content, :summary, nil) == "just a note"
+
+      # Should respect explicit sensitive: false
+      assert e(post, :sensitive, :is_sensitive, nil) != true
     end
 
     test "process mastodon activity with content warning" do
