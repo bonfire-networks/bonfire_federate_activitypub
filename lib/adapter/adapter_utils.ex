@@ -41,7 +41,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def log(l) do
     # if Bonfire.Common.Config.get(:log_federation), do:
     # Logger.info(inspect(l))
-    Untangle.log_or_flood(:info, l)
+    Untangle.log_or_debug(:info, l)
   end
 
   def ap_base_url() do

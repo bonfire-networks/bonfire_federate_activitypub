@@ -114,7 +114,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp maybe_prepare_and_queue(subject, :create, %{__struct__: struct_type} = local_object, opts) do
     if c2s_activity = opts[:from_c2s_activity] do
       # C2S: federate the original AP activity directly instead of re-creating a new object
-      flood(c2s_activity, "Federating original C2S AP activity directly")
+      debug(c2s_activity, "Federating original C2S AP activity directly")
       ActivityPub.Federator.publish(c2s_activity)
     else
       # Check if there's already an AP object for this local object (e.g. from C2S),
@@ -123,7 +123,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
              ActivityPub.Object.get_cached(pointer: Enums.id(local_object)),
            %ActivityPub.Object{} = existing_activity <-
              ActivityPub.Object.get_activity_for_object_ap_id(existing_ap_object.data["id"]) do
-        flood(
+        debug(
           existing_ap_object,
           "Federating existing AP activity with original data (e.g. from C2S)"
         )

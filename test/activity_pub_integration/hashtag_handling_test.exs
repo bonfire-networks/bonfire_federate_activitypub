@@ -50,9 +50,9 @@ defmodule Bonfire.Federate.ActivityPub.HashtagHandlingTest do
       # The main content should be preserved
       assert post.post_content.html_body =~ "data protection"
 
-      # The trailing hashtags should be stripped from inline content
-      refute post.post_content.html_body =~ "#privacy"
-      refute post.post_content.html_body =~ "#gdpr"
+      # The trailing hashtags should be wrapped in invisible spans
+      assert post.post_content.html_body =~ ~r/<span class="invisible">.*#privacy.*<\/span>/s
+      assert post.post_content.html_body =~ ~r/<span class="invisible">.*#gdpr.*<\/span>/s
 
       # But the hashtags should still be associated via tags
       hashtag_names =
@@ -62,6 +62,28 @@ defmodule Bonfire.Federate.ActivityPub.HashtagHandlingTest do
 
       assert "privacy" in hashtag_names
       assert "gdpr" in hashtag_names
+    end
+
+    test "inline hashtags mixed with text on the last line are NOT treated as trailing" do
+      user = fake_user!()
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: user,
+          post_attrs: %{
+            post_content: %{
+              html_body: "This is about #privacy and also #gdpr regulations"
+            }
+          },
+          boundary: "public"
+        )
+
+      post = repo().maybe_preload(post, [:post_content, tags: [:named, :character]])
+
+      # Hashtags should remain visible inline (not wrapped in invisible)
+      refute post.post_content.html_body =~ "invisible"
+      assert post.post_content.html_body =~ "#privacy"
+      assert post.post_content.html_body =~ "#gdpr"
     end
   end
 
@@ -114,10 +136,9 @@ defmodule Bonfire.Federate.ActivityPub.HashtagHandlingTest do
       # The main content should be preserved
       assert post.post_content.html_body =~ "age verification"
 
-      # The trailing hashtag paragraph should be stripped from the body
-      # (Mastodon wraps names in <span>, so check for the word itself)
-      refute post.post_content.html_body =~ "privacy"
-      refute post.post_content.html_body =~ "gdpr"
+      # The trailing hashtag paragraph should be marked invisible
+      assert post.post_content.html_body =~ ~r/<p class="invisible">.*privacy.*<\/p>/s
+      assert post.post_content.html_body =~ ~r/<p class="invisible">.*gdpr.*<\/p>/s
 
       # But the hashtags should still be associated via tags
       hashtag_names =
