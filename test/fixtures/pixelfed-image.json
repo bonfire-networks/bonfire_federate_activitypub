@@ -35,7 +35,7 @@
 	"id": "https://pixelfed.local/p/dajbelshaw/371584017931323759",
 	"type": "Note",
 	"summary": null,
-	"content": "At the end of last year I sat down with a bunch of magazines and created this A3-sized collage. It was a cathartic exercise, so I'm considering doing it again this year.",
+	"content": "At the end of last year I sat down with a bunch of magazines and created this A3-sized collage. <a href=\"https://pixelfed.local/discover/tags/collage?src=hash\" class=\"u-url hashtag\" rel=\"nofollow noopener noreferrer\" target=\"_blank\">#collage</a> <a href=\"https://pixelfed.local/discover/tags/art?src=hash\" class=\"u-url hashtag\" rel=\"nofollow noopener noreferrer\" target=\"_blank\">#art</a>",
 	"inReplyTo": null,
 	"published": "2021-12-01T09:02:13+00:00",
 	"url": "https://pixelfed.local/p/dajbelshaw/371584017931323759",
@@ -54,7 +54,18 @@
 			"height": 1080
 		}
 	],
-	"tag": [],
+	"tag": [
+		{
+			"type": "Hashtag",
+			"name": "#collage",
+			"href": "https://pixelfed.local/discover/tags/collage"
+		},
+		{
+			"type": "Hashtag",
+			"name": "#art",
+			"href": "https://pixelfed.local/discover/tags/art"
+		}
+	],
 	"commentsEnabled": true,
 	"capabilities": {
 		"announce": "https://www.w3.org/ns/activitystreams#Public",

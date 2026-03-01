@@ -1,0 +1,62 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        {
+            "ostatus": "http://ostatus.org#",
+            "atomUri": "ostatus:atomUri",
+            "inReplyToAtomUri": "ostatus:inReplyToAtomUri",
+            "conversation": "ostatus:conversation",
+            "sensitive": "as:sensitive",
+            "toot": "http://joinmastodon.org/ns#",
+            "votersCount": "toot:votersCount"
+        }
+    ],
+    "id": "https://mocked.local/users/karen/statuses/114800379424129999/activity",
+    "type": "Create",
+    "actor": "https://mocked.local/users/karen",
+    "published": "2025-07-05T12:00:00Z",
+    "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+        "https://mocked.local/users/karen/followers"
+    ],
+    "object": {
+        "id": "https://mocked.local/users/karen/statuses/114800379424129999",
+        "type": "Note",
+        "inReplyTo": null,
+        "published": "2025-07-05T12:00:00Z",
+        "url": "https://mocked.local/@karen/114800379424129999",
+        "attributedTo": "https://mocked.local/users/karen",
+        "to": [
+            "https://www.w3.org/ns/activitystreams#Public"
+        ],
+        "cc": [
+            "https://mocked.local/users/karen/followers"
+        ],
+        "content": "<p>This is a post about age verification and data protection regulations.</p><p><a href=\"https://mocked.local/tags/privacy\" class=\"mention hashtag\" rel=\"tag\">#<span>privacy</span></a> <a href=\"https://mocked.local/tags/gdpr\" class=\"mention hashtag\" rel=\"tag\">#<span>gdpr</span></a></p>",
+        "attachment": [],
+        "tag": [
+            {
+                "type": "Hashtag",
+                "name": "#privacy",
+                "href": "https://mocked.local/tags/privacy"
+            },
+            {
+                "type": "Hashtag",
+                "name": "#gdpr",
+                "href": "https://mocked.local/tags/gdpr"
+            }
+        ],
+        "replies": {
+            "id": "https://mocked.local/users/karen/statuses/114800379424129999/replies",
+            "type": "Collection",
+            "first": {
+                "type": "CollectionPage",
+                "next": "https://mocked.local/users/karen/statuses/114800379424129999/replies?only_other_accounts=true&page=true",
+                "partOf": "https://mocked.local/users/karen/statuses/114800379424129999/replies",
+                "items": []
+            }
+        }
+    }
+}
