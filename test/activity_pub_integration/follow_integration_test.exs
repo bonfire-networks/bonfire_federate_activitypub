@@ -14,6 +14,18 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
 
+      %{
+        method: :get,
+        url: "https://mocked.local/.well-known/webfinger?resource=https%3A%2F%2Fmocked.local"
+      } ->
+        %Tesla.Env{status: 404, body: ""}
+
+      %{
+        method: :get,
+        url: "https://mocked.local/.well-known/nodeinfo"
+      } ->
+        %Tesla.Env{status: 404, body: ""}
+
       %{method: :get, url: url} ->
         url
         |> String.split("/pub/actors/")

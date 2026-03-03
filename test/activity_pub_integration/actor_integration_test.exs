@@ -35,6 +35,18 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
       } ->
         json(Simulate.webfingered())
 
+      %{
+        method: :get,
+        url: "https://mocked.local/.well-known/webfinger?resource=https%3A%2F%2Fmocked.local"
+      } ->
+        %Tesla.Env{status: 404, body: ""}
+
+      %{
+        method: :get,
+        url: "https://mocked.local/.well-known/nodeinfo"
+      } ->
+        %Tesla.Env{status: 404, body: ""}
+
       other ->
         error(other, "mock not configured")
         nil

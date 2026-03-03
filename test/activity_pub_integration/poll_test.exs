@@ -9,6 +9,18 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
       %{method: :get, url: "https://mocked.local/users/karen"} ->
         json(Simulate.actor_json("https://mocked.local/users/karen"))
 
+      %{
+        method: :get,
+        url: "https://mocked.local/.well-known/webfinger?resource=https%3A%2F%2Fmocked.local"
+      } ->
+        %Tesla.Env{status: 404, body: ""}
+
+      %{
+        method: :get,
+        url: "https://mocked.local/.well-known/nodeinfo"
+      } ->
+        %Tesla.Env{status: 404, body: ""}
+
       # %{url: "https://mocked.local/relation/27005"} ->
 
       # NOTE: already mocked in AP lib

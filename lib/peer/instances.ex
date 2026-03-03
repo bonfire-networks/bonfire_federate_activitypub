@@ -13,6 +13,11 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   alias Bonfire.Common.Extend
   alias Bonfire.Common.Types
 
+  @doc "Counts all known federated instances."
+  def count do
+    repo().aggregate(from(p in Peer), :count)
+  end
+
   def list do
     repo().many(list_query())
   end
@@ -213,6 +218,61 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
   def instance_blocked?(%Bonfire.Data.AccessControl.Circle{} = circle, block_type, opts) do
     Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
+  end
+
+  @doc """
+  Query for instances involved in federated follows.
+  `:incoming` = instances whose actors follow local actors.
+  `:outgoing` = instances where local actors follow remote actors.
+  """
+  def federated_follows_query(direction) when direction in [:incoming, :outgoing] do
+    {remote_side, local_side} =
+      case direction do
+        :incoming -> {:subject_id, :object_id}
+        :outgoing -> {:object_id, :subject_id}
+      end
+
+    Bonfire.Social.Graph.Follows.query([], skip_boundary_check: true)
+    |> join(:inner, [edge: edge], remote_peered in Bonfire.Data.ActivityPub.Peered,
+      as: :remote_peered,
+      on: field(edge, ^remote_side) == remote_peered.id
+    )
+    |> join(:inner, [remote_peered: rp], peer in Peer, as: :peer, on: peer.id == rp.peer_id)
+    |> join(:left, [edge: edge], local_peered in Bonfire.Data.ActivityPub.Peered,
+      as: :local_peered,
+      on: field(edge, ^local_side) == local_peered.id
+    )
+    |> where([local_peered: lp], is_nil(lp.id))
+  end
+
+  @doc "Counts distinct instances whose actors follow local actors."
+  def count_instances_following_local do
+    federated_follows_query(:incoming)
+    |> select([peer: p], count(p.id, :distinct))
+    |> repo().one() || 0
+  end
+
+  @doc "Counts distinct instances where local actors follow remote actors."
+  def count_instances_followed_by_local do
+    federated_follows_query(:outgoing)
+    |> select([peer: p], count(p.id, :distinct))
+    |> repo().one() || 0
+  end
+
+  @doc "Lists distinct instances whose actors follow local actors."
+  def list_instances_following_local do
+    federated_follows_query(:incoming)
+    |> select([peer: p], p)
+    |> distinct([peer: p], p.id)
+    |> repo().many()
+  end
+
+  @doc "Lists distinct instances where local actors follow remote actors."
+  def list_instances_followed_by_local do
+    federated_follows_query(:outgoing)
+    |> select([peer: p], p)
+    |> distinct([peer: p], p.id)
+    |> repo().many()
   end
 
   @doc """
