@@ -92,7 +92,9 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     if not String.starts_with?(canonical_uri, base_url) do
       do_get_or_create(canonical_uri, opts[:id], opts[:type])
     else
-      error(canonical_uri, "We do not create a Peered for local URI")
+      # TODO: avoid calling this for local ones?
+      warn(canonical_uri, "We do not create a Peered for local URI")
+      {:error, :local}
 
       # maybe_username = String.replace_leading(canonical_uri, base_url <> "/pub/actors/", "")
 
@@ -183,7 +185,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
         actor_blocked?(peered, block_type, opts)
       else
         other ->
-          error(other, "could not find or create a Peered, assuming not blocked")
+          info(other, "could not find or create a Peered, assuming not blocked")
           false
       end
     end
