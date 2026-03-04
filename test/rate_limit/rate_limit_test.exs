@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.RateLimitTest do
   import Untangle
   alias Bonfire.Federate.ActivityPub.RateLimit.Testing
 
-  @moduletag :test_instance
+  @moduletag :rate_limit
 
   describe "WebFinger endpoint rate limiting" do
     test "throttles excessive requests to WebFinger", context do

@@ -661,7 +661,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         debug(ap_id, "assume fetching remote object")
         # FIXME: this should not query the AP db
         # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-        ActivityPub.Federator.Fetcher.get_cached_object_or_fetch_ap_id(ap_id, opts)
+        ActivityPub.Federator.Fetcher.get_cached_or_fetch_object(ap_id, opts)
         |> debug("got by ap_id")
         |> return_pointable()
       end

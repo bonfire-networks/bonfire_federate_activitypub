@@ -423,6 +423,137 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert ap_json["interactionPolicy"]["canQuote"]["automaticApproval"]
   end
 
+  test "accepting a quote request adds quoteAuthorization to the AP JSON", context do
+    other_user = fake_user!()
+
+    # other_user creates a quote of user's post (creates a request since no direct permission)
+    quote_attrs = %{
+      post_content: %{html_body: "Quoting this! #{context.original_url}"}
+    }
+
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: other_user,
+        post_attrs: quote_attrs,
+        boundary: "public"
+      )
+
+    # Verify request was created
+    assert {:ok, _request} = Quotes.requested(quote_post, context.original_post)
+
+    # Before acceptance: ap_quote_fields should not return quoteAuthorization
+    {:ok, actor} = ActivityPub.Actor.get_cached(pointer: other_user.id)
+    {pre_fields, _} = Quotes.ap_quote_fields(actor, quote_post)
+    refute pre_fields["quoteAuthorization"]
+
+    # Accept the quote request
+    {:ok, _} = Quotes.accept_quote(quote_post, context.original_post)
+
+    # After acceptance: ap_quote_fields should include quoteAuthorization
+    # (for local users, the QuoteAuthorization is created on-demand by ap_quote_fields
+    # since the quoted object is local; for federated case, it's stored from Accept's result)
+    {post_fields, post_tags} = Quotes.ap_quote_fields(actor, quote_post)
+
+    assert post_fields["quoteAuthorization"],
+           "quoteAuthorization should be available after acceptance"
+
+    assert post_fields["quote"] == context.original_url
+    assert length(post_tags) > 0
+  end
+
+  test "rejecting a previously accepted quote removes quoteAuthorization from the AP JSON",
+       context do
+    other_user = fake_user!()
+
+    # other_user creates a quote of user's post (creates a request since no direct permission)
+    quote_attrs = %{
+      post_content: %{html_body: "Quoting this! #{context.original_url}"}
+    }
+
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: other_user,
+        post_attrs: quote_attrs,
+        boundary: "public"
+      )
+
+    # Verify request was created
+    assert {:ok, _request} = Quotes.requested(quote_post, context.original_post)
+
+    # Accept the quote request
+    {:ok, accepted_quote} = Quotes.accept_quote(quote_post, context.original_post)
+
+    # Simulate what federation does: store quoteAuthorization on the AP object
+    # (in local-only tests, the Accept doesn't go through federation so it's not stored automatically)
+    {:ok, %{data: data} = ap_object} = ActivityPub.Object.get_cached(pointer: accepted_quote)
+    fake_auth_url = context.original_url <> "_authorization_test123"
+
+    {:ok, _} =
+      ActivityPub.Object.do_update_existing(ap_object, %{
+        data:
+          data
+          |> Map.put("quoteAuthorization", fake_auth_url)
+          |> Map.put("quote", context.original_url)
+      })
+
+    # Verify quoteAuthorization is present
+    {:ok, %{data: stored_ap_json}} = ActivityPub.Object.get_cached(pointer: accepted_quote)
+    assert stored_ap_json["quoteAuthorization"] == fake_auth_url
+
+    # Now reject the previously accepted quote
+    {:ok, _} =
+      Quotes.reject_quote(accepted_quote, context.original_post, current_user: context.user)
+
+    # Verify quoteAuthorization is removed after rejection
+    {:ok, %{data: rejected_ap_json}} = ActivityPub.Object.get_cached(pointer: quote_post)
+    refute rejected_ap_json["quoteAuthorization"]
+    refute rejected_ap_json["quote"]
+
+    # Verify quote relationship is removed
+    quote_tags = Bonfire.Social.Tags.list_tags_quote(quote_post)
+    assert quote_tags == []
+  end
+
+  test "ap_quote_fields uses stored fields even when quote tags are missing (cross-instance scenario)",
+       context do
+    # This simulates what happens in dance tests: the AP object has quote + quoteAuthorization
+    # stored from an Accept's result, but list_tags_quote returns empty because the tags
+    # are in a different repo context.
+    user = fake_user!()
+
+    # Create a plain post (NOT a quote — no quote tags)
+    {:ok, post} =
+      Posts.publish(
+        current_user: user,
+        post_attrs: %{post_content: %{html_body: "A post"}},
+        boundary: "public"
+      )
+
+    # Manually store quote + quoteAuthorization on the AP object
+    # (simulating what store_quote_authorization_on_ap_object does after receiving Accept)
+    fake_quote_url = context.original_url
+    fake_auth_url = "https://remote.example/auth/xyz"
+
+    {:ok, %{data: data} = ap_object} = ActivityPub.Object.get_cached(pointer: post)
+
+    ActivityPub.Object.do_update_existing(ap_object, %{
+      data:
+        data
+        |> Map.put("quote", fake_quote_url)
+        |> Map.put("quoteAuthorization", fake_auth_url)
+    })
+
+    # ap_quote_fields should still return the stored fields even with no quote tags
+    {:ok, actor} = ActivityPub.Actor.get_cached(pointer: user.id)
+    {quote_fields, _quote_tags} = Quotes.ap_quote_fields(actor, post)
+
+    assert quote_fields["quote"] == fake_quote_url,
+           "quote field should be preserved from stored AP object data"
+
+    assert quote_fields["quoteAuthorization"] == fake_auth_url,
+           "quoteAuthorization should be preserved from stored AP object data"
+  end
+
   test "skips quote creation when user doesn't have permission to request", context do
     # Block the other user from the original post's creator
     other_user = fake_user!()

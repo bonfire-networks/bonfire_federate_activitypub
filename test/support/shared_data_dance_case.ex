@@ -24,8 +24,6 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
 
       # The default endpoint for testing
       @endpoint Application.compile_env!(:bonfire, :endpoint_module)
-
-      @moduletag :test_instance
     end
   end
 
