@@ -30,6 +30,32 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
   @callback federation_module() :: any
   def federation_module(query, modules \\ federation_modules_data_types())
 
+  # Expand list verbs or list object types into all {verb, type} combinations,
+  # returning the first matching module found.
+  def federation_module({verbs, types}, modules) when is_list(verbs) or is_list(types) do
+    mods = modules || federation_modules_data_types()
+
+    for(v <- List.wrap(verbs), t <- List.wrap(types), do: {v, t})
+    |> Enum.find_value({:error, :not_found}, fn query ->
+      case federation_module(query, mods) do
+        {:ok, _} = ok -> ok
+        _ -> nil
+      end
+    end) || {:error, :not_found}
+  end
+
+  def federation_module(types, modules) when is_list(types) do
+    mods = modules || federation_modules_data_types()
+
+    types
+    |> Enum.find_value({:error, :not_found}, fn query ->
+      case federation_module(query, mods) do
+        {:ok, _} = ok -> ok
+        _ -> nil
+      end
+    end) || {:error, :not_found}
+  end
+
   def federation_module({_verb, type} = query, modules) when is_atom(type) do
     case Map.get(modules || federation_modules_data_types(), query) do
       nil ->
@@ -38,7 +64,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
       other ->
         {:ok, other}
-    end
+    end || {:error, :not_found}
   end
 
   def federation_module(query, modules) when is_atom(query) do
@@ -49,7 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
 
       other ->
         {:ok, other}
-    end
+    end || {:error, :not_found}
   end
 
   def federation_module(query, modules)
@@ -61,20 +87,6 @@ defmodule Bonfire.Federate.ActivityPub.FederationModules do
       other ->
         {:ok, other}
     end
-  end
-
-  def federation_module(queries, modules)
-      when is_list(queries) do
-    Enum.find_value(queries, fn query ->
-      case Map.get(modules || federation_modules_data_types(), query) do
-        nil ->
-          # fallback to context module
-          Bonfire.Common.ContextModule.context_module(query)
-
-        val ->
-          {:ok, val}
-      end
-    end) || {:error, :not_found}
   end
 
   @doc "Look up a Federation Module, throw :not_found if not found."

@@ -3,6 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   use Bonfire.Common.Utils
   # alias Bonfire.Common.URIs
   import Bonfire.Federate.ActivityPub
+  import ActivityPub.Config, only: [is_in: 2]
   alias Needle.Pointer
   alias ActivityPub.Actor
   alias ActivityPub.Object
@@ -13,7 +14,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   alias Bonfire.Federate.ActivityPub.Adapter
   alias Bonfire.Federate.ActivityPub.Incoming
   require Logger
-  require ActivityPub.Config
   import Untangle
 
   # TODO: refactor, clean up, and split into more logical modules
@@ -458,7 +458,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           end
       end
     end)
-    |> Enum.uniq()
+    |> Enum.uniq_by(&elem(&1, 0))
     |> filter_empty([])
     |> debug()
   end
@@ -849,7 +849,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         {:error, :not_found}
 
       %{pointer_id: id, local: local?, data: %{"type" => type}}
-      when is_binary(id) and ActivityPub.Config.is_in(type, :supported_actor_types) ->
+      when is_binary(id) and is_in(type, :supported_actor_types) ->
         with {:error, :not_found} <- get_character_by_id(id) do
           # in case the local pointer was deleted
           if local? do
@@ -908,7 +908,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         create_remote_actor(fetched)
 
       %ActivityPub.Object{data: %{"type" => type}, local: false}
-      when ActivityPub.Config.is_in(type, :supported_actor_types) ->
+      when is_in(type, :supported_actor_types) ->
         create_remote_actor(fetched)
 
       %ActivityPub.Object{local: false} ->

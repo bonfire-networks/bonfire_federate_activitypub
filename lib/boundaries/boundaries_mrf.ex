@@ -2,9 +2,9 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   @moduledoc "Filter activities depending on their origin instance, actor, or other criteria"
   use Bonfire.Common.Utils
   use Arrows
-  require ActivityPub.Config
   import Untangle
   import Bonfire.Federate.ActivityPub
+  import ActivityPub.Config, only: [is_in: 2]
   alias ActivityPub.MRF
   alias Bonfire.Boundaries
   alias Bonfire.Federate.ActivityPub.AdapterUtils
@@ -294,7 +294,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     if ed(filtered, :to, nil) || ed(filtered, :cc, nil) || ed(filtered, :bto, nil) ||
          ed(filtered, :bcc, nil) || ed(filtered, :audience, nil) ||
          e(activity, "publishedDate", nil) || ed(activity, "object", "publishedDate", nil) ||
-         ed(activity, "object", "type", nil) in ["Tombstone", "Place"] do
+         is_in(ed(activity, "object", "type", nil), ["Tombstone", "Place"]) do
       # ^ `publishedDate` here is intended as an exception for bookwyrm which doesn't put audience info
       # TODO: put exceptions in config
       {:ok, filtered}
@@ -499,7 +499,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          _local_recipient_ids,
          _is_local?
        )
-       when ActivityPub.Config.is_in(uri, :public_uris) do
+       when is_in(uri, :public_uris) do
     false
   end
 

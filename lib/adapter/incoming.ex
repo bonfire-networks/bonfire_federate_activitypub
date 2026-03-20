@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   import Untangle
   use Arrows
   use Bonfire.Common.Utils
-  require ActivityPub.Config
+  import ActivityPub.Config
   import Bonfire.Federate.ActivityPub
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   # import AdapterUtils, only: [log: 1]
@@ -82,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       )
       when is_binary(object_id) do
     is_deleted? =
-      e(activity.data, "type", nil) in ["Delete", "Tombstone"]
+      is_in(e(activity.data, "type", nil), ["Delete", "Tombstone"])
 
     if is_deleted? and
          (object_id == e(activity.data, "actor", nil) or
@@ -191,7 +191,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         %{data: %{"type" => "Update"}} = _activity,
         %{data: %{"type" => object_type, "id" => ap_id}} = _object
       )
-      when ActivityPub.Config.is_in(object_type, :supported_actor_types) do
+      when is_in(object_type, :supported_actor_types) do
     info("AP Match#0 - update actor")
 
     with {:ok, actor} <- ActivityPub.Actor.get_cached(ap_id: ap_id),
@@ -372,7 +372,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
        )
        when is_atom(module) and not is_nil(module) and
               (verb in @creation_verbs or
-                 ActivityPub.Config.is_in(verb, :supported_intransitive_types) == true) do
+                 is_in(verb, :supported_intransitive_types) == true) do
     ap_obj_id = e(object, :data, "id", nil)
     ap_activity_id = e(activity, :data, "id", nil)
     ap_id = ap_obj_id || ap_activity_id
@@ -458,6 +458,10 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
           {:ok, pointable_object}
         else
+          {:ok, :skipped} ->
+            debug(ap_id, "AP - object skipped (no Bonfire record needed)")
+            {:ok, :skipped}
+
           e ->
             debug(e, "Could not create object")
 
@@ -478,7 +482,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
          %{data: %{"type" => verb}} = activity,
          object
        )
-       when is_atom(module) and not is_nil(module) and verb in ["Accept", "Reject"] do
+       when is_atom(module) and not is_nil(module) and is_in(verb, ["Accept", "Reject"]) do
     info(
       "AP - Accept/Reject (related to another activity) handle_activity_with module: #{module}"
     )
@@ -517,7 +521,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
             Types.uid(pointable_object_id)
             |> debug("uiid")
 
-      if id && e(activity, :data, "type", nil) not in ["Update", "Delete"] do
+      if id && !is_in(e(activity, :data, "type", nil), ["Update", "Delete"]) do
         ActivityPub.Object.update_existing(Enums.id(activity) || Enums.id(object), %{
           pointer_id: id
         })
@@ -540,7 +544,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   end
 
   defp activity_character(%{data: %{"type" => type, "actor" => actor}})
-       when type in ["Delete", "Tombstone"] do
+       when is_in(type, ["Delete", "Tombstone"]) do
     AdapterUtils.get_character(actor, skip_boundary_check: true)
   end
 
@@ -557,7 +561,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   end
 
   defp activity_character(%{"id" => actor, "type" => type})
-       when ActivityPub.Config.is_in(type, :supported_actor_types) == true and is_binary(actor) do
+       when is_in(type, :supported_actor_types) == true and is_binary(actor) do
     activity_character(actor)
   end
 

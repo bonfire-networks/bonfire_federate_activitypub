@@ -4,6 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Untangle
   import Bonfire.Federate.ActivityPub
   use Bonfire.Common.E
+  import ActivityPub.Config, only: [is_in: 2]
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Common
@@ -254,7 +255,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     msg =
       "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
 
-    if verb in ["Delete", "Update"],
+    if is_in(verb, ["Delete", "Update"]),
       do:
         error(
           object,
@@ -272,7 +273,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   def preparation_error(error, verb, object) do
     msg = "Federate.ActivityPub - Unable to federate out - #{error} - with verb: #{verb}}"
 
-    if verb in ["Delete", "Update"],
+    if is_in(verb, ["Delete", "Update"]),
       do:
         error(
           object,
