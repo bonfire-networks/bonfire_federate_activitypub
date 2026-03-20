@@ -28,7 +28,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
       }
     }
 
-    post2_attrs = %{post_content: %{html_body: "try out federated mentions-only"}}
+    post2_attrs = %{post_content: %{html_body: "try out federated mentions-only 20"}}
 
     post3_text = "try out federated reply with mention 200"
 
@@ -38,8 +38,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
       }
     }
 
-    post4_attrs = %{post_content: %{html_body: "try out federated reply-only"}}
-    post5_attrs = %{post_content: %{html_body: "try out federated reply in thread"}}
+    post4_attrs = %{post_content: %{html_body: "try out federated reply-only 40"}}
+    post5_attrs = %{post_content: %{html_body: "try out federated reply in thread 50"}}
 
     local_user = context[:local][:user]
 

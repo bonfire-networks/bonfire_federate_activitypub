@@ -458,11 +458,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           end
       end
     end)
-    |> Enum.uniq_by(fn 
+    |> Enum.uniq_by(fn
       {ap_id, _user} -> ap_id
       nil -> nil
       other -> other
-  end)
+    end)
     |> filter_empty([])
     |> debug()
   end
