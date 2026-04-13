@@ -255,17 +255,17 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     msg =
       "Federate.ActivityPub - Unable to federate out - #{error}... object ID: #{id} - with verb: #{verb} ; object type: #{object_type}"
 
-    if is_in(verb, ["Delete", "Update"]),
-      do:
-        error(
-          object,
-          msg
-        ),
-      else:
-        err(
-          object,
-          msg
-        )
+    if is_in(verb, ["Delete", "Update"]) do
+      error(
+        object,
+        msg
+      )
+    else
+      err(
+        object,
+        msg
+      )
+    end
 
     :ignore
   end
