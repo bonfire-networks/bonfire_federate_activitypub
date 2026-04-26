@@ -212,7 +212,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(activity_type) and (is_binary(object_type) or is_list(object_type)) do
     info(object_type, "AP Match#1 - with activity_type: #{activity_type} and object_type:")
 
-    with {:ok, subject} <- activity_character(activity) |> info("activity_character"),
+    with {:ok, subject} <- AdapterUtils.activity_character(activity) |> info("activity_character"),
          {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(
@@ -254,7 +254,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(activity_type) do
     info("AP Match#2 - by activity_type only: #{activity_type}")
 
-    with {:ok, subject} <- activity_character(activity),
+    with {:ok, subject} <- AdapterUtils.activity_character(activity),
          # For actor deletion: check if we only have an ap_id for the object, and if it matches the subject's ap_id, and if so use subject as object 
          subject_as_object =
            if(
@@ -281,7 +281,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(object_type) or is_list(object_type) do
     info(object_type, "AP Match#3 - by object_type only")
 
-    with {:ok, subject} <- activity_character(activity),
+    with {:ok, subject} <- AdapterUtils.activity_character(activity),
          {:no_federation_module_match, _} <-
            handle_activity_with(
              Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type),
@@ -522,9 +522,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
             |> debug("uiid")
 
       if id && !is_in(e(activity, :data, "type", nil), ["Update", "Delete"]) do
-        ActivityPub.Object.update_existing(Enums.id(activity) || Enums.id(object), %{
-          pointer_id: id
-        })
+        with activity_id when not is_nil(activity_id) <- Enums.id(activity) do
+          ActivityPub.Object.update_existing(activity_id, %{pointer_id: id})
+        end
       end
       |> debug("pointer_id update")
 
@@ -541,59 +541,6 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
     {:no_federation_module_match, :ignore}
-  end
-
-  defp activity_character(%{data: %{"type" => type, "actor" => actor}})
-       when is_in(type, ["Delete", "Tombstone"]) do
-    AdapterUtils.get_character(actor, skip_boundary_check: true)
-  end
-
-  defp activity_character(%{data: %{"type" => "Tombstone"}} = actor) do
-    AdapterUtils.get_character(actor, skip_boundary_check: true)
-  end
-
-  defp activity_character(%{data: %{} = data}) do
-    activity_character(data)
-  end
-
-  defp activity_character(%{"actor" => actor}) do
-    activity_character(actor)
-  end
-
-  defp activity_character(%{"id" => actor, "type" => type})
-       when is_in(type, :supported_actor_types) == true and is_binary(actor) do
-    activity_character(actor)
-  end
-
-  defp activity_character(actor) when is_binary(actor) do
-    info(actor, "AP - receive - get activity_character")
-    # FIXME to handle actor types other than Person/User
-    with {:error, e} <-
-           AdapterUtils.get_or_fetch_and_create_by_uri(actor,
-             fetch_collection: false,
-             return_tombstones: true
-           )
-           |> debug("fetched actor") do
-      error(e, "AP - could not find local character for the actor")
-      {:ok, AdapterUtils.get_or_create_service_character()}
-    end
-  end
-
-  defp activity_character(%{"object" => object}) do
-    activity_character(object)
-  end
-
-  defp activity_character(%{"attributedTo" => actor}) do
-    activity_character(actor)
-  end
-
-  defp activity_character(%{actor: actor}) do
-    activity_character(actor)
-  end
-
-  defp activity_character(actor) do
-    error(actor, "AP - could not find an actor in the activity or object")
-    {:ok, AdapterUtils.get_or_create_service_character()}
   end
 
   defp maybe_set_pointer_on_ap_object(object, activity, pointer_id, previous_pointer_id) do

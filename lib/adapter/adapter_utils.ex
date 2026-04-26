@@ -1892,4 +1892,66 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       _ -> [preload: preload]
     end
   end
+
+  def activity_character(%{data: %{"type" => type, "actor" => actor}})
+      when is_in(type, ["Delete", "Tombstone"]) do
+    get_character(actor, skip_boundary_check: true)
+  end
+
+  def activity_character(%{data: %{"type" => "Tombstone"}} = actor) do
+    get_character(actor, skip_boundary_check: true)
+  end
+
+  def activity_character(%{data: %{} = data}) do
+    activity_character(data)
+  end
+
+  def activity_character(%{"actor" => actor}) do
+    activity_character(actor)
+  end
+
+  def activity_character(%{"id" => actor, "type" => type})
+      when is_in(type, :supported_actor_types) == true and is_binary(actor) do
+    activity_character(actor)
+  end
+
+  def activity_character(actor) when is_binary(actor) do
+    info(actor, "AP - receive - get activity_character")
+    # FIXME to handle actor types other than Person/User
+    with {:error, e} <-
+           get_or_fetch_and_create_by_uri(actor,
+             fetch_collection: false,
+             return_tombstones: true
+           )
+           |> debug("fetched actor") do
+      error(e, "AP - could not find local character for the actor")
+      {:ok, get_or_create_service_character()}
+    end
+  end
+
+  def activity_character(%{"object" => object}) do
+    activity_character(object)
+  end
+
+  def activity_character(%{"attributedTo" => actors}) when is_list(actors) do
+    actor =
+      Enum.find(actors, &(&1["type"] == "Person")) ||
+        Enum.find(actors, &(&1["type"] == "Group")) ||
+        List.first(actors)
+
+    activity_character(actor)
+  end
+
+  def activity_character(%{"attributedTo" => actor}) do
+    activity_character(actor)
+  end
+
+  def activity_character(%{actor: actor}) do
+    activity_character(actor)
+  end
+
+  def activity_character(actor) do
+    error(actor, "AP - could not find an actor in the activity or object")
+    {:ok, get_or_create_service_character()}
+  end
 end
