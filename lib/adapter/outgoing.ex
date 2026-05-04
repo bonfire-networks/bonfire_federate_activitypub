@@ -368,16 +368,32 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  def push_actor_update(%{__struct__: type, id: id})
+  def push_actor_update(%{__struct__: type, id: id} = character)
       when type in @types_characters do
     # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
-    with {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: id) do
-      ActivityPub.Actor.set_cache(actor)
-      push_actor_update(actor)
-    else
-      e ->
-        preparation_error("Error while attempting to find the Actor to update", "Update", e)
+    actor =
+      case ActivityPub.Actor.get_cached(pointer: id) do
+        {:ok, actor} ->
+          ActivityPub.Actor.set_cache(actor)
+          actor
+
+        _ ->
+          # Fallback for actors with no ap_objects row yet (e.g. service character)
+          AdapterUtils.character_to_actor(character)
+      end
+
+    push_actor_update(actor)
+  end
+
+  def push_actor_update(user_id) when is_binary(user_id) do
+    with {:ok, user} <- Bonfire.Me.Users.by_id(user_id) do
+      push_actor_update(user)
     end
+  end
+
+  def push_actor_update(nil) do
+    AdapterUtils.get_or_create_service_character()
+    |> push_actor_update()
   end
 
   def push_now!(activity) do

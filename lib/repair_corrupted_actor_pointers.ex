@@ -48,6 +48,10 @@ defmodule Bonfire.Federate.ActivityPub.RepairCorruptedActorPointers do
     WHERE ap.data->>'type' IN ('Person', 'Group', 'Organization', 'Service', 'Application')
       AND ap.data->>'preferredUsername' = c.username
       AND (ap.pointer_id IS NULL OR ap.pointer_id != c.id)
+      AND NOT EXISTS (
+        SELECT 1 FROM ap_object other
+        WHERE other.pointer_id = c.id AND other.id != ap.id
+      )
     """)
     |> then(&{&1.num_rows, nil})
   end
