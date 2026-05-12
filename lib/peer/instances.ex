@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   import Bonfire.Federate.ActivityPub
   import Ecto.Query
   alias Bonfire.Data.ActivityPub.Peer
-  # alias Bonfire.Common.Utils
+  alias Bonfire.Common.Utils
   alias Bonfire.Common.URIs
   alias Bonfire.Common.Extend
   alias Bonfire.Common.Types
@@ -77,17 +77,21 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   defp create(instance_url, host) do
-    get_or_create_instance_circle(host)
-    |> debug("circle for instance actors")
-
     # TODO: maybe Peer should be a mixin so it can have the same ID as the Circle representing it?
 
     with {:ok, peer} <-
            repo().insert(
              Peer.changeset(%Peer{}, %{ap_base_uri: instance_url, display_hostname: host})
-           ) do
-      Extend.maybe_module(Bonfire.Boundaries.Circles).create_stereotype_circle(peer, :silence_me)
-
+           ),
+         {:ok, _instance_circle} <- get_or_create_instance_circle(host),
+         {:ok, _stereo} <-
+           Utils.maybe_apply(
+             Bonfire.Boundaries.Circles,
+             :get_or_create_stereotype_circle,
+             [
+               peer,
+               :silence_me
+             ], fallback_return: {:ok, nil}) do
       {:ok, peer}
     end
   end
@@ -142,20 +146,6 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
       case get_by_instance_url(instance_url) do
         {:ok, peer} ->
           debug(instance_url, "instance already exists")
-
-          get_or_create_instance_circle(host)
-          |> warn(
-            "TEMPORARY: create a circle for instance (remove this in future, since doing it when a Peer is first created should be enough)"
-          )
-
-          Extend.maybe_module(Bonfire.Boundaries.Circles).get_or_create_stereotype_circle(
-            peer,
-            :silence_me
-          )
-          |> warn(
-            "TEMPORARY: create a silencing circle for instance (remove this in future, since doing it when a Peer is first created should be enough)"
-          )
-
           {:ok, peer}
 
         _none ->
@@ -169,26 +159,37 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   def get_or_create_instance_circle(host) do
-    if module = Extend.maybe_module(Bonfire.Boundaries.Circles) do
-      with {:ok, instance_circle} <-
-             module.get_or_create(
-               host,
-               Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
-             ) do
-        # module.get_or_create_stereotype_circle(instance_circle, :silence_me)
+    circle_type =
+      Utils.maybe_apply(Bonfire.Boundaries.Scaffold.Instance, :activity_pub_circle, [],
+        fallback_return: nil
+      )
 
-        {:ok, instance_circle}
-      end
-    end
+    if(circle_type,
+      do:
+        Utils.maybe_apply(
+          Bonfire.Boundaries.Circles,
+          :get_or_create,
+          [host, circle_type],
+          fallback_return: nil
+        )
+    ) || {:ok, nil}
   end
 
   def get_instance_circle(host) do
-    if module = Extend.maybe_module(Bonfire.Boundaries.Circles) do
-      module.get_by_name(
-        host,
-        Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
+    circle_type =
+      Utils.maybe_apply(Bonfire.Boundaries.Scaffold.Instance, :activity_pub_circle, [],
+        fallback_return: nil
       )
-    end
+
+    if(circle_type,
+      do:
+        Utils.maybe_apply(
+          Bonfire.Boundaries.Circles,
+          :get_by_name,
+          [host, circle_type],
+          fallback_return: nil
+        )
+    )
   end
 
   def instance_blocked?(peered, block_type \\ :any, opts \\ [])
