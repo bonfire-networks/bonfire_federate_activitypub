@@ -557,5 +557,45 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert {:ok, _object} = ActivityPub.Object.get_cached(pointer: pointer_id)
       assert {:ok, _object} = ActivityPub.Object.get_cached(ap_id: ap_id)
     end
+
+    test "GH #1754 - hashtag link in AP content preserves rel=tag so Mastodon skips link preview" do
+      user = fake_user!()
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: user,
+          post_attrs: %{post_content: %{html_body: "post with #bonfire hashtag"}},
+          boundary: "public"
+        )
+
+      {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      content = ap_activity.object.data["content"]
+
+      assert content =~ ~r/rel="[^"]*\btag\b/,
+             "Expected hashtag link to carry rel=tag in AP content, got: #{content}"
+    end
+
+    test "GH #1754 - mention AP tag name has @ prefix as Mastodon expects" do
+      me = fake_user!()
+      mentioned = fake_user!()
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: me,
+          post_attrs: %{
+            post_content: %{html_body: "hey @#{mentioned.character.username}"}
+          },
+          boundary: "public"
+        )
+
+      {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      tags = ap_activity.object.data["tag"] || []
+      mention = Enum.find(tags, &(&1["type"] == "Mention"))
+
+      assert mention, "Expected a Mention tag in AP object, got tags: #{inspect(tags)}"
+
+      assert String.starts_with?(mention["name"], "@"),
+             "Expected mention name to start with @, got: #{inspect(mention["name"])}"
+    end
   end
 end
