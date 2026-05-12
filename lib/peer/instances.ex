@@ -91,7 +91,9 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
              [
                peer,
                :silence_me
-             ], fallback_return: {:ok, nil}) do
+             ],
+             fallback_return: {:ok, nil}
+           ) do
       {:ok, peer}
     end
   end
