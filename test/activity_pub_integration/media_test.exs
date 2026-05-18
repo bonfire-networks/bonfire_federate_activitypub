@@ -29,6 +29,39 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
     :ok
   end
 
+  describe "supports outgoing" do
+    test "a link/article Media (comments_embed flow) federates with an instance-hosted `id` (not the external `url`)" do
+      # Regression: previously no explicit `"id"` was set, so AP normalisation
+      # filled `id` from `url` (the external article URL). A remote server
+      # (e.g. Mastodon) then dereferences the instance object URL, gets back an
+      # object whose `id` is on a different host, and rejects it → broken
+      # remote interaction. The `id` must be origin-consistent with the host
+      # that serves the object; the external URL stays in `url`.
+      user = Bonfire.Me.Fake.fake_user!()
+      url = "https://example.com/some/article"
+
+      {:ok, media} =
+        Bonfire.Files.Media.insert(
+          user,
+          url,
+          %{media_type: "link", size: 0},
+          %{url: url, media_type: "link", metadata: %{"label" => "Some Article Title"}}
+        )
+
+      assert {:ok, _published} =
+               Bonfire.Files.Media.publish(user, media, boundary: "public")
+
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: media)
+
+      assert data["type"] == "Page"
+      assert data["url"] == url
+
+      ap_base = ActivityPub.Utils.ap_base_url()
+      assert String.starts_with?(data["id"], ap_base <> "/objects/")
+      refute data["id"] == url
+    end
+  end
+
   describe "supports incoming" do
     test "pixelfed note with image" do
       data =
@@ -137,6 +170,46 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
       assert media.media_type == "audio/ogg"
 
       assert {:ok, _} = Bonfire.Social.Objects.read(media.id)
+    end
+
+    test "bonfire-style Create{Page} link is received as a link, not an audio/mp3 Media" do
+      # Mirrors what `Bonfire.Files.Media.ap_publish_activity/3` emits when
+      # comments_embed first creates a Media activity for a link/article:
+      # a `Page` object whose `url` is a plain string. This must NOT be
+      # hijacked into an `audio/mp3` Media by the Audio receive clause.
+      actor_id = "https://mocked.local/users/karen"
+
+      page = %{
+        "id" => "https://mocked.local/objects/some-article-media",
+        "type" => "Page",
+        "actor" => actor_id,
+        "attributedTo" => actor_id,
+        "name" => "Some Article Title",
+        "summary" => "A normal blog article, definitely not audio",
+        "url" => "https://example.com/some/article",
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+      }
+
+      create = %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => "Create",
+        "id" => "https://mocked.local/objects/some-article-media/activity",
+        "actor" => actor_id,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "object" => page
+      }
+
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(create)
+
+      assert {:ok, received} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+               |> repo().maybe_preload([:post_content, :media])
+
+      # The core regression: never a defaulted audio/mp3 Media
+      refute match?(%Bonfire.Files.Media{media_type: "audio/mp3"}, received)
+
+      # A Page without image/audio/video should be saved as a Post (link preview)
+      assert received.__struct__ == Bonfire.Data.Social.Post
     end
 
     test "update activity with media changes - add primary image, remove one attachment, add another" do
