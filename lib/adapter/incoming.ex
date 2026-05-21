@@ -186,13 +186,28 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     receive_activity(activity, %{data: object})
   end
 
-  # Activity: Update + Object: actor/character
+  # Activity: Update + Object: actor/character (local C2S — use object body directly)
+  def receive_activity(
+        %{local: true, data: %{"type" => "Update"}} = _activity,
+        %{data: %{"type" => object_type, "id" => ap_id} = object_data} = _object
+      )
+      when is_in(object_type, :supported_actor_types) do
+    info("AP Match#0a - update local actor from C2S body")
+
+    with {:ok, actor} <- ActivityPub.Actor.get_cached(ap_id: ap_id),
+         {:ok, actor} <-
+           Bonfire.Federate.ActivityPub.Adapter.update_local_actor(actor, object_data) do
+      {:ok, actor}
+    end
+  end
+
+  # Activity: Update + Object: actor/character (remote — re-fetch from network)
   def receive_activity(
         %{data: %{"type" => "Update"}} = _activity,
         %{data: %{"type" => object_type, "id" => ap_id}} = _object
       )
       when is_in(object_type, :supported_actor_types) do
-    info("AP Match#0 - update actor")
+    info("AP Match#0b - update remote actor")
 
     with {:ok, actor} <- ActivityPub.Actor.get_cached(ap_id: ap_id),
          {:ok, actor} <-
@@ -416,6 +431,10 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         # just federate the existing activity directly (no need to create a local APActivity)
         debug("Local C2S activity going to fallback module, federating existing AP activity")
         ActivityPub.Federator.publish(activity)
+        # Still link the pointer so /pub/objects/:ulid can find the object by pointer lookup
+        if pointer_id,
+          do: maybe_set_pointer_on_ap_object(object, activity, pointer_id, previous_pointer_id)
+
         {:ok, object || activity}
       else
         with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
