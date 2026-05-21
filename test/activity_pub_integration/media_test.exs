@@ -172,6 +172,64 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
       assert {:ok, _} = Bonfire.Social.Objects.read(media.id)
     end
 
+    test "peertube video that only exposes HLS playlists (mp4s nested in the playlist `tag`) is ingested" do
+      # Regression for bonfire-app#1728 / #1774 / #1715. Newer PeerTube versions
+      # don't list progressive `.mp4` at the top level of `url` — only the HTML
+      # watch page and the HLS master playlist, with the real `video/mp4` links
+      # nested in the playlist entry's `tag`. The old extractor returned no media
+      # type, so ingestion failed the `media_type: can't be blank` changeset and
+      # left an orphaned/untitled object. It must now ingest with a usable type.
+      creator = fake_user!()
+
+      base = "https://peertube.linuxrocks.local/static/streaming-playlists/hls/hls-only"
+      watch_url = "https://peertube.linuxrocks.local/videos/watch/hls-only"
+
+      object_data = %{
+        "id" => watch_url,
+        "type" => "Video",
+        "name" => "HLS-only PeerTube video",
+        "content" => "A video federated by a recent PeerTube version",
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "url" => [
+          %{"type" => "Link", "mediaType" => "text/html", "href" => watch_url},
+          %{
+            "type" => "Link",
+            "mediaType" => "application/x-mpegURL",
+            "href" => "#{base}/master.m3u8",
+            "tag" => [
+              %{
+                "type" => "Link",
+                "mediaType" => "video/mp4",
+                "height" => 1080,
+                "size" => 57_888_169,
+                "href" => "#{base}/hls-only-1080-fragmented.mp4"
+              },
+              %{
+                "type" => "Link",
+                "mediaType" => "video/mp4",
+                "height" => 720,
+                "size" => 45_165_123,
+                "href" => "#{base}/hls-only-720-fragmented.mp4"
+              }
+            ]
+          }
+        ]
+      }
+
+      # Call the Media receive clause directly to isolate the Media-layer fix from
+      # the AP transformer's remote actor/object resolution.
+      activity = %{
+        public: true,
+        data: %{"type" => "Create", "to" => ["https://www.w3.org/ns/activitystreams#Public"]}
+      }
+
+      assert {:ok, _received} =
+               Bonfire.Files.Media.ap_receive_activity(creator, activity, %{
+                 public: true,
+                 data: object_data
+               })
+    end
+
     test "bonfire-style Create{Page} link is received as a link, not an audio/mp3 Media" do
       # Mirrors what `Bonfire.Files.Media.ap_publish_activity/3` emits when
       # comments_embed first creates a Media activity for a link/article:
