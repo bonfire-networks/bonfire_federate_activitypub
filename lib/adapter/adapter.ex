@@ -18,7 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   alias ActivityPub.Actor
   alias ActivityPub.Object
 
-  import Bonfire.Federate.ActivityPub
+  import Bonfire.Federate.ActivityPub, except: [federation_allowed?: 2]
   import Untangle
 
   @behaviour ActivityPub.Federator.Adapter
@@ -439,46 +439,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_locale, do: Bonfire.Common.Localise.get_locale_id()
 
-  def federate_actor?(
-        actor,
-        direction \\ nil,
-        by_actor \\ nil
-      ) do
-    case {AdapterUtils.get_character(actor),
-          if(by_actor, do: AdapterUtils.get_character(by_actor))} do
-      {{:ok, character}, {:ok, by_character}} ->
-        Bonfire.Federate.ActivityPub.federating?(character) &&
-          Bonfire.Federate.ActivityPub.federating?(by_character) &&
-          !BoundariesMRF.actor_blocked?(
-            character,
-            direction,
-            by_character
-          ) &&
-          !BoundariesMRF.actor_blocked?(
-            by_character,
-            direction,
-            character
-          )
-
-      {{:ok, character}, _} ->
-        Bonfire.Federate.ActivityPub.federating?(character) &&
-          !BoundariesMRF.actor_blocked?(
-            character,
-            direction
-          )
-
-      {_, {:ok, by_character}} ->
-        Bonfire.Federate.ActivityPub.federating?(by_character) &&
-          !BoundariesMRF.actor_blocked?(
-            by_character,
-            direction
-          )
-
-      _ ->
-        debug(actor, "no character for actor")
-        Bonfire.Federate.ActivityPub.federating?()
-    end
-  end
+  def federate_actor?(actor, direction \\ nil, by_actor \\ nil),
+    do: federation_allowed?(actor, direction: direction, by_actor: by_actor)
 
   def transform_outgoing(data, target_host \\ nil, target_actor_id \\ nil)
 
@@ -516,4 +478,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # debug(data, "WIP transform_outgoing")
     data
   end
+
+  def federation_allowed?(subject, opts \\ []),
+    do: Bonfire.Federate.ActivityPub.federation_allowed?(subject, opts)
 end

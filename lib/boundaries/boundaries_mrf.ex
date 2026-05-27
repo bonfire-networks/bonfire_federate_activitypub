@@ -251,7 +251,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     # || Bonfire.Federate.ActivityPub.Peered.actor_blocked?(actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
     # |> debug()
     MRF.subdomain_match?(rejects, clean_url) ||
-      Bonfire.Federate.ActivityPub.Peered.actor_blocked?(actor || actor_uri, block_types,
+      not federation_allowed?(actor || actor_uri,
+        block_types: block_types,
         user_ids: local_author_ids
       )
   end
@@ -599,11 +600,12 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         |> debug(
           "filter '#{clean_recipient_actor_uri}' blocked #{inspect(block_types)} actor in config?"
         ) ||
-        Bonfire.Federate.ActivityPub.Peered.actor_blocked?(actor_to_check, block_types,
+        not Bonfire.Federate.ActivityPub.federation_allowed?(actor_to_check,
+          block_types: block_types,
           user_ids: by_characters
         )
         |> debug(
-          "filter '#{id(actor_to_check) || inspect(actor_to_check)}' blocked (#{inspect(block_types)}) by #{inspect(by_characters)} in DB, either instance-wide or by specified local_actor_ids?"
+          "filter '#{id(actor_to_check) || inspect(actor_to_check)}' federation_allowed? (#{inspect(block_types)}) by #{inspect(by_characters)}?"
         )
     end
   end

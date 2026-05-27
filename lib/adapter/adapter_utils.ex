@@ -754,11 +754,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     do: get_or_fetch_and_create_by_uri(url, opts)
 
   def get_by_url_ap_id_or_username(string, opts) when is_binary(string) do
-    with {:ok, uri} <- Bonfire.Common.URIs.validate_uri(string) |> debug("uri?") do
-      get_or_fetch_and_create_by_uri(URI.to_string(uri), opts)
-    else
-      _ ->
+    cond do
+      String.contains?(string, "@") ->
         get_or_fetch_and_create_by_username(string, opts)
+
+      true ->
+        with {:ok, uri} <- Bonfire.Common.URIs.validate_uri(string) |> debug("uri?") do
+          get_or_fetch_and_create_by_uri(URI.to_string(uri), opts)
+        else
+          _ ->
+            # bare domain — treat as instance
+            get_or_fetch_and_create_by_uri("https://#{string}", opts)
+        end
     end
   end
 
@@ -1953,5 +1960,64 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def activity_character(actor) do
     error(actor, "AP - could not find an actor in the activity or object")
     {:ok, get_or_create_service_character()}
+  end
+
+  @doc """
+  Resolve a URI, @handle, or bare domain to an actor or instance circle without adding it anywhere.
+
+  Bare domains and instance-level URLs resolve to an instance circle via `Instances`.
+  Actor URLs and webfinger handles are fetched remotely.
+
+  Uses `federation_mode: true` to bypass allowlist checks so callers can resolve actors
+  even when in allowlist-only mode (e.g. to add them to an allowlist or blocklist).
+
+  Returns `{:ok, subject}`.
+  """
+  def resolve_uri(uri, current_user) when is_binary(uri) do
+    alias Bonfire.Federate.ActivityPub.Instances
+
+    is_bare_domain =
+      not String.contains?(uri, "@") and
+        not String.starts_with?(uri, "http") and
+        not String.contains?(uri, "/")
+
+    parsed_path = URI.parse(uri).path
+
+    is_instance_url =
+      not String.contains?(uri, "@") and
+        String.starts_with?(uri, "http") and
+        (is_nil(parsed_path) or parsed_path == "" or parsed_path == "/")
+
+    if is_bare_domain or is_instance_url do
+      host = if is_bare_domain, do: uri, else: URI.parse(uri).host
+
+      with {:ok, instance_circle} <- Instances.get_or_create_instance_circle(host),
+           instance_circle when not is_nil(instance_circle) <- instance_circle do
+        {:ok, instance_circle}
+      else
+        nil -> {:error, "Could not resolve instance"}
+        other -> other
+      end
+    else
+      # federation_mode: true bypasses allowlist check so users can resolve actors even in allowlist-only mode
+      get_by_url_ap_id_or_username(uri,
+        current_user: current_user,
+        federation_mode: true
+      )
+    end
+  end
+
+  @doc """
+  Resolve a URI, @handle, or bare domain and add the result to a circle.
+
+  Returns `{:ok, subject}` where subject is the actor or instance circle that was added.
+  """
+  def add_to_circle_by_uri(uri, circle, current_user) when is_binary(uri) do
+    alias Bonfire.Boundaries.Circles
+
+    with {:ok, subject} <- resolve_uri(uri, current_user),
+         {:ok, _} <- Circles.add_to_circles(subject, circle) do
+      {:ok, subject}
+    end
   end
 end

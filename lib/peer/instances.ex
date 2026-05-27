@@ -40,8 +40,10 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     if Types.is_uid?(id_or_canonical_uri) do
       get_by_id(id_or_canonical_uri)
     else
-      with %URI{} = instance_url <- URIs.base_url(id_or_canonical_uri) do
-        get_by_instance_url(instance_url)
+      with instance_url when is_binary(instance_url) <-
+             URIs.base_url(id_or_canonical_uri)
+             |> info("Instances.get base_url for #{id_or_canonical_uri}") do
+        get_by_instance_url(instance_url) |> info("Instances.get by_instance_url #{instance_url}")
       end
     end
   end
@@ -194,13 +196,71 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     )
   end
 
+  def instance_allowlisted?(host_or_uri, opts \\ [])
+
+  def instance_allowlisted?(uri_or_id, opts) when is_binary(uri_or_id) do
+    case get(uri_or_id) do
+      {:ok, peer} ->
+        instance_allowlisted?(peer, opts)
+
+      _ ->
+        # No Peer record — try via hostname circle directly (e.g. when added by hostname before actor fetch)
+        hostname = URI.parse(uri_or_id).host || uri_or_id
+
+        with {:ok, circle} <-
+               get_instance_circle(hostname)
+               |> debug("instance_circle by hostname for #{hostname}") do
+          Bonfire.Boundaries.Allowlist.is_allowlisted?(circle, opts)
+        else
+          _ -> false
+        end
+    end
+  end
+
+  def instance_allowlisted?(%Peer{display_hostname: display_hostname}, opts) do
+    with {:ok, circle} <-
+           get_instance_circle(display_hostname) |> debug("instance_circle for allowlist") do
+      Bonfire.Boundaries.Allowlist.is_allowlisted?(circle, opts)
+    else
+      _ -> false
+    end
+  end
+
+  def instance_allowlisted?(_, _opts), do: false
+
+  def add_to_allowlist(host_or_peer, scope \\ :instance_wide)
+
+  def add_to_allowlist(%Peer{display_hostname: display_hostname}, scope),
+    do: add_to_allowlist(display_hostname, scope)
+
+  def add_to_allowlist(host_or_uri, scope) when is_binary(host_or_uri) do
+    with {:ok, circle} <- get_or_create_instance_circle(host_or_uri) do
+      Bonfire.Boundaries.Allowlist.allow(circle, scope)
+    end
+  end
+
+  def remove_from_allowlist(host_or_peer, scope \\ :instance_wide)
+
+  def remove_from_allowlist(%Peer{display_hostname: display_hostname}, scope),
+    do: remove_from_allowlist(display_hostname, scope)
+
+  def remove_from_allowlist(host_or_uri, scope) when is_binary(host_or_uri) do
+    with {:ok, circle} <- get_instance_circle(host_or_uri) do
+      Bonfire.Boundaries.Allowlist.unallow(circle, scope)
+    end
+  end
+
+  def list_allowlist(scope \\ :instance_wide),
+    do: Bonfire.Boundaries.Allowlist.list(scope)
+
   def instance_blocked?(peered, block_type \\ :any, opts \\ [])
 
   def instance_blocked?(uri, block_type, opts) when is_binary(uri) do
-    with {:ok, peer} <- get(uri) do
+    with {:ok, peer} <- get(uri) |> info("Instances.instance_blocked? get peer for #{uri}") do
       instance_blocked?(peer, block_type, opts)
     else
-      _ ->
+      other ->
+        info(other, "Instances.instance_blocked? could not find peer for #{uri}")
         false
     end
   end

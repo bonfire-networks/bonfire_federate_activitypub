@@ -134,12 +134,13 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     do: receive_remote_activity_to([to])
 
   def receive_remote_activity_to(to) do
-    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
-    recipient_actors = Enum.map(to, &recipient/1)
-    params = remote_activity_json(actor, recipient_actors)
+    with {:ok, actor} <- ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor) do
+      recipient_actors = Enum.map(to, &recipient/1)
+      params = remote_activity_json(actor, recipient_actors)
 
-    with {:ok, activity} <- ActivityPub.create(params),
-         do: Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      with {:ok, activity} <- ActivityPub.create(params),
+           do: Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+    end
   end
 
   defp recipient(%{id: _} = recipient) do

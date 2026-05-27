@@ -49,6 +49,14 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     nil
   end
 
+  @doc "Returns `%Peered{}` if resolvable, otherwise `nil`. Used to preload once before block+allowlist checks."
+  def get_or_nil(subject) do
+    case get(subject) do
+      {:ok, peered} -> peered
+      _ -> nil
+    end
+  end
+
   def get_by_uid(id) when is_binary(id) do
     repo().single(
       from(p in Peered)
@@ -156,6 +164,68 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     })
   end
 
+  def actor_allowlisted?(peered_or_uri, opts \\ [])
+
+  def actor_allowlisted?(%Peered{} = peered, opts) do
+    peered = repo().maybe_preload(peered, :peer)
+    is_allowlisted_peer_or_peered?(peered, opts)
+  end
+
+  def actor_allowlisted?(%Peer{} = peer, opts) do
+    Instances.instance_allowlisted?(peer, opts)
+  end
+
+  def actor_allowlisted?(id_or_uri, opts) when is_binary(id_or_uri) do
+    if is_uid?(id_or_uri) do
+      with {:ok, peered} <- get(id_or_uri) do
+        actor_allowlisted?(peered, opts)
+      else
+        _ -> false
+      end
+    else
+      with {:ok, peered} <- get(id_or_uri) do
+        actor_allowlisted?(peered, opts)
+      else
+        _ ->
+          info(
+            id_or_uri,
+            "no existing Peered record for URI, falling back to instance allowlist check"
+          )
+
+          Instances.instance_allowlisted?(id_or_uri, opts)
+          |> info("instance_allowlisted? result for #{id_or_uri}")
+      end
+    end
+  end
+
+  def actor_allowlisted?(%URI{} = uri, opts) do
+    URI.to_string(uri) |> actor_allowlisted?(opts)
+  end
+
+  def actor_allowlisted?(%{peered: _} = object, opts) do
+    object = repo().preload(object, [peered: [:peer]], force: true)
+    peered = Map.get(object, :peered) || %{}
+    peered = repo().maybe_preload(peered, :peer)
+    is_allowlisted_peer_or_peered?(peered, opts)
+  end
+
+  def actor_allowlisted?(_, _opts), do: false
+
+  defp is_allowlisted_peer_or_peered?(peered, _opts) when peered in [nil, %{}], do: false
+
+  defp is_allowlisted_peer_or_peered?(%{peer: peer} = peered, opts)
+       when peer not in [nil, %{}] do
+    Instances.instance_allowlisted?(peer, opts)
+    |> debug("Instance allowlisted? #{inspect(peer)}") ||
+      Bonfire.Boundaries.Allowlist.is_allowlisted?(peered, opts)
+      |> debug("Actor directly allowlisted? #{inspect(peered)}")
+  end
+
+  defp is_allowlisted_peer_or_peered?(peered, opts) do
+    debug(peered, "no instance associated with actor, checking actor directly")
+    Bonfire.Boundaries.Allowlist.is_allowlisted?(peered, opts)
+  end
+
   def actor_blocked?(peered, block_type \\ :any, opts \\ [])
 
   def actor_blocked?(%Peered{} = peered, block_type, opts) do
@@ -181,12 +251,17 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
           Bonfire.Boundaries.Blocks.is_blocked?(id_or_uri, block_type, opts)
       end
     else
-      with {:ok, peered} <- get_or_create(id_or_uri, opts) |> debug("Peered found or created?") do
+      with {:ok, peered} <- get(id_or_uri) |> debug("existing Peered for URI") do
         actor_blocked?(peered, block_type, opts)
       else
-        other ->
-          info(other, "could not find or create a Peered, assuming not blocked")
-          false
+        _ ->
+          info(
+            id_or_uri,
+            "no existing Peered record for URI, falling back to instance check with block_type=#{inspect(block_type)}"
+          )
+
+          Instances.instance_blocked?(id_or_uri, block_type, opts)
+          |> info("instance_blocked? result for #{id_or_uri}")
       end
     end
   end

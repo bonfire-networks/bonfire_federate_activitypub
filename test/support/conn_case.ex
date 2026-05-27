@@ -25,6 +25,7 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
 
       import Bonfire.UI.Common.Testing.Helpers
 
+      import PhoenixTest
       import Phoenix.LiveViewTest
       # import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers
