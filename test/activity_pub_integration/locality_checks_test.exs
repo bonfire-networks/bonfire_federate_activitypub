@@ -10,6 +10,11 @@ defmodule Bonfire.Federate.ActivityPub.LocalityChecksTest do
 
   alias ActivityPub.Federator.Workers.PublisherWorker
 
+  setup do
+    Process.put(:federating, true)
+    :ok
+  end
+
   # Maybe move this to adapter tests?
   describe "locality checks" do
     test "federates activities from local actors" do

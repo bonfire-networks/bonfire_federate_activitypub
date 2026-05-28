@@ -101,9 +101,14 @@ defmodule Bonfire.Federate.ActivityPub do
     end
   end
 
-  @doc "Returns `true` if federation is enabled (open or allowlist-only) for the given subject."
-  def federating?(subject \\ nil, opts \\ []),
-    do: federation_mode(subject, opts) != false
+  @doc "Returns `true` if federation is enabled (open or allowlist-only), `nil` for manual/paused mode, `false` if disabled."
+  def federating?(subject \\ nil, opts \\ []) do
+    case federation_mode(subject, opts) do
+      false -> false
+      nil -> nil
+      _ -> true
+    end
+  end
 
   @doc "Returns `true` if the subject is in allowlist-only mode."
   def allowlist_only?(subject \\ nil, opts \\ []),
@@ -168,6 +173,7 @@ defmodule Bonfire.Federate.ActivityPub do
           (mode != :allowlist_only or
              Bonfire.Federate.ActivityPub.Peered.actor_allowlisted?(subject_to_check, opts))
       )
+      |> info("federation_allowed?")
   end
 
   def federating_default?() do
@@ -205,8 +211,12 @@ defmodule Bonfire.Federate.ActivityPub do
       {:default, false} ->
         false
 
+      {_tag, instance_mode} when instance_mode in [nil, :manual] ->
+        # instance is in manual/paused mode — user can only disable, not enable
+        if user_federating?(subject) == false, do: false, else: nil
+
       {_tag, instance_mode} ->
-        # single user-level Settings lookup; key now accepts true | :allowlist_only | false
+        # single user-level Settings lookup; key now accepts true | :allowlist_only | false | :manual | nil
         case user_federating?(subject) do
           false ->
             false
@@ -214,12 +224,15 @@ defmodule Bonfire.Federate.ActivityPub do
           :allowlist_only ->
             :allowlist_only
 
+          v when v in [:manual, nil] ->
+            nil
+
           _ ->
             # instance :allowlist_only overrides an open user setting
             if instance_mode == :allowlist_only, do: :allowlist_only, else: true
         end
     end
-    |> debug()
+    |> info("computed_federation_mode")
   end
 
   defp user_federating?(subject, default \\ :not_set) do

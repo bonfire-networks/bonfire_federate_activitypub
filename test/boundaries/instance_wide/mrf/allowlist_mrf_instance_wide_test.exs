@@ -19,6 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
 
   setup do
     Process.put(:federating, :allowlist_only)
+    on_exit(fn -> Process.delete(:federating) end)
     :ok
   end
 
@@ -69,6 +70,45 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
   describe "outgoing: allowlisted recipients pass" do
     test "local activity to allowlisted remote actor is delivered" do
       Instances.add_to_allowlist("mocked.local")
+
+      local_activity = local_activity_json_to(@remote_actor)
+      assert {:ok, _} = BoundariesMRF.filter(local_activity, true)
+    end
+  end
+
+  describe "incoming: actor-level allowlist (domain not allowlisted)" do
+    test "remote activity from allowlisted actor passes even when domain not allowlisted" do
+      # fetch while open so Peered record exists, then allowlist the actor, then switch to allowlist mode
+      Process.put(:federating, true)
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
+      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Process.put(:federating, :allowlist_only)
+
+      remote_activity = remote_activity_json()
+      assert {:ok, _} = BoundariesMRF.filter(remote_activity, false)
+    end
+
+    test "remote activity from non-allowlisted actor on same instance is still rejected" do
+      Process.put(:federating, true)
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
+      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Process.put(:federating, :allowlist_only)
+
+      other_actor = @remote_instance <> "/users/other"
+      other_activity = remote_activity_json(other_actor, [ActivityPub.Config.public_uri()])
+      assert reject_or_no_recipients?(BoundariesMRF.filter(other_activity, false))
+    end
+  end
+
+  describe "outgoing: actor-level allowlist (domain not allowlisted)" do
+    test "local activity to allowlisted actor passes even when domain not allowlisted" do
+      Process.put(:federating, true)
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
+      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Process.put(:federating, :allowlist_only)
 
       local_activity = local_activity_json_to(@remote_actor)
       assert {:ok, _} = BoundariesMRF.filter(local_activity, true)

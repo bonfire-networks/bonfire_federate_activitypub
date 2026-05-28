@@ -82,7 +82,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          object when is_binary(object) or is_struct(object) <-
            e(object, :pointer, nil) || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-
-           AdapterUtils.character_id_from_actor(actor) |> debug("character_id_from_actor"),
+           AdapterUtils.character_id_from_actor(actor) |> info("character_id_from_actor"),
+         federation_mode when is_atom(federation_mode) and not is_nil(federation_mode) <-
+           Bonfire.Federate.ActivityPub.federation_mode(character)
+           |> info("external_followers_for_activity:federation_mode"),
          followers when is_list(followers) and followers != [] <-
            AdapterUtils.get_followers(character, :activity, nil,
              exclude_ids: addressed_pointer_ids
@@ -101,7 +104,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
        |> Enum.reject(&(&1.subject_id in addressed_pointer_ids))
        |> debug("post_grants (excluding already addressed)")
        |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject_id))
-       |> filter_empty([])}
+       |> filter_empty([])
+       |> Enum.filter(
+         &Bonfire.Federate.ActivityPub.federation_allowed?(&1,
+           current_user: character,
+           federation_mode: federation_mode
+         )
+       )}
     else
       [] ->
         debug(actor, "No remote followers or grants")

@@ -8,6 +8,11 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
   @remote_actor "https://mocked.local/users/karen"
   @local_actor "alice"
 
+  setup do
+    Process.put(:federating, true)
+    :ok
+  end
+
   setup_all do
     orig = Config.get!(:boundaries)
 

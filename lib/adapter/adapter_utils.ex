@@ -478,9 +478,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def all_object_recipients(activity_or_object, fields \\ [:to, :bto, :cc, :bcc, :audience]) do
-    (e(activity_or_object, :data, nil) || activity_or_object)
-    # |> debug
-    |> all_fields(fields)
+    [e(activity_or_object, :data, nil), activity_or_object]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.flat_map(&all_fields(&1, fields))
     |> debug("all_recipients")
     |> List.flatten()
     |> cleanup_list()

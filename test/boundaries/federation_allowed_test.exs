@@ -53,6 +53,28 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
     end
   end
 
+  describe "federation_allowed?/2 allowlist-only mode — actor-level allowlist" do
+    test "allows URI when specific actor is allowlisted (domain not allowlisted)" do
+      # fetch actor while open so Peered record is created, then switch to allowlist mode
+      {:ok, _actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
+      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+
+      Process.put(:federating, :allowlist_only)
+      assert Federation.federation_allowed?(@remote_actor)
+    end
+
+    test "rejects URI when only a different actor on the same instance is allowlisted" do
+      other_actor = @remote_instance <> "/users/other"
+      {:ok, _actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
+      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+
+      Process.put(:federating, :allowlist_only)
+      refute Federation.federation_allowed?(other_actor)
+    end
+  end
+
   describe "federation_allowed?/2 disabled" do
     test "rejects all URIs when federation disabled" do
       Process.put(:federating, false)

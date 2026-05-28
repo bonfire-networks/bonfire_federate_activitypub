@@ -8,6 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
   @remote_actor @remote_instance <> "/users/karen"
 
   setup do
+    Process.put(:federating, true)
+
     mock(fn
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))

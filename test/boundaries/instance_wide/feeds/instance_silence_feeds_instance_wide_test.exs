@@ -9,6 +9,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
 
   @local_actor "alice"
 
+  setup do
+    Process.put(:federating, true)
+    :ok
+  end
+
   setup_all do
     orig = Config.get!(:boundaries)
 

@@ -33,6 +33,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       |> AdapterUtils.local_actor_ids()
       |> debug("local_recipient_ids")
 
+    is_public? = Enum.any?(recipients, &ActivityPub.Utils.has_as_public?/1)
+
+    opts = Keyword.put(opts, :is_public, is_public?)
+
     # num_local_authors = length(local_author_ids)
     # = (num_local_authors && num_local_authors == length(authors))
 
@@ -128,7 +132,10 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
           "check for silenced actor/instances & filter recipients of incoming remote activities"
         )
 
-        activity_blocked?(block_types, [], activity, rejects) ||
+        # blanket instance-wide check (no user scope) for public posts or when no local recipients;
+        # per-recipient check handles user-scoped blocks for addressed activities
+        ((local_recipient_ids == [] or opts[:is_public]) and
+           activity_blocked?(block_types, [], activity, rejects)) ||
           block_or_filter_recipients(
             block_types,
             activity,
@@ -269,7 +276,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
            activity,
            local_author_ids,
            local_recipient_ids,
-           opts[:is_local]
+           opts
          )
          |> debug("with_filtered_recipients") do
       %{type: verb} = filtered when verb in @filter_for_verbs ->
@@ -341,7 +348,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     end
   end
 
-  defp filter_recipients(block_types, activity, local_author_ids, local_recipient_ids, is_local?) do
+  defp filter_recipients(block_types, activity, local_author_ids, local_recipient_ids, opts) do
     rejects = rejects_regex(block_types)
 
     activity
@@ -351,7 +358,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       rejects,
       local_author_ids,
       local_recipient_ids,
-      is_local?
+      opts
     )
     |> filter_recipients_field(
       :cc,
@@ -359,7 +366,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       rejects,
       local_author_ids,
       local_recipient_ids,
-      is_local?
+      opts
     )
     |> filter_recipients_field(
       :bto,
@@ -367,7 +374,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       rejects,
       local_author_ids,
       local_recipient_ids,
-      is_local?
+      opts
     )
     |> filter_recipients_field(
       :bcc,
@@ -375,7 +382,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       rejects,
       local_author_ids,
       local_recipient_ids,
-      is_local?
+      opts
     )
     |> filter_recipients_field(
       :audience,
@@ -383,7 +390,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       rejects,
       local_author_ids,
       local_recipient_ids,
-      is_local?
+      opts
     )
   end
 
@@ -394,7 +401,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          rejects,
          local_author_ids,
          local_recipient_ids,
-         is_local?,
+         opts,
          recursing \\ false
        ) do
     case Enums.maybe_get(activity, field, nil) ||
@@ -410,7 +417,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
             rejects,
             local_author_ids,
             local_recipient_ids,
-            is_local?
+            opts
           )
         )
 
@@ -425,7 +432,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
             rejects,
             local_author_ids,
             local_recipient_ids,
-            is_local?
+            opts
           )
         )
 
@@ -440,7 +447,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
                 rejects,
                 local_author_ids,
                 local_recipient_ids,
-                is_local?,
+                opts,
                 true
               )
 
@@ -453,7 +460,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
                   rejects,
                   local_author_ids,
                   local_recipient_ids,
-                  is_local?,
+                  opts,
                   true
                 )
               end
@@ -472,7 +479,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          rejects,
          local_author_ids,
          local_recipient_ids,
-         is_local?
+         opts
        ) do
     (actors || [])
     |> Enum.reject(&is_nil/1)
@@ -486,7 +493,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         rejects,
         local_author_ids,
         local_recipient_ids,
-        is_local?
+        opts
       )
     )
   end
@@ -498,7 +505,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          _rejects,
          _local_author_ids,
          _local_recipient_ids,
-         _is_local?
+         _opts
        )
        when is_in(uri, :public_uris) do
     false
@@ -553,13 +560,14 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          rejects,
          local_author_ids,
          local_recipient_ids,
-         is_local?
+         opts
        ) do
     recipient_actor =
       (ed(recipient, :ap_id, nil) || ed(recipient, "id", nil) || e(recipient, :data, "id", nil) ||
          recipient)
       |> debug("recipient_actor")
 
+    is_local? = opts[:is_local]
     debug(is_local?, "is_local???")
 
     if is_binary(recipient_actor) do
@@ -585,9 +593,12 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         else
           debug("remote activity - need to check if the local recipient blocks the remote author")
 
-          local_recipient = ed(local_recipient_ids, recipient_actor, nil) || recipient_actor
+          local_recipient_id =
+            Enum.find_value(local_recipient_ids, fn {ap_id, id} ->
+              if ap_id == recipient_actor, do: id
+            end) || recipient_actor
 
-          {local_recipient, ed(author_ids, nil) || AdapterUtils.all_actors(activity)}
+          {local_recipient_id, ed(author_ids, nil) || AdapterUtils.all_actors(activity)}
         end
         |> debug("by_characters & actor_to_check")
 

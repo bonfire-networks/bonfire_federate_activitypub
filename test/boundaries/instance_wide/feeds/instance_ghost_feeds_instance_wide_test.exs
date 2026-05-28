@@ -9,6 +9,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceGhostFeedsTest do
 
   @local_actor "alice"
 
+  setup do
+    Process.put(:federating, true)
+    :ok
+  end
+
   setup_all do
     orig = Config.get!(:boundaries)
 

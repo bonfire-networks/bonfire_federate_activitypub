@@ -28,6 +28,10 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     obj |> repo().maybe_preload(:peered) |> Map.get(:peered)
   end
 
+  def get(%{pointer_id: pointer_id}) when is_binary(pointer_id) do
+    get_by_uid(pointer_id)
+  end
+
   def get(%{id: pointer_id}) do
     get_by_uid(pointer_id)
   end
@@ -42,6 +46,10 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
 
   def get(%{"canonicalUrl" => canonical_uri}) when is_binary(canonical_uri) do
     get_by_uri(canonical_uri)
+  end
+
+  def get(%URI{host: host} = uri) when not is_nil(host) do
+    get_by_uri(URI.to_string(uri))
   end
 
   def get(unknown) do
@@ -166,6 +174,10 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
 
   def actor_allowlisted?(peered_or_uri, opts \\ [])
 
+  def actor_allowlisted?(subjects, opts) when is_list(subjects) do
+    Enum.any?(subjects, &actor_allowlisted?(&1, opts))
+  end
+
   def actor_allowlisted?(%Peered{} = peered, opts) do
     peered = repo().maybe_preload(peered, :peer)
     is_allowlisted_peer_or_peered?(peered, opts)
@@ -257,11 +269,29 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
         _ ->
           info(
             id_or_uri,
-            "no existing Peered record for URI, falling back to instance check with block_type=#{inspect(block_type)}"
+            "no existing Peered record for URI, falling back to character + instance block check with block_type=#{inspect(block_type)}"
           )
 
-          Instances.instance_blocked?(id_or_uri, block_type, opts)
-          |> info("instance_blocked? result for #{id_or_uri}")
+          character_blocked =
+            case get_by_uri(id_or_uri)
+                 |> info("get by canonical_uri result") do
+              {:ok, peered} ->
+                actor_blocked?(peered, block_type, opts)
+
+              _ ->
+                case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(id_or_uri)
+                     |> info("get_character_by_ap_id result") do
+                  {:ok, character} ->
+                    Bonfire.Boundaries.Blocks.is_blocked?(character, block_type, opts)
+                    |> info("is_blocked? for character #{id(character)}")
+
+                  _ ->
+                    false
+                end
+            end
+
+          (character_blocked || Instances.instance_blocked?(id_or_uri, block_type, opts))
+          |> info("blocked? result for #{id_or_uri}")
       end
     end
   end
