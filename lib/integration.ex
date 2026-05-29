@@ -89,14 +89,14 @@ defmodule Bonfire.Federate.ActivityPub do
 
   def federation_mode(nil, opts) when is_list(opts) do
     case opts[:federation_mode] do
-      nil -> compute_federation_mode(opts[:subject] || Utils.current_user(opts))
+      nil -> compute_federation_mode(opts[:subject] || Utils.current_user(opts), opts)
       mode -> mode
     end
   end
 
   def federation_mode(subject, opts) when is_list(opts) do
     case opts[:federation_mode] do
-      nil -> compute_federation_mode(subject)
+      nil -> compute_federation_mode(subject, opts)
       mode -> mode
     end
   end
@@ -169,39 +169,61 @@ defmodule Bonfire.Federate.ActivityPub do
             opts
           )
 
+        # local subjects don't have Peered records and are always allowed;
+        # BoundariesMRF handles per-recipient allowlist filtering for outgoing activities
         not_blocked &&
           (mode != :allowlist_only or
+             (is_nil(peered) and Bonfire.Federate.ActivityPub.AdapterUtils.local_subject?(subject)) or
              Bonfire.Federate.ActivityPub.Peered.actor_allowlisted?(subject_to_check, opts))
       )
       |> info("federation_allowed?")
   end
 
-  def federating_default?() do
+  def federating_default?(fallback_default \\ true) do
     case ProcessTree.get(:federating) do
       nil ->
-        {:default,
-         Bonfire.Common.Extend.module_enabled?(ActivityPub) and
-           ActivityPub.Config.federating?()}
+        {:default, instance_federating?(fallback_default)}
 
       other ->
         {:override, other}
     end
   end
 
+  if Config.env() == :test do
+    # In tests, read instance-level Bonfire Settings (DB-scoped per instance) so that dance
+    # tests with two instances can have independent federation modes.
+    defp instance_federating?(fallback_default) do
+      case Settings.get([:activity_pub, :instance, :federating], :not_set,
+             scope: :instance,
+             one_scope_only: true
+           ) do
+        :not_set -> fallback_default
+        other -> other
+      end
+    end
+  else
+    defp instance_federating?(_fallback_default), do: ap_instance_federating?()
+  end
+
+  defp ap_instance_federating?,
+    do:
+      Bonfire.Common.Extend.module_enabled?(ActivityPub) and
+        ActivityPub.Config.federating?()
+
   ###
 
-  defp compute_federation_mode([subject]), do: compute_federation_mode(subject)
+  defp compute_federation_mode([subject], opts), do: compute_federation_mode(subject, opts)
 
-  defp compute_federation_mode([_ | _] = subjects) do
-    subjects |> Enum.map(&compute_federation_mode/1) |> most_restrictive_mode()
+  defp compute_federation_mode([_ | _] = subjects, opts) do
+    subjects |> Enum.map(&compute_federation_mode(&1, opts)) |> most_restrictive_mode()
   end
 
   defp most_restrictive_mode(modes) do
     Enum.find([false, :allowlist_only, :manual, nil, true], true, &(&1 in modes))
   end
 
-  defp compute_federation_mode(subject) do
-    case federating_default?() do
+  defp compute_federation_mode(subject, opts) do
+    case federating_default?(Keyword.get(opts, :fallback_default, true)) do
       {:override, false} ->
         false
 
@@ -235,7 +257,23 @@ defmodule Bonfire.Federate.ActivityPub do
     |> info("computed_federation_mode")
   end
 
-  defp user_federating?(subject, default \\ :not_set) do
+  defp user_federating?(subject, default \\ :not_set)
+
+  # Local AP actors: use pointer or pointer_id (Needle ULID) to look up their Bonfire settings
+  defp user_federating?(%ActivityPub.Actor{pointer: %{id: _} = pointer}, default) do
+    user_federating?(pointer, default)
+  end
+
+  defp user_federating?(%ActivityPub.Actor{pointer_id: pointer_id}, default)
+       when is_binary(pointer_id) do
+    user_federating?(pointer_id, default)
+  end
+
+  # Remote AP actors (no Needle pointer) and URI structs don't have per-user Bonfire settings
+  defp user_federating?(%ActivityPub.Actor{}, _default), do: :not_set
+  defp user_federating?(%URI{}, _default), do: :not_set
+
+  defp user_federating?(subject, default) do
     Settings.get([:activity_pub, :user_federating], default,
       current_user: subject,
       one_scope_only: true,

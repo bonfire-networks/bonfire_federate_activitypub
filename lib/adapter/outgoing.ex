@@ -59,7 +59,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def federate_outgoing?(subject \\ nil) do
-    Bonfire.Federate.ActivityPub.federation_allowed?(subject, direction: :out)
+    Bonfire.Federate.ActivityPub.federating?(subject)
 
     # and Bonfire.Common.Extend.module_enabled?(
     #   Bonfire.Federate.ActivityPub.Outgoing,

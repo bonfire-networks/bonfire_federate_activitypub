@@ -32,6 +32,11 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     get_by_uid(pointer_id)
   end
 
+  # AP Actor structs use ap_id (URL) for lookup; their `id` field is a UUID not a Needle UID
+  def get(%ActivityPub.Actor{ap_id: ap_id}) when is_binary(ap_id) do
+    get_by_uri(ap_id)
+  end
+
   def get(%{id: pointer_id}) do
     get_by_uid(pointer_id)
   end

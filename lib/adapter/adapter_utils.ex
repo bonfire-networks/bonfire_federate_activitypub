@@ -170,6 +170,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  @doc """
+  Returns `true` only when the subject is definitely local.
+  Unlike `is_local?/2`, this never defaults to `true` for unknown subjects — safe for
+  allowlist checks where a false positive would bypass federation restrictions.
+  """
+  def local_subject?(%ActivityPub.Actor{local: local}), do: local == true
+
+  def local_subject?(subject) when is_binary(subject) do
+    if String.contains?(subject, "://") do
+      base = ap_base_url()
+      String.starts_with?(subject, base) or String.starts_with?(subject, Adapter.base_url())
+    else
+      # bare identifier (username, ULID, etc.) — not a remote URI, assume local
+      true
+    end
+  end
+
+  def local_subject?(_), do: true
+
   def preload_peered(object) do
     case object do
       %{peered: _, created: _} ->
@@ -481,6 +500,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     [e(activity_or_object, :data, nil), activity_or_object]
     |> Enum.reject(&is_nil/1)
     |> Enum.flat_map(&all_fields(&1, fields))
+    # Also include actors implied by `object`/`target` for types where the relevant
+    # party is not addressed in to/cc (Follow, Like, Announce, Undo, Accept, Add, etc.)
+    |> Kernel.++(object_implied_actor_ids(activity_or_object))
     |> debug("all_recipients")
     |> List.flatten()
     |> cleanup_list()
@@ -576,16 +598,63 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     nil
   end
 
-  def is_follow?(%{"type" => "Follow"}) do
-    true
-  end
+  def is_follow?(%{"type" => "Follow"}), do: true
+  def is_follow?(%{type: "Follow"}), do: true
+  def is_follow?(_), do: false
 
-  def is_follow?(%{type: "Follow"}) do
-    true
-  end
+  @doc """
+  Returns AP IDs of actors/objects implied by the `object` (and `target`) field of an
+  activity, for activity types where the relevant party is NOT addressed via `to`/`cc`/`bcc`.
 
-  def is_follow?(_) do
-    false
+  These are the entities whose per-actor blocks/allowlists should be consulted, even though
+  they don't appear in the addressing fields.
+
+  | Type | Relevant party | Source field |
+  |------|---------------|-------------|
+  | Follow | the followed actor | `object` |
+  | Block | the blocked actor | `object` |
+  | Like/Dislike/EmojiReact/Announce | author of the liked/boosted content | `object.attributedTo` |
+  | Undo | same as wrapped activity | recursive on `object` |
+  | Accept/Reject/TentativeAccept/TentativeReject | actor of the wrapped activity | `object.actor` |
+  | Add/Remove | the target collection (audience, not author) | `target` |
+  """
+  def object_implied_actor_ids(activity) do
+    type = e(activity, "type", e(activity, :type, nil))
+    object = e(activity, "object", e(activity, :object, nil))
+
+    candidates =
+      cond do
+        # The followed/blocked person is the direct object
+        type in ["Follow", "Block"] ->
+          [id_or_object_id(object)]
+
+        # For reactions/boosts, the author of the target content is the relevant party
+        type in ["Like", "Dislike", "Announce", "EmojiReact"] ->
+          [
+            e(object, "attributedTo", nil) || e(object, "actor", nil),
+            e(object, :attributedTo, nil) || e(object, :actor, nil)
+          ]
+
+        # Accept/Reject respond to an activity; check the actor of the wrapped activity
+        type in ["Accept", "Reject", "TentativeAccept", "TentativeReject"] ->
+          [e(object, "actor", nil) || e(object, :actor, nil)]
+
+        # Undo wraps another activity — recurse one level to reuse the same logic
+        type == "Undo" ->
+          object_implied_actor_ids(object)
+
+        # Add/Remove: the target collection itself is the audience entity (not its attributedTo/author)
+        type in ["Add", "Remove"] ->
+          target = e(activity, "target", e(activity, :target, nil))
+          [id_or_object_id(target)]
+
+        true ->
+          []
+      end
+
+    candidates
+    |> filter_empty([])
+    |> Enum.uniq()
   end
 
   def local_actor_ids(actors) do
@@ -716,7 +785,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         |> info("got by ap_id")
         |> return_pointable()
       else
-        error(ap_id, "assume we're looking up a local character")
+        debug(ap_id, "local AP ID not in AP object cache, looking up by username")
+        get_local_character_by_ap_id(ap_id, local_instance)
       end
     end
   end
@@ -793,51 +863,78 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # TODO: cleanup
       case URI.parse(q) do
         %{path: path, host: host} = uri when is_nil(path) or path == "/" ->
-          log("AP - get_or_fetch_and_create_by_uri - assume remote instance with URI: " <> q)
+          log(
+            "AP - get_or_fetch_and_create_by_uri - root path URI, check if known AP actor before treating as instance: " <>
+              q
+          )
 
-          with {:error, _} <- Bonfire.Federate.ActivityPub.Instances.get_by_domain(host),
-               ret when ret == true or is_map(ret) <-
-                 opts[:add_all_domains_as_instances] || ActivityPub.Instances.scrape_nodeinfo(uri) ||
-                   error(:not_found, "Could not find nodeinfo"),
-               {:ok, instance} <-
-                 Bonfire.Federate.ActivityPub.Instances.get_or_create(
-                   uri
-                   |> Map.put(:scheme, "https")
-                   |> Map.put(:path, nil)
-                   |> URI.to_string()
-                 ) do
-            {:ok, instance}
+          # Some servers (e.g. single-user instances) use the root URL as their AP actor ID.
+          # Try local cache first (fast), then network fetch, before falling back to instance circle.
+          case get_character_by_ap_id(q) do
+            {:ok, actor} ->
+              {:ok, actor}
+
+            _ ->
+              case fetch_and_return_ap_object(q, opts) do
+                {:ok, actor} ->
+                  {:ok, actor}
+
+                _ ->
+                  log(
+                    "AP - get_or_fetch_and_create_by_uri - not found as AP actor, try as instance: " <>
+                      q
+                  )
+
+                  with {:error, _} <-
+                         Bonfire.Federate.ActivityPub.Instances.get_by_domain(host),
+                       ret when ret == true or is_map(ret) <-
+                         opts[:add_all_domains_as_instances] ||
+                           ActivityPub.Instances.scrape_nodeinfo(uri) ||
+                           error(:not_found, "Could not find nodeinfo"),
+                       {:ok, instance} <-
+                         Bonfire.Federate.ActivityPub.Instances.get_or_create(
+                           uri
+                           |> Map.put(:scheme, "https")
+                           |> Map.put(:path, nil)
+                           |> URI.to_string()
+                         ) do
+                    {:ok, instance}
+                  end
+              end
           end
 
         _ ->
           log("AP - get_or_fetch_and_create_by_uri - assume remote object with URI : " <> q)
-
-          case ActivityPub.Federator.Fetcher.fetch_object_from_id(q, opts)
-               |> debug("fetch_object_from_id result") do
-            {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
-              {:ok, pointable}
-
-            {:ok, %{pointer_id: _pointer_id} = ap_object} ->
-              return_pointable(ap_object, opts)
-
-            {:ok, %ActivityPub.Actor{} = actor} ->
-              return_pointable(actor, opts)
-
-            {:ok, %ActivityPub.Object{} = object} ->
-              # FIXME? for non-actors
-              return_pointable(object, opts)
-
-            # {{:ok, object}, _actor} -> {:ok, object}
-            {:ok, object} ->
-              {:ok, object}
-
-            e ->
-              error(e)
-          end
+          fetch_and_return_ap_object(q, opts)
       end
     else
       log("AP - uri : assume local : " <> q)
       get_or_fetch_pointable_by_ap_id(q, opts)
+    end
+  end
+
+  defp fetch_and_return_ap_object(q, opts) do
+    case ActivityPub.Federator.Fetcher.fetch_object_from_id(q, opts)
+         |> debug("fetch_object_from_id result") do
+      {:ok, %{pointer: %{id: _} = pointable} = _ap_object} ->
+        {:ok, pointable}
+
+      {:ok, %{pointer_id: _pointer_id} = ap_object} ->
+        return_pointable(ap_object, opts)
+
+      {:ok, %ActivityPub.Actor{} = actor} ->
+        return_pointable(actor, opts)
+
+      {:ok, %ActivityPub.Object{} = object} ->
+        # FIXME? for non-actors
+        return_pointable(object, opts)
+
+      # {{:ok, object}, _actor} -> {:ok, object}
+      {:ok, object} ->
+        {:ok, object}
+
+      e ->
+        error(e)
     end
   end
 
@@ -1271,7 +1368,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
     debug(actor)
 
-    # username = actor.data["preferredUsername"] <> "@" <> URI.parse(actor.data["id"]).host
+    # username = actor.data["preferredUsername"] <> "@" <> Bonfire.Common.URIs.base_domain(actor.data["id"])
     username = actor.username || actor.ap_id
     name = actor.data["name"]
     name = if empty?(name), do: username, else: name
@@ -1989,14 +2086,23 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         (is_nil(parsed_path) or parsed_path == "" or parsed_path == "/")
 
     if is_bare_domain or is_instance_url do
-      host = if is_bare_domain, do: uri, else: URI.parse(uri).host
+      host = if is_bare_domain, do: uri, else: Bonfire.Common.URIs.base_domain(uri)
 
-      with {:ok, instance_circle} <- Instances.get_or_create_instance_circle(host),
-           instance_circle when not is_nil(instance_circle) <- instance_circle do
-        {:ok, instance_circle}
+      # For full HTTP URLs (not bare domains), check local cache/Peered first —
+      # some single-user instances use the root URL as their AP actor ID.
+      # Bare domains are unambiguously instance identifiers; skip this check for them.
+      with false <- is_bare_domain,
+           {:ok, actor} <- get_character_by_ap_id(uri) do
+        {:ok, actor}
       else
-        nil -> {:error, "Could not resolve instance"}
-        other -> other
+        _ ->
+          with {:ok, instance_circle} <- Instances.get_or_create_instance_circle(host),
+               instance_circle when not is_nil(instance_circle) <- instance_circle do
+            {:ok, instance_circle}
+          else
+            nil -> {:error, "Could not resolve instance"}
+            other -> other
+          end
       end
     else
       # federation_mode: true bypasses allowlist check so users can resolve actors even in allowlist-only mode

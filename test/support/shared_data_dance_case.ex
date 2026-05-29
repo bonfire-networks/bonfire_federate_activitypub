@@ -47,6 +47,8 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     end)
 
     ActivityPub.Utils.cache_clear()
+    # Reset federation mode to open (guard against stale DB state from interrupted test runs)
+    Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
 
     # Bonfire.Common.Repo.config()
     # |> Keyword.take([:name, :database, :hostname, :port, :username])
@@ -58,6 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
 
     TestInstanceRepo.apply(fn ->
       ActivityPub.Utils.cache_clear()
+      Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
 
       if !Bonfire.Boundaries.Circles.exists?(Bonfire.Boundaries.Circles.get_id!(:local)) do
         info("Seems boundary fixtures are missing on test instance, running now")

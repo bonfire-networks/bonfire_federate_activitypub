@@ -205,7 +205,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
       _ ->
         # No Peer record — try via hostname circle directly (e.g. when added by hostname before actor fetch)
-        hostname = URI.parse(uri_or_id).host || uri_or_id
+        hostname = Bonfire.Common.URIs.base_domain(uri_or_id) || uri_or_id
 
         with {:ok, circle} <-
                get_instance_circle(hostname)
