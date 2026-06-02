@@ -18,39 +18,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
   use Mneme
 
   setup context do
-    # clean_slate(context)
     on_exit(fn ->
       clean_slate(context)
     end)
   end
 
-  def clean_slate(context) do
-    do_clean_slate(context[:local][:user], context[:remote][:canonical_url])
-
-    # on remote instance, bob_remote follows alice
-    TestInstanceRepo.apply(fn ->
-      do_clean_slate(context[:remote][:user], context[:local][:canonical_url])
-    end)
-
-    :ok
-  end
-
-  def do_clean_slate(local, remote) do
-    Config.put([:activity_pub, :instance, :federating], true)
-
-    # repo().query("delete from ap_object", [])
-    ActivityPub.Utils.cache_clear()
-
-    {:ok, remote_user_on_local} =
-      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(remote)
-
-    Blocks.unblock(local, remote_user_on_local)
-    Blocks.unblock(remote_user_on_local, local)
-
-    Follows.unfollow(local, remote_user_on_local)
-
-    # Follows.unfollow(local, remote_user_on_local)
-  end
+  # NOTE: `clean_slate/1` + `do_clean_slate/2` come from `SharedDataDanceCase` (reset caches +
+  # process overrides, unblock both directions/types incl `:silence_me`, instance-wide unblock,
+  # unallow, open federation) — no local override needed here.
 
   describe "if I silenced a remote user i will not receive any update from it" do
     test "i'll not see anything they publish in feeds", context do

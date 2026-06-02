@@ -13,16 +13,17 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FederationSettingsDanceTest do
   alias Bonfire.Posts
   alias Bonfire.Social.Graph.Follows
 
-  setup do
+  setup context do
     orig = Config.get([:activity_pub, :instance, :federating])
 
-    repo().query("delete from ap_object  ", [])
-    ActivityPub.Utils.cache_clear()
+    # full clean state on both instances: resets caches + process overrides AND the per-user
+    # `user_federating` setting / blocks / follows / allowlist (these tests mutate `user_federating`
+    # to nil/:manual/false, and the on_exit below only restores the *instance* federating config)
+    clean_slate(context)
 
-    TestInstanceRepo.apply(fn ->
-      repo().query("delete from ap_object  ", [])
-      ActivityPub.Utils.cache_clear()
-    end)
+    # then start each test with an empty ap_object table so federation fetches actually hit remote
+    repo().query("delete from ap_object  ", [])
+    TestInstanceRepo.apply(fn -> repo().query("delete from ap_object  ", []) end)
 
     on_exit(fn ->
       Config.put([:activity_pub, :instance, :federating], orig)
