@@ -159,7 +159,7 @@ defmodule Bonfire.Federate.ActivityPub do
     # resolve Peered once so both blocked? and allowlisted? skip an extra DB lookup
     mode != false &&
       (
-        peered = Bonfire.Federate.ActivityPub.Peered.get_or_nil(subject)
+        peered = Bonfire.Federate.ActivityPub.Peered.get_or_nil(subject, opts)
         subject_to_check = peered || subject
 
         not_blocked =

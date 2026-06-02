@@ -45,7 +45,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoInstanceDanceTest do
           )
       end)
 
-      refute Bonfire.Social.FeedLoader.feed_contains?(:my, text, current_user: alice_local)
+      refute Bonfire.Social.FeedLoader.feed_contains?(:remote, text, current_user: alice_local)
     end
 
     test "incoming from allowlisted domain is received", context do
@@ -70,7 +70,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoInstanceDanceTest do
           )
       end)
 
-      assert Bonfire.Social.FeedLoader.feed_contains?(:my, text, current_user: alice_local)
+      assert Bonfire.Social.FeedLoader.feed_contains?(:remote, text, current_user: alice_local)
     end
 
     test "outgoing to non-allowlisted domain is not delivered", context do
@@ -99,7 +99,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoInstanceDanceTest do
         )
 
       TestInstanceRepo.apply(fn ->
-        refute Bonfire.Social.FeedLoader.feed_contains?(:my, text, current_user: bob_remote)
+        refute Bonfire.Social.FeedLoader.feed_contains?(:remote, text, current_user: bob_remote)
       end)
     end
 
@@ -129,7 +129,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoInstanceDanceTest do
         )
 
       TestInstanceRepo.apply(fn ->
-        assert Bonfire.Social.FeedLoader.feed_contains?(:my, text, current_user: bob_remote)
+        assert Bonfire.Social.FeedLoader.feed_contains?(:remote, text, current_user: bob_remote)
       end)
     end
 
@@ -159,7 +159,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoInstanceDanceTest do
           )
       end)
 
-      refute Bonfire.Social.FeedLoader.feed_contains?(:my, text, current_user: alice_local)
+      refute Bonfire.Social.FeedLoader.feed_contains?(:remote, text, current_user: alice_local)
     end
   end
 

@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
 
     on_exit(fn ->
       info("Done with a DanceTest")
-      ActivityPub.Utils.cache_clear()
+      reset_caches()
 
       # this callback needs to checkout its own connection since it
       # runs in its own process
@@ -55,7 +55,7 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
       :ok
     end)
 
-    ActivityPub.Utils.cache_clear()
+    reset_caches()
     # Reset federation mode to open (guard against stale DB state from interrupted test runs)
     Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
 
@@ -68,7 +68,7 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     # |> debug("REMOTE DB CONFIG")
 
     TestInstanceRepo.apply(fn ->
-      ActivityPub.Utils.cache_clear()
+      reset_caches()
       Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
 
       if !Bonfire.Boundaries.Circles.exists?(Bonfire.Boundaries.Circles.get_id!(:local)) do
@@ -87,6 +87,14 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     ]
   end
 
+  # runs before EVERY test of any module using this case (not just files that call clean_slate), so
+  # stale cross-test state in caches/process-overrides can't bleed in via the shared instances
+  setup _tags do
+    reset_caches()
+    TestInstanceRepo.apply(fn -> reset_caches() end)
+    :ok
+  end
+
   # -----------------------------------------------------------------------
   # Shared helpers for the archipelago/allowlist dance tests
   # -----------------------------------------------------------------------
@@ -101,6 +109,18 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     :ok
   end
 
+  @doc """
+  Clear all caches + process-scoped overrides for the current instance, so stale state can't bleed
+  between tests/runs: the AP actor/object caches, the generic Bonfire cache (allowlist/circle/
+  settings/boundary entries that survive the AP clear), and `ProcessTree`-based config/settings
+  overrides. Call inside `TestInstanceRepo.apply` to cover the other instance too.
+  """
+  def reset_caches do
+    ActivityPub.Utils.cache_clear()
+    Bonfire.Common.Cache.remove_all()
+    Settings.reset_process_overrides()
+  end
+
   def do_clean_slate(local, remote) do
     Federation.set_allowlist_only(:instance, false)
 
@@ -109,13 +129,18 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
         Settings.put([:activity_pub, :user_federating], true, current_user: local)
       )
 
-    ActivityPub.Utils.cache_clear()
+    reset_caches()
 
     {:ok, remote_user_on_local} =
       AdapterUtils.get_by_url_ap_id_or_username(remote)
 
+    # per-user blocks/silences (both directions); nil type now clears `:silence_me` too
     Blocks.unblock(local, remote_user_on_local)
     Blocks.unblock(remote_user_on_local, local)
+    # and any instance-wide blocks/silences (not per-user scoped)
+    Blocks.unblock(remote_user_on_local, :instance_wide)
+    Blocks.unblock(local, :instance_wide)
+
     Follows.unfollow(local, remote_user_on_local)
 
     # unallow anything we may have allowed at user level

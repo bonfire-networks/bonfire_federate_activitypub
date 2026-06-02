@@ -666,7 +666,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enum.uniq()
   end
 
-  def local_actor_ids(actors) do
+  def local_actor_ids(actors, objects_by_ap_id \\ nil) do
     # TODO: cleaner: and put in AdapterUtils
     # ap_base_uri = ActivityPub.Web.base_url() <> System.get_env("AP_BASE_PATH", "/pub")
 
@@ -678,8 +678,52 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enum.uniq()
     # |> Enum.filter(&String.starts_with?(&1, ap_base_uri))
     # |> debug("before local_actor_ids")
-    |> Enum.map(&maybe_pointer_for_ap_id/1)
+    |> pointers_for_ap_ids(objects_by_ap_id)
     |> filter_empty([])
+  end
+
+  @doc """
+  Batch-fetch the `ActivityPub.Object`s (with `:pointer`) for a set of actors as a `%{ap_id => object}`
+  map, so multiple `local_actor_ids/2` calls (e.g. authors + recipients) can share **one** query.
+  """
+  def objects_for_actors(actors) do
+    actors
+    |> Enum.map(&id_or_object_id/1)
+    |> Enum.reject(&is_local_collection_or_built_in?/1)
+    |> Enum.uniq()
+    |> fetch_objects_by_ap_ids()
+  end
+
+  @doc """
+  Batch-resolve a list of AP IDs to `{ap_id, pointer | pointer_id | character}` tuples in a single
+  query (instead of one `get_cached` + `:pointer` preload per actor), to avoid n+1 when checking a
+  whole recipient/author set. Pass a pre-fetched `objects_by_ap_id` map (from `objects_for_actors/1`)
+  to reuse one query across calls. Misses (e.g. local actors with no `ActivityPub.Object`) fall back
+  to the per-id `maybe_pointer_for_ap_id/1`.
+  """
+  def pointers_for_ap_ids(ap_ids, objects_by_ap_id \\ nil) when is_list(ap_ids) do
+    objects_by_ap_id = objects_by_ap_id || fetch_objects_by_ap_ids(ap_ids)
+
+    Enum.map(ap_ids, fn ap_id ->
+      case Map.get(objects_by_ap_id, ap_id) do
+        %{pointer: %{id: _} = pointer} -> {ap_id, pointer}
+        %{pointer_id: pointer_id} when not is_nil(pointer_id) -> {ap_id, pointer_id}
+        _ -> maybe_pointer_for_ap_id(ap_id)
+      end
+    end)
+  end
+
+  defp fetch_objects_by_ap_ids(ap_ids) do
+    case ap_ids |> Enum.filter(&is_binary/1) |> Enum.uniq() do
+      [] ->
+        %{}
+
+      ids ->
+        ActivityPub.Object.query(ap_ids: ids)
+        |> repo().many()
+        |> repo().maybe_preload(:pointer)
+        |> Map.new(fn object -> {e(object, :data, "id", nil), object} end)
+    end
   end
 
   def fetch_pointer_for_ap_id(ap_id) do
@@ -1057,7 +1101,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         {:ok, fetched}
 
       {:error, :not_found} ->
-        error(opts, "no Pointable found, with opts")
+        error(opts, "no Pointable detected, with opts")
         {:error, :not_found}
 
       {:error, :is_local} ->

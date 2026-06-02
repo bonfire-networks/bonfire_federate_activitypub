@@ -64,13 +64,36 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     nil
   end
 
-  @doc "Returns `%Peered{}` if resolvable, otherwise `nil`. Used to preload once before block+allowlist checks."
-  def get_or_nil(subject) do
-    case get(subject) do
+  @doc "Returns `%Peered{}` if resolvable, otherwise `nil`. Used to preload once before block+allowlist checks. Prefers a `Peered` pre-resolved for the whole recipient set (`opts[:resolved][:peered_by_urls]`, built by `BoundariesMRF.filter/2`) to avoid per-actor n+1."
+  def get_or_nil(subject, opts \\ []) do
+    case preloaded_peered(subject, opts) || get(subject) do
       {:ok, peered} -> peered
+      %Peered{} = peered -> peered
       _ -> nil
     end
   end
+
+  # look the subject's canonical URI up in the pre-resolved map, when present
+  defp preloaded_peered(subject, opts) do
+    case peered_uri_key(subject) do
+      uri when is_binary(uri) ->
+        case ed(opts, :resolved, :peered_by_urls, uri, nil) do
+          %Peered{} = peered -> {:ok, peered}
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp peered_uri_key(uri) when is_binary(uri),
+    do: if(Types.is_uid?(uri), do: nil, else: uri)
+
+  defp peered_uri_key(%ActivityPub.Actor{ap_id: ap_id}) when is_binary(ap_id), do: ap_id
+  defp peered_uri_key(%URI{host: host} = uri) when not is_nil(host), do: URI.to_string(uri)
+  defp peered_uri_key(%{canonical_uri: uri}) when is_binary(uri), do: uri
+  defp peered_uri_key(_), do: nil
 
   def get_by_uid(id) when is_binary(id) do
     repo().single(
@@ -93,6 +116,21 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
       from(p in Peered)
       |> proload(:peer)
     )
+  end
+
+  @doc "Batch-load `Peered` records for a list of canonical URIs (to pre-resolve recipients and avoid n+1 in the MRF filter)."
+  def list_by_canonical_uris(canonical_uris) when is_list(canonical_uris) do
+    case canonical_uris |> Enum.filter(&is_binary/1) |> Enum.uniq() do
+      [] ->
+        []
+
+      uris ->
+        repo().many(
+          from(p in Peered)
+          |> where([p], p.canonical_uri in ^uris)
+          |> proload(:peer)
+        )
+    end
   end
 
   def get_canonical_uri(obj_or_id),
@@ -202,7 +240,11 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
         _ -> false
       end
     else
-      with {:ok, peered} <- get(id_or_uri) do
+      # prefer a pre-resolved `Peered` (`opts[:resolved]`, built by `BoundariesMRF.filter/2`) to avoid
+      # per-actor n+1; fall back to a single query when not provided
+      preloaded = ed(opts, :resolved, :peered_by_urls, id_or_uri, nil)
+
+      with {:ok, peered} <- (preloaded && {:ok, preloaded}) || get(id_or_uri) do
         actor_allowlisted?(peered, opts)
       else
         _ ->
@@ -270,7 +312,13 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
           Bonfire.Boundaries.Blocks.is_blocked?(id_or_uri, block_type, opts)
       end
     else
-      with {:ok, peered} <- get(id_or_uri) |> debug("existing Peered for URI") do
+      # prefer a `Peered` pre-resolved for the whole recipient set (avoids per-actor n+1 in the MRF
+      # filter); fall back to a single query when not provided (non-MRF callers)
+      preloaded = ed(opts, :resolved, :peered_by_urls, id_or_uri, nil)
+
+      with {:ok, peered} <-
+             (preloaded && {:ok, preloaded}) ||
+               get(id_or_uri) |> debug("existing Peered for URI") do
         actor_blocked?(peered, block_type, opts)
       else
         _ ->
@@ -297,7 +345,11 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
                 end
             end
 
-          (character_blocked || Instances.instance_blocked?(id_or_uri, block_type, opts))
+          # only do the remote instance-block check for remote subjects — a local actor (e.g. a bare
+          # username served via /pub/actors/:username) isn't on a blockable remote instance
+          (character_blocked ||
+             (not Bonfire.Federate.ActivityPub.AdapterUtils.local_subject?(id_or_uri) and
+                Instances.instance_blocked?(id_or_uri, block_type, opts)))
           |> info("blocked? result for #{id_or_uri}")
       end
     end

@@ -8,6 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   alias ActivityPub.MRF
   alias Bonfire.Boundaries
   alias Bonfire.Federate.ActivityPub.AdapterUtils
+  alias Bonfire.Federate.ActivityPub.Instances
+  alias Bonfire.Federate.ActivityPub.Peered
 
   @behaviour MRF
 
@@ -21,21 +23,78 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       AdapterUtils.all_actors(activity)
       |> debug("authors")
 
+    recipients = AdapterUtils.all_object_recipients(activity)
+
+    # one batched query for the whole author+recipient set, shared by both `local_actor_ids/2` calls
+    prefetched_objects = AdapterUtils.objects_for_actors(authors ++ recipients)
+
     local_author_ids =
       authors
-      |> AdapterUtils.local_actor_ids()
+      |> AdapterUtils.local_actor_ids(prefetched_objects)
       |> debug("local_author_ids")
-
-    recipients = AdapterUtils.all_object_recipients(activity)
 
     local_recipient_ids =
       recipients
-      |> AdapterUtils.local_actor_ids()
+      |> AdapterUtils.local_actor_ids(prefetched_objects)
       |> debug("local_recipient_ids")
 
     is_public? = Enum.any?(recipients, &ActivityPub.Utils.has_as_public?/1)
 
-    opts = Keyword.put(opts, :is_public, is_public?)
+    # pre-resolve, for the whole recipient+author set in one query each, the data the per-recipient
+    # block/allowlist checks need — so `actor_blocked?`/`instance_allowlisted?` read from these maps
+    # instead of querying per actor (avoids n+X). Leaf checks fall back to per-call query if absent.
+    all_uris =
+      (authors ++ recipients)
+      |> Enum.filter(&is_binary/1)
+      |> Enum.uniq()
+
+    peered_by_urls =
+      Peered.list_by_canonical_uris(all_uris)
+      |> Map.new(fn %{canonical_uri: uri} = peered -> {uri, peered} end)
+
+    allowlist_circles_by_hosts =
+      all_uris
+      |> Enum.map(&URIs.base_domain/1)
+      |> Enum.filter(&is_binary/1)
+      |> Enum.uniq()
+      |> Instances.get_instance_circles()
+
+    # candidate subjects the allowlist checks run against: the resolved instance-circles + peereds
+    allowlist_candidates = Map.values(allowlist_circles_by_hosts) ++ Map.values(peered_by_urls)
+
+    # the local users whose per-user allowlist circles may apply (authors + recipients)
+    scope_user_ids =
+      (local_author_ids ++ local_recipient_ids)
+      |> Enum.map(&elem(&1, 1))
+      |> Enum.uniq()
+
+    resolved =
+      %{
+        peered_by_urls: peered_by_urls,
+        allowlist_circles_by_hosts: allowlist_circles_by_hosts,
+        # which candidates are instance-wide allowlisted (one query)
+        allowlisted_ids:
+          Utils.maybe_apply(
+            Bonfire.Boundaries.Allowlist,
+            :instance_wide_allowlisted_subset,
+            [allowlist_candidates],
+            fallback_return: nil
+          ),
+        # per-user: %{user_id => MapSet(allowlisted candidate ids)} (one query per in-scope user)
+        allowlisted_by_user:
+          Utils.maybe_apply(
+            Bonfire.Boundaries.Allowlist,
+            :allowlisted_by_users_subset,
+            [allowlist_candidates, scope_user_ids],
+            fallback_return: nil
+          )
+      }
+      |> info("pre-resolved data for MRF checks")
+
+    opts =
+      opts
+      |> Keyword.put(:is_public, is_public?)
+      |> Keyword.put(:resolved, resolved)
 
     # num_local_authors = length(local_author_ids)
     # = (num_local_authors && num_local_authors == length(authors))
@@ -108,7 +167,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
           block_types,
           local_author_ids,
           rejects,
-          AdapterUtils.id_or_object_id(ed(activity, "object", nil))
+          AdapterUtils.id_or_object_id(ed(activity, "object", nil)),
+          opts
         )
         |> debug("object_blocked") || {:ok, activity}
 
@@ -120,7 +180,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       is_follow? and :ghost == check_block_type and !is_local? ->
         debug("reject follows from ghosted remote actors")
 
-        activity_blocked?(block_types, local_recipient_ids, activity, rejects) || {:ok, activity}
+        activity_blocked?(block_types, local_recipient_ids, activity, rejects, opts) ||
+          {:ok, activity}
 
       :silence == check_block_type and is_local? ->
         debug("do nothing with silencing on outgoing local activities")
@@ -135,7 +196,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         # blanket instance-wide check (no user scope) for public posts or when no local recipients;
         # per-recipient check handles user-scoped blocks for addressed activities
         ((local_recipient_ids == [] or opts[:is_public]) and
-           activity_blocked?(block_types, [], activity, rejects)) ||
+           activity_blocked?(block_types, [], activity, rejects, opts)) ||
           block_or_filter_recipients(
             block_types,
             activity,
@@ -165,59 +226,64 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     end
   end
 
-  defp activity_blocked?(block_types, local_character_ids, activity, rejects) do
+  defp activity_blocked?(block_types, local_character_ids, activity, rejects, opts) do
     object_blocked?(
       block_types,
       local_character_ids,
       rejects,
-      AdapterUtils.id_or_object_id(ed(activity, "actor", nil))
+      AdapterUtils.id_or_object_id(ed(activity, "actor", nil)),
+      opts
     )
     |> debug("activity's actor?") ||
       object_blocked?(
         block_types,
         local_character_ids,
         rejects,
-        AdapterUtils.id_or_object_id(ed(activity, "object", "attributedTo", nil))
+        AdapterUtils.id_or_object_id(ed(activity, "object", "attributedTo", nil)),
+        opts
       )
       |> debug("object's actor?") ||
       object_blocked?(
         block_types,
         local_character_ids,
         rejects,
-        AdapterUtils.id_or_object_id(activity)
+        AdapterUtils.id_or_object_id(activity),
+        opts
       )
       |> debug("activity's instance?") ||
       object_blocked?(
         block_types,
         local_character_ids,
         rejects,
-        AdapterUtils.id_or_object_id(ed(activity, "object", nil))
+        AdapterUtils.id_or_object_id(ed(activity, "object", nil)),
+        opts
       )
       |> debug("object or its instance?")
   end
 
-  defp object_blocked?(block_types, local_author_ids, rejects, canonical_uri)
+  defp object_blocked?(block_types, local_author_ids, rejects, canonical_uri, opts)
        when is_binary(canonical_uri) do
     uri = URI.parse(canonical_uri)
     # |> debug("uri")
 
     instance_blocked_in_config?(uri, rejects) ||
-      actor_or_instance_blocked?(block_types, local_author_ids, uri, nil, rejects)
+      actor_or_instance_blocked?(block_types, local_author_ids, uri, nil, rejects, opts)
   end
 
-  defp object_blocked?(block_types, local_author_ids, rejects, %{} = object) do
+  defp object_blocked?(block_types, local_author_ids, rejects, %{} = object, opts) do
     canonical_uri = URIs.canonical_url(object)
     uri = URI.parse(canonical_uri)
 
     instance_blocked_in_config?(uri, rejects) ||
-      actor_or_instance_blocked?(block_types, local_author_ids, uri, object, rejects)
+      actor_or_instance_blocked?(block_types, local_author_ids, uri, object, rejects, opts)
   end
 
-  defp object_blocked?(block_types, local_author_ids, rejects, objects) when is_list(objects) do
-    Enum.any?(objects, &object_blocked?(block_types, local_author_ids, rejects, &1))
+  defp object_blocked?(block_types, local_author_ids, rejects, objects, opts)
+       when is_list(objects) do
+    Enum.any?(objects, &object_blocked?(block_types, local_author_ids, rejects, &1, opts))
   end
 
-  defp object_blocked?(_, _, _, canonical_uri) do
+  defp object_blocked?(_, _, _, canonical_uri, _opts) do
     warn(canonical_uri, "no valid URI")
     # raise "no valid URI"
     nil
@@ -235,7 +301,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
          local_author_ids,
          %URI{} = actor_uri,
          actor,
-         rejects
+         rejects,
+         opts
        ) do
     clean_url = "#{actor_uri.host}#{actor_uri.path}"
 
@@ -260,7 +327,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     MRF.subdomain_match?(rejects, clean_url) ||
       not federation_allowed?(actor || actor_uri,
         block_types: block_types,
-        user_ids: local_author_ids
+        user_ids: local_author_ids,
+        resolved: opts[:resolved]
       )
   end
 
@@ -613,7 +681,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         ) ||
         not Bonfire.Federate.ActivityPub.federation_allowed?(actor_to_check,
           block_types: block_types,
-          user_ids: by_characters
+          user_ids: by_characters,
+          resolved: opts[:resolved]
         )
         |> debug(
           "filter '#{id(actor_to_check) || inspect(actor_to_check)}' federation_allowed? (#{inspect(block_types)}) by #{inspect(by_characters)}?"
@@ -631,65 +700,74 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
     |> debug("MRF instance_wide blocks from config")
   end
 
-  def actor_blocked?(
-        actor,
-        direction \\ nil,
-        by_user \\ nil
-      )
+  # def actor_blocked?(
+  #       actor,
+  #       direction \\ nil,
+  #       by_user \\ nil,
+  #       opts \\ []
+  #     )
 
-  def actor_blocked?(
-        actor,
-        :in,
-        by_user
-      ) do
-    actor_blocked?(
-      actor,
-      :silence,
-      by_user
-    )
-  end
+  # def actor_blocked?(
+  #       actor,
+  #       :in,
+  #       by_user,
+  #       opts
+  #     ) do
+  #   actor_blocked?(
+  #     actor,
+  #     :silence,
+  #     by_user,
+  #     opts
+  #   )
+  # end
 
-  def actor_blocked?(
-        actor,
-        :out,
-        by_user
-      ) do
-    actor_blocked?(
-      actor,
-      :ghost,
-      by_user
-    )
-  end
+  # def actor_blocked?(
+  #       actor,
+  #       :out,
+  #       by_user,
+  #       opts
+  #     ) do
+  #   actor_blocked?(
+  #     actor,
+  #     :ghost,
+  #     by_user,
+  #     opts
+  #   )
+  # end
 
-  def actor_blocked?(
-        actor,
-        nil,
-        by_user
-      ) do
-    actor_blocked?(
-      actor,
-      [:ghost, :silence],
-      by_user
-    )
-  end
+  # def actor_blocked?(
+  #       actor,
+  #       nil,
+  #       by_user,
+  #       opts
+  #     ) do
+  #   actor_blocked?(
+  #     actor,
+  #     [:ghost, :silence],
+  #     by_user,
+  #     opts
+  #   )
+  # end
 
-  def actor_blocked?(
-        actor,
-        check_block_types,
-        by_user
-      ) do
-    block_types = Boundaries.Blocks.types_blocked(check_block_types)
+  # def actor_blocked?(
+  #       actor,
+  #       check_block_types,
+  #       by_user,
+  #       opts
+  #     ) do
+  #   block_types = Boundaries.Blocks.types_blocked(check_block_types)
 
-    rejects = rejects_regex(block_types)
+  #   rejects = rejects_regex(block_types)
 
-    actor = actor |> repo().maybe_preload(character: [:peered])
+  #   actor = actor |> repo().maybe_preload(character: [:peered])
 
-    object_blocked?(
-      block_types,
-      List.wrap(by_user),
-      rejects,
-      AdapterUtils.id_or_object_id(actor) || actor
-    )
-    |> debug()
-  end
+  #   object_blocked?(
+  #     block_types,
+  #     List.wrap(by_user),
+  #     rejects,
+  #     AdapterUtils.id_or_object_id(actor) || actor,
+  #     opts
+  #   )
+  #   |> debug()
+  # end
 end

@@ -6,6 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   use Arrows
   import Untangle
   import Bonfire.Federate.ActivityPub
+  use Bonfire.Common.E
   import Ecto.Query
   alias Bonfire.Data.ActivityPub.Peer
   alias Bonfire.Common.Utils
@@ -37,14 +38,22 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   def get(id_or_canonical_uri) when is_binary(id_or_canonical_uri) do
-    if Types.is_uid?(id_or_canonical_uri) do
-      get_by_id(id_or_canonical_uri)
-    else
-      with instance_url when is_binary(instance_url) <-
-             URIs.base_url(id_or_canonical_uri)
-             |> info("Instances.get base_url for #{id_or_canonical_uri}") do
-        get_by_instance_url(instance_url) |> info("Instances.get by_instance_url #{instance_url}")
-      end
+    cond do
+      Types.is_uid?(id_or_canonical_uri) ->
+        get_by_id(id_or_canonical_uri)
+
+      # not a uid and not a `scheme://…` URL → not an instance canonical URI (e.g. a bare username or
+      # a `user@host` actor handle). Don't try to derive a host from it.
+      not String.contains?(id_or_canonical_uri, "://") ->
+        error(id_or_canonical_uri, "not a valid instance ID or canonical URI")
+
+      true ->
+        with instance_url when is_binary(instance_url) <-
+               URIs.base_url(id_or_canonical_uri)
+               |> info("Instances.get base_url for #{id_or_canonical_uri}") do
+          get_by_instance_url(instance_url)
+          |> info("Instances.get by_instance_url #{instance_url}")
+        end
     end
   end
 
@@ -196,6 +205,27 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     )
   end
 
+  @doc "Batch version of `get_instance_circle/1`: returns a `%{host => circle}` map for a list of hosts (to pre-resolve allowlist circles and avoid n+1 in the MRF filter)."
+  def get_instance_circles(hosts) when is_list(hosts) do
+    circle_type =
+      Utils.maybe_apply(Bonfire.Boundaries.Scaffold.Instance, :activity_pub_circle, [],
+        fallback_return: nil
+      )
+
+    if circle_type do
+      Utils.maybe_apply(
+        Bonfire.Boundaries.Circles,
+        :list_by_names,
+        [hosts, circle_type],
+        fallback_return: []
+      )
+      |> Enum.reduce(%{}, fn
+        %{named: %{name: name}} = circle, acc when is_binary(name) -> Map.put(acc, name, circle)
+        _, acc -> acc
+      end)
+    end || %{}
+  end
+
   def instance_allowlisted?(host_or_uri, opts \\ [])
 
   def instance_allowlisted?(uri_or_id, opts) when is_binary(uri_or_id) do
@@ -208,7 +238,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
         hostname = Bonfire.Common.URIs.base_domain(uri_or_id) || uri_or_id
 
         with {:ok, circle} <-
-               get_instance_circle(hostname)
+               instance_circle_for(hostname, opts)
                |> debug("instance_circle by hostname for #{hostname}") do
           Bonfire.Boundaries.Allowlist.is_allowlisted?(circle, opts)
         else
@@ -219,10 +249,19 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
   def instance_allowlisted?(%Peer{display_hostname: display_hostname}, opts) do
     with {:ok, circle} <-
-           get_instance_circle(display_hostname) |> debug("instance_circle for allowlist") do
+           instance_circle_for(display_hostname, opts) |> debug("instance_circle for allowlist") do
       Bonfire.Boundaries.Allowlist.is_allowlisted?(circle, opts)
     else
       _ -> false
+    end
+  end
+
+  # prefer an instance circle pre-resolved for the whole recipient set (`opts[:resolved]`, built by
+  # `BoundariesMRF.filter/2`), falling back to a single `get_instance_circle/1` query when absent
+  defp instance_circle_for(host, opts) do
+    case ed(opts, :resolved, :allowlist_circles_by_hosts, host, nil) do
+      nil -> get_instance_circle(host)
+      circle -> {:ok, circle}
     end
   end
 
