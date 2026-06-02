@@ -4,7 +4,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveHandler do
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   def handle_event("refetch_profile:" <> id, _params, socket) do
-    with {:ok, actor} <- ActivityPub.Actor.get_cached_or_fetch(id),
+    with {:ok, actor} <-
+           ActivityPub.Actor.get_cached_or_fetch(id, current_user: current_user(socket)),
+         {:ok, ap_id} when is_binary(ap_id) <- e(actor, :ap_id, nil),
          ap_id when is_binary(ap_id) <- e(actor, :ap_id, nil),
          false <- String.starts_with?(ap_id, AdapterUtils.ap_base_url()) do
       ActivityPub.Federator.Fetcher.enqueue_fetch(ap_id, %{"fresh" => true})

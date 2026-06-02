@@ -177,6 +177,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   """
   def local_subject?(%ActivityPub.Actor{local: local}), do: local == true
 
+  # a remote/unresolved actor often arrives as a %URI{} — route it through the string check
+  # so its host is compared to the local base (otherwise it would hit the `-> true` catch-all)
+  def local_subject?(%URI{} = uri), do: local_subject?(URI.to_string(uri))
+
   def local_subject?(subject) when is_binary(subject) do
     if String.contains?(subject, "://") do
       base = ap_base_url()
@@ -186,6 +190,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       true
     end
   end
+
+  # a subject can arrive as a list of actors (e.g. from `all_actors/1`) — local only if non-empty
+  # and every member is local, so a remote actor in the list isn't treated as local
+  def local_subject?(list) when is_list(list),
+    do: list != [] and Enum.all?(list, &local_subject?/1)
 
   def local_subject?(_), do: true
 
@@ -770,22 +779,29 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def get_or_fetch_character_by_ap_id(%{pointer: %{id: _} = pointer}), do: {:ok, pointer}
+  def get_or_fetch_character_by_ap_id(actor_or_ap_id, opts \\ [])
+  def get_or_fetch_character_by_ap_id(%{pointer: %{id: _} = pointer}, _opts), do: {:ok, pointer}
 
-  def get_or_fetch_character_by_ap_id(actor_or_ap_id) do
+  def get_or_fetch_character_by_ap_id(actor_or_ap_id, opts) do
     local_instance = ap_base_url()
 
     with {:error, :not_found} <- get_character_by_ap_id(actor_or_ap_id),
          ap_id when is_binary(ap_id) <- the_ap_id(actor_or_ap_id) || {:error, :not_found} do
-      if not String.starts_with?(ap_id, local_instance) do
+      # only treat it as a remote ap_id to fetch when it's actually a URL on another instance;
+      # a bare username (no scheme) is not a remote URI, so resolve it by username instead
+      if String.contains?(ap_id, "://") and not String.starts_with?(ap_id, local_instance) do
         debug(ap_id, "assume fetching remote character")
         # FIXME: this should not query the AP db
         # query Character.Peered instead? but what about if we're requesting a remote actor which isn't cached yet?
-        ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id)
+        ActivityPub.Actor.get_cached_or_fetch([ap_id: ap_id], opts)
         |> info("got by ap_id")
         |> return_pointable()
       else
-        debug(ap_id, "local AP ID not in AP object cache, looking up by username")
+        debug(
+          ap_id,
+          "local AP ID or bare username not in AP object cache, looking up by username"
+        )
+
         get_local_character_by_ap_id(ap_id, local_instance)
       end
     end

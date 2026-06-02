@@ -18,7 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
       user_count: Bonfire.Me.Users.maybe_count(),
       node_name: Config.get([:ui, :theme, :instance_name], nil) || "An instance of #{app_name}",
       node_description: Config.get([:ui, :theme, :instance_description], nil),
-      federating: ActivityPub.Config.federating?(),
+      federating: !!ActivityPub.Config.federating?(),
       app_repository: maybe_apply(Bonfire.Application, :repository, [])
     }
   end

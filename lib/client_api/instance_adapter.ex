@@ -38,7 +38,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
         "2.7.2 (compatible; Akkoma 3.9.3; #{app_name} #{Bonfire.Application.version()})",
       "source_url" => Bonfire.Application.repository(),
       # non-standard
-      "federating" => ActivityPub.Config.federating?() || false,
+      "federating" => !!ActivityPub.Config.federating?(),
       "configuration" => %{
         "urls" =>
           %{
