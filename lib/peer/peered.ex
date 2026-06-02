@@ -2,6 +2,8 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
   @moduledoc """
   Federated actors or objects
   Context for `Bonfire.Data.ActivityPub.Peered`
+
+  Since `Peered` is a mixin whose `id` is the object's pointer id, associations injected via config (in `config/bonfire_data.exs`) that key on that id apply to the host — e.g. `:encircles` (circle memberships, where `Encircle.subject_id == id`) resolves to the objects's memberships, used when an actor/instance is silenced or ghosted into a circle.
   """
   use Arrows
   use Bonfire.Common.Utils

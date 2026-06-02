@@ -22,7 +22,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
   end
 
   test "can set instance federation to manual mode" do
-    Config.put([:activity_pub, :instance, :federating], nil)
+    Config.put([:activity_pub, :instance, :federating], :manual)
 
     assert nil == Bonfire.Federate.ActivityPub.federating?()
   end
@@ -60,7 +60,7 @@ defmodule Bonfire.Federate.ActivityPub.Web.FederationEnabledTest do
   end
 
   test "cannot enable federation for user when instance is in manual mode" do
-    Config.put([:activity_pub, :instance, :federating], nil)
+    Config.put([:activity_pub, :instance, :federating], :manual)
 
     me = fake_user!()
 
