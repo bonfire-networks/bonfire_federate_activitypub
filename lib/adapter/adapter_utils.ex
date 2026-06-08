@@ -1555,6 +1555,36 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       |> debug("cfa")
       |> create_remote_actor()
 
+  @doc """
+  Checks whether two actors share a verified alias relationship by consulting AP actor data
+  from the cache. Returns true if any of the following holds:
+  - `target_actor.alsoKnownAs` contains `local_ap_id`
+  - `target_actor.movedTo` == `local_ap_id`
+  - `local_actor.alsoKnownAs` contains `target_actor.ap_id`
+
+  Returns false (not a crash) when actor data is missing or unreachable.
+  """
+  def also_known_as?(local, target) when is_struct(local),
+    do: also_known_as?(Bonfire.Common.URIs.canonical_url(local), target)
+
+  def also_known_as?(local_ap_id, target) when is_binary(local_ap_id) do
+    case ActivityPub.Actor.get_cached(pointer: target) do
+      {:ok, %{ap_id: target_ap_id, data: target_data}} ->
+        ActivityPub.Actor.also_known_as?(local_ap_id, target_data) or
+          ActivityPub.Actor.valid_move_chain?(target_ap_id, local_ap_id) or
+          case ActivityPub.Actor.get_cached(ap_id: local_ap_id) do
+            {:ok, %{data: local_data}} ->
+              ActivityPub.Actor.also_known_as?(target_ap_id, local_data)
+
+            _ ->
+              false
+          end
+
+      _ ->
+        false
+    end
+  end
+
   def maybe_add_aliases(user_etc, aliases) do
     case aliases do
       nil ->
