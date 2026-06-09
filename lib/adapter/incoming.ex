@@ -229,30 +229,60 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     with {:ok, subject} <- AdapterUtils.activity_character(activity) |> info("activity_character"),
          {:no_federation_module_match, _} <-
-           handle_activity_with(
-             Bonfire.Federate.ActivityPub.FederationModules.federation_module(
-               {activity_type, object_type}
-             )
-             |> info("AP attempt #1.1 - with activity_type and object_type"),
-             subject,
-             activity,
-             object
+           if(activity_type && object_type,
+             do:
+               handle_activity_with(
+                 Bonfire.Federate.ActivityPub.FederationModules.federation_module(
+                   {activity_type, object_type}
+                 )
+                 |> info("AP attempt #1.1 - with activity_type and object_type"),
+                 subject,
+                 activity,
+                 object
+               ),
+             else: {:no_federation_module_match, "missing activity+object types"}
            ),
+         # e.g. an Add/Remove targeting a known collection type (featured, …) → route by
+         # {activity_type, target_collection_type} so the owning module (e.g. Pins) handles it
          {:no_federation_module_match, _} <-
-           handle_activity_with(
-             Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type)
-             |> info("AP attempt #1.2 - with activity_type"),
-             subject,
-             activity,
-             object
+           if(collection_target_type = collection_target_type(activity),
+             do:
+               handle_activity_with(
+                 Bonfire.Federate.ActivityPub.FederationModules.federation_module(
+                   {activity_type, collection_target_type}
+                 )
+                 |> info("AP attempt #1.1b - with activity_type and target collection type"),
+                 subject,
+                 activity,
+                 object
+               ),
+             else: {:no_federation_module_match, "missing collection target type"}
            ),
+         # just activity type
          {:no_federation_module_match, _} <-
-           handle_activity_with(
-             Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type)
-             |> info("AP attempt #1.3 - with object_type"),
-             subject,
-             activity,
-             object
+           if(activity_type,
+             do:
+               handle_activity_with(
+                 Bonfire.Federate.ActivityPub.FederationModules.federation_module(activity_type)
+                 |> info("AP attempt #1.2 - with activity_type"),
+                 subject,
+                 activity,
+                 object
+               ),
+             else: {:no_federation_module_match, "missing activity type"}
+           ),
+         # just object type
+         {:no_federation_module_match, _} <-
+           if(object_type,
+             do:
+               handle_activity_with(
+                 Bonfire.Federate.ActivityPub.FederationModules.federation_module(object_type)
+                 |> info("AP attempt #1.3 - with object_type"),
+                 subject,
+                 activity,
+                 object
+               ),
+             else: {:no_federation_module_match, "missing object type"}
            ) do
       receive_activity_fallback(activity, object, subject)
     end
@@ -313,6 +343,29 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     receive_activity_fallback(activity, object)
   end
+
+  # The collection "type" of an activity's `target` (e.g. "featured"), for dispatch-by-target —
+  # determined by which collection property on the *actor* points at the target. Works for our own
+  # ids and remote/Mastodon (`{actor}/collections/featured`) alike. `target` and `actor` were already
+  # resolved into the activity by earlier `receive_activity/1` clauses.
+  defp collection_target_type(%{data: %{"target" => target} = data}) do
+    with target_id when is_binary(target_id) <-
+           (is_binary(target) && target) || e(target, "id", nil) || e(target, :data, "id", nil),
+         actor_ap_id when is_binary(actor_ap_id) <-
+           e(data, "actor", "id", nil) || e(data, "actor", nil),
+         {:ok, %{data: actor_data}} when is_map(actor_data) <-
+           ActivityPub.Actor.get_cached(ap_id: actor_ap_id) do
+      # the type is the actor property whose value is the target id (e.g. "featured", "keyPackages")
+      Enum.find_value(actor_data, fn
+        {key, value} when is_binary(value) and value == target_id -> key
+        _ -> nil
+      end)
+    else
+      _ -> nil
+    end
+  end
+
+  defp collection_target_type(_), do: nil
 
   defp fetch_final_object(object_id, opts) do
     case ActivityPub.Federator.Fetcher.get_cached_or_fetch_object(

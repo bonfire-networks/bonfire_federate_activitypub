@@ -44,13 +44,68 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     #   # "activity" => activity
     # })
 
-    # case 
+    # case
     Incoming.receive_activity(activity)
     # |> debug("receive done") do
     #   nil -> activity
     #   received -> received
     # end
   end
+
+  # Generic collection read: route by collection type to the owning extension's FederationModule
+  # (e.g. Pins owns "featured"), which supplies the member ap_ids / count. Returns `nil` for any
+  # collection type no module claims, so the AP lib falls back to its GenericCollectionStore
+  # (used by keyPackages). Keeps this adapter free of per-collection (Pins-specific) logic.
+  # Owning module returns its members as **local pointer ids** (its natural shape); this adapter
+  # shapes them to what serving/delivery asked for via `opts[:return]`:
+  # `:ap_ids` (default — cheap canonical URLs, no AP object build), `:ap_objects` (loaded
+  # `%ActivityPub.Object{}`), `:pointer_ids` (as-is), `:pointers` (loaded host pointers/objects).
+  def collection_items(%Object{} = collection, opts \\ []) do
+    case collection_via_module(collection, :collection_items, opts) do
+      pointer_ids when is_list(pointer_ids) -> shape_members(pointer_ids, opts[:return])
+      _ -> nil
+    end
+  end
+
+  def collection_total(%Object{} = collection, opts \\ []),
+    do: collection_via_module(collection, :collection_total, opts)
+
+  defp shape_members(pointer_ids, :pointer_ids), do: pointer_ids
+
+  defp shape_members(pointer_ids, :pointers),
+    do: Bonfire.Common.Needles.list!(pointer_ids, skip_boundary_check: true)
+
+  defp shape_members(pointer_ids, :ap_objects) do
+    Enum.flat_map(pointer_ids, fn id ->
+      case Object.get_cached(pointer: id) do
+        {:ok, %Object{} = object} -> [object]
+        _ -> []
+      end
+    end)
+  end
+
+  defp shape_members(pointer_ids, _ap_ids) do
+    pointer_ids
+    |> Enum.map(&URIs.canonical_url/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  # cheap registry lookup (no fetching): does any FederationModule handle this query? Used by the
+  # lib to infer routing (e.g. store-backed collections are those no adapter handles).
+  def adapter_handles?(query),
+    do: match?({:ok, _}, Bonfire.Federate.ActivityPub.FederationModules.federation_module(query))
+
+  defp collection_via_module(%{data: %{"id" => id}} = collection, fun, opts) do
+    with {:ok, type, _uuid} <- ActivityPub.Utils.parse_collection_ap_id(id),
+         {:ok, module} <-
+           Bonfire.Federate.ActivityPub.FederationModules.federation_module({:collection, type}) do
+      maybe_apply(module, fun, [collection, opts], fallback_return: nil)
+    else
+      _ -> nil
+    end
+  end
+
+  defp collection_via_module(_collection, _fun, _opts), do: nil
 
   def get_follower_local_ids(actor, purpose_or_current_actor \\ nil) do
     # debug(actor)

@@ -1360,7 +1360,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             ) !=
               true,
           "indexable" => Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer, user_etc),
-          "keyPackages" => e(user_etc, :extra_info, :info, "keyPackages", nil),
+          # MLS-over-ActivityPub: advertise a stable, dereferenceable keyPackages collection id
+          # (served by `ActivityPub.Web.ActivityPubController.collection/2`, backed by the lib's
+          # GenericCollectionStore) rather than embedding a mutable blob in the actor — so the
+          # actor cache never churns as single-use key packages rotate.
+          "keyPackages" =>
+            if(Bonfire.Common.Extend.module_enabled?(Bonfire.Encrypt, user_etc),
+              do: ActivityPub.Utils.collection_ap_id("keyPackages", user_etc.id)
+            ),
+          # Mastodon-compatible `featured` collection (the actor's pinned objects), owned by Pins
+          "featured" =>
+            if(Bonfire.Common.Extend.module_enabled?(Bonfire.Social.Pins, user_etc),
+              do: ActivityPub.Utils.collection_ap_id("featured", user_etc.id)
+            ),
           "updated" =>
             updated_at
             |> NaiveDateTime.to_iso8601()
