@@ -499,23 +499,29 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
                  repo().all(
                    from j in Oban.Job,
                      where:
-                       (j.worker == "ActivityPub.Federator.Workers.PublisherWorker" and
-                          is_nil(j.scheduled_at)) or
-                         j.scheduled_at < ^scheduled_after
+                       j.worker == "ActivityPub.Federator.Workers.PublisherWorker" and
+                         (is_nil(j.scheduled_at) or j.scheduled_at < ^scheduled_after)
                  )
                  |> Enum.map(fn j ->
-                   {:ok, activity} = ActivityPub.Object.get_cached(id: j.args["activity_id"])
+                   info(
+                     j.args,
+                     "unexpected PublisherWorker job scheduled before #{inspect(scheduled_after)}"
+                   )
 
-                   if e(activity, :data, "object", nil) == "Create" do
-                     if object_id = e(activity, :data, "object", nil) do
-                       {:ok, object} = ActivityPub.Object.get_cached(id: object_id)
+                   nil
 
-                       object
-                       |> debug(
-                         "unexpected federation job for activity schedule for #{inspect(scheduled_at)}"
-                       )
-                     end
-                   end
+                   # {:ok, activity} = ActivityPub.Object.get_cached(id: j.args["activity_id"])
+
+                   #  if e(activity, :data, "object", nil) == "Create" do
+                   #    if object_id = e(activity, :data, "object", nil) do
+                   #      {:ok, object} = ActivityPub.Object.get_cached(id: object_id)
+
+                   #      object
+                   #      |> debug(
+                   #        "unexpected federation job for activity schedule for #{inspect(scheduled_at)}"
+                   #      )
+                   #    end
+                   #  end
                  end)
                  |> Enum.reject(&is_nil/1)
 

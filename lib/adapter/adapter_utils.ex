@@ -1571,7 +1571,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     case ActivityPub.Actor.get_cached(pointer: target) do
       {:ok, %{ap_id: target_ap_id, data: target_data}} ->
         ActivityPub.Actor.also_known_as?(local_ap_id, target_data) or
-          ActivityPub.Actor.valid_move_chain?(target_ap_id, local_ap_id) or
+          ActivityPub.Actor.moved_to?(target_data, local_ap_id) or
           case ActivityPub.Actor.get_cached(ap_id: local_ap_id) do
             {:ok, %{data: local_data}} ->
               ActivityPub.Actor.also_known_as?(target_ap_id, local_data)
