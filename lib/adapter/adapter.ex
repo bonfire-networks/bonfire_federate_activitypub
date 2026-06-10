@@ -75,14 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   defp shape_members(pointer_ids, :pointers),
     do: Bonfire.Common.Needles.list!(pointer_ids, skip_boundary_check: true)
 
-  defp shape_members(pointer_ids, :ap_objects) do
-    Enum.flat_map(pointer_ids, fn id ->
-      case Object.get_cached(pointer: id) do
-        {:ok, %Object{} = object} -> [object]
-        _ -> []
-      end
-    end)
-  end
+  defp shape_members(pointer_ids, :ap_objects), do: Object.list_cached(pointer_ids)
 
   defp shape_members(pointer_ids, _ap_ids) do
     pointer_ids
@@ -158,8 +151,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
        # Skip granted followers already in addressed recipients
        |> Enum.reject(&(&1.subject_id in addressed_pointer_ids))
        |> debug("post_grants (excluding already addressed)")
-       |> Enum.map(&ActivityPub.Actor.get_cached!(pointer: &1.subject_id))
-       |> filter_empty([])
+       |> Enum.map(& &1.subject_id)
+       |> ActivityPub.Actor.list_cached()
        |> Enum.filter(
          &Bonfire.Federate.ActivityPub.federation_allowed?(&1,
            current_user: character,
@@ -191,6 +184,21 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character) do
       {:ok, actor}
     end
+  end
+
+  # batch sibling of `get_actor_by_id/1` (for `Actor.list_cached/2`): one `Needles.list!` + preload,
+  # then format each local character. `skip_boundary_check: true` matches the single
+  # `get_character_by_id` default for federation actor resolution.
+  def get_actors_by_ids(ids) when is_list(ids) do
+    ids
+    |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+    |> Enum.flat_map(fn character ->
+      # `character_to_actor` → `format_actor` accepts the (virtual) pointer directly; non-locals nil
+      case AdapterUtils.character_to_actor(character) do
+        %ActivityPub.Actor{} = actor -> [actor]
+        _ -> []
+      end
+    end)
   end
 
   def get_actor_by_username(username) do

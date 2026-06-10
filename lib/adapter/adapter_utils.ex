@@ -719,7 +719,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         %{}
 
       ids ->
-        ActivityPub.Object.query(ap_ids: ids)
+        ActivityPub.Object.query(ap_id: ids)
         |> repo().many()
         |> repo().maybe_preload(:pointer)
         |> Map.new(fn object -> {e(object, :data, "id", nil), object} end)
@@ -1181,7 +1181,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     debug(character, "character")
 
     character_module(character)
-    |> debug()
+    |> info("character_module")
     |> maybe_apply_or(:format_actor, character)
 
     # with %ActivityPub.Actor{} = actor <-
@@ -1238,6 +1238,33 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def format_actor(user_etc, type \\ "Person")
 
   def format_actor(%struct{id: _pointer_id} = user_etc, type) when struct in @types_characters do
+    do_format_actor(user_etc, type)
+  end
+
+  # a (virtual) pointer to a character — e.g. from a batched `Needles.list!`, which doesn't cast
+  # virtual pointables — isn't itself a character struct. If its type matches a character schema,
+  # cast it to that struct (a no-DB struct cast for virtuals) and format.
+  def format_actor(%Pointer{table_id: table_id} = pointer, type) do
+    with {:ok, schema} when schema in @types_characters <- Needle.Tables.schema(table_id) do
+      do_format_actor(pointer, type)
+    else
+      _ ->
+        warn(pointer, "pointer type is not a character, cannot format_actor to #{type}")
+        nil
+    end
+  end
+
+  def format_actor(%struct{}, type) do
+    warn(struct, "unsupported character type for format_actor to type #{type}")
+    nil
+  end
+
+  def format_actor(struct, type) do
+    warn(struct, "unsupported character type for format_actor to type #{type}")
+    nil
+  end
+
+  defp do_format_actor(%{} = user_etc, type) do
     user_etc =
       repo().maybe_preload(
         user_etc,
@@ -1399,16 +1426,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         error(user_etc, "Could not find remote Actor")
       end
     end
-  end
-
-  def format_actor(%struct{}, type) do
-    warn(struct, "unsupported character type for format_actor to type #{type}")
-    nil
-  end
-
-  def format_actor(struct, type) do
-    warn(struct, "unsupported character type for format_actor to type #{type}")
-    nil
   end
 
   defp alias_actor_ids(aliases) when is_list(aliases) and aliases != [],
