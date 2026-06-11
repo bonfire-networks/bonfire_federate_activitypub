@@ -995,13 +995,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
           # Some servers (e.g. single-user instances) use the root URL as their AP actor ID.
           # Try local cache first (fast), then network fetch, before falling back to instance circle.
-          case get_character_by_ap_id(q) |> io_inspect("ROOTURI_DEBUG get_character_by_ap_id") do
+          case get_character_by_ap_id(q) |> debug("ROOTURI_DEBUG get_character_by_ap_id") do
             {:ok, actor} ->
               {:ok, actor}
 
             _ ->
               case fetch_and_return_ap_object(q, opts)
-                   |> io_inspect("ROOTURI_DEBUG fetch_and_return_ap_object") do
+                   |> debug("ROOTURI_DEBUG fetch_and_return_ap_object") do
                 {:ok, actor} ->
                   {:ok, actor}
 
@@ -2193,6 +2193,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  # when set in the process dict, `activity_character/1`'s unresolved-actor fallback to the service
+  # character logs a `warn` instead of a `:test`-raising `err` (the resilient incoming pipeline sets
+  # it, since relay / 404 / Tombstone actors are expected there)
+  @service_character_fallback_flag :bonfire_ap_service_character_fallback
+
+  def allow_service_character_fallback, do: Process.put(@service_character_fallback_flag, true)
+
   def activity_character(%{data: %{"type" => type, "actor" => actor}})
       when is_in(type, ["Delete", "Tombstone"]) do
     get_character(actor, skip_boundary_check: true)
@@ -2224,9 +2231,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              return_tombstones: true
            )
            |> debug("fetched actor") do
-      # falling back to the service character means we couldn't resolve the actor — surface it
-      # loudly (raises in `:test`); non-fatal in dev/prod where it proceeds to the fallback
-      err(e, "AP - could not find local character for the actor, fallback to service character")
+      # falling back to the service character means we couldn't resolve the actor. By default
+      # surface it loudly (`err` raises in `:test`) to catch unexpected unresolved actors; but
+      # callers that expect this (the resilient incoming pipeline — relay / 404 / Tombstone actors)
+      # opt into a quiet warn via `allowing_service_character_fallback/1`.
+      if Process.get(@service_character_fallback_flag) do
+        warn(
+          e,
+          "AP - could not find local character for the actor, fallback to service character"
+        )
+      else
+        err(e, "AP - could not find local character for the actor, fallback to service character")
+      end
+
       {:ok, get_or_create_service_character()}
     end
   end

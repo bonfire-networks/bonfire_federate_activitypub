@@ -118,6 +118,10 @@ defmodule Bonfire.Federate.ActivityPub.RelayActorCorruptionTest do
         )
 
       ActivityPub.Actor.invalidate_cache(local_actor)
+
+      # the relay actor (@relay_actor) deliberately 404s, so resolving it falls back to the service
+      # character — expected here, so allow it without the test-only raise
+      Bonfire.Federate.ActivityPub.AdapterUtils.allow_service_character_fallback()
       Bonfire.Federate.ActivityPub.Incoming.receive_activity(add_ap_object)
 
       # Local user must still be resolvable by pointer after the incoming activity
@@ -189,6 +193,9 @@ defmodule Bonfire.Federate.ActivityPub.RelayActorCorruptionTest do
         ])
       end)
 
+      # the relay actor (@relay_actor) deliberately 404s, so resolving it falls back to the service
+      # character — expected here, so allow it without the test-only raise
+      Bonfire.Federate.ActivityPub.AdapterUtils.allow_service_character_fallback()
       Bonfire.Federate.ActivityPub.Incoming.receive_activity(add_ap_object)
 
       # Confirm shape A corruption exists
