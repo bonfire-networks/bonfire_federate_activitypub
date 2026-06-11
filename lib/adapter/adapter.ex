@@ -134,8 +134,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          federation_mode when is_atom(federation_mode) and not is_nil(federation_mode) <-
            Bonfire.Federate.ActivityPub.federation_mode(character)
            |> info("external_followers_for_activity:federation_mode"),
+         # preload `subject.character.peered` so the `is_local?` reject below classifies each
+         # follower's locality without an on-demand (raising) preload
          followers when is_list(followers) and followers != [] <-
-           AdapterUtils.get_followers(character, :activity, nil,
+           AdapterUtils.get_followers(character, :activity, :subject_character_peered,
              exclude_ids: addressed_pointer_ids
            )
            |> debug("got_followers (excluding already addressed)")

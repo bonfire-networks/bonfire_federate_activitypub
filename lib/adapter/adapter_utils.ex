@@ -9,6 +9,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   alias ActivityPub.Object
   alias Bonfire.Data.ActivityPub.Peered
   alias Bonfire.Me.Users
+  alias Bonfire.Me.Characters
   # alias Bonfire.Social.Threads
   alias Ecto.Association.NotLoaded
   alias Bonfire.Federate.ActivityPub.Adapter
@@ -107,10 +108,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %Bonfire.Data.ActivityPub.Peered{} ->
         false
 
-      %{peered: %Peered{}} ->
+      # a Peer is a known remote instance (the local instance is never stored as a Peer) — e.g. a
+      # single-user instance whose actor URI is the instance root
+      %Bonfire.Data.ActivityPub.Peer{} ->
         false
 
       %{character: %{peered: %Peered{}}} ->
+        false
+
+      %{peered: %Peered{}} ->
         false
 
       %{creator_id: @service_character_id} ->
@@ -134,6 +140,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{created: %{creator: %{peered: %Peered{}}}} ->
         false
 
+      # a marked creator carries locality on `character.peered` (top-level `peered` may be NotLoaded)
+      %{created: %{creator: %{character: %{peered: %Peered{}}}}} ->
+        false
+
+      %{creator: %{character: %{peered: %Peered{}}}} ->
+        false
+
+      %{character: %{peered: nil}} ->
+        true
+
       %{peered: nil} ->
         true
 
@@ -143,30 +159,79 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{created: %{creator: %{peered: nil}}} ->
         true
 
-      %{created: %{peered: nil}} ->
+      # a marked creator carries locality on `character.peered` (top-level `peered` may be NotLoaded)
+      %{created: %{creator: %{character: %{peered: nil}}}} ->
         true
 
-      %{character: %{peered: nil}} ->
+      %{creator: %{character: %{peered: nil}}} ->
+        true
+
+      %{created: %{peered: nil}} ->
         true
 
       %{user: %{peered: nil}} ->
         true
 
-      object when is_struct(object) ->
-        if opts[:preload_if_needed] != false do
-          preload_peered(object)
-          |> warn(
-            "preloaded peered info (should try always doing this in original query to avoid N plus 1)"
-          )
-          |> is_local?(preload_if_needed: false)
-        else
-          warn(object, "no case matched for struct (maybe need to preload peered info)")
-          true
-        end
+      # an actor whose `:peered` isn't loaded yet (directly, or via character/creator/created/user) —
+      # preload it when allowed, otherwise flag the un-preloaded subject. These `NotLoaded` shapes
+      # are the only ones we raise on; a non-actor object (e.g. a Circle) carries no such field and
+      # falls through to the `_` clause below as local.
+      %{character: %{peered: %NotLoaded{}}} = object ->
+        maybe_preload_peered(object, opts)
 
-      other ->
-        warn(other, "no case matched")
+      %{peered: %NotLoaded{}} = object ->
+        maybe_preload_peered(object, opts)
+
+      %{creator: %{peered: %NotLoaded{}}} = object ->
+        maybe_preload_peered(object, opts)
+
+      %{created: %{creator: %{peered: %NotLoaded{}}}} = object ->
+        maybe_preload_peered(object, opts)
+
+      %{created: %{creator: %{character: %{peered: %NotLoaded{}}}}} = object ->
+        maybe_preload_peered(object, opts)
+
+      %{creator: %{character: %{peered: %NotLoaded{}}}} = object ->
+        maybe_preload_peered(object, opts)
+
+      %{created: %{peered: %NotLoaded{}}} = object ->
+        maybe_preload_peered(object, opts)
+
+      %{user: %{peered: %NotLoaded{}}} = object ->
+        maybe_preload_peered(object, opts)
+
+      _ ->
+        warn(
+          thing,
+          "is_local?: object could not be classified, please make sure it is a local/remote object, and preload it at the source, or pass a loaded struct (not a bare id/map). See queries_subject_circles_test.exs"
+        )
+
         true
+    end
+  end
+
+  # an actor reached without its `:peered` loaded: preload it (avoiding the per-build N+1 by doing
+  # it once at the source is still preferable), or — when we mustn't fetch (`preload_if_needed:
+  # false`, the boundary path) — flag the misuse via `Untangle.err` (raising in `:test` so the
+  # offending caller is found, non-fatal in dev/prod) and return the caller's `on_unclassifiable`
+  # sentinel (so the boundary path can add no locality circle), defaulting to local.
+  defp maybe_preload_peered(object, opts) do
+    if opts[:preload_if_needed] != false do
+      err(
+        object,
+        "is_local?: object reached locality classification without loaded `:peered` info, Peered is now being preloaded, but please preload it at the source instead, and pass a loaded struct (not a bare id/map). See queries_subject_circles_test.exs"
+      )
+
+      preload_peered(object)
+      |> info("preloaded peered info")
+      |> is_local?(Keyword.put(opts, :preload_if_needed, false))
+    else
+      err(
+        object,
+        "is_local?: object reached locality classification without loaded `:peered` info, please preload it at the source, and pass a loaded struct (not a bare id/map). See queries_subject_circles_test.exs"
+      )
+
+      Keyword.get(opts, :on_unclassifiable, nil)
     end
   end
 
@@ -407,8 +472,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
     if username != ap_id and !is_local_collection_or_built_in?(ap_id),
       do:
-        username
-        |> get_character_by_username()
+        get_character_by_username(username)
+        |> Characters.mark_as(:local)
   end
 
   def get_pointable_by_peered_ap_id(ap_id) do
@@ -930,12 +995,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
           # Some servers (e.g. single-user instances) use the root URL as their AP actor ID.
           # Try local cache first (fast), then network fetch, before falling back to instance circle.
-          case get_character_by_ap_id(q) do
+          case get_character_by_ap_id(q) |> io_inspect("ROOTURI_DEBUG get_character_by_ap_id") do
             {:ok, actor} ->
               {:ok, actor}
 
             _ ->
-              case fetch_and_return_ap_object(q, opts) do
+              case fetch_and_return_ap_object(q, opts)
+                   |> io_inspect("ROOTURI_DEBUG fetch_and_return_ap_object") do
                 {:ok, actor} ->
                   {:ok, actor}
 
@@ -1018,15 +1084,20 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       %{pointer_id: id, local: local?, data: %{"type" => type}}
       when is_binary(id) and is_in(type, :supported_actor_types) ->
-        with {:error, :not_found} <- get_character_by_id(id) do
-          # in case the local pointer was deleted
-          if local? do
-            error(fetched, "local actor not found by username")
-            {:error, :not_found}
-          else
-            debug(fetched, "create remote actor by username")
-            create_remote_actor(fetched)
-          end
+        case get_character_by_id(id) do
+          {:error, :not_found} ->
+            # in case the local pointer was deleted
+            if local? do
+              error(fetched, "local actor not found by username")
+              {:error, :not_found}
+            else
+              debug(fetched, "create remote actor by username")
+              create_remote_actor(fetched)
+            end
+
+          found ->
+            # locality is known from the fetched actor's `local` flag
+            found |> Characters.mark_as(if(local?, do: :local, else: :remote))
         end
 
       %{pointer_id: id, local: local?} when is_binary(id) ->
@@ -1045,15 +1116,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %ActivityPub.Actor{username: username, local: local?} when is_binary(username) ->
         debug("we have a username")
 
-        with {:error, :not_found} <-
-               get_character_by_username(ActivityPub.Actor.format_username(fetched)) do
-          if local? do
-            error(fetched, "local actor not found by username")
-            {:error, :not_found}
-          else
-            debug(fetched, "create remote actor by username")
-            create_remote_actor(fetched)
-          end
+        case get_character_by_username(ActivityPub.Actor.format_username(fetched)) do
+          {:error, :not_found} ->
+            if local? do
+              error(fetched, "local actor not found by username")
+              {:error, :not_found}
+            else
+              debug(fetched, "create remote actor by username")
+              create_remote_actor(fetched)
+            end
+
+          found ->
+            # locality is known from the fetched actor's `local` flag
+            found |> Characters.mark_as(if(local?, do: :local, else: :remote))
         end
 
       _ when is_binary(fetched) ->
@@ -1068,8 +1143,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %Peered{
         id: pointer_id
       } ->
+        # a Peered row means a remote actor
         # TODO: can we reuse the Peered in the final object instead of having to preload it again?
         get_character_by_id(pointer_id, opts)
+        |> Characters.mark_as(:remote)
 
       # nope? let's try and find them from their ap id
       %ActivityPub.Actor{} ->
@@ -1551,10 +1628,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                user_etc,
                %{"profile" => %{"icon_id" => icon_id, "image_id" => banner_id}}
              ]) do
-        {:ok, updated_user}
+        {:ok, Characters.mark_as(updated_user, :remote)}
       else
         _ ->
-          {:ok, user_etc}
+          {:ok, Characters.mark_as(user_etc, :remote)}
       end
     end
   end
@@ -2147,7 +2224,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              return_tombstones: true
            )
            |> debug("fetched actor") do
-      error(e, "AP - could not find local character for the actor")
+      # falling back to the service character means we couldn't resolve the actor — surface it
+      # loudly (raises in `:test`); non-fatal in dev/prod where it proceeds to the fallback
+      err(e, "AP - could not find local character for the actor, fallback to service character")
       {:ok, get_or_create_service_character()}
     end
   end
