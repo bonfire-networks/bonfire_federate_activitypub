@@ -118,6 +118,28 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
     )
   end
 
+  @doc """
+  Filters a query of pointable objects by federation origin, via the `Peered` mixin (whose `id` is the
+  object's pointer id): `:local` keeps objects with no `Peered` row, `:remote` keeps those with one,
+  `:all`/`nil` is a no-op. The query must have a `:main_object` named binding (the convention for the
+  object table). Users have their own variant (`Bonfire.Me.Users.Queries`) since locality lives on
+  `character.peered`, but the local/remote semantics are shared here.
+  """
+  def filter_by_origin(query, origin) when origin in [:local, :remote] do
+    query =
+      reusable_join(query, :left, [main_object: o], peered in Peered,
+        on: peered.id == o.id,
+        as: :peered
+      )
+
+    case origin do
+      :local -> where(query, [peered: p], is_nil(p.id))
+      :remote -> where(query, [peered: p], not is_nil(p.id))
+    end
+  end
+
+  def filter_by_origin(query, _all), do: query
+
   @doc "Batch-load `Peered` records for a list of canonical URIs (to pre-resolve recipients and avoid n+1 in the MRF filter)."
   def list_by_canonical_uris(canonical_uris) when is_list(canonical_uris) do
     case canonical_uris |> Enum.filter(&is_binary/1) |> Enum.uniq() do
