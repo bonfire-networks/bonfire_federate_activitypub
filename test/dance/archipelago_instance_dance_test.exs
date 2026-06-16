@@ -201,6 +201,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoInstanceDanceTest do
       end)
 
       assert Follows.following?(bob_remote_on_local, alice_local)
+
+      # the Accept must federate back so the remote follower's request is confirmed as a follow.
+      # regression: in allowlist-only mode the auto-accept used to fail (returning nil), so no
+      # Accept was sent and the follow stayed pending on the follower's instance.
+      TestInstanceRepo.apply(fn ->
+        {:ok, alice_on_remote} = AdapterUtils.get_by_url_ap_id_or_username(alice_local_ap_id)
+        assert Follows.following?(bob_remote, alice_on_remote)
+        refute Follows.requested?(bob_remote, alice_on_remote)
+      end)
     end
 
     test "outgoing follow to non-allowlisted domain is not delivered", context do
