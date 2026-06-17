@@ -90,6 +90,12 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
   # runs before EVERY test of any module using this case (not just files that call clean_slate), so
   # stale cross-test state in caches/process-overrides can't bleed in via the shared instances
   setup _tags do
+    # run dance tests with the AP cache live (it's bypassed by default in tests) so they exercise the
+    # real prod caching behaviour — incl. negative-cache invalidation. Set in the per-test process so
+    # `ProcessTree` propagates it to the inline (`testing: :inline`) federation/Oban jobs; `reset_caches`
+    # right after keeps cross-test isolation. Cache keys are partitioned per repo, and dance tests use
+    # committed data (no sandbox rollback), so a live cache is safe here.
+    Process.put(:activity_pub_enable_cache, true)
     reset_caches()
     TestInstanceRepo.apply(fn -> reset_caches() end)
     :ok
