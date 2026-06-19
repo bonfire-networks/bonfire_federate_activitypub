@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.C2STest do
       TestInstanceRepo.apply(fn ->
         assert {:ok, object} =
                  AdapterUtils.get_by_url_ap_id_or_username(created_note["id"])
-                 |> repo().maybe_preload(:post_content)
+                 |> repo().maybe_preload([:post_content, :peered])
 
         assert object.post_content.html_body =~ note_content
 
@@ -150,7 +150,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.C2STest do
 
     assert {:ok, object} =
              AdapterUtils.get_by_url_ap_id_or_username(created_note["id"])
-             |> repo().maybe_preload(:post_content)
+             |> repo().maybe_preload([:post_content, :peered])
 
     assert object.post_content.html_body =~ note_content
 

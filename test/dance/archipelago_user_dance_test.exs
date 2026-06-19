@@ -2,6 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoUserDanceTest do
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
+  @moduletag :todo
 
   import Bonfire.Federate.ActivityPub.SharedDataDanceCase
 

@@ -87,6 +87,12 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       [ok: del] ->
         {:ok, del}
 
+      # a push that failed (e.g. a recipient inbox returned an HTTP error) comes back
+      # list-wrapped like the `[ok: del]` case — handle it so a failed delivery degrades
+      # to a logged error instead of crashing the (linked) federation task
+      [error: reason] ->
+        error(reason, "Failed to delete")
+
       [] ->
         debug("No delete activity was pushed")
         :ignore
