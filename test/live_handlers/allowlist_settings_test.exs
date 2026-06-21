@@ -24,7 +24,8 @@ defmodule Bonfire.Federate.ActivityPub.AllowlistSettingsTest do
       conn
       |> visit("/settings/user/safety")
       |> within("form[data-scope=federation_mode]", fn c ->
-        choose(c, "Archipelago: Only federate with instances and actors you explicitly allow")
+        # rich card: name "Allowlist only" + tag "Archipelago"
+        choose(c, "Archipelago", exact: false)
       end)
       |> assert_has("a", text: "Manage my federation allowlist")
     end
@@ -35,7 +36,8 @@ defmodule Bonfire.Federate.ActivityPub.AllowlistSettingsTest do
       conn
       |> visit("/settings/user/safety")
       |> within("form[data-scope=federation_mode]", fn c ->
-        choose(c, "Automatic: Push activities to the fediverse, and accept remote activities")
+        # rich card: name "Open" + tag "Automatic"
+        choose(c, "Open", exact: false)
       end)
       |> refute_has("a", text: "Manage my federation allowlist")
     end
