@@ -550,6 +550,63 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
              "Post should be deleted from Bonfire even when AP object was pruned"
     end
 
+    test "incoming Delete for an object we have never seen locally is a graceful no-op (not an error that Oban would retry)" do
+      # A known remote actor sends a Delete (with an embedded Tombstone) for an object
+      # this instance has never received. There is nothing to delete locally, so this
+      # should be a skip/no-op rather than an `{:error, _}` — which the AP Oban worker
+      # would retry 3x and log as a federation error. See bonfire-app#1784.
+
+      # Ensure the actor is known locally (the bug is about an unknown OBJECT, not actor)
+      {:ok, _actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+
+      unknown_object_id = "#{@remote_instance}/objects/#{Needle.UID.generate()}"
+
+      delete_data = %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "id" => "#{unknown_object_id}/delete",
+        "type" => "Delete",
+        "actor" => @remote_actor,
+        "object" => %{
+          "id" => unknown_object_id,
+          "type" => "Tombstone"
+        }
+      }
+
+      # receive_activity/1 is what the AP Oban worker calls; its return decides retry vs cancel.
+      assert {:ok, :skip} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(%{
+                 data: delete_data,
+                 local: false
+               })
+               |> debug("received Delete for unknown object")
+    end
+
+    test "incoming Delete from an actor we don't know (e.g. a remote account deletion we never saw) is a graceful no-op" do
+      # A Delete arrives referencing an actor (and object) this instance has never seen
+      # — e.g. a remote account self-deletion where we never knew the actor. Nothing to
+      # do locally, so skip cleanly rather than erroring (which Oban would retry). #1784
+      unknown_actor = "#{@remote_instance}/users/ghost-#{Needle.UID.generate()}"
+      unknown_object_id = "#{@remote_instance}/objects/#{Needle.UID.generate()}"
+
+      delete_data = %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "id" => "#{unknown_object_id}/delete",
+        "type" => "Delete",
+        "actor" => unknown_actor,
+        "object" => %{
+          "id" => unknown_object_id,
+          "type" => "Tombstone"
+        }
+      }
+
+      assert {:ok, :skip} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(%{
+                 data: delete_data,
+                 local: false
+               })
+               |> debug("received Delete from unknown actor")
+    end
+
     test "update object works for incoming when the object has been pruned from AP db" do
       # Simulate receiving a remote post
       remote_post_data =

@@ -285,6 +285,24 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              else: {:no_federation_module_match, "missing object type"}
            ) do
       receive_activity_fallback(activity, object, subject)
+    else
+      {:error, :not_found} ->
+        if is_in(activity_type, ["Delete", "Tombstone"]) do
+          # A Delete arrived for an actor (and object) we don't know locally — e.g. a
+          # remote account deletion we never saw. Nothing to delete, so skip cleanly
+          # rather than erroring (which the Oban worker would retry 3x). See #1784.
+          debug(
+            activity,
+            "AP - Delete from an actor we don't know locally, skipping (nothing to delete)"
+          )
+
+          {:ok, :skip}
+        else
+          {:error, :not_found}
+        end
+
+      other ->
+        other
     end
   end
 
