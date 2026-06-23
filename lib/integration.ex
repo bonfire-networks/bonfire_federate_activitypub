@@ -162,12 +162,15 @@ defmodule Bonfire.Federate.ActivityPub do
         peered = Bonfire.Federate.ActivityPub.Peered.get_or_nil(subject, opts)
         subject_to_check = peered || subject
 
+        # callers that already enforce blocks (e.g. via `can?`) can pass `skip_block_check: true`
+        # to avoid the redundant block query
         not_blocked =
-          !Bonfire.Federate.ActivityPub.Peered.actor_blocked?(
-            subject_to_check,
-            block_types,
-            opts
-          )
+          opts[:skip_block_check] == true or
+            !Bonfire.Federate.ActivityPub.Peered.actor_blocked?(
+              subject_to_check,
+              block_types,
+              opts
+            )
 
         # local subjects don't have Peered records and are always allowed;
         # BoundariesMRF handles per-recipient allowlist filtering for outgoing activities
@@ -177,6 +180,41 @@ defmodule Bonfire.Federate.ActivityPub do
              Bonfire.Federate.ActivityPub.Peered.actor_allowlisted?(subject_to_check, opts))
       )
       |> info("federation_allowed?")
+  end
+
+  @doc """
+  Whether `subject` (the acting current user) could FEDERATE an interaction (follow, reply, like,
+  boost, DM, mention) with `target`. `target` may be a user/character or an object (post/activity)
+  — `is_local?/2` and `federation_allowed?/2` both resolve the relevant peered/creator internally,
+  so callers pass whichever they have (for a post, pass its author/subject when known). Accounts
+  for the effective federation mode: a LOCAL target is always federatable (no federation needed); a
+  REMOTE target only when federation is open, or — under allowlist-only — when allowlisted. See #647.
+
+  Cheapest check first: the cached `federation_mode` short-circuits the whole branch under open
+  federation (no per-target Peered lookup), and the computed `mode` is threaded into
+  `federation_allowed?` so it isn't looked up twice.
+  """
+  def interaction_allowed?(subject, target, opts \\ []) do
+    case federation_mode(subject, opts) do
+      # open — any target is federatable
+      true ->
+        true
+
+      # disabled or manual/paused — only local interactions reach their target (nothing is
+      # pushed to remotes), so federation can't help here regardless of the target
+      mode when mode in [false, nil] ->
+        Bonfire.Federate.ActivityPub.AdapterUtils.is_local?(target, opts)
+
+      # allowlist-only — local target, or remote target that is allowlisted; reuse
+      # federation_allowed? for the allowlist check (caller passes skip_block_check when it has
+      # already enforced blocks via can?)
+      mode ->
+        Bonfire.Federate.ActivityPub.AdapterUtils.is_local?(target, opts) or
+          federation_allowed?(
+            target,
+            [direction: :out, current_user: subject, federation_mode: mode] ++ opts
+          )
+    end
   end
 
   def federating_default?(fallback_default \\ true) do

@@ -46,7 +46,23 @@ defmodule Bonfire.Federate.ActivityPub.AliasesAlsoKnownAsTest do
     char
   end
 
-  describe "AdapterUtils.also_known_as?/2 — verified alias badge" do
+  # set up the mocks for two actors that reference each other, then create both. Needed for the
+  # bidirectional cases, since a single Tesla mock/1 call replaces any previous one.
+  defp remote_actor_pair(a_ap_id, a_extra, b_ap_id, b_extra) do
+    a_json = actor_json(a_ap_id, a_extra)
+    b_json = actor_json(b_ap_id, b_extra)
+
+    mock(fn
+      %{method: :get, url: ^a_ap_id} -> json(a_json)
+      %{method: :get, url: ^b_ap_id} -> json(b_json)
+    end)
+
+    {:ok, a} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(a_json)
+    {:ok, b} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(b_json)
+    {a, b}
+  end
+
+  describe "AdapterUtils.also_known_as?/2 — verified alias badge (bidirectional, #2042)" do
     test "returns false when no relationship exists between actors" do
       b = remote_actor("https://mocked.local/users/b_unrelated")
       a = remote_actor("https://mocked.local/users/a_unrelated")
@@ -54,15 +70,17 @@ defmodule Bonfire.Federate.ActivityPub.AliasesAlsoKnownAsTest do
       refute AdapterUtils.also_known_as?(b, a)
     end
 
-    test "returns true when A.alsoKnownAs contains B (A claims B as successor)" do
+    # --- one-sided relationships must NOT verify (the heart of #2042) ---
+
+    test "false when only A acknowledges B via A.alsoKnownAs (B doesn't acknowledge A back)" do
       b_ap_id = "https://mocked.local/users/b_fwd"
       b = remote_actor(b_ap_id)
       a = remote_actor("https://mocked.local/users/a_fwd", %{"alsoKnownAs" => [b_ap_id]})
 
-      assert AdapterUtils.also_known_as?(b, a)
+      refute AdapterUtils.also_known_as?(b, a)
     end
 
-    test "returns true when A.movedTo == B (A confirmed migration to B — normal Mastodon case)" do
+    test "true when A.movedTo == B alone (migration is self-sufficient — set only post-handshake)" do
       b_ap_id = "https://mocked.local/users/b_movedto"
       b = remote_actor(b_ap_id)
       a = remote_actor("https://mocked.local/users/a_movedto", %{"movedTo" => b_ap_id})
@@ -70,11 +88,54 @@ defmodule Bonfire.Federate.ActivityPub.AliasesAlsoKnownAsTest do
       assert AdapterUtils.also_known_as?(b, a)
     end
 
-    test "returns true when B.alsoKnownAs contains A (B claims A as past identity)" do
+    test "false when only B claims A via B.alsoKnownAs (A doesn't acknowledge back) — #2042" do
+      # exactly what happens when you add any handle as an alias: it lands in your own
+      # alsoKnownAs, which must NOT by itself produce a 'verified' badge
       a_ap_id = "https://mocked.local/users/a_claims"
-      # Create a first so it's cached before b (b's alsoKnownAs triggers a fetch of a)
       a = remote_actor(a_ap_id)
       b = remote_actor("https://mocked.local/users/b_claims", %{"alsoKnownAs" => [a_ap_id]})
+
+      refute AdapterUtils.also_known_as?(b, a)
+    end
+
+    test "true when B.movedTo == A alone (migration is self-sufficient — set only post-handshake)" do
+      a_ap_id = "https://mocked.local/users/a_nomove"
+      a = remote_actor(a_ap_id)
+      b = remote_actor("https://mocked.local/users/b_nomove", %{"movedTo" => a_ap_id})
+
+      assert AdapterUtils.also_known_as?(b, a)
+    end
+
+    # --- bidirectional relationships verify (both sides acknowledge, via aKA and/or movedTo) ---
+
+    test "true when both acknowledge via alsoKnownAs (mutual alias)" do
+      a_ap_id = "https://mocked.local/users/a_bi"
+      b_ap_id = "https://mocked.local/users/b_bi"
+
+      {a, b} =
+        remote_actor_pair(a_ap_id, %{"alsoKnownAs" => [b_ap_id]}, b_ap_id, %{
+          "alsoKnownAs" => [a_ap_id]
+        })
+
+      assert AdapterUtils.also_known_as?(b, a)
+    end
+
+    test "true for migration A→B: A.movedTo == B AND B.alsoKnownAs contains A" do
+      a_ap_id = "https://mocked.local/users/a_mig1"
+      b_ap_id = "https://mocked.local/users/b_mig1"
+
+      {a, b} =
+        remote_actor_pair(a_ap_id, %{"movedTo" => b_ap_id}, b_ap_id, %{"alsoKnownAs" => [a_ap_id]})
+
+      assert AdapterUtils.also_known_as?(b, a)
+    end
+
+    test "true for migration B→A: B.movedTo == A AND A.alsoKnownAs contains B" do
+      a_ap_id = "https://mocked.local/users/a_mig2"
+      b_ap_id = "https://mocked.local/users/b_mig2"
+
+      {a, b} =
+        remote_actor_pair(a_ap_id, %{"alsoKnownAs" => [b_ap_id]}, b_ap_id, %{"movedTo" => a_ap_id})
 
       assert AdapterUtils.also_known_as?(b, a)
     end

@@ -24,10 +24,10 @@ defmodule Bonfire.Federate.ActivityPub.AllowlistSettingsTest do
       conn
       |> visit("/settings/user/safety")
       |> within("form[data-scope=federation_mode]", fn c ->
-        # rich card: name "Allowlist only" + tag "Archipelago"
+        # rich card: name "Archipelago" + tag "Allow-list only"
         choose(c, "Archipelago", exact: false)
       end)
-      |> assert_has("a", text: "Manage my federation allowlist")
+      |> assert_has("a", text: "Manage my federation archipelago allow-list")
     end
 
     test "user can switch back to open mode from allowlist-only", %{conn: conn, me: me} do
@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.AllowlistSettingsTest do
         # rich card: name "Open" + tag "Automatic"
         choose(c, "Open", exact: false)
       end)
-      |> refute_has("a", text: "Manage my federation allowlist")
+      |> refute_has("a", text: "Manage my federation archipelago allow-list")
     end
   end
 
@@ -50,6 +50,10 @@ defmodule Bonfire.Federate.ActivityPub.AllowlistSettingsTest do
       |> assert_has("div", text: "Federation Archipelago")
     end
 
+    # TODO: re-enable when user-level allowlists ship. For now `/allowlisted` is just a
+    # "coming soon" placeholder (the add-member component is commented out in
+    # `allowlisted_live.sface`) — only the instance-wide allowlist applies.
+    @tag :todo
     test "user can add a remote actor to their allowlist", %{conn: conn} do
       mock(fn
         %{method: :get, url: @remote_actor} -> json(Simulate.actor_json(@remote_actor))
@@ -66,6 +70,8 @@ defmodule Bonfire.Federate.ActivityPub.AllowlistSettingsTest do
       |> refute_has("li", text: "Unknown")
     end
 
+    # TODO: re-enable when user-level allowlists ship (see note above).
+    @tag :todo
     test "user can add a bare domain to their allowlist", %{conn: conn} do
       mock(fn
         %{method: :get, url: "https://mocked.local/.well-known/nodeinfo"} ->

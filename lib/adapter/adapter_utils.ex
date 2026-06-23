@@ -1676,11 +1676,20 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def also_known_as?(local_ap_id, target) when is_binary(local_ap_id) do
     case ActivityPub.Actor.get_cached(pointer: target) do
       {:ok, %{ap_id: target_ap_id, data: target_data}} ->
-        ActivityPub.Actor.also_known_as?(local_ap_id, target_data) or
-          ActivityPub.Actor.moved_to?(target_data, local_ap_id) or
+        # Verification semantics (#2042):
+        # - `movedTo` is functional and consequential — in the Mastodon migration flow it's only
+        #   set on the OLD actor AFTER the destination consented (via its `alsoKnownAs`) and
+        #   followers actually moved. So a `movedTo` between the two (in either direction) already
+        #   encodes a completed, verified handshake and is self-sufficient.
+        # - `alsoKnownAs` is a freely-settable list with no consequence (adding any handle as an
+        #   alias puts it in YOUR OWN `alsoKnownAs`), so it only verifies when BOTH actors list
+        #   each other — a one-sided claim must NOT show a 'verified' badge.
+        ActivityPub.Actor.moved_to?(target_data, local_ap_id) or
           case ActivityPub.Actor.get_cached(ap_id: local_ap_id) do
             {:ok, %{data: local_data}} ->
-              ActivityPub.Actor.also_known_as?(target_ap_id, local_data)
+              ActivityPub.Actor.moved_to?(local_data, target_ap_id) or
+                (ActivityPub.Actor.also_known_as?(local_ap_id, target_data) and
+                   ActivityPub.Actor.also_known_as?(target_ap_id, local_data))
 
             _ ->
               false
