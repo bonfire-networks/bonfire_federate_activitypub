@@ -88,6 +88,27 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
       assert Follows.following?(follower_on_remote, remote_followed)
       refute Follows.requested?(follower_on_remote, remote_followed)
 
+      Logger.metadata(action: info("check accepted follow's activity actor is the follower"))
+      # the accepted follow's activity must show the FOLLOWER as the actor — not the accepter
+      # (bonfire-app#1907/#1906/#1659). Independent of `following?` (which checks the edge).
+      %{edges: remote_notifs} =
+        Bonfire.Social.FeedLoader.feed(:notifications,
+          current_user: remote_followed,
+          preload: false
+        )
+
+      follow_verb_id = Bonfire.Boundaries.Verbs.get(:follow)[:id]
+
+      follow_activity =
+        Enum.find_value(remote_notifs, fn e ->
+          if e.activity.verb_id == follow_verb_id, do: e.activity
+        end)
+
+      assert follow_activity, "expected a :follow activity in the accepter's notifications"
+
+      assert follow_activity.subject_id == uid(follower_on_remote),
+             "accepted follow's subject should be the follower (#{uid(follower_on_remote)}), got #{follow_activity.subject_id} (accepter is #{uid(remote_followed)})"
+
       # Logger.metadata(action: info("make a post on remote"))
 
       {:ok, post} =
