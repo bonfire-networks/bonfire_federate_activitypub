@@ -180,6 +180,76 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
       assert_valid_quote_post(quote_post, context.original_post)
     end
 
+    test "transformer normalises a Bridgy Fed bare ld+json quote Link (no rel) into a single canonical quote tag",
+         context do
+      # Regression for bonfire-app#1759: Bridgy Fed bridges Bluesky/atproto quotes as a `tag` Link
+      # carrying an ld+json mediaType and a `name` of `"RE: <url>"`, but — unlike Misskey/FEP-044f
+      # — WITHOUT a `rel`. We massage the incoming JSON in `fix_quote` so the bare Link becomes a
+      # single rel-tagged quote Link (otherwise it's mistaken for a regular link → rendered as a
+      # broken duplicate link-preview). This covers the tag-only shape (no top-level quote field).
+      bridgy_note = %{
+        "type" => "Note",
+        "tag" => [
+          %{
+            "type" => "Link",
+            "mediaType" =>
+              "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"",
+            "name" =>
+              "RE: https://bsky.app/profile/did:plc:xgvzy7ni6ig6ievcbls5jaxe/post/3mnpqevv37c2w",
+            "href" => context.original_url
+          }
+        ]
+      }
+
+      fixed = ActivityPub.Federator.Transformer.fix_quote(bridgy_note)
+
+      quote_links =
+        fixed["tag"]
+        |> List.wrap()
+        |> Enum.filter(fn
+          %{"type" => "Link", "href" => href} -> href == context.original_url
+          _ -> false
+        end)
+
+      # exactly one quote Link remains, carrying a recognised quote rel (no bare duplicate)
+      assert [%{"rel" => rel}] = quote_links
+
+      assert rel in [
+               "https://misskey-hub.net/ns#_misskey_quote",
+               "https://w3id.org/fep/044f#quote"
+             ]
+    end
+
+    test "Bridgy Fed quote (ld+json Link tag without rel) does not create a duplicate link preview",
+         context do
+      # Full incoming shape as captured from bsky.brid.gy: quoteUrl + _misskey_quote + a bare
+      # `Link` tag (no rel). Must yield exactly one quote and NO link-preview media.
+      quote_object = %{
+        "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),
+        "type" => "Note",
+        "attributedTo" => context.actor.ap_id,
+        "to" => context.to,
+        "content" =>
+          "Great post! <span class=\"quote-inline\"><br/>RE: <a href=\"#{context.original_url}\">#{context.original_url}</a></span>",
+        "quoteUrl" => context.original_url,
+        "_misskey_quote" => context.original_url,
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "tag" => [
+          %{
+            "type" => "Link",
+            "mediaType" =>
+              "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"",
+            "name" =>
+              "RE: https://bsky.app/profile/did:plc:xgvzy7ni6ig6ievcbls5jaxe/post/3mnpqevv37c2w",
+            "href" => context.original_url
+          }
+        ]
+      }
+
+      quote_post = create_quote_post(context, quote_object)
+      assert_valid_quote_post(quote_post, context.original_post)
+    end
+
     test "full compatibility format with multiple fields", context do
       quote_object = %{
         "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),

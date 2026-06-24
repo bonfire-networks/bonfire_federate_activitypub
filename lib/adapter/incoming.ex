@@ -13,11 +13,28 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   @creation_verbs ["Create"]
 
+  # Engagement-ping activity types (e.g. PeerTube `View`) that Bonfire does not model. We skip
+  # these cleanly instead of letting them fall through to the fallback store — which tried to
+  # persist them and crashed with a DB error that the Oban worker then retried 3×. See #1802.
+  # Compile-time config so it can be used directly in the guard below (override in config).
+  @skip_activity_types Application.compile_env(
+                         :bonfire_federate_activitypub,
+                         :skip_activity_types,
+                         ["View", "Listen", "WatchAction"]
+                       )
+
   def receive_activity(activity_id) when is_binary(activity_id) do
     info("AP - load the activity data from ID")
 
     ActivityPub.Object.get_cached!(id: activity_id)
     |> receive_activity()
+  end
+
+  def receive_activity(%{data: %{"type" => type}} = activity)
+      when type in @skip_activity_types do
+    # short-circuit before any actor/object fetch or store
+    debug(activity, "AP - '#{type}' activity is not modelled by Bonfire, skipping cleanly")
+    {:ok, :skip}
   end
 
   def receive_activity(
@@ -556,8 +573,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
             debug(e, "Could not create object")
 
             error(
-              Errors.error_msg(e),
-              "Could not create object for #{ap_id}"
+              "Could not create object for #{ap_id}: #{Utils.to_string_or_inspect(Errors.error_msg(e))}"
             )
 
             # throw({:error, "Could not process incoming activity"})
