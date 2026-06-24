@@ -14,7 +14,9 @@ defmodule Bonfire.Federate.ActivityPub.InteractionReachableTest do
   alias Bonfire.Federate.ActivityPub.Simulate
 
   setup do
-    # default to open federation; reset after each test (cross-process, see allowlist_settings_test)
+    # default to open federation; reset after each test (cross-process, see allowlist_settings_test).
+    # NOTE: the instance-wide `federating`/`allowlist_only` reset is now also done globally in the
+    # federation ConnCase/DataCase setup (so a restrictive mode can't leak across modules).
     Bonfire.Federate.ActivityPub.set_federating(:instance, true)
 
     on_exit(fn ->

@@ -40,6 +40,13 @@ defmodule Bonfire.Federate.ActivityPub.DataCase do
 
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
+    # Reset instance-wide federation mode to the open default before every federation test.
+    # `federating`/`allowlist_only` are instance-scope settings persisted in Application env / DB
+    # and are NOT rolled back by the Ecto sandbox, so a test that sets a restrictive mode (e.g.
+    # allowlist-only) leaks it into later modules, rejecting all incoming activities.
+    Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
+    Bonfire.Federate.ActivityPub.set_federating(:instance, true)
+
     :ok
   end
 

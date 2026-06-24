@@ -317,8 +317,9 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         |> Map.update("object", %{}, fn object ->
           object
           |> Map.put("sensitive", false)
-          # Remove the summary/CW
-          |> Map.delete("summary")
+          # Clear the summary/CW — a real Mastodon Update sends an explicit empty/nil summary
+          # (not an omitted key), and object update merges fields, so only a present key clears it
+          |> Map.put("summary", nil)
         end)
         |> Map.update("id", %{}, fn id ->
           # needs a unique activity ID

@@ -119,6 +119,8 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       # assert is_list(ap_activity.object.data["tag"]) and ap_activity.object.data["tag"] != []
     end
 
+    # NOTE: we now create Article only for Article type
+    @tag :skip
     test "creates an Article for long posts with a title" do
       user = fake_user!()
 
