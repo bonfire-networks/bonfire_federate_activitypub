@@ -573,7 +573,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
             debug(e, "Could not create object")
 
             error(
-              "Could not create object for #{ap_id}: #{Utils.to_string_or_inspect(Errors.error_msg(e))}"
+              "Could not create object for #{ap_id}: #{Types.to_string_or_inspect(Errors.error_msg(e))}"
             )
 
             # throw({:error, "Could not process incoming activity"})
