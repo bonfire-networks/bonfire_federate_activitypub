@@ -256,11 +256,26 @@ defmodule Bonfire.Federate.ActivityPub do
     subjects |> Enum.map(&compute_federation_mode(&1, opts)) |> most_restrictive_mode()
   end
 
+  if Config.env() == :dev do
+    # In :dev, FEDERATE=yes overrides all per-user/per-instance DB settings (e.g. allowlist_only),
+    # so federated e2e tests work without manually resetting actor settings between runs.
+    defp compute_federation_mode(subject, opts) do
+      if System.get_env("FEDERATE") in ["yes", "true"] do
+        true |> info("computed_federation_mode (FEDERATE override)")
+      else
+        compute_federation_mode_from_settings(subject, opts)
+      end
+    end
+  else
+    defp compute_federation_mode(subject, opts),
+      do: compute_federation_mode_from_settings(subject, opts)
+  end
+
   defp most_restrictive_mode(modes) do
     Enum.find([false, :allowlist_only, :manual, nil, true], true, &(&1 in modes))
   end
 
-  defp compute_federation_mode(subject, opts) do
+  defp compute_federation_mode_from_settings(subject, opts) do
     case federating_default?(Keyword.get(opts, :fallback_default, true)) do
       {:override, false} ->
         false
