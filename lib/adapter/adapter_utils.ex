@@ -1472,6 +1472,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             if(Bonfire.Common.Extend.module_enabled?(Bonfire.Encrypt, user_etc),
               do: ActivityPub.Utils.collection_ap_id("keyPackages", user_etc.id)
             ),
+          # MLS-over-ActivityPub: the `mls:messages` collection of received MLS activities (host-domain
+          # actor-scoped, served owner-only) so E2EE clients can skip scanning the inbox
+          "mls:messages" =>
+            if(Bonfire.Common.Extend.module_enabled?(Bonfire.Encrypt, user_etc),
+              do: actor_collection(id, "mls_messages")
+            ),
           # Mastodon-compatible `featured` collection (the actor's pinned objects), owned by Pins
           "featured" =>
             if(Bonfire.Common.Extend.module_enabled?(Bonfire.Social.Pins, user_etc),
