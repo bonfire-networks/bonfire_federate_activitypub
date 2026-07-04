@@ -1342,6 +1342,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   defp do_format_actor(%{} = user_etc, type) do
+    # storm attribution: local-actor formatting runs several preloads per call, on every AP-JSON
+    # render (actor endpoint cache miss + embedding the author in each outgoing activity). StormRecorder.
+    Logger.metadata(action: "format_actor")
+
     user_etc =
       repo().maybe_preload(
         user_etc,
@@ -1535,6 +1539,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     do: create_remote_actor(a)
 
   def create_remote_actor(%ActivityPub.Actor{} = actor) do
+    # storm attribution: remote-user creation spikes when boosts arrive from never-seen actors (StormRecorder)
+    Logger.metadata(action: "create_remote_actor")
     character_module = character_module(actor.data["type"])
 
     log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
