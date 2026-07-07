@@ -83,8 +83,39 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoUserIngestTest do
   test "deny path: DM from non-allowlisted actor does not arrive", %{alice: alice} do
     alice = set_allowlist_only(alice)
     text = "ingest deny non-allowlisted #{System.unique_integer()}"
-    # the pipeline may reject at create, at receive, or deliver-nowhere — any is acceptable
-    ingest_remote_dm_to(alice, text)
+
+    # TEMP diagnostics: compare direct MRF filtering vs what happens inside create
+    {:ok, actor} = Actor.get_cached_or_fetch(ap_id: @remote_actor)
+    recipient_actor = ActivityPub.Actor.get_cached!(pointer: alice.id)
+    params = remote_activity_json_with_mentions(actor, recipient_actor, %{"content" => text})
+
+    # (a) raw atom-keyed params, as the MRF unit tests feed it — expect alice trimmed/rejected
+    IO.inspect(Bonfire.Federate.ActivityPub.BoundariesMRF.filter(params, false),
+      label: "DIAG direct MRF on raw params"
+    )
+
+    # (b) approximation of the normalized string-keyed create_data shape that Object.insert filters
+    string_keyed = %{
+      "type" => "Create",
+      "actor" => params.actor.data["id"],
+      "to" => params.to,
+      "context" => params.context,
+      "object" => params.object
+    }
+
+    IO.inspect(Bonfire.Federate.ActivityPub.BoundariesMRF.filter(string_keyed, false),
+      label: "DIAG direct MRF on string-keyed create_data"
+    )
+
+    create_result = ActivityPub.create(params)
+
+    with {:ok, activity} <- create_result do
+      IO.inspect(activity.data["to"], label: "DIAG activity.to after create")
+      IO.inspect(Incoming.receive_activity(activity) |> elem(0), label: "DIAG receive result tag")
+    else
+      other -> IO.inspect(other, label: "DIAG create rejected")
+    end
+
     refute received_message?(alice, text)
   end
 
