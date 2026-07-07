@@ -1381,7 +1381,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # image = maybe_format_image_object_from_path(Bonfire.Files.ImageUploader.remote_url(user_etc.profile.image))
 
       icon = maybe_format_image_object_from_path(Media.avatar_url(user_etc))
-      image = maybe_format_image_object_from_path(Media.banner_url(user_etc))
+      image = maybe_format_image_object_from_path(Media.banner_url(user_etc, fallback: false))
 
       base_url = Bonfire.Common.URIs.base_url()
       ap_base_path = Bonfire.Common.Config.get(:ap_base_path, "/pub")
