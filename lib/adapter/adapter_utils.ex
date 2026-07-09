@@ -316,11 +316,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_character(%struct{id: _} = character, _opts) when struct not in [Actor, Pointer] do
-    {:ok, repo().maybe_preload(character, [:actor, :settings, :profile, character: [:peered]])}
+    {:ok,
+     repo().maybe_preload(character, [
+       :actor,
+       :settings,
+       :profile,
+       :shared_user,
+       character: [:peered]
+     ])}
   end
 
   def get_character(%{pointer: %{id: _} = pointer}, _opts) do
-    {:ok, repo().maybe_preload(pointer, [:actor, :settings, :profile, character: [:peered]])}
+    {:ok,
+     repo().maybe_preload(pointer, [
+       :actor,
+       :settings,
+       :profile,
+       :shared_user,
+       character: [:peered]
+     ])}
   end
 
   def get_character(%{pointer_id: pointer_id}, opts) when is_binary(pointer_id) do
@@ -334,7 +348,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     else
       case object do
         %Pointer{} ->
-          {:ok, repo().maybe_preload(object, [:actor, :settings, :profile, character: [:peered]])}
+          {:ok,
+           repo().maybe_preload(object, [
+             :actor,
+             :settings,
+             :profile,
+             :shared_user,
+             character: [:peered]
+           ])}
 
         _ when is_struct(object) ->
           {:ok, object}
@@ -466,14 +487,20 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     # FIXME: this is fragile as doesn't support hostname/port changes
     local_instance = debug(local_instance || ap_base_url())
 
-    username =
-      String.trim_leading(ap_id, "#{local_instance}/actors/")
-      |> debug("username?")
+    # NEW actors use a ULID-based URL (/pub/person|group|application/<ULID>), resolve by pointer id. Existing actors keep /pub/actors/<username>, handled by the trim below.
+    if actor_id = actor_pointer_id_from_url(ap_id, local_instance) do
+      get_character_by_id(actor_id)
+      |> Characters.mark_as(:local)
+    else
+      username =
+        String.trim_leading(ap_id, "#{local_instance}/actors/")
+        |> debug("username?")
 
-    if username != ap_id and !is_local_collection_or_built_in?(ap_id),
-      do:
-        get_character_by_username(username)
-        |> Characters.mark_as(:local)
+      if username != ap_id and !is_local_collection_or_built_in?(ap_id),
+        do:
+          get_character_by_username(username)
+          |> Characters.mark_as(:local)
+    end
   end
 
   def get_pointable_by_peered_ap_id(ap_id) do
@@ -827,6 +854,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         debug(ap_id, "detected local URI, attempting to parse")
 
         cond do
+          # local ULID actor URIs like /pub/person|group|application/<ULID>
+          actor_id = actor_pointer_id_from_url(ap_id, local_ap_url) ->
+            debug(actor_id, "extracted actor ULID from local ULID actor URI")
+            Bonfire.Common.Needles.get(actor_id, skip_boundary_check: true)
+
           # Handle local actor URIs like /pub/actors/username
           String.contains?(ap_id, "/actors/") ->
             username = String.trim_leading(ap_id, "#{local_ap_url}/actors/")
@@ -886,6 +918,32 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ^discussion_prefix <> rest -> rest
       _ -> nil
     end
+  end
+
+  # The AP-actor-type path segments used by Phase-2 ULID actor URLs (`<base>/pub/<type>/<ULID>`).
+  @actor_type_segments ~w(person group organization service application)
+
+  @doc """
+  Extracts the ULID from a Phase-2 type-based local actor URL of the form `<base>/pub/<type>/<ULID>`
+  (where `<type>` is one of #{inspect(@actor_type_segments)}), including its sub-collection and key
+  URLs (`.../<ULID>/inbox`, `.../<ULID>#main-key`). Returns nil for anything else.
+  """
+  def actor_pointer_id_from_url(ap_id, local_ap_url \\ ap_base_url()) do
+    # One clause per AP actor type segment. Everything else (the username scheme `/actors/`, and non-actor URLs like `/objects/` or `/collections/`) falls through to nil.
+    case ap_id do
+      ^local_ap_url <> "/person/" <> rest -> actor_ulid_from_tail(rest)
+      ^local_ap_url <> "/group/" <> rest -> actor_ulid_from_tail(rest)
+      ^local_ap_url <> "/organization/" <> rest -> actor_ulid_from_tail(rest)
+      ^local_ap_url <> "/service/" <> rest -> actor_ulid_from_tail(rest)
+      ^local_ap_url <> "/application/" <> rest -> actor_ulid_from_tail(rest)
+      _ -> nil
+    end
+  end
+
+  # the ULID is the first segment of the tail (drop any /collection suffix or #fragment), or nil
+  defp actor_ulid_from_tail(rest) do
+    id = rest |> String.split(["/", "#"], parts: 2) |> List.first()
+    if Types.is_ulid?(id), do: id
   end
 
   def get_or_fetch_character_by_ap_id(actor_or_ap_id, opts \\ [])
@@ -1349,9 +1407,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     user_etc =
       repo().maybe_preload(
         user_etc,
-        character: [
-          :peered
-        ]
+        # `:shared_user` is needed so `canonical_url` can tell an organisation (shared user)
+        # from a person and emit the right `/pub/<type>/<ULID>` — the id must be computed from
+        # a struct that carries it (see Bonfire.Common.URIs `shared_user?/1`).
+        [:shared_user, character: [:peered]]
       )
 
     local? = if e(user_etc, :character, :peered, nil), do: false, else: true
