@@ -194,6 +194,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def get_actors_by_ids(ids) when is_list(ids) do
     ids
     |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+    # preload what actor formatting needs, at the source and BEFORE `character_to_actor` (mirroring the single-actor `get_character` path): `character: [:peered]` for locality + the ULID `canonical_url`, and `:shared_user` so it's typed Person vs Organization
+    |> repo().maybe_preload([:actor, :settings, :profile, :shared_user, character: [:peered]])
     |> Enum.flat_map(fn character ->
       # `character_to_actor` → `format_actor` accepts the (virtual) pointer directly; non-locals nil
       case AdapterUtils.character_to_actor(character) do
