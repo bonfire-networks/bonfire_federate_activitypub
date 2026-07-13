@@ -33,7 +33,8 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     {:ok, original_post} =
       Posts.publish(current_user: user, post_attrs: original_attrs, boundary: "public")
 
-    original_url = Bonfire.Common.URIs.canonical_url(original_post)
+    # deliberate lazy caller: a freshly-published post hasn't preloaded :peered
+    original_url = Bonfire.Common.URIs.canonical_url(original_post, preload_if_needed: true)
 
     # Create remote actor
     {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)

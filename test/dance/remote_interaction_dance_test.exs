@@ -35,7 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteInteractionTest do
       )
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(post)
+      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
       |> info("post canonical_url")
 
     # --- Part A: guest clicks Like -> redirected to the remote interaction form

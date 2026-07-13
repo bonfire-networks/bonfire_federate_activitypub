@@ -41,7 +41,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
         )
 
       original_url =
-        Bonfire.Common.URIs.canonical_url(original_post)
+        Bonfire.Common.URIs.canonical_url(original_post, preload_if_needed: true)
         |> info("original_post_url")
 
       %{original_post: original_post, original_url: original_url}
@@ -70,7 +70,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
       assert local_quote_post.media == []
       assert quotes_post(local_quote_post, original_post)
 
-      local_quote_url = Bonfire.Common.URIs.canonical_url(local_quote_post)
+      local_quote_url =
+        Bonfire.Common.URIs.canonical_url(local_quote_post, preload_if_needed: true)
 
       {:ok, %{data: ap_json}} = ActivityPub.Object.get_cached(ap_id: local_quote_url)
 
@@ -148,7 +149,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
 
           refute quotes_post(remote_quote_post, remote_original)
 
-          {remote_quote_post, Bonfire.Common.URIs.canonical_url(remote_quote_post)}
+          {remote_quote_post,
+           Bonfire.Common.URIs.canonical_url(remote_quote_post, preload_if_needed: true)}
         end)
 
       # Verify remote quote federates to local
@@ -257,7 +259,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
               boundary: "public"
             )
 
-          {remote_quote_post, Bonfire.Common.URIs.canonical_url(remote_quote_post)}
+          {remote_quote_post,
+           Bonfire.Common.URIs.canonical_url(remote_quote_post, preload_if_needed: true)}
         end)
 
       Logger.metadata(action: "Verify remote quote federates to local")
@@ -344,7 +347,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
           ]
         )
 
-      post_url = Bonfire.Common.URIs.canonical_url(post)
+      post_url = Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
 
       # Try to quote from remote
       remote_quote_url =
@@ -385,7 +388,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
           # Should not have a quote request
           refute Bonfire.Social.Quotes.requested?(remote_quote_post, post)
 
-          Bonfire.Common.URIs.canonical_url(remote_quote_post)
+          Bonfire.Common.URIs.canonical_url(remote_quote_post, preload_if_needed: true)
         end)
 
       # Back on local, should have federated the post, but not the quote relationship or request
@@ -450,7 +453,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
         }
       )
 
-    auto_accept_url = Bonfire.Common.URIs.canonical_url(post_to_auto_accept)
+    auto_accept_url =
+      Bonfire.Common.URIs.canonical_url(post_to_auto_accept, preload_if_needed: true)
 
     # TODO: Configure boundaries to auto-accept quotes from trusted_circle
     # This would require implementing boundary rules for quote auto-acceptance
@@ -484,7 +488,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
         assert {:ok, :authorization_verified} =
                  Quotes.verify_quote_authorization(remote_quote_post, remote_auto_accept)
 
-        Bonfire.Common.URIs.canonical_url(remote_quote_post)
+        Bonfire.Common.URIs.canonical_url(remote_quote_post, preload_if_needed: true)
       end)
 
     # Verify auto-acceptance 

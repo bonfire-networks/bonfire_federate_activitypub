@@ -16,21 +16,33 @@ defmodule Bonfire.Federate.ActivityPub.UlidActorIdsTest do
   @all_new String.duplicate("0", 26)
   @all_old String.duplicate("Z", 26)
 
+  # cutoffs live under IdCutoffs `:recorded` (in test env, config/test.exs records epoch-zero so the NEW scheme is on by default); Application.put_env because conn requests read the cutoff in other processes. `set_cutoff(nil)` covers the never-recorded case.
+  @cutoffs_module Bonfire.Common.Settings.IdCutoffs
+
   setup do
-    original = Application.get_env(:bonfire, :ulid_actor_ids_since)
+    original = Application.get_env(:bonfire_common, @cutoffs_module)
 
     on_exit(fn ->
       case original do
-        nil -> Application.delete_env(:bonfire, :ulid_actor_ids_since)
-        v -> Application.put_env(:bonfire, :ulid_actor_ids_since, v)
+        nil -> Application.delete_env(:bonfire_common, @cutoffs_module)
+        v -> Application.put_env(:bonfire_common, @cutoffs_module, v)
       end
     end)
 
     :ok
   end
 
-  defp set_cutoff(nil), do: Application.delete_env(:bonfire, :ulid_actor_ids_since)
-  defp set_cutoff(v), do: Application.put_env(:bonfire, :ulid_actor_ids_since, v)
+  defp set_cutoff(v) do
+    Application.put_env(
+      :bonfire_common,
+      @cutoffs_module,
+      Keyword.put(
+        Application.get_env(:bonfire_common, @cutoffs_module) || [],
+        :recorded,
+        ulid_actor_ids_since: v
+      )
+    )
+  end
 
   describe "canonical_url generation with the ULID cutoff" do
     test "a post-cutoff USER federates as /pub/person/<ULID>" do
@@ -75,6 +87,20 @@ defmodule Bonfire.Federate.ActivityPub.UlidActorIdsTest do
 
       assert URIs.canonical_url(group) =~ "/pub/group/#{group.id}"
       refute URIs.canonical_url(group) =~ "/pub/actors/"
+    end
+
+    test "a post-cutoff USER passed as a (virtual) Pointer still gets the person URL (mention/batch path)" do
+      # mention resolution and `get_actors_by_ids` hand actor formatting a `%Needle.Pointer{}`,
+      # not a concrete `%User{}` — the type segment must resolve via the pointer's table_id,
+      # else it falls back to the username URL and mentions/cc diverge from the canonical actor id
+      user = fake_user!()
+      {:ok, pointer} = Bonfire.Common.Needles.one(user.id, skip_boundary_check: true)
+
+      pointer =
+        repo().maybe_preload(pointer, [:shared_user, character: [:peered]], prune: true)
+
+      assert URIs.canonical_url(pointer) =~ "/pub/person/#{user.id}"
+      refute URIs.canonical_url(pointer) =~ "/pub/actors/"
     end
 
     test "a pre-cutoff USER keeps the username URL" do

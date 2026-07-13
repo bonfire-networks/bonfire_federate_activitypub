@@ -25,7 +25,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(post)
+      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
       |> info("canonical_url")
 
     Logger.metadata(action: "create local post 2")
@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "local")
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(post)
+      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
       |> info("canonical_url")
 
     Logger.metadata(action: "create private post 2")
@@ -102,7 +102,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(post)
+      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
       |> info("canonical_url")
 
     Logger.metadata(action: "create local post 2")
@@ -177,7 +177,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(post)
+      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
       |> info("canonical_url")
 
     # Simulate a bot request with HTML-only Accept headers
@@ -252,8 +252,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     {:ok, post_no_summary} =
       Posts.publish(current_user: local_user, post_attrs: attrs_no_summary, boundary: "public")
 
-    canonical_url_with_summary = Bonfire.Common.URIs.canonical_url(post_with_summary)
-    canonical_url_no_summary = Bonfire.Common.URIs.canonical_url(post_no_summary)
+    canonical_url_with_summary =
+      Bonfire.Common.URIs.canonical_url(post_with_summary, preload_if_needed: true)
+
+    canonical_url_no_summary =
+      Bonfire.Common.URIs.canonical_url(post_no_summary, preload_if_needed: true)
 
     # Back to local instance to verify CW recognition
     Logger.metadata(action: "verify CW posts are properly imported on remote instance")
@@ -313,7 +316,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
     {:ok, post} = Posts.publish(current_user: me, post_attrs: attrs, boundary: "public")
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(post)
+      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
       |> info("canonical_url")
 
     TestInstanceRepo.apply(fn ->
@@ -365,7 +368,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
   #     Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
   #   canonical_url =
-  #     Bonfire.Common.URIs.canonical_url(post_with_link)
+  #     Bonfire.Common.URIs.canonical_url(post_with_link, preload_if_needed: true)
   #     |> info("post_with_link_url")
 
   #   # Verify link preview was generated locally
@@ -536,7 +539,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
         # Attempt to drain the Oban queue before scheduled time (should not actually run the job)
         Oban.drain_queue(queue: :federator_outgoing, with_scheduled: false)
 
-        canonical_url = Bonfire.Common.URIs.canonical_url(post)
+        canonical_url = Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
 
         # Check on remote: post should NOT be in feed or fetchable before scheduled time
         TestInstanceRepo.apply(fn ->

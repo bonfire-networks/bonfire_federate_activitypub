@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MediaLinkTest do
              Bonfire.Files.Media.publish(local_user, media, boundary: "public")
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(media)
+      Bonfire.Common.URIs.canonical_url(media, preload_if_needed: true)
       |> info("canonical_url")
 
     TestInstanceRepo.apply(fn ->

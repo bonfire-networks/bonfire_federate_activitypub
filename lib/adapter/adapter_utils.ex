@@ -305,6 +305,22 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def get_actor_username(u) when is_binary(u), do: u
   def get_actor_username(_), do: nil
 
+  # the data an AP actor needs, preloaded on any character-bearing struct (User, Category,
+  # Pointer, ...) — a superset list: `prune: true` fits it to what each schema actually has
+  defp preload_character_data(character) do
+    repo().maybe_preload(
+      character,
+      [
+        :actor,
+        :settings,
+        :profile,
+        :shared_user,
+        character: [:peered]
+      ],
+      prune: true
+    )
+  end
+
   def get_character(q, opts \\ [])
 
   def get_character("http" <> _ = q, opts) do
@@ -316,25 +332,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_character(%struct{id: _} = character, _opts) when struct not in [Actor, Pointer] do
-    {:ok,
-     repo().maybe_preload(character, [
-       :actor,
-       :settings,
-       :profile,
-       :shared_user,
-       character: [:peered]
-     ])}
+    {:ok, preload_character_data(character)}
   end
 
   def get_character(%{pointer: %{id: _} = pointer}, _opts) do
-    {:ok,
-     repo().maybe_preload(pointer, [
-       :actor,
-       :settings,
-       :profile,
-       :shared_user,
-       character: [:peered]
-     ])}
+    {:ok, preload_character_data(pointer)}
   end
 
   def get_character(%{pointer_id: pointer_id}, opts) when is_binary(pointer_id) do
@@ -348,14 +350,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     else
       case object do
         %Pointer{} ->
-          {:ok,
-           repo().maybe_preload(object, [
-             :actor,
-             :settings,
-             :profile,
-             :shared_user,
-             character: [:peered]
-           ])}
+          {:ok, preload_character_data(object)}
 
         _ when is_struct(object) ->
           {:ok, object}
@@ -1256,8 +1251,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     Bonfire.Common.Needles.get(uid(id), opts)
     # |> info("got")
     # actor_integration_test
-    |> repo().maybe_preload([:actor, :character, :profile])
-    |> repo().maybe_preload([:post_content])
+    # superset lists: the pointer can be any type (actor-ish or content) — pruned per schema
+    |> repo().maybe_preload([:actor, :character, :profile, :post_content], prune: true)
 
     # |>
     # nope? let's try and find them from their ap id
@@ -1410,7 +1405,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         # `:shared_user` is needed so `canonical_url` can tell an organisation (shared user)
         # from a person and emit the right `/pub/<type>/<ULID>` — the id must be computed from
         # a struct that carries it (see Bonfire.Common.URIs `shared_user?/1`).
-        [:shared_user, character: [:peered]]
+        # superset list: actors can be Users, Categories, etc — `prune: true` fits it per schema
+        [:shared_user, character: [:peered]],
+        prune: true
       )
 
     local? = if e(user_etc, :character, :peered, nil), do: false, else: true
@@ -1431,7 +1428,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
               aliases: [object: [:character]]
               # aliased: [object: [:character]]
             ]
-          ]
+          ],
+          # superset list: actors can be Users, Categories, etc — `prune: true` fits it per schema
+          prune: true
         )
         # |> Bonfire.Common.Needles.Preload.maybe_preload_nested_pointers([character: [aliases: [:object]]])
         |> debug("preloaded_user_etc")
@@ -1456,6 +1455,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             list
             # |> IO.inspect(label: "objjj")
             |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+            # a bare-Character alias target needs its `:user` loaded to be typed for the actor
+            # URL scheme (else its `alsoKnownAs` entry would keep the legacy username URL and
+            # diverge from the same actor's canonical ULID URL) — mixed list, pruned per schema
+            |> repo().maybe_preload([user: [:shared_user]], prune: true)
             |> Enum.group_by(fn
               %struct{} ->
                 struct
@@ -2310,6 +2313,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              fetch_collection: false,
              return_tombstones: true
            )
+           |> preload_character_locality()
            |> debug("fetched actor") do
       # falling back to the service character means we couldn't resolve the actor. By default
       # surface it loudly (`err` raises in `:test`) to catch unexpected unresolved actors; but
@@ -2327,6 +2331,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       {:ok, get_or_create_service_character()}
     end
   end
+
+  # the resolved subject flows into boundarised queries (`subject_ids_with_locality`), which
+  # classify locality WITHOUT fetching — so preload `:peered` at this binding (superset: the
+  # subject can be a User, Character, etc — pruned per schema)
+  defp preload_character_locality({:ok, character}),
+    do: {:ok, repo().maybe_preload(character, [:peered, character: [:peered]], prune: true)}
+
+  defp preload_character_locality(other), do: other
 
   def activity_character(%{"object" => object}) do
     activity_character(object)

@@ -55,20 +55,23 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     :ok
   end
 
+  # new actors 301 from the username URL to their canonical /pub/<type>/<ULID> URL — follow it
+  defp get_actor_json(path) do
+    conn = build_conn() |> get(path)
+
+    case conn.status do
+      301 -> build_conn() |> get(redirected_to(conn, 301)) |> response(200) |> Jason.decode!()
+      _ -> conn |> response(200) |> Jason.decode!()
+    end
+  end
+
   test "fetch user from AP API with AP ID" do
     user = fake_user!()
 
     # we are trying to check for a cacheing bug, so we do this twice
-    build_conn()
-    |> get("/pub/actors/#{user.character.username}")
-    |> response(200)
-    |> Jason.decode!()
+    get_actor_json("/pub/actors/#{user.character.username}")
 
-    ret =
-      build_conn()
-      |> get("/pub/actors/#{user.character.username}")
-      |> response(200)
-      |> Jason.decode!()
+    ret = get_actor_json("/pub/actors/#{user.character.username}")
 
     assert ret["preferredUsername"] == user.character.username
     assert ret["name"] =~ user.profile.name
@@ -94,11 +97,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   test "serves user in AP API with profile fields, taking into account privacy settings" do
     user = fake_user!()
 
-    conn =
-      build_conn()
-      |> get("/pub/actors/#{user.character.username}")
-      |> response(200)
-      |> Jason.decode!()
+    conn = get_actor_json("/pub/actors/#{user.character.username}")
 
     # |> IO.inspect
 
@@ -107,7 +106,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert conn["summary"] =~ user.profile.summary
 
     assert conn["icon"]["url"] =~ Common.Media.avatar_url(user)
-    assert conn["image"]["url"] =~ Common.Media.banner_url(user)
+    # no custom banner uploaded → the default/fallback banner is NOT federated
+    # (`do_format_actor` uses `banner_url(user, fallback: false)`)
+    refute conn["image"]
 
     assert List.first(conn["attachment"])["value"] =~ user.profile.website
 
@@ -130,11 +131,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
         )
       )
 
-    conn =
-      build_conn()
-      |> get("/pub/actors/#{user.character.username}")
-      |> response(200)
-      |> Jason.decode!()
+    conn = get_actor_json("/pub/actors/#{user.character.username}")
 
     # |> IO.inspect
 

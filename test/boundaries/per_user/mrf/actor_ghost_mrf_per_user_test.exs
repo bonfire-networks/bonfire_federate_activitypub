@@ -79,9 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorMRFPerUserTest do
       assert BoundariesMRF.filter(local_activity, true) ==
                {:ok,
                 %{
-                  actor:
-                    Bonfire.Federate.ActivityPub.AdapterUtils.ap_base_url() <>
-                      "/actors/" <> @local_actor,
+                  actor: local_activity.actor,
                   to: [ActivityPub.Config.public_uri()],
                   data: %{"type" => "Create"}
                 }}

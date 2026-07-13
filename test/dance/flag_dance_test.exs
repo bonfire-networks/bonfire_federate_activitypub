@@ -39,7 +39,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
     {:ok, post1} =
       Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
-    post1_url = Bonfire.Common.URIs.canonical_url(post1)
+    post1_url = Bonfire.Common.URIs.canonical_url(post1, preload_if_needed: true)
 
     TestInstanceRepo.apply(fn ->
       assert {:ok, post_on_remote} =
@@ -130,7 +130,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FlagDanceTest do
         {:ok, post1} =
           Posts.publish(current_user: remote_user, post_attrs: post_attrs, boundary: "public")
 
-        Bonfire.Common.URIs.canonical_url(post1)
+        Bonfire.Common.URIs.canonical_url(post1, preload_if_needed: true)
       end)
 
     Logger.metadata(action: info("fetch remote post to local instance"))

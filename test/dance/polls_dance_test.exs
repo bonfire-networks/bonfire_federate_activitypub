@@ -50,7 +50,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PollTest do
 
     poll = repo().maybe_preload(poll, choices: [:post_content])
 
-    poll_url = URIs.canonical_url(poll) |> debug("Poll URL")
+    poll_url = URIs.canonical_url(poll, preload_if_needed: true) |> debug("Poll URL")
 
     # 3. Get poll on remote (should be federated inline)
     remote_results =

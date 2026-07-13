@@ -188,14 +188,14 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
     # {:ok, outbox_data} = File.read(json_path) |> elem(1) |> Jason.decode()
 
     # Get canonical URLs while on local instance
-    post1_url = Bonfire.Common.URIs.canonical_url(post1)
-    post2_url = Bonfire.Common.URIs.canonical_url(post2)
-    mention_post_url = Bonfire.Common.URIs.canonical_url(mention_post)
-    hashtag_post_url = Bonfire.Common.URIs.canonical_url(hashtag_post)
-    other_post_url = Bonfire.Common.URIs.canonical_url(other_post)
-    # reply1_url = Bonfire.Common.URIs.canonical_url(reply1)
-    # reply2_url = Bonfire.Common.URIs.canonical_url(reply2)
-    # another_reply_url = Bonfire.Common.URIs.canonical_url(another_reply)
+    post1_url = Bonfire.Common.URIs.canonical_url(post1, preload_if_needed: true)
+    post2_url = Bonfire.Common.URIs.canonical_url(post2, preload_if_needed: true)
+    mention_post_url = Bonfire.Common.URIs.canonical_url(mention_post, preload_if_needed: true)
+    hashtag_post_url = Bonfire.Common.URIs.canonical_url(hashtag_post, preload_if_needed: true)
+    other_post_url = Bonfire.Common.URIs.canonical_url(other_post, preload_if_needed: true)
+    # reply1_url = Bonfire.Common.URIs.canonical_url(reply1, preload_if_needed: true)
+    # reply2_url = Bonfire.Common.URIs.canonical_url(reply2, preload_if_needed: true)
+    # another_reply_url = Bonfire.Common.URIs.canonical_url(another_reply, preload_if_needed: true)
 
     # Set up remote instance and import
     TestInstanceRepo.apply(fn ->

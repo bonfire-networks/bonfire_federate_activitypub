@@ -24,7 +24,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsHashtagsTest do
     {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
 
     canonical_url =
-      Bonfire.Common.URIs.canonical_url(post)
+      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
       |> info("canonical_url")
 
     TestInstanceRepo.apply(fn ->

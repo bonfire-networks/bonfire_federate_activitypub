@@ -109,8 +109,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FetchCollectionsTest do
           )
 
         {
-          Bonfire.Common.URIs.canonical_url(root_post),
-          Bonfire.Common.URIs.canonical_url(reply_post)
+          Bonfire.Common.URIs.canonical_url(root_post, preload_if_needed: true),
+          Bonfire.Common.URIs.canonical_url(reply_post, preload_if_needed: true)
         }
       end)
 

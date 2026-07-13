@@ -16,5 +16,12 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
       reserved_username_actor_ids: [
         Bonfire.Federate.ActivityPub.AdapterUtils.service_character_id()
       ]
+
+    # Auto-record (once, at each instance's first boot with this code) the per-instance cutoff
+    # that switches NEW actors to the ULID-based AP URL scheme — see `new_actor_scheme?/1` in
+    # `Bonfire.Common.URIs` and `Bonfire.Common.Settings.IdCutoffs`. Existing actors keep their
+    # username URLs forever. Keyword list so declarations from other extensions deep-merge.
+    config :bonfire_common, Bonfire.Common.Settings.IdCutoffs,
+      record: [ulid_actor_ids_since: true]
   end
 end
