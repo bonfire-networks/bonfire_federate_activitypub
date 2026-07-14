@@ -1455,10 +1455,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             list
             # |> IO.inspect(label: "objjj")
             |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
-            # a bare-Character alias target needs its `:user` loaded to be typed for the actor
-            # URL scheme (else its `alsoKnownAs` entry would keep the legacy username URL and
-            # diverge from the same actor's canonical ULID URL) — mixed list, pruned per schema
-            |> repo().maybe_preload([user: [:shared_user]], prune: true)
             |> Enum.group_by(fn
               %struct{} ->
                 struct
@@ -1466,6 +1462,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
               other ->
                 warn(other, "unsupported data")
                 :unknown
+            end)
+            # preload the locality/typing assocs `canonical_url` needs, per struct (see helper)
+            |> Map.new(fn {struct, objects} ->
+              {struct, preload_alias_locality(struct, objects)}
             end)
         end
 
@@ -1576,6 +1576,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       end
     end
   end
+
+  # Actor aliases serialise into `alsoKnownAs` via `canonical_url`, which reads an actor's locality
+  # from `:peered` (a bare Character carries it top-level) — so a REMOTE alias emits the remote's
+  # real ap_id, not a local-scheme URL (which would break the incoming-Move `alsoKnownAs` match) —
+  # and types the URL scheme (person vs org) from the user's `:shared_user`. Non-actor aliases
+  # (e.g. a `Media` link) need nothing extra here.
+  defp preload_alias_locality(Bonfire.Data.Identity.Character, objects),
+    do: repo().maybe_preload(objects, [:peered, user: [:shared_user]])
+
+  defp preload_alias_locality(_struct, objects), do: objects
 
   defp alias_actor_ids(aliases) when is_list(aliases) and aliases != [],
     do: Enum.map(aliases, &alias_actor_ids/1)
