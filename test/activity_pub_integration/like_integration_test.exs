@@ -176,5 +176,40 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
       # assert is_map(activity.json["object"])
       # assert activity.json["type"] == "EmojiReact"
     end
+
+    test "supports incoming misskey custom emoji react (a Like with emoji content)" do
+      ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
+
+      user = fake_user!()
+
+      attrs = %{post_content: %{html_body: "content"}}
+
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      data =
+        "../fixtures/pleroma-emojireact.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+        |> Map.put("object", ap_activity.data["object"])
+        # Misskey federates custom emoji reactions as a `Like` carrying the emoji in
+        # `content`/`_misskey_reaction` (see fixtures/custom-emoji-reaction.json in the AP lib)
+        |> Map.put("type", "Like")
+        |> Map.put("content", ":hanapog:")
+        |> Map.put("_misskey_reaction", ":hanapog:")
+        |> Map.put("id", "https://mocked.local/activities/misskey-like-hanapog")
+
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+
+      assert {:ok, like} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+               |> repo().maybe_preload(emoji: [:extra_info])
+
+      assert like.__struct__ == Bonfire.Data.Social.Like
+      # the emoji must be recorded, not dropped as a plain like
+      assert like.emoji.extra_info.summary == ":hanapog:"
+    end
   end
 end
