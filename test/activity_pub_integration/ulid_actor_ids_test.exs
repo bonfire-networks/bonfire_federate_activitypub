@@ -103,6 +103,35 @@ defmodule Bonfire.Federate.ActivityPub.UlidActorIdsTest do
       refute URIs.canonical_url(pointer) =~ "/pub/actors/"
     end
 
+    test "a POST passed as a (virtual) Pointer gets the object URL, not misclassified as an actor" do
+      # regression: a bare `%Needle.Pointer{}` carries a VIRTUAL `:character` field, so
+      # `canonical_url` wrongly matched the actor clause and tripped its `character: [:peered]`
+      # preload guard even though the pointer is a Post. It must resolve the virtual pointer to the
+      # concrete `%Post{}` (which has no `:character`) and build the OBJECT url.
+      set_cutoff(@all_new)
+      user = fake_user!()
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: user,
+          post_attrs: %{post_content: %{html_body: "an object, not an actor"}},
+          boundary: "public"
+        )
+
+      # keep the pointer BARE: preloading a concrete assoc (e.g. `created:`) would follow the virtual
+      # and hand `canonical_url` a `%Post{}` directly, bypassing the very Pointer-resolution clause under
+      # test. A bare pointer still carries the virtual `:character` — the OLD code matched the actor clause
+      # on it and raised for `character: [:peered]`. `preload_if_needed: true` lets the resolved `%Post{}`
+      # lazily load its locality assoc (the deliberate lazy-caller opt, as on the guest-interaction path).
+      {:ok, pointer} = Bonfire.Common.Needles.one(post.id, skip_boundary_check: true)
+      assert %Needle.Pointer{} = pointer
+
+      url = URIs.canonical_url(pointer, preload_if_needed: true)
+      assert url =~ "/pub/objects/#{post.id}"
+      refute url =~ "/pub/person/"
+      refute url =~ "/pub/actors/"
+    end
+
     test "a pre-cutoff USER keeps the username URL" do
       set_cutoff(@all_old)
       user = fake_user!()
