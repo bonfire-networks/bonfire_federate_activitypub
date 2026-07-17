@@ -216,11 +216,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # offending caller is found, non-fatal in dev/prod) and return the caller's `on_unclassifiable`
   # sentinel (so the boundary path can add no locality circle), defaulting to local.
   defp maybe_preload_peered(object, opts) do
-    if opts[:preload_if_needed] != false do
-      err(
-        object,
-        "is_local?: object reached locality classification without loaded `:peered` info, Peered is now being preloaded, but please preload it at the source instead, and pass a loaded struct (not a bare id/map). See queries_subject_circles_test.exs"
-      )
+    preload_if_needed? = opts[:preload_if_needed]
+
+    if preload_if_needed? != false do
+      if is_nil(preload_if_needed?),
+        do:
+          err(
+            object,
+            "is_local?: object reached locality classification without loaded `:peered` info, Peered is now being preloaded, but please preload it at the source instead, and pass a loaded struct (not a bare id/map). See queries_subject_circles_test.exs"
+          )
 
       preload_peered(object)
       |> info("preloaded peered info")

@@ -78,7 +78,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   defp shape_members(pointer_ids, :ap_objects), do: Object.list_cached(pointer_ids)
 
   defp shape_members(pointer_ids, _ap_ids) do
-    pointer_ids
+    # load + preload each member's locality assocs at SOURCE so `canonical_url` doesn't trip the
+    # preload-at-source guard per member (collection members are mixed types — pinned objects and
+    # actors — hence the superset + `prune: true`)
+    shape_members(pointer_ids, :pointers)
+    |> repo().maybe_preload([:peered, character: [:peered], created: [:peered]], prune: true)
     |> Enum.map(&URIs.canonical_url/1)
     |> Enum.reject(&is_nil/1)
   end
