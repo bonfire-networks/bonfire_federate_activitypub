@@ -1688,14 +1688,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       maybe_add_aliases(user_etc, e(actor, :data, "alsoKnownAs", nil))
 
-      # save remote discoverability flag as a user setting
-      if actor.data["discoverable"] in ["false", false, "no"],
-        do:
-          Bonfire.Common.Settings.put(
-            [Bonfire.Me.Users, :undiscoverable],
-            true,
-            current_user: user_etc
-          )
+      # save remote discoverability & indexing flags as user settings, mirroring what local signup does in `Bonfire.Me.Users.create/2` so the same consent check in `Bonfire.Search.maybe_index/3` applies to remote authors
+      user_etc = maybe_save_remote_privacy_flags(user_etc, actor.data)
 
       # do this after the transaction, in case of timeouts downloading the images
       icon_id =
@@ -1723,6 +1717,34 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       end
     end
   end
+
+  @doc """
+  Maps a remote actor's `discoverable` and `indexable` properties onto the same user settings
+  that local signup writes, and returns the updated user.
+
+  Absent properties leave the corresponding setting untouched, so a server that doesn't send them
+  gets the local defaults rather than an opt-out it never asked for.
+  """
+  def maybe_save_remote_privacy_flags(user_etc, %{} = data) do
+    maybe_apply(
+      Bonfire.Me.Users,
+      :put_privacy_settings,
+      [
+        user_etc,
+        [
+          undiscoverable: opted_out?(data["discoverable"]),
+          unindexable: opted_out?(data["indexable"])
+        ]
+      ],
+      fallback_return: user_etc
+    )
+  end
+
+  def maybe_save_remote_privacy_flags(user_etc, _), do: user_etc
+
+  # only an explicit opt-out writes a setting: absent or affirmative properties return `nil` so the local defaults stand, and remote actor creation (a hot path) doesn't do a settings write each time
+  defp opted_out?(value) when value in ["false", false, "no"], do: true
+  defp opted_out?(_), do: nil
 
   def create_remote_actor(%{ap_id: ap_id}) when is_binary(ap_id),
     do: create_remote_actor(ap_id)

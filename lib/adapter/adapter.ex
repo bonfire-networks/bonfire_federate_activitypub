@@ -381,6 +381,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       e(data, :also_known_as, nil) || e(params, "alsoKnownAs", nil)
     )
 
+    # pick up a change of mind about discoverability or indexing, since these are only saved as settings at creation otherwise
+    character = AdapterUtils.maybe_save_remote_privacy_flags(character, data)
+
     # WIP - support types other than user
     case AdapterUtils.character_module(character) do
       nil ->

@@ -61,6 +61,37 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
     }
   end
 
+  # variants of `karen` (who is `discoverable: false`) that isolate each privacy property:
+  # `kip` opts out of indexing while staying discoverable, `jo` sends neither property so the
+  # local defaults should stand
+  def actor_json("https://mocked.local/users/kip" = actor_id),
+    do: actor_variant(actor_id, "kip", %{"discoverable" => true, "indexable" => false})
+
+  def actor_json("https://mocked.local/users/jo" = actor_id),
+    do: actor_variant(actor_id, "jo", :without_privacy_properties)
+
+  defp actor_variant(actor_id, username, overrides) do
+    actor_json("https://mocked.local/users/karen")
+    |> Map.merge(%{
+      "id" => actor_id,
+      "preferredUsername" => username,
+      "name" => "test user #{username}",
+      "url" => "https://mocked.local/@#{username}",
+      "followers" => actor_id <> "/followers",
+      "following" => actor_id <> "/following",
+      "inbox" => actor_id <> "/inbox",
+      "outbox" => actor_id <> "/outbox"
+    })
+    |> put_in(["publicKey", "id"], actor_id <> "#main-key")
+    |> put_in(["publicKey", "owner"], actor_id)
+    |> apply_privacy_properties(overrides)
+  end
+
+  defp apply_privacy_properties(actor, :without_privacy_properties),
+    do: Map.drop(actor, ["discoverable", "indexable"])
+
+  defp apply_privacy_properties(actor, %{} = overrides), do: Map.merge(actor, overrides)
+
   @doc """
   Fetches a real remote actor then corrupts their avatar/banner media paths to broken URLs,
   for manual browser testing of the image 404 → fallback + actor refetch flow.

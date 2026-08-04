@@ -9,6 +9,10 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   @actor_name "karen@mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
   @remote_actor_url @remote_instance <> "/@karen"
+  # `karen` is `discoverable: false`; `kip` is `discoverable: true, indexable: false`;
+  # `jo` sends neither property
+  @remote_actor_unindexable @remote_instance <> "/users/kip"
+  @remote_actor_no_privacy_props @remote_instance <> "/users/jo"
   @webfinger @remote_instance <>
                "/.well-known/webfinger?resource=acct:" <> @actor_name
   @webfinger @remote_instance <>
@@ -22,6 +26,12 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
       %{method: :get, url: @remote_actor_url} ->
         json(Simulate.actor_json(@remote_actor))
+
+      %{method: :get, url: @remote_actor_unindexable} ->
+        json(Simulate.actor_json(@remote_actor_unindexable))
+
+      %{method: :get, url: @remote_actor_no_privacy_props} ->
+        json(Simulate.actor_json(@remote_actor_no_privacy_props))
 
       %{method: :get, url: @webfinger} ->
         json(Simulate.webfingered())
@@ -153,15 +163,62 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert user.profile.image_id
   end
 
-  test "remote actor discoverability flag is preserved" do
-    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
-    assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
+  # `by_username/1` doesn't preload settings and `Settings.get` reads them off the struct, so
+  # without the preload the privacy assertions below would pass for the wrong reason (missing
+  # preload rather than missing write)
+  defp fetch_remote_user(ap_id) do
+    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id)
+    {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
+    {actor, Bonfire.Common.Repo.preload(user, :settings)}
+  end
+
+  # `one_scope_only: true` reads just this user's scope instead of the merged cascade. Without it
+  # the indexing assertions could never fail: `config/test.exs` sets `config :bonfire_search,
+  # adapter: nil`, and `Bonfire.Search.RuntimeConfig` then forces `modularity: :disabled`
+  # instance-wide, so a cascaded get returns `:disabled` for every user in the test env.
+  defp own_setting(user, keys),
+    do: Bonfire.Common.Settings.get(keys, nil, current_user: user, one_scope_only: true)
+
+  defp undiscoverable(user), do: own_setting(user, [Bonfire.Me.Users, :undiscoverable])
+  defp indexer_modularity(user), do: own_setting(user, [Bonfire.Search.Indexer, :modularity])
+
+  test "remote actor discoverability opt-out is preserved" do
+    {actor, user} = fetch_remote_user(@remote_actor)
+
     assert actor.data["discoverable"] == false
 
-    assert nil ==
-             Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
-               current_user: user
-             )
+    assert true == undiscoverable(user)
+  end
+
+  test "remote actor indexing opt-out is preserved" do
+    {actor, user} = fetch_remote_user(@remote_actor_unindexable)
+
+    # preconditions: opted out of indexing but stayed discoverable, so this can only pass by
+    # reading `indexable` rather than piggybacking on `discoverable`
+    assert actor.data["indexable"] == false
+    assert actor.data["discoverable"] == true
+
+    assert :disabled == indexer_modularity(user)
+    refute undiscoverable(user)
+  end
+
+  test "remote actor privacy opt-outs are applied when the actor is updated" do
+    {actor, user} = fetch_remote_user(@remote_actor_no_privacy_props)
+
+    # precondition: sent neither property, so nothing was written at creation
+    refute actor.data["discoverable"]
+    refute actor.data["indexable"]
+    refute undiscoverable(user)
+    refute indexer_modularity(user)
+
+    # they change their mind on their own server, and we refetch/receive the updated actor
+    updated_data = Map.merge(actor.data, %{"discoverable" => false, "indexable" => false})
+    assert {:ok, _} = Bonfire.Federate.ActivityPub.Adapter.update_remote_actor(user, updated_data)
+
+    {_actor, user} = fetch_remote_user(@remote_actor_no_privacy_props)
+
+    assert true == undiscoverable(user)
+    assert :disabled == indexer_modularity(user)
   end
 
   test "can follow pointers to remote actors" do
