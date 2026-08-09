@@ -1,7 +1,9 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.ArchipelagoUserDanceTest do
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
-  @moduletag :test_instance
+  # NOTE: no :test_instance tag while parked as :todo, as the dance runner's `--only test_instance` is an ExUnit *include* filter, which overrides `--exclude todo` and would un-park the module.
+  # To run it: `just test-federation-dance <this file> --include todo` (re-add when done):
+  # @moduletag :test_instance
   @moduletag :todo
 
   import Bonfire.Federate.ActivityPub.SharedDataDanceCase
