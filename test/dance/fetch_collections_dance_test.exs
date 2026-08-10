@@ -49,9 +49,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FetchCollectionsTest do
     assert {:ok, remote_user_local} =
              AdapterUtils.get_or_fetch_and_create_by_uri(remote_ap_id)
 
-    # Local: subscribe to the fediverse feed for PubSub notifications
-    feed_id = Feeds.named_feed_id(:activity_pub)
-    :ok = PubSub.subscribe(feed_id, current_user: local_user)
+    # Local: subscribe to the fediverse feed for PubSub notifications — ALL of the remote feed ids,
+    # not just the legacy `:activity_pub` one: with write-addressing on (the default since
+    # `config/test.exs` declares it) incoming remote content is published to the `:remote_public`
+    # bucket instead, so subscribing to the single legacy id would never receive it
+    :ok = PubSub.subscribe(Feeds.named_feed_ids(:remote), current_user: local_user)
 
     # Local: fetch the remote user's outbox (async mode, runs inline in tests)
     Logger.metadata(action: info("fetch_outbox"))
