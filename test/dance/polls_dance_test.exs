@@ -76,9 +76,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PollTest do
           Votes.vote(remote_user, remote_poll, vote_input)
           |> debug("Remote user voted")
 
+        # keyed by choice name, not positional: the two instances load `choices` in whatever order the association returns, so comparing lists by index compares different choices 
         remote_results =
-          Enum.map(remote_choices, fn choice ->
-            Votes.calculate_if_visible(choice, remote_poll, current_user: remote_user)
+          Map.new(remote_choices, fn choice ->
+            {e(choice, :post_content, :name, nil),
+             Votes.calculate_if_visible(choice, remote_poll, current_user: remote_user)}
           end)
           |> debug("Remote results")
       end)
@@ -88,8 +90,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PollTest do
     local_choices = poll.choices
 
     local_results =
-      Enum.map(local_choices, fn choice ->
-        Votes.calculate_if_visible(choice, poll, current_user: local_user)
+      Map.new(local_choices, fn choice ->
+        {e(choice, :post_content, :name, nil),
+         Votes.calculate_if_visible(choice, poll, current_user: local_user)}
       end)
 
     assert local_results == remote_results
