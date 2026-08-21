@@ -75,6 +75,30 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
     end
   end
 
+  describe "block checks with no current user" do
+    # Every unauthenticated incoming activity checks blocks with no user in scope, so the per-user
+    # side of `Blocks.is_blocked?/3` gets `nil`. That is an ordinary case, not unexpected input, and
+    # must not log as one — it fired twice per delivery. Asserting the return value alone cannot see
+    # this: it was always correct, which is why the noise went unnoticed.
+    # NOTE: keep the refuted phrase out of the test NAME — this suite logs a "test … started" line
+    # containing the name, which `capture_log` would then match, failing for its own title.
+    test "does not warn about unmatched input" do
+      # the actor must be KNOWN (have a Peered record) to reach the per-actor block check at all —
+      # an unknown URI takes an earlier fallback path and never gets there
+      {:ok, _actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, _peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert Federation.federation_allowed?(@remote_actor)
+        end)
+
+      # the block checks ran (this can't pass by never getting there)
+      assert log =~ "federation_allowed?"
+      refute log =~ "no pattern" <> " found"
+    end
+  end
+
   describe "federation_allowed?/2 disabled" do
     test "rejects all URIs when federation disabled" do
       Process.put(:federating, false)

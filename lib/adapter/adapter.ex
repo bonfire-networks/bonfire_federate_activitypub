@@ -13,6 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   # alias Bonfire.Common.Needles
   alias Bonfire.Common.URIs
   alias Bonfire.Me.Characters
+  alias Bonfire.Federate.ActivityPub.ActorDelegation
   alias Bonfire.Federate.ActivityPub.Incoming
   alias Bonfire.Federate.ActivityPub.Outgoing
   alias ActivityPub.Actor
@@ -504,10 +505,18 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_or_create_service_actor() do
     case ActivityPub.Actor.get_cached(pointer: AdapterUtils.service_character_id()) do
-      {:ok, actor} ->
+      {:ok, %ActivityPub.Actor{local: true} = actor} ->
         {:ok, actor}
 
-      _ ->
+      other ->
+        # every Bonfire instance uses the SAME hardcoded service character id, and `Actor.get(pointer: …)` looks in `ap_object` (remote objects) before asking us, so another instance's service actor can federate in and shadow ours here. Publishing as it would attribute our own activities to a bot on someone else's server.
+        if match?({:ok, %ActivityPub.Actor{}}, other),
+          do:
+            err(
+              other,
+              "Ignoring a non-local actor occupying the service character id, using ours instead"
+            )
+
         with %{} = character <- AdapterUtils.get_or_create_service_character(),
              %ActivityPub.Actor{} = actor <-
                AdapterUtils.character_to_actor(character) |> debug("service actor"),
@@ -519,6 +528,29 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
         end
     end
   end
+
+  @doc """
+  The local user that a signature-authenticated remote `signer` may publish as through
+  `local_actor`'s C2S outbox, or nil when that is not allowed.
+
+  Optional lib callback: returning the identity (rather than a yes/no) keeps the user lookup on our
+  side. See `Bonfire.Federate.ActivityPub.ActorDelegation` for the policy.
+  """
+  def maybe_delegated_user(%{username: username} = local_actor, signer)
+      when is_binary(username) do
+    if ActorDelegation.delegated?(username, signer) do
+      case AdapterUtils.get_character_by_ap_id(local_actor) do
+        {:ok, user} ->
+          user
+
+        e ->
+          error(e, "Delegation is allowed, but could not resolve the local user to publish as")
+          nil
+      end
+    end
+  end
+
+  def maybe_delegated_user(_local_actor, _signer), do: nil
 
   def get_locale, do: Bonfire.Common.Localise.get_locale_id()
 

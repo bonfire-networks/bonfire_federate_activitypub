@@ -70,6 +70,10 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
   def actor_json("https://mocked.local/users/jo" = actor_id),
     do: actor_variant(actor_id, "jo", :without_privacy_properties)
 
+  # an instance-level actor, whose id is the bare origin rather than a `/users/…` path (this is what signs instance-key requests, and what an origin entry in `AP_DELEGATED_ACTORS` refers to)
+  def actor_json("https://mocked.local" = actor_id),
+    do: actor_variant(actor_id, "mocked.local", %{"type" => "Application", "url" => actor_id})
+
   defp actor_variant(actor_id, username, overrides) do
     actor_json("https://mocked.local/users/karen")
     |> Map.merge(%{
