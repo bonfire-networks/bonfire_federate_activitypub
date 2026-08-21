@@ -70,25 +70,38 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
   def actor_json("https://mocked.local/users/jo" = actor_id),
     do: actor_variant(actor_id, "jo", :without_privacy_properties)
 
+  # an actor on a SECOND instance, for tests that need per-instance behaviour (e.g. that a private audience is narrowed to each target instance)
+  def actor_json("https://other.local/users/dave" = actor_id),
+    do: actor_variant(actor_id, "dave", %{})
+
   # an instance-level actor, whose id is the bare origin rather than a `/users/…` path (this is what signs instance-key requests, and what an origin entry in `AP_DELEGATED_ACTORS` refers to)
   def actor_json("https://mocked.local" = actor_id),
     do: actor_variant(actor_id, "mocked.local", %{"type" => "Application", "url" => actor_id})
 
   defp actor_variant(actor_id, username, overrides) do
+    # derive host-scoped fields from `actor_id` rather than hardcoding, so variants can also live on a DIFFERENT instance (identical output for the `mocked.local` actors)
+    origin = actor_origin(actor_id)
+
     actor_json("https://mocked.local/users/karen")
     |> Map.merge(%{
       "id" => actor_id,
       "preferredUsername" => username,
       "name" => "test user #{username}",
-      "url" => "https://mocked.local/@#{username}",
+      "url" => "#{origin}/@#{username}",
       "followers" => actor_id <> "/followers",
       "following" => actor_id <> "/following",
       "inbox" => actor_id <> "/inbox",
       "outbox" => actor_id <> "/outbox"
     })
+    |> put_in(["endpoints", "sharedInbox"], "#{origin}/inbox")
     |> put_in(["publicKey", "id"], actor_id <> "#main-key")
     |> put_in(["publicKey", "owner"], actor_id)
     |> apply_privacy_properties(overrides)
+  end
+
+  defp actor_origin(actor_id) do
+    uri = URI.parse(actor_id)
+    "#{uri.scheme}://#{uri.host}"
   end
 
   defp apply_privacy_properties(actor, :without_privacy_properties),

@@ -170,6 +170,26 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       end)
     end
 
+    test "dropping a local activity with no recipients is logged loudly enough to see in prod" do
+      # Exercised directly rather than through `push_now!`, because the real drop happens inside an async federation task whose logs `capture_log` in this process never sees.
+      activity = %{
+        "type" => "Create",
+        "actor" => "https://mocked.local/users/karen",
+        "to" => [],
+        "cc" => [],
+        "object" => %{"type" => "Note", "content" => "nobody to send to", "to" => [], "cc" => []}
+      }
+
+      log =
+        ExUnit.CaptureLog.capture_log([level: :warning], fn ->
+          # this silently discards a user's post, so it must not be invisible at prod log level
+          assert :ignore = ActivityPub.MRF.filter(activity, is_local: true)
+        end)
+
+      assert log =~ "no recipients",
+             "expected the silent drop to be logged at warning level or above, got: #{inspect(log)}"
+    end
+
     test "does not publish private Posts publicly" do
       user = fake_user!()
       to = fake_user!()

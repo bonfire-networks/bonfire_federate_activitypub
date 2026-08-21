@@ -111,6 +111,98 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
     end
   end
 
+  describe "outgoing question addressing" do
+    test "a public poll question is addressed publicly" do
+      author = fake_user!()
+
+      {:ok, question} =
+        Bonfire.Poll.Fake.fake_question_with_choices(
+          %{},
+          [%{name: "yay"}, %{name: "nay"}],
+          current_user: author,
+          boundary: "public"
+        )
+
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: question)
+      assert ActivityPub.Config.public_uri() in List.wrap(data["to"])
+    end
+
+    test "a poll question's interactionPolicy matches an equivalent post's" do
+      author = fake_user!()
+
+      {:ok, question} =
+        Bonfire.Poll.Fake.fake_question_with_choices(
+          %{},
+          [%{name: "yay"}, %{name: "nay"}],
+          current_user: author,
+          boundary: "public"
+        )
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: author,
+          post_attrs: %{post_content: %{html_body: "same author, same boundary"}},
+          boundary: "public"
+        )
+
+      assert {:ok, %{data: poll_data}} = ActivityPub.Object.get_cached(pointer: question)
+      assert {:ok, %{data: post_data}} = ActivityPub.Object.get_cached(pointer: post)
+
+      # Same author, same boundary, so the interaction policy must describe the same audience. `ap_prepare_outgoing_interaction_policy/3` resolves the author's circles via `Circles.list_user_built_ins/2` and builds URLs from `URIs.canonical_url/1`, both of which need the SUBJECT — passing an `%ActivityPub.Actor{}` instead resolves no circles and collapses every verb to "only the author may interact".
+      for verb <- ["canLike", "canReply", "canAnnounce"] do
+        assert get_in(poll_data, ["interactionPolicy", verb, "automaticApproval"]) ==
+                 get_in(post_data, ["interactionPolicy", verb, "automaticApproval"]),
+               "#{verb} differs — poll: #{inspect(get_in(poll_data, ["interactionPolicy", verb]))}, post: #{inspect(get_in(post_data, ["interactionPolicy", verb]))}"
+      end
+    end
+
+    test "a poll question scoped to a circle is addressed to its grantees, not publicly" do
+      author = fake_user!()
+      {:ok, author_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(author.id)
+
+      {:ok, karen_actor} =
+        ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
+
+      {:ok, karen} = Bonfire.Me.Users.by_ap_id("https://mocked.local/users/karen")
+
+      # karen follows the author, so she is a deliverable recipient under the mentioned-or-following gate
+      {:ok, follow_activity} =
+        ActivityPub.follow(%{actor: karen_actor, object: author_actor, local: false})
+
+      {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
+
+      {:ok, circle} = Bonfire.Boundaries.Circles.create(author, %{named: %{name: "friends"}})
+      {:ok, _} = Bonfire.Boundaries.Circles.add_to_circles(id(karen), circle)
+      {:ok, acl} = Bonfire.Boundaries.Acls.simple_create(author, "friends only")
+
+      Bonfire.Boundaries.Grants.grant(circle.id, acl.id, [:see, :read], true,
+        current_user: author
+      )
+
+      {:ok, question} =
+        Bonfire.Poll.Fake.fake_question_with_choices(
+          %{},
+          [%{name: "yay"}, %{name: "nay"}],
+          current_user: author,
+          boundary: acl.id
+        )
+
+      refute Bonfire.Boundaries.object_public?(question)
+
+      # asserting the object EXISTS is what keeps this test honest: a boundary that simply never federates (e.g. "local") would let it pass vacuously
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: question)
+
+      addressing =
+        List.wrap(data["to"]) ++ List.wrap(data["cc"]) ++ List.wrap(data["bcc"])
+
+      refute ActivityPub.Config.public_uri() in addressing,
+             "a circle-scoped poll must not be addressed publicly, got: #{inspect(addressing)}"
+
+      assert karen_actor.ap_id in addressing,
+             "expected the circle grantee to be addressed, got: #{inspect(addressing)}"
+    end
+  end
+
   describe "votes" do
     test "incoming vote (Create of a Note with name + inReplyTo) is recorded as a Bonfire Vote" do
       author = fake_user!()

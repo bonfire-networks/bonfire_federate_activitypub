@@ -384,7 +384,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
           maybe_self_address_activity(filtered)
         else
-          info(activity, "Skip federation of local activity with no recipients")
+          # `warn` not `info`: this silently discards a user's post (no AP object is written, nothing is queued), and at prod log level an `info` left no trace at all, which is why circle-scoped posts appeared to vanish. The check itself is unchanged.
+          warn(activity, "Skip federation of local activity with no recipients")
           :ignore
         end
       else

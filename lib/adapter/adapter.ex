@@ -127,7 +127,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
-  def external_followers_for_activity(actor, activity_data, addressed_pointer_ids \\ []) do
+  # NOTE: for anything already addressed at publish time (see `AdapterUtils.determine_recipients/4`, which puts boundary-granted recipients in `bto`/`bcc`), those recipients arrive here in `addressed_pointer_ids` and are excluded at the SQL level by `get_followers`, so the expensive `bonfire_boundaries_summary` grants query is skipped by the `followers != []` guard rather than being re-run.
+  def external_followers_for_activity(actor, activity_data, addressed_pointer_ids) do
     with ap_object when is_binary(ap_object) <-
            e(activity_data, "object", "id", nil) || e(activity_data, "object", nil),
          {:ok, object} <-
@@ -135,49 +136,17 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
          object when is_binary(object) or is_struct(object) <-
            e(object, :pointer, nil) || object.pointer_id,
          character when is_struct(character) or is_binary(character) <-
-           AdapterUtils.character_id_from_actor(actor) |> info("character_id_from_actor"),
-         federation_mode when is_atom(federation_mode) and not is_nil(federation_mode) <-
-           Bonfire.Federate.ActivityPub.federation_mode(character)
-           |> info("external_followers_for_activity:federation_mode"),
-         # preload `subject.character.peered` so the `is_local?` reject below classifies each
-         # follower's locality without an on-demand (raising) preload
-         followers when is_list(followers) and followers != [] <-
-           AdapterUtils.get_followers(character, :activity, :subject_character_peered,
-             exclude_ids: addressed_pointer_ids
-           )
-           |> debug("got_followers (excluding already addressed)")
-           |> Enum.reject(&AdapterUtils.is_local?/1)
-           |> debug("remote followers"),
-         granted_followers when is_list(granted_followers) and granted_followers != [] <-
-           Bonfire.Boundaries.users_grants_on(followers, object, [:see, :read]) do
-      {:ok,
-       granted_followers
-       #  only positive grants
-       |> Enum.filter(& &1.value)
-       |> Enum.map(&Map.take(&1, [:subject_id]))
-       # Skip granted followers already in addressed recipients
-       |> Enum.reject(&(&1.subject_id in addressed_pointer_ids))
-       |> debug("post_grants (excluding already addressed)")
-       |> Enum.map(& &1.subject_id)
-       |> ActivityPub.Actor.list_cached()
-       |> Enum.filter(
-         &Bonfire.Federate.ActivityPub.federation_allowed?(&1,
-           current_user: character,
-           federation_mode: federation_mode
-         )
-       )}
+           AdapterUtils.character_id_from_actor(actor) |> info("character_id_from_actor") do
+      AdapterUtils.external_recipients_for_object(character, object,
+        exclude_ids: addressed_pointer_ids
+      )
     else
-      [] ->
-        debug(actor, "No remote followers or grants")
-        {:ok, []}
-
       e ->
         warn(e, "Could not find the object or actor?")
         debug(actor, "actor")
         debug(activity_data, "activity")
         {:ok, []}
     end
-    |> debug("bcc actors based on grants")
   end
 
   def get_actor_by_id(id) when is_binary(id) do

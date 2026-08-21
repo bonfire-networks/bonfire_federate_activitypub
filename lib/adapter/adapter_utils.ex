@@ -1850,32 +1850,124 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  # def determine_recipients(actor, comment) do
-  #   determine_recipients(actor, comment, [public_uri()], [
-  #     actor.data["followers"]
-  #   ])
-  # end
+  @doc """
+  Determines the ActivityPub addressing for an outgoing object, from its boundaries.
 
-  # def determine_recipients(actor, comment, parent) do
-  #   if(is_map(parent) and Map.has_key?(parent, :id)) do
-  #     case ActivityPub.Actor.get_cached(pointer: parent.id) do
-  #       {:ok, parent_actor} ->
-  #         determine_recipients(
-  #           actor,
-  #           comment,
-  #           [parent_actor.ap_id, public_uri()],
-  #           [
-  #             actor.data["followers"]
-  #           ]
-  #         )
+  Returns `%{to: [...], cc: [...], bcc: [...], mentions: [...]}`, where the lists of addresses are AP ids and `mentions` are `ActivityPub.Actor` structs that should ALSO be rendered as `Mention` tags.
 
-  #       _ ->
-  #         determine_recipients(actor, comment)
-  #     end
-  #   else
-  #     determine_recipients(actor, comment)
-  #   end
-  # end
+  The distinction between `cc` and `bcc` is deliberate:
+
+    * `cc` holds recipients it is fine for every receiving instance to see — the mentioned actors and the thread/reply-to authors, all of whom are already discoverable from the thread
+    * `bcc` holds the boundary-granted recipients (e.g. members of a circle a custom boundary grants see+read to). Keeping them out of `cc` avoids leaking circle membership to every recipient's instance; `ActivityPub.Federator.Transformer.preserve_privacy_of_outgoing/3` narrows `bcc` to each target instance at delivery time.
+
+  Addressing them at all is what stops a circle-scoped post shipping with an empty audience, which `Bonfire.Federate.ActivityPub.BoundariesMRF` drops inside `ActivityPub.Object.insert` before any AP object is written.
+
+  Boundary-granted recipients are only those who are ALSO followers of the author: delivery stays gated on mentioned-or-following. See `external_recipients_for_object/3`.
+
+  Options:
+
+    * `:cc` — extra AP ids to append to `cc` (e.g. FEP-044f quote authorisation)
+  """
+  def determine_recipients(subject, object, is_public?, opts \\ []) do
+    mentions =
+      maybe_apply(Bonfire.Social.Tags, :list_tags_mentions, [object, subject],
+        fallback_return: []
+      )
+      |> ActivityPub.Actor.list_cached()
+      |> debug("mentions to actors")
+
+    thread_creator =
+      e(object, :replied, :thread, :created, :creator, nil) ||
+        e(object, :replied, :thread, :created, :creator_id, nil)
+
+    reply_to_creator =
+      e(object, :replied, :reply_to, :created, :creator, nil) ||
+        e(object, :replied, :reply_to, :created, :creator_id, nil)
+
+    # TODO: should we just include ALL thread participants?
+    cc =
+      [reply_to_creator, thread_creator]
+      |> Enums.uniq_by_id()
+      |> Enum.reject(&(id(&1) == id(subject)))
+      |> ActivityPub.Actor.list_cached()
+      |> Enum.concat(mentions)
+      |> Enums.uniq_by_id()
+      |> Enum.map(& &1.ap_id)
+      |> Enum.concat(List.wrap(opts[:cc]))
+      |> Enum.uniq()
+      |> debug("direct_recipients")
+
+    %{
+      to: if(is_public?, do: [public_uri()], else: []),
+      cc: cc,
+      bcc: if(is_public?, do: [], else: boundary_granted_recipients(subject, object)),
+      mentions: mentions
+    }
+    |> debug("determined recipients")
+  end
+
+  defp boundary_granted_recipients(subject, object) do
+    case external_recipients_for_object(subject, object) do
+      {:ok, actors} -> Enum.map(actors, & &1.ap_id)
+      _ -> []
+    end
+    |> debug("boundary-granted recipients to bcc")
+  end
+
+  @doc """
+  Remote actors who should receive `object`, according to boundaries.
+
+  Takes a character and an object pointer rather than AP activity data, so it can also be called while PREPARING an activity for publication, before any AP object exists for it. `external_followers_for_activity/3` is the delivery-time wrapper that resolves an AP activity to its pointer and delegates here.
+
+  Candidates are the author's remote followers, narrowed to those actually granted `:see` and `:read`. Grantees who do not follow the author are deliberately NOT included: delivery stays gated on mentioned-or-following.
+
+  Options:
+
+    * `:exclude_ids` — pointer ids already addressed elsewhere, skipped to avoid redundant delivery
+  """
+  def external_recipients_for_object(character, object, opts \\ []) do
+    exclude_ids = opts[:exclude_ids] || []
+
+    with federation_mode when is_atom(federation_mode) and not is_nil(federation_mode) <-
+           Bonfire.Federate.ActivityPub.federation_mode(character)
+           |> info("external_recipients_for_object:federation_mode"),
+         # preload `subject.character.peered` so the `is_local?` reject below classifies each follower's locality without an on-demand (raising) preload
+         followers when is_list(followers) and followers != [] <-
+           get_followers(character, :activity, :subject_character_peered,
+             exclude_ids: exclude_ids
+           )
+           |> debug("got_followers (excluding already addressed)")
+           |> Enum.reject(&is_local?/1)
+           |> debug("remote followers"),
+         granted_followers when is_list(granted_followers) and granted_followers != [] <-
+           Bonfire.Boundaries.users_grants_on(followers, object, [:see, :read]) do
+      {:ok,
+       granted_followers
+       #  only positive grants
+       |> Enum.filter(& &1.value)
+       |> Enum.map(&Map.take(&1, [:subject_id]))
+       # Skip granted followers already in addressed recipients
+       |> Enum.reject(&(&1.subject_id in exclude_ids))
+       |> debug("post_grants (excluding already addressed)")
+       |> Enum.map(& &1.subject_id)
+       |> ActivityPub.Actor.list_cached()
+       |> Enum.filter(
+         &Bonfire.Federate.ActivityPub.federation_allowed?(&1,
+           current_user: character,
+           federation_mode: federation_mode
+         )
+       )}
+    else
+      [] ->
+        debug(character, "No remote followers or grants")
+        {:ok, []}
+
+      e ->
+        warn(e, "Could not determine boundary-based recipients")
+        {:ok, []}
+    end
+    |> debug("recipients based on grants")
+  end
 
   # def determine_recipients(_actor, _comment, to, cc) do
   #   # this doesn't feel very robust

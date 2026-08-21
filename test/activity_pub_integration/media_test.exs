@@ -60,6 +60,48 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
       assert String.starts_with?(data["id"], ap_base <> "/objects/")
       refute data["id"] == url
     end
+
+    test "a public Media is addressed publicly" do
+      user = Bonfire.Me.Fake.fake_user!()
+      url = "https://example.com/public/article"
+
+      {:ok, media} =
+        Bonfire.Files.Media.insert(user, url, %{media_type: "link", size: 0}, %{
+          url: url,
+          media_type: "link"
+        })
+
+      assert {:ok, _} = Bonfire.Files.Media.publish(user, media, boundary: "public")
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: media)
+
+      assert ActivityPub.Config.public_uri() in List.wrap(data["to"])
+    end
+
+    test "a Media published with a non-public boundary is NOT addressed publicly" do
+      user = Bonfire.Me.Fake.fake_user!()
+      url = "https://example.com/private/article"
+
+      {:ok, media} =
+        Bonfire.Files.Media.insert(user, url, %{media_type: "link", size: 0}, %{
+          url: url,
+          media_type: "link"
+        })
+
+      # `Media.publish/3` is only ever reached for an explicit publish carrying an intentional boundary (the GraphQL caller requires `to_boundary`/`to_circles`), so honouring it here cannot stop non-published media from federating — that never federated in the first place.
+      assert {:ok, _} = Bonfire.Files.Media.publish(user, media, boundary: "local")
+
+      refute Bonfire.Boundaries.object_public?(media)
+
+      case ActivityPub.Object.get_cached(pointer: media) do
+        {:ok, %{data: data}} ->
+          refute ActivityPub.Config.public_uri() in List.wrap(data["to"]),
+                 "a non-public Media must not be addressed to the AP public collection, got to: #{inspect(data["to"])}"
+
+        # no recipients to deliver to, so nothing was federated — also acceptable
+        {:error, :not_found} ->
+          :ok
+      end
+    end
   end
 
   describe "supports incoming" do
