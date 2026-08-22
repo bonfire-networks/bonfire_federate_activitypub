@@ -128,7 +128,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   # NOTE: for anything already addressed at publish time (see `AdapterUtils.determine_recipients/4`, which puts boundary-granted recipients in `bto`/`bcc`), those recipients arrive here in `addressed_pointer_ids` and are excluded at the SQL level by `get_followers`, so the expensive `bonfire_boundaries_summary` grants query is skipped by the `followers != []` guard rather than being re-run.
-  def external_followers_for_activity(actor, activity_data, addressed_pointer_ids) do
+  def external_followers_for_activity(actor, activity_data, addressed_pointer_ids \\ []) do
     with ap_object when is_binary(ap_object) <-
            e(activity_data, "object", "id", nil) || e(activity_data, "object", nil),
          {:ok, object} <-
