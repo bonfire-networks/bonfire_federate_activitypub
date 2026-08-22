@@ -332,7 +332,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_character(q, opts) when is_binary(q) do
-    skip?(:username, opts) || get_character_by_username(q)
+    skip?(:username, opts) || get_character_by_username(q, opts)
   end
 
   def get_character(%struct{id: _} = character, _opts) when struct not in [Actor, Pointer] do
@@ -374,7 +374,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_character(%{username: q}, opts) when is_binary(q) do
-    skip?(:username, opts) || get_character_by_username(q)
+    skip?(:username, opts) || get_character_by_username(q, opts)
   end
 
   def get_character(q, _opts) do
@@ -386,31 +386,56 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     if opts[:skip] == type, do: {:error, :not_found}
   end
 
-  def get_character_by_username({:ok, c}), do: get_character_by_username(c)
+  def get_character_by_username(username, opts \\ [])
 
-  def get_character_by_username("@" <> username),
-    do: get_character_by_username(username)
+  def get_character_by_username({:ok, c}, opts), do: get_character_by_username(c, opts)
 
-  def get_character_by_username(username) when is_binary(username) do
-    with {:error, :not_found} <- Users.by_username(username) do
+  def get_character_by_username("@" <> username, opts),
+    do: get_character_by_username(username, opts)
+
+  def get_character_by_username(username, opts) when is_binary(username) do
+    opts = opts_for_ap_boundarisation(opts)
+
+    with {:error, :not_found} <- Users.by_username(username, opts) do
       debug(username, "not a user, check for any other character types")
-      Bonfire.Common.Needles.get(username)
+      Bonfire.Common.Needles.get(username, opts)
     end
-    ~> get_character(skip: :username)
-
-    # Bonfire.Common.Needles.get(username, [skip_boundary_check: true])
-    # ~> get_character()
+    ~> get_character(opts ++ [skip: :username])
   end
 
-  def get_character_by_username(other) do
+  def get_character_by_username(other, opts) do
     error(other, "Dunno how to look for character, attempt fallback to `get_character/1`")
-    get_character(other, skip: :username)
+    get_character(other, opts ++ [skip: :username])
+  end
+
+  # boundarise AP-context lookups as the `activity_pub` circle (unless the caller sets a subject), NOT as guest: nonfederated groups/topics deliberately let web guests see/read while denying the activity_pub circle, so their actors must not resolve in AP contexts
+  defp opts_for_ap_boundarisation(opts) do
+    # NOT put_new: an explicitly-set `current_user: nil` (common caller pattern) must also fall back to the circle, not to guest
+    case Keyword.get(opts, :current_user) do
+      nil -> Keyword.put(opts, :current_user, Bonfire.Boundaries.Circles.get_id(:activity_pub))
+      _ -> opts
+    end
+  end
+
+  @doc """
+  Whether the character's own boundaries permit federating it as an actor.
+
+  Eg. groups/topics preset visibility grants or explicitly denies the `activity_pub` circle, which is the source of truth for whether a group federates (see `Bonfire.Classify.Boundaries.maybe_deny_activity_pub/3`). The subject checked must be the `activity_pub` circle, NOT guest, so nonfederated group visibilities deliberately let web guests see/read while denying federation. 
+  """
+  def character_ap_readable?(character) do
+    if is_local?(character) do
+      Bonfire.Boundaries.can?(:activity_pub, :read, character) == true
+    else
+      true
+    end
   end
 
   def get_character_by_id(id, opts \\ [skip_boundary_check: true])
 
   def get_character_by_id(id, opts)
       when is_binary(id) do
+    opts = opts_for_ap_boundarisation(opts)
+
     if pointer_id = uid(id) do
       Bonfire.Common.Needles.get(pointer_id, opts)
       ~> get_character(opts ++ [skip: :id])
@@ -425,35 +450,39 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     get_character(other, opts ++ [skip: :id])
   end
 
-  def get_character_by_ap_id(ap_id) when is_binary(ap_id) do
+  def get_character_by_ap_id(ap_id, opts \\ [])
+
+  def get_character_by_ap_id(ap_id, opts) when is_binary(ap_id) do
     local_instance = ap_base_url()
+    opts = opts_for_ap_boundarisation(opts) |> Keyword.put_new(:skip_boundary_check, true)
 
     case get_actor_by_ap_id(ap_id, local_instance) do
       {:error, :not_found} ->
         debug(ap_id, "could not find AP Actor, check if we have a Peered linking to a character")
 
-        get_pointable_by_peered_ap_id(ap_id)
+        get_pointable_by_peered_ap_id(ap_id, opts)
 
       actor ->
         actor
-        |> return_pointable()
+        # skip remains the default, but a caller opting into checks via `skip_boundary_check: false` gets the AP-circle subject rather than guest
+        |> return_pointable(opts)
     end
   end
 
-  def get_character_by_ap_id(%{ap_id: ap_id}) when is_binary(ap_id) do
-    get_character_by_ap_id(ap_id)
+  def get_character_by_ap_id(%{ap_id: ap_id}, opts) when is_binary(ap_id) do
+    get_character_by_ap_id(ap_id, opts)
   end
 
-  def get_character_by_ap_id(%{"id" => ap_id}) when is_binary(ap_id) when is_binary(ap_id) do
-    get_character_by_ap_id(ap_id)
+  def get_character_by_ap_id(%{"id" => ap_id}, opts) when is_binary(ap_id) do
+    get_character_by_ap_id(ap_id, opts)
   end
 
-  def get_character_by_ap_id(%{data: %{"id" => ap_id} = _data}) do
-    get_character_by_ap_id(ap_id)
+  def get_character_by_ap_id(%{data: %{"id" => ap_id} = _data}, opts) do
+    get_character_by_ap_id(ap_id, opts)
   end
 
-  def get_character_by_ap_id(%{username: username} = actor) when is_binary(username) do
-    get_character_by_username(ActivityPub.Actor.format_username(actor))
+  def get_character_by_ap_id(%{username: username} = actor, opts) when is_binary(username) do
+    get_character_by_username(ActivityPub.Actor.format_username(actor), opts)
   end
 
   # def get_character_by_ap_id(%{username: username}) when is_binary(username) do
@@ -463,18 +492,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   #   get_character_by_username(username) |> info("preferredUsername: #{username}")
   # end
 
-  def get_character_by_ap_id(other) do
+  def get_character_by_ap_id(other, opts) do
     error(
       other,
       "Invalid parameters when looking up an actor, attempt fallback to `get_character/1`"
     )
 
-    get_character(other, skip: :ap_id)
+    get_character(other, opts ++ [skip: :ap_id])
   end
 
   @doc "without :ok / :error tuple"
-  def get_character_by_ap_id!(ap_id) do
-    case get_character_by_ap_id(ap_id) do
+  def get_character_by_ap_id!(ap_id, opts \\ []) do
+    case get_character_by_ap_id(ap_id, opts) do
       {:ok, character} -> character
       # TEMP
       %{} = character -> character
@@ -482,13 +511,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
-  def get_local_character_by_ap_id(ap_id, local_instance \\ nil) when is_binary(ap_id) do
+  def get_local_character_by_ap_id(ap_id, local_instance \\ nil, opts \\ [])
+      when is_binary(ap_id) do
     # FIXME: this is fragile as doesn't support hostname/port changes
-    local_instance = debug(local_instance || ap_base_url())
+    local_instance = local_instance || ap_base_url()
+    opts = opts_for_ap_boundarisation(opts)
 
     # NEW actors use a ULID-based URL (/pub/person|group|application/<ULID>), resolve by pointer id. Existing actors keep /pub/actors/<username>, handled by the trim below.
+    # NOTE: resolving by AP URL is inherently an AP context, so (unlike bare `get_character_by_id`) this defaults to boundarised-as-activity_pub-circle rather than skip_boundary_check
     if actor_id = actor_pointer_id_from_url(ap_id, local_instance) do
-      get_character_by_id(actor_id)
+      get_character_by_id(actor_id, opts)
       |> Characters.mark_as(:local)
     else
       username =
@@ -497,14 +529,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       if username != ap_id and !is_local_collection_or_built_in?(ap_id),
         do:
-          get_character_by_username(username)
+          get_character_by_username(username, opts)
           |> Characters.mark_as(:local)
     end
   end
 
-  def get_pointable_by_peered_ap_id(ap_id) do
+  def get_pointable_by_peered_ap_id(ap_id, opts \\ []) do
     Bonfire.Federate.ActivityPub.Peered.get(ap_id)
-    |> return_pointable()
+    # skip remains the default (first occurrence wins, so caller opts take precedence), but a caller opting into checks via `skip_boundary_check: false` gets the AP-circle subject rather than guest
+    |> return_pointable(
+      opts_for_ap_boundarisation(opts)
+      |> Keyword.put_new(:skip_boundary_check, true)
+    )
   end
 
   def is_local_collection_or_built_in?("https://www.w3.org/ns/activitystreams#Public"),
@@ -840,7 +876,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   def get_or_fetch_pointable_by_ap_id(actor_or_ap_id, opts \\ []) do
-    opts = opts |> Keyword.put(:triggered_by, "get_or_fetch_pointable_by_ap_id")
+    opts =
+      opts
+      |> Keyword.put(:triggered_by, "get_or_fetch_pointable_by_ap_id")
+      |> Keyword.put_new(:skip_boundary_check, true)
 
     local_instance = Adapter.base_url()
     local_ap_url = ap_base_url()
@@ -856,13 +895,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           # local ULID actor URIs like /pub/person|group|application/<ULID>
           actor_id = actor_pointer_id_from_url(ap_id, local_ap_url) ->
             debug(actor_id, "extracted actor ULID from local ULID actor URI")
-            Bonfire.Common.Needles.get(actor_id, skip_boundary_check: true)
+            Bonfire.Common.Needles.get(actor_id, opts)
 
           # Handle local actor URIs like /pub/actors/username
           String.contains?(ap_id, "/actors/") ->
             username = String.trim_leading(ap_id, "#{local_ap_url}/actors/")
             debug(username, "extracted username from local actor URI")
-            get_character_by_username(username)
+            get_character_by_username(username, opts)
 
           # Handle local object URIs like /pub/objects/ULID
           # TODO: make this better and extensible
@@ -870,7 +909,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             if pointer_id =
                  pointer_id_from_url(ap_id, local_instance, local_ap_url)
                  |> debug("extracted object ID from local object URI") do
-              Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true)
+              Bonfire.Common.Needles.get(pointer_id, opts)
             end ||
               {:error, :not_found}
 
@@ -1029,7 +1068,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ~> return_pointable()
     else
       log("AP - get_character_by_username: " <> q)
-      get_character_by_username(q)
+      get_character_by_username(q, opts)
     end
   end
 
@@ -1159,7 +1198,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       %{pointer_id: id, local: local?} when is_binary(id) ->
         with {:error, :not_found} <-
-               return_pointer(id, opts ++ [skip_boundary_check: true]) |> debug("return_pointer") do
+               return_pointer(
+                 id,
+                 opts
+                 |> Keyword.put_new(:skip_boundary_check, true)
+               )
+               |> debug("return_pointer") do
           # in case the local pointer was deleted
           if local? do
             error(fetched, "local pointer not found by id")
@@ -1173,7 +1217,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %ActivityPub.Actor{username: username, local: local?} when is_binary(username) ->
         debug("we have a username")
 
-        case get_character_by_username(ActivityPub.Actor.format_username(fetched)) do
+        case get_character_by_username(ActivityPub.Actor.format_username(fetched), opts) do
           {:error, :not_found} ->
             if local? do
               error(fetched, "local actor not found by username")

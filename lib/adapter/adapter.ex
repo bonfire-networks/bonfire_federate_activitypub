@@ -508,7 +508,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def maybe_delegated_user(%{username: username} = local_actor, signer)
       when is_binary(username) do
     if ActorDelegation.delegated?(username, signer) do
-      case AdapterUtils.get_character_by_ap_id(local_actor) do
+      # explicit skip_boundary_check: false, publishing AS this actor is an AP-facing authorization, so the actor must be readable by the activity_pub circle (eg. not a nonfederated group)
+      case AdapterUtils.get_character_by_ap_id(local_actor, skip_boundary_check: false) do
         {:ok, user} ->
           user
 

@@ -59,7 +59,15 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   def federate_outgoing?(subject \\ nil) do
-    Bonfire.Federate.ActivityPub.federating?(subject)
+    # settings check first: it's config + at most one Settings read, while the boundary check costs an is_local? classification + a grants query per local subject
+    case Bonfire.Federate.ActivityPub.federating?(subject) do
+      false ->
+        false
+
+      mode ->
+        # an actor only federates when its own boundaries grant the activity_pub circle (eg. groups/topics with nonfederated visibility deny it)
+        if AdapterUtils.character_ap_readable?(subject), do: mode, else: false
+    end
 
     # and Bonfire.Common.Extend.module_enabled?(
     #   Bonfire.Federate.ActivityPub.Outgoing,
@@ -372,19 +380,28 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
   def push_actor_update(%{__struct__: type, id: id} = character)
       when type in @types_characters do
-    # Works for Users, Collections, Communities (not MN.ActivityPub.Actor)
-    actor =
-      case ActivityPub.Actor.get_cached(pointer: id) do
-        {:ok, actor} ->
-          ActivityPub.Actor.set_cache(actor)
-          actor
+    # gate on the character being pushed (not the editor, which `maybe_federate` already checked): its own settings (eg. user_federating) AND its boundaries (eg. nonfederated group visibility)
+    if federate_outgoing?(character) == true do
+      actor =
+        case ActivityPub.Actor.get_cached(pointer: id) do
+          {:ok, actor} ->
+            ActivityPub.Actor.set_cache(actor)
+            actor
 
-        _ ->
-          # Fallback for actors with no ap_objects row yet (e.g. service character)
-          AdapterUtils.character_to_actor(character)
-      end
+          _ ->
+            # Fallback for actors with no ap_objects row yet (e.g. service character)
+            AdapterUtils.character_to_actor(character)
+        end
 
-    push_actor_update(actor)
+      push_actor_update(actor)
+    else
+      debug(
+        id,
+        "Skip pushing actor update: federation is disabled for this character (by settings or boundaries)"
+      )
+
+      :ignore
+    end
   end
 
   def push_actor_update(user_id) when is_binary(user_id) do
