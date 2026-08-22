@@ -104,6 +104,18 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
            |> redirected_to() =~ "/pub/actors/#{user.character.username}"
   end
 
+  # AS2 Core §2.3: date/time values MUST conform to the RFC3339 `date-time` production, and "an uppercase 'Z' character MUST be used in the absence of a numeric time zone offset".
+  # We used to serialise `updated` from a NaiveDateTime (no zone), which made Lemmy (strict RFC3339) reject the WHOLE actor with "premature end of input", breaking every interaction with Lemmy instances, not just group federation.
+  test "date fields in the served actor carry a timezone (RFC3339), so strict consumers can parse it" do
+    user = fake_user!()
+    json = get_actor_json("/pub/actors/#{user.character.username}")
+
+    for field <- ["updated", "published"], value = json[field] do
+      assert {:ok, _, _} = DateTime.from_iso8601(value),
+             "actor `#{field}` is not RFC3339 with a timezone: #{inspect(value)}"
+    end
+  end
+
   test "serves user in AP API with profile fields, taking into account privacy settings" do
     user = fake_user!()
 

@@ -1597,9 +1597,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             if(Bonfire.Common.Extend.module_enabled?(Bonfire.Social.Pins, user_etc),
               do: ActivityPub.Utils.collection_ap_id("featured", user_etc.id)
             ),
+          # MUST carry a timezone: AS2 dates are xsd:dateTime and strict consumers reject a naive one, Lemmy (chrono RFC3339) fails the WHOLE actor with "premature end of input", which blocks every interaction with Lemmy instances
           "updated" =>
             updated_at
-            |> NaiveDateTime.to_iso8601()
+            |> DateTime.from_naive!("Etc/UTC")
+            |> DateTime.to_iso8601()
         }
 
       # |> debug("data")
