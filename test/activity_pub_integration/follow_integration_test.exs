@@ -10,7 +10,14 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
   @remote_actor @remote_instance <> "/users/karen"
 
   setup do
+    test_pid = self()
+
     mock(fn
+      # records outgoing deliveries so tests can assert the payload actually reached an inbox
+      %{method: :post, url: url, body: body} ->
+        send(test_pid, {:delivered, url, body})
+        %Tesla.Env{status: 202, body: ""}
+
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
 
@@ -65,6 +72,30 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       assert Bonfire.Social.Graph.Follows.requested?(follower, followed)
       refute Bonfire.Social.Graph.Follows.following?(follower, followed)
+    end
+
+    # COVERAGE GAP this closes: `push_now!` only performs the `publish` op, which ENQUEUES a `publish_one` job per inbox, so nothing above ever exercises signing-actor resolution or the actual POST. Draining the queue runs them, which is where a live probe against Lemmy died.
+    test "outgoing follow is actually delivered to the remote inbox, as a spec-shaped payload" do
+      follower = fake_user!()
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, followed} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      {:ok, follow} = Follows.follow(follower, followed)
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
+
+      queue = Oban.drain_queue(queue: :federator_outgoing)
+      assert queue[:failure] == 0, "a delivery job failed: #{inspect(queue)}"
+
+      assert_received {:delivered, url, body}
+      assert url =~ "mocked.local"
+
+      payload = Jason.decode!(body)
+      assert payload["type"] == "Follow"
+      assert payload["actor"] =~ id(follower)
+
+      # `object` must stay a bare id: strict implementations (eg. Lemmy's `ObjectId`) can't deserialise an embedded actor, which `prepare_outgoing_object/1` used to produce
+      assert is_binary(payload["object"]),
+             "Follow object should reference the actor's id, got: #{inspect(payload["object"])}"
     end
 
     test "outgoing follow which then gets an Accept works" do

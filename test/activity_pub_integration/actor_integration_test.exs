@@ -116,6 +116,30 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     end
   end
 
+  # Lemmy rejected our Follow with `ASN.1 error: PEM error: PEM error in pre-encapsulation boundary`
+  # — ie. it could not parse the key it fetched from our actor. Strict (Rust rfc7468) parsers accept exactly one well-formed entry, so assert the SERVED JSON carries that, not just our internal value.
+  test "the served actor's publicKeyPem is a single well-formed PEM entry" do
+    user = fake_user!()
+    json = get_actor_json("/pub/actors/#{user.character.username}")
+
+    pem = get_in(json, ["publicKey", "publicKeyPem"])
+    assert is_binary(pem), "no publicKeyPem served: #{inspect(json["publicKey"])}"
+
+    assert [{:SubjectPublicKeyInfo, _der, :not_encrypted}] = :public_key.pem_decode(pem),
+           "publicKeyPem is not a single SubjectPublicKeyInfo entry: #{inspect(pem)}"
+
+    assert String.starts_with?(pem, "-----BEGIN PUBLIC KEY-----\n"),
+           "PEM must open with the exact pre-encapsulation boundary, got: #{inspect(String.slice(pem, 0, 40))}"
+
+    # …and via the CANONICAL ULID url, which is the actor's real ap_id and where a remote's signature keyId points, so it's the document a remote actually parses
+    canonical = get_actor_json("/pub/person/#{id(user)}")
+
+    assert get_in(canonical, ["publicKey", "publicKeyPem"]) == pem,
+           "the canonical (ULID) actor url serves a different publicKeyPem than the username url"
+
+    assert get_in(canonical, ["publicKey", "id"]) =~ "#main-key"
+  end
+
   test "serves user in AP API with profile fields, taking into account privacy settings" do
     user = fake_user!()
 
