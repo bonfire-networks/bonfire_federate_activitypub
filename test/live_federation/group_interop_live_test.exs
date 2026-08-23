@@ -86,7 +86,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       Interop.follow(handle, as: me)
 
       assert {:ok, post} =
-               Interop.post_to(handle, "<p>Bonfire interop probe #{System.unique_integer([:positive])}</p>", as: me)
+               Interop.post_to(
+                 handle,
+                 "<p>Bonfire interop probe #{System.unique_integer([:positive])}</p>", as: me)
 
       post_ap_id =
         Interop.outgoing_json(post)["id"] ||

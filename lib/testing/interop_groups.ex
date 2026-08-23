@@ -24,6 +24,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     def group_flow(community, opts \\ []) do
       wait = opts[:wait] || 120
       host = host(community)
+
       # fixtures are grouped by SOFTWARE (eg. "lemmy"), not by instance host — override with `fixtures:`
       fixtures = opts[:fixtures] || software_slug(host)
 
@@ -62,7 +63,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     @doc "The host part of a group handle or URI."
     def host(handle) do
       URI.parse(normalise_handle(handle)).host ||
-        (handle |> normalise_handle() |> String.split("@") |> List.last())
+        handle |> normalise_handle() |> String.split("@") |> List.last()
     end
 
     @doc """

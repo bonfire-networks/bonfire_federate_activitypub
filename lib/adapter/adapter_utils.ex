@@ -1663,9 +1663,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def create_remote_actor(%ActivityPub.Actor{} = actor) do
     # storm attribution: remote-user creation spikes when boosts arrive from never-seen actors (StormRecorder)
     Logger.metadata(action: "create_remote_actor")
-    character_module = character_module(actor.data["type"])
+    actor_type = rewrite_actor_type(actor.data["type"], actor.data["id"])
+    character_module = character_module(actor_type)
 
-    log("AP - create_remote_actor of type #{actor.data["type"]} with module #{character_module}")
+    log(
+      "AP - create_remote_actor of type #{actor_type}#{if actor_type != actor.data["type"], do: " (rewritten from #{actor.data["type"]})"} with module #{character_module}"
+    )
+
     debug(actor)
 
     # username = actor.data["preferredUsername"] <> "@" <> Bonfire.Common.URIs.base_domain(actor.data["id"])
@@ -1700,7 +1704,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                         },
                         [
                           local: false,
-                          #  FIXME: don't query again (Instances.get_or_create already has)
+                          #  several AS2 types share one context module (Service/Application/Organization all map to SharedUsers), so pass the type along, since picking the module discards which one it was
+                          actor_type: actor_type,
+                          # policy the actor declares about itself, which the flattened params above don't carry: `manuallyApprovesFollowers` is AS2, `postingRestrictedToMods` is the threadiverse extension (Lemmy/Mbin/PieFed)
+                          manually_approves_followers:
+                            actor.data["manuallyApprovesFollowers"] == true,
+                          posting_restricted_to_mods:
+                            actor.data["postingRestrictedToMods"] == true,
+                          # FIXME: don't query again (Instances.get_or_create already has)
                           custom_circles: [
                             silence_my_instance:
                               from_ok(
@@ -1875,6 +1886,37 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         |> debug("added??")
     end
   end
+
+  @doc """
+  The AS2 type to handle an incoming actor as, which is usually just the type it declared.
+
+  Some implementations federate a group as a bot account, so the document says `Service` while the thing is really a forum. Nothing in the document distinguishes those from an ordinary bot, so an instance admin can allowlist the actors to treat differently:
+
+      config :bonfire_federate_activitypub, :rewrite_actor_types,
+        Service: [Group: ["fedigroups.social", "https://example.org/users/just_this_one"]]
+
+  An entry is either a host (every actor on that instance) or a full actor URI (only that actor). Only local handling changes: the stored AP object keeps the type the remote sent, as our record of what was actually received.
+  """
+  def rewrite_actor_type(type, ap_id) when is_binary(type) and is_binary(ap_id) do
+    (Config.get_ext(:bonfire_federate_activitypub, :rewrite_actor_types, []) || [])
+    |> Enum.find_value(type, fn {from, targets} ->
+      # keyword syntax makes the config keys atoms, while AP types are strings
+      if to_string(from) == type do
+        Enum.find_value(targets, fn {to, matchers} ->
+          if actor_matches?(ap_id, matchers), do: to_string(to)
+        end)
+      end
+    end)
+  end
+
+  def rewrite_actor_type(type, _ap_id), do: type
+
+  defp actor_matches?(ap_id, matchers) when is_list(matchers) do
+    host = URI.parse(ap_id).host
+    Enum.any?(matchers, &(&1 == ap_id or &1 == host))
+  end
+
+  defp actor_matches?(_ap_id, _matchers), do: false
 
   def character_module(%{__struct__: Needle.Pointer} = struct),
     do: Types.object_type(struct) |> character_module()
