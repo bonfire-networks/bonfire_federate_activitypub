@@ -21,7 +21,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
   alias Bonfire.Common.URIs
 
   @remote_instance "https://mocked.local"
-  @fixture "fedigroups/service_group_actor.json"
+  # resolved relative to this file, NOT to the cwd: CI builds the extension from `deps/`, where an app-root-relative path points at nothing
+  @fixture Path.join([__DIR__, "..", "fixtures", "fedigroups", "service_group_actor.json"])
   @fedigroups_actor "https://fedigroups.social/users/xmpp"
   @other_host_actor "https://elsewhere.local/users/notagroup"
   @sibling_actor "https://fedigroups.social/users/sibling"
@@ -290,7 +291,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
   end
 
   defp fixture_json do
-    Path.join([File.cwd!(), "forks/activity_pub/test/fixtures", @fixture])
+    @fixture
     |> File.read!()
     |> Jason.decode!()
   end

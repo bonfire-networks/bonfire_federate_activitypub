@@ -88,10 +88,20 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
       {:ok, _actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, _peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
 
+      # Pin the level rather than inheriting it: the line asserted below is logged at `info`, and CI
+      # runs with `TEST_LOG_LEVEL: notice`, which filters it out and leaves `capture_log` empty —
+      # failing the guard for a reason that has nothing to do with what's under test.
+      previous_level = Logger.level()
+      Logger.configure(level: :info)
+
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          assert Federation.federation_allowed?(@remote_actor)
-        end)
+        try do
+          ExUnit.CaptureLog.capture_log(fn ->
+            assert Federation.federation_allowed?(@remote_actor)
+          end)
+        after
+          Logger.configure(level: previous_level)
+        end
 
       # the block checks ran (this can't pass by never getting there)
       assert log =~ "federation_allowed?"

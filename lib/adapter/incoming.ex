@@ -13,9 +13,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   @creation_verbs ["Create"]
 
-  # Engagement-ping activity types (e.g. PeerTube `View`) that Bonfire does not model. We skip
-  # these cleanly instead of letting them fall through to the fallback store — which tried to
-  # persist them and crashed with a DB error that the Oban worker then retried 3×. See #1802.
+  # Engagement-ping activity types (e.g. PeerTube `View`) that Bonfire does not model. We skip these cleanly instead of letting them fall through to the fallback store, which tried to persist them and crashed with a DB error that the Oban worker then retried 3×. See #1802.
   # Compile-time config so it can be used directly in the guard below (override in config).
   @skip_activity_types Application.compile_env(
                          :bonfire_federate_activitypub,
@@ -514,70 +512,66 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       fallback_module =
         Application.get_env(:bonfire, :federation_fallback_module, Bonfire.Social.APActivities)
 
-      if local? and module == fallback_module do
-        # Local C2S with no specific adapter: AP data already stored by Object.insert,
-        # just federate the existing activity directly (no need to create a local APActivity)
-        debug("Local C2S activity going to fallback module, federating existing AP activity")
-        ActivityPub.Federator.publish(activity)
-        # Still link the pointer so /pub/objects/:ulid can find the object by pointer lookup
-        if pointer_id,
-          do: maybe_set_pointer_on_ap_object(object, activity, pointer_id, previous_pointer_id)
+      # A local C2S activity is not federated by `ActivityPub.create/2` (which skips `maybe_federate` when `from_c2s`), so it has to be published from here, but it still needs a local object first: the `ActivityPub.Object` stored by `Object.insert` is not a pointable and never reaches a feed.
+      publish_after_create? = local? and module == fallback_module
 
-        {:ok, object || activity}
-      else
-        with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
-               Utils.maybe_apply(
-                 module,
-                 :ap_receive_activity,
-                 [
-                   character,
-                   if(not is_map(object),
-                     do: Map.merge(activity, %{pointer_id: pointer_id}),
-                     else: activity
-                   ),
-                   if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
-                 ],
-                 no_argument_rescue: true,
-                 fallback_fun: &no_federation_module_match/2
-               )
-               |> debug("attempted creation of object") do
-          debug(
-            "AP - created object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
-          )
+      with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
+             Utils.maybe_apply(
+               module,
+               :ap_receive_activity,
+               [
+                 character,
+                 if(not is_map(object),
+                   do: Map.merge(activity, %{pointer_id: pointer_id}),
+                   else: activity
+                 ),
+                 if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
+               ],
+               no_argument_rescue: true,
+               fallback_fun: &no_federation_module_match/2
+             )
+             |> debug("attempted creation of object") do
+        debug(
+          "AP - created object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
+        )
 
-          unless local? do
-            # save a Peer for instance and Peered URI (only for remote objects)
-            Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
-              pointable_object_id,
-              ap_id,
-              type: :object
-            )
-            |> debug("saved canonical uri for peered object")
-          end
-
-          # attach the local pointer to the AP object (for both local C2S and remote)
-          maybe_set_pointer_on_ap_object(
-            object,
-            activity,
+        unless local? do
+          # save a Peer for instance and Peered URI (only for remote objects)
+          Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
             pointable_object_id,
-            previous_pointer_id
+            ap_id,
+            type: :object
+          )
+          |> debug("saved canonical uri for peered object")
+        end
+
+        # attach the local pointer to the AP object (for both local C2S and remote)
+        maybe_set_pointer_on_ap_object(
+          object,
+          activity,
+          pointable_object_id,
+          previous_pointer_id
+        )
+
+        if publish_after_create? do
+          info("Local C2S activity handled by the fallback module, federating it now")
+          ActivityPub.Federator.publish(activity)
+        end
+
+        {:ok, pointable_object}
+      else
+        {:ok, :skipped} ->
+          debug(ap_id, "AP - object skipped (no Bonfire record needed)")
+          {:ok, :skipped}
+
+        e ->
+          debug(e, "Could not create object")
+
+          error(
+            "Could not create object for #{ap_id}: #{Types.to_string_or_inspect(Errors.error_msg(e))}"
           )
 
-          {:ok, pointable_object}
-        else
-          {:ok, :skipped} ->
-            debug(ap_id, "AP - object skipped (no Bonfire record needed)")
-            {:ok, :skipped}
-
-          e ->
-            debug(e, "Could not create object")
-
-            error(
-              "Could not create object for #{ap_id}: #{Types.to_string_or_inspect(Errors.error_msg(e))}"
-            )
-
-            # throw({:error, "Could not process incoming activity"})
-        end
+          # throw({:error, "Could not process incoming activity"})
       end
     end
   end

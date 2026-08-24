@@ -370,6 +370,34 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegationTest do
       assert activity.local, "a delegated post is authored here, so it must be local"
     end
 
+    test "creates a local object, so the post can appear in feeds", %{
+      conn: conn,
+      username: username,
+      user: user
+    } do
+      System.put_env(@env, "#{username}:#{@remote_host}")
+
+      conn = post_as(conn, @remote_actor, username, event_doc())
+      assert conn.status == 201
+
+      # the `ap_object` row alone is not a pointable and never reaches a feed — a
+      # `Bonfire.Data.Social.APActivity` (or other pointable) has to exist and be linked
+      object = posted_object(conn)
+
+      assert object.pointer_id,
+             "the AP object was stored but never linked to a local object"
+
+      assert %Bonfire.Data.Social.APActivity{} =
+               local = Bonfire.Common.Needles.get!(object.pointer_id, skip_boundary_check: true)
+
+      assert local.json["type"] in ["Create", "Event"]
+
+      assert %{edges: edges} = Bonfire.Social.FeedLoader.feed(:my, current_user: user)
+
+      assert Enum.any?(edges, &(id(e(&1, :activity, :object, nil)) == object.pointer_id)),
+             "the delegated post did not reach the actor's feed"
+    end
+
     test "an allowlisted exact actor URI publishes as the local actor", %{
       conn: conn,
       username: username,
