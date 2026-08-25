@@ -2,6 +2,10 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
   @behaviour Bonfire.Common.ConfigModule
   def config_module, do: true
 
+  # Keyed by `{declared type, local type}`: that pair IS the key, so defaults and env overrides merge per pair for free.
+  # Strings, not atoms: `AdapterUtils.rewrite_actor_type/2` compares against the AS2 type string, and env-provided names must never be turned into atoms anyway.
+  @default_rewrite_actor_types [{{"Service", "Group"}, ["fedigroups.social"]}]
+
   def config do
     import Config
 
@@ -17,10 +21,15 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
         Bonfire.Federate.ActivityPub.AdapterUtils.service_character_id()
       ]
 
-    # Auto-record (once, at each instance's first boot with this code) the per-instance cutoff
-    # that switches NEW actors to the ULID-based AP URL scheme — see `new_actor_scheme?/1` in
-    # `Bonfire.Common.URIs` and `Bonfire.Common.Settings.IdCutoffs`. Existing actors keep their
-    # username URLs forever. Keyword list so declarations from other extensions deep-merge.
+    # How to handle an incoming actor whose declared type misrepresents what it is; documented on `AdapterUtils.rewrite_actor_type/2`, which reads it
+    config :bonfire_federate_activitypub,
+      rewrite_actor_types:
+        Bonfire.Common.EnvConfig.pairs(@default_rewrite_actor_types,
+          prefix: "AP_REWRITE_ACTOR_TYPES",
+          transform_keys: &String.capitalize/1
+        )
+
+    # Auto-record (once, at each instance's first boot with this code) the per-instance cutoff that switches NEW actors to the ULID-based AP URL scheme — see `new_actor_scheme?/1` in `Bonfire.Common.URIs` and `Bonfire.Common.Settings.IdCutoffs`. Existing actors keep their username URLs forever. Keyword list so declarations from other extensions deep-merge.
     config :bonfire_common, Bonfire.Common.Settings.IdCutoffs,
       record: [ulid_actor_ids_since: true]
   end

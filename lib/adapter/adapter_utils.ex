@@ -1890,22 +1890,32 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   @doc """
   The AS2 type to handle an incoming actor as, which is usually just the type it declared.
 
-  Some implementations federate a group as a bot account, so the document says `Service` while the thing is really a forum. Nothing in the document distinguishes those from an ordinary bot, so an instance admin can allowlist the actors to treat differently:
+  Some implementations federate a group as a bot account, so the document says `Service` while the thing is really a forum. Nothing in the document distinguishes those from an ordinary bot, so an instance admin can allowlist the actors to treat differently, keyed by `{declared type, local type}`:
 
-      config :bonfire_federate_activitypub, :rewrite_actor_types,
-        Service: [Group: ["fedigroups.social", "https://example.org/users/just_this_one"]]
+      config :bonfire_federate_activitypub, :rewrite_actor_types, [
+        {{"Service", "Group"}, ["fedigroups.social", "https://example.org/users/just_this_one"]}
+      ]
 
-  An entry is either a host (every actor on that instance) or a full actor URI (only that actor). Only local handling changes: the stored AP object keeps the type the remote sent, as our record of what was actually received.
+  An entry is either a host (matching every actor on that instance) or a full actor URI (matching only that actor). Only local handling changes: the stored AP object keeps the type the remote sent, as our record of what was actually received.
+
+  ## Configuring it
+
+  Type names are strings on both sides of the pair, matching the AS2 type verbatim.
+
+  The default (declared in `Bonfire.Federate.ActivityPub.RuntimeConfig`) covers the one case known in the wild: FediGroups-style bots on `fedigroups.social`, which federate as `Service` while really being forums. Shipping a default means this works out of the box rather than needing an obscure config key.
+
+  Operators can override per type pair via env, `AP_REWRITE_ACTOR_TYPES_<DECLARED>_<LOCAL>`, comma-separated:
+
+      AP_REWRITE_ACTOR_TYPES_SERVICE_GROUP=fedigroups.social,https://example.org/users/just_this_one
+
+  Overrides are PER PAIR, not wholesale: setting `…_APPLICATION_GROUP` leaves the `Service`→`Group` default alone, and only `…_SERVICE_GROUP` can change that one. Set a pair to `none` to drop it, which is how to opt out of the shipped default.
+
+  ⚠️ There is no in-place conversion: an actor already ingested as a User before its host was allowlisted stays a User.
   """
   def rewrite_actor_type(type, ap_id) when is_binary(type) and is_binary(ap_id) do
     (Config.get_ext(:bonfire_federate_activitypub, :rewrite_actor_types, []) || [])
-    |> Enum.find_value(type, fn {from, targets} ->
-      # keyword syntax makes the config keys atoms, while AP types are strings
-      if to_string(from) == type do
-        Enum.find_value(targets, fn {to, matchers} ->
-          if actor_matches?(ap_id, matchers), do: to_string(to)
-        end)
-      end
+    |> Enum.find_value(type, fn {{from, to}, matchers} ->
+      if from == type and actor_matches?(ap_id, matchers), do: to
     end)
   end
 

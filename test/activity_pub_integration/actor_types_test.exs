@@ -124,7 +124,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
     end
 
     test "RED: an allowlisted host's Service actor becomes a group Category" do
-      with_rewrite_config([Service: [Group: ["fedigroups.social"]]], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
         assert {:ok, character} =
                  Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
 
@@ -136,19 +136,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
       end)
     end
 
-    # `Service:` in keyword syntax is the ATOM :Service while AP types are strings — a silent
-    # mismatch here would make the config appear to do nothing
-    test "RED: atom config keys are matched against the string AP type" do
-      with_rewrite_config([Service: [Group: ["fedigroups.social"]]], fn ->
-        assert {:ok, character} =
-                 Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
-
-        assert %Bonfire.Classify.Category{} = character
-      end)
-    end
-
     test "a Service actor from a NON-configured host is untouched" do
-      with_rewrite_config([Service: [Group: ["fedigroups.social"]]], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
         assert {:ok, character} =
                  Adapter.maybe_create_remote_actor(fixture_actor(@other_host_actor))
 
@@ -158,14 +147,14 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
     end
 
     test "a full-URI entry matches only that actor, not siblings on the same host" do
-      with_rewrite_config([Service: [Group: [@fedigroups_actor]]], fn ->
+      with_rewrite_config([{{"Service", "Group"}, [@fedigroups_actor]}], fn ->
         assert {:ok, sibling} = Adapter.maybe_create_remote_actor(fixture_actor(@sibling_actor))
         refute match?(%Bonfire.Classify.Category{}, sibling)
       end)
     end
 
     test "RED: re-fetching keeps it a group and creates no second object" do
-      with_rewrite_config([Service: [Group: ["fedigroups.social"]]], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
         assert {:ok, first} = Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
         assert {:ok, again} = Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
 
@@ -177,7 +166,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
     # DECIDED: we record what the remote sent, and decide separately what to make of it locally.
     # Asserted so nobody later "fixes" the AP record into agreeing with the rewrite.
     test "the stored AP object still records the type the remote sent" do
-      with_rewrite_config([Service: [Group: ["fedigroups.social"]]], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
         assert {:ok, _} = Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
         assert {:ok, ap_object} = ActivityPub.Object.get_cached(ap_id: @fedigroups_actor)
 
