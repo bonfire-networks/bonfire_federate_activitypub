@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "type": "Group",
+  "id": "https://lemmy.ml/c/technology",
+  "preferredUsername": "technology",
+  "inbox": "https://lemmy.ml/c/technology/inbox",
+  "followers": "https://lemmy.ml/c/technology/followers",
+  "publicKey": {
+    "id": "https://lemmy.ml/c/technology#main-key",
+    "owner": "https://lemmy.ml/c/technology",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1enSp/cMIPGr7i22UYr/\n7qPI+N2yppfvYx5H3wO4TPnzJgDz23NzV/LNC7YBYuBi6ovlBDCEXYEOdliDMb+M\nsuKfERYaq3IquSDJFFsy5xTgncfMW8J/psLkEZdT8Byfc1hJVxAZQJ0SlfV/84RJ\na5hdiAtx92pGarRSfBaBpbKMJO3XniR4RvkiZWCaU90LdtJmPdkLMwkkdMgCHSdj\nVWehJetHsLm7ptJg4LXsoCdDRtR8hi9NX/i0zSIJiWMqBYp3DxK8N3FBUZrOtHCR\nqH5ll0qyEu8UbQsDUSnls5Oxd7Ncly3ll3vEz+6MXQLKxIqOACUMbSLUeC5bMYdB\nsQIDAQAB\n-----END PUBLIC KEY-----\n"
+  },
+  "name": "Technology",
+  "summary": "<p>This is the official technology community of Lemmy.ml for all news related to creation and use of technology, and to facilitate civil, meaningful discussion around it.</p>\n<hr />\n<p>Ask in DM before posting product reviews or ads. All such posts otherwise are subject to removal.</p>\n<hr />\n<p>Rules:</p>\n<p>1: All Lemmy rules apply</p>\n<p>2: Do not post low effort posts</p>\n<p>3: NEVER post naziped*gore stuff</p>\n<p>4: Always post article URLs or their archived version URLs as sources, NOT screenshots. Help the blind users.</p>\n<p>5: personal rants of Big Tech CEOs like Elon Musk are unwelcome (does not include posts about their companies affecting wide range of people)</p>\n<p>6: no advertisement posts unless verified as legitimate and non-exploitative/non-consumerist</p>\n<p>7: crypto related posts, unless essential, are disallowed</p>\n",
+  "source": {
+    "content": "This is the official technology community of Lemmy.ml for all news related to creation and use of technology, and to facilitate civil, meaningful discussion around it.\n\n---\n\nAsk in DM before posting product reviews or ads. All such posts otherwise are subject to removal.\n\n---\n\nRules:\n\n1: All Lemmy rules apply\n\n2: Do not post low effort posts\n\n3: NEVER post naziped*gore stuff\n\n4: Always post article URLs or their archived version URLs as sources, NOT screenshots. Help the blind users.\n\n5: personal rants of Big Tech CEOs like Elon Musk are unwelcome (does not include posts about their companies affecting wide range of people)\n\n6: no advertisement posts unless verified as legitimate and non-exploitative/non-consumerist\n\n7: crypto related posts, unless essential, are disallowed",
+    "mediaType": "text/markdown"
+  },
+  "icon": {
+    "type": "Image",
+    "url": "https://lemmy.ml/pictrs/image/2QNz7bkA1V.png"
+  },
+  "sensitive": false,
+  "attributedTo": "https://lemmy.ml/c/technology/moderators",
+  "postingRestrictedToMods": false,
+  "outbox": "https://lemmy.ml/c/technology/outbox",
+  "endpoints": {
+    "sharedInbox": "https://lemmy.ml/inbox"
+  },
+  "featured": "https://lemmy.ml/c/technology/featured",
+  "language": [],
+  "published": "2019-04-25T21:58:01.788609Z",
+  "updated": "2023-10-30T08:08:07.411525Z"
+}

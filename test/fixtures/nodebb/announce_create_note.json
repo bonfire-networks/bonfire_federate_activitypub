@@ -1,0 +1,58 @@
+{
+  "id": "https://community.nodebb.org/post/130#activity/announce/cid/6",
+  "type": "Announce",
+  "actor": "https://community.nodebb.org/category/6",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://community.nodebb.org/category/6/followers"
+  ],
+  "object": {
+    "id": "https://community.nodebb.org/post/130#activity/create/1787700058849",
+    "type": "Create",
+    "actor": "https://community.nodebb.org/uid/1",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://community.nodebb.org/uid/47",
+      "https://community.nodebb.org/category/6"
+    ],
+    "cc": [
+      "https://community.nodebb.org/uid/1/followers"
+    ],
+    "object": {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        {
+          "toot": "http://joinmastodon.org/ns#",
+          "Emoji": "toot:Emoji"
+        }
+      ],
+      "id": "https://community.nodebb.org/post/130",
+      "type": "Note",
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public",
+        "https://community.nodebb.org/uid/47",
+        "https://community.nodebb.org/category/6"
+      ],
+      "cc": [
+        "https://community.nodebb.org/uid/1/followers"
+      ],
+      "inReplyTo": "https://community.nodebb.org/post/127",
+      "name": "Cant edit posts",
+      "published": "2013-08-18T05:59:19.425Z",
+      "url": "https://community.nodebb.org/post/130",
+      "attributedTo": "https://community.nodebb.org/uid/1",
+      "context": "https://community.nodebb.org/topic/34",
+      "audience": "https://community.nodebb.org/category/6",
+      "content": "<p>Hmm will look into this.<br />\nEdit: trying edit.<br />\nEdit 2: seems to work.</p>\n",
+      "source": {
+        "content": "Hmm will look into this.\nEdit: trying edit.\nEdit 2: seems to work.",
+        "mediaType": "text/markdown"
+      },
+      "tag": [],
+      "attachment": [],
+      "replies": "https://community.nodebb.org/post/130/replies"
+    }
+  }
+}

@@ -56,8 +56,8 @@ defmodule Bonfire.Federate.ActivityPub.PeertubeAnnouncedVideoLinkedTest do
     }
 
     {:ok, data} = Transformer.handle_incoming(announce)
-    # boost edge creation may report "already boosted" (the fetch above can create it first) —
-    # irrelevant here; we only care that the inner Video object is linked.
+
+    # boost edge creation may report "already boosted" (the fetch above can create it first) which is irrelevant here; we only care that the inner Video object is linked.
     Incoming.receive_activity(data)
 
     video_row =

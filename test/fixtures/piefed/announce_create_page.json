@@ -1,0 +1,66 @@
+{
+  "actor": "https://piefed.social/c/piefed_meta",
+  "cc": [
+    "https://piefed.social/c/piefed_meta/followers"
+  ],
+  "id": "https://piefed.social/activities/announce/pk5CnFWYnIR8dxl",
+  "object": {
+    "actor": "https://piefed.social/u/Skavau",
+    "audience": "https://piefed.social/c/piefed_meta",
+    "cc": [
+      "https://piefed.social/c/piefed_meta"
+    ],
+    "id": "https://piefed.social/activities/create/3CFOj3WB7zfAdC6",
+    "object": {
+      "attachment": [],
+      "attributedTo": "https://piefed.social/u/Skavau",
+      "audience": "https://piefed.social/c/piefed_meta",
+      "cc": [],
+      "commentsEnabled": true,
+      "content": "<p>The onboarding will offer you a lot of <a href=\"https://piefed.social/topics\" rel=\"nofollow ugc\" target=\"_blank\">topics</a> to sign up to. These contain communities in them. The idea is to populate subscription feeds, however it can leave some users with a lot of undesired subscriptions if they click too many.  </p>\n<p>If you wish to roll this back. Go to Settings -&gt; Profile and <a href=\"https://i.imgur.com/Wbef7H1.png\" rel=\"nofollow ugc\" target=\"_blank\">click the yellow bar</a>. Don’t click the red bar!  </p>\n<p>But welcome, and feel free to post your thoughts here.  </p>\n<p>!newcomers@piefed.zip for a specific community also devoted to new users to the Fediverse.  </p>\n<p><a href=\"https://chat.piefed.social/\" rel=\"nofollow ugc\" target=\"_blank\">Come Join us in the Zulip Chat</a> if you have specific queries.  </p>\n",
+      "contentMap": {
+        "en": "<p>The onboarding will offer you a lot of <a href=\"https://piefed.social/topics\" rel=\"nofollow ugc\" target=\"_blank\">topics</a> to sign up to. These contain communities in them. The idea is to populate subscription feeds, however it can leave some users with a lot of undesired subscriptions if they click too many.  </p>\n<p>If you wish to roll this back. Go to Settings -&gt; Profile and <a href=\"https://i.imgur.com/Wbef7H1.png\" rel=\"nofollow ugc\" target=\"_blank\">click the yellow bar</a>. Don’t click the red bar!  </p>\n<p>But welcome, and feel free to post your thoughts here.  </p>\n<p>!newcomers@piefed.zip for a specific community also devoted to new users to the Fediverse.  </p>\n<p><a href=\"https://chat.piefed.social/\" rel=\"nofollow ugc\" target=\"_blank\">Come Join us in the Zulip Chat</a> if you have specific queries.  </p>\n"
+      },
+      "context": "https://piefed.social/post/1736183/context",
+      "genAI": false,
+      "id": "https://piefed.social/c/piefed_meta/p/1736183/to-all-of-those-new-to-piefed-social-welcome-and-this-post-might-be-helpful",
+      "interactionPolicy": {
+        "canQuote": {
+          "automaticApproval": [
+            "https://www.w3.org/ns/activitystreams#Public"
+          ]
+        }
+      },
+      "language": {
+        "identifier": "en",
+        "name": "English"
+      },
+      "mediaType": "text/html",
+      "name": "To all of those new to Piefed.social - welcome, and this post might be helpful",
+      "published": "2026-02-03T20:12:23.652544+00:00",
+      "replies": "https://piefed.social/post/1736183/replies",
+      "searchableBy": "https://www.w3.org/ns/activitystreams#Public",
+      "sensitive": false,
+      "source": {
+        "content": "The onboarding will offer you a lot of [topics](https://piefed.social/topics) to sign up to. These contain communities in them. The idea is to populate subscription feeds, however it can leave some users with a lot of undesired subscriptions if they click too many.  \r\n\r\nIf you wish to roll this back. Go to Settings -> Profile and [click the yellow bar](https://i.imgur.com/Wbef7H1.png). Don't click the red bar!  \r\n\r\nBut welcome, and feel free to post your thoughts here.  \r\n\r\n!newcomers@piefed.zip for a specific community also devoted to new users to the Fediverse.  \r\n\r\n[Come Join us in the Zulip Chat](https://chat.piefed.social/) if you have specific queries.  \r\n",
+        "mediaType": "text/markdown"
+      },
+      "stickied": true,
+      "tag": [],
+      "to": [
+        "https://piefed.social/c/piefed_meta",
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "type": "Page",
+      "updated": "2026-02-03T21:07:30.966856+00:00"
+    },
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Create"
+  },
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Announce"
+}

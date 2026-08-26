@@ -1,0 +1,60 @@
+{
+  "actor": "https://lemmy.ml/c/technology",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "object": {
+    "id": "https://lemmy.ml/activities/create/44a2c847-516e-4fed-a7d3-42f077f57d46",
+    "actor": "https://lemmy.ml/u/yogthos",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "object": {
+      "type": "Page",
+      "id": "https://lemmy.ml/post/51861708",
+      "attributedTo": "https://lemmy.ml/u/yogthos",
+      "to": [
+        "https://lemmy.ml/c/technology",
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "name": "BBC Looks at China's Robot Revolution: “I Went to Sleep, and the World Changed”",
+      "cc": [],
+      "mediaType": "text/html",
+      "attachment": [
+        {
+          "href": "https://pandaily.com/bbc-china-robot-revolution-world-factory-industrial-robots-aug2026",
+          "mediaType": "text/html",
+          "type": "Link"
+        }
+      ],
+      "image": {
+        "type": "Image",
+        "url": "https://lemmy.ml/api/v3/image_proxy?url=https%3A%2F%2Fcms-image.pandaily.com%2F1%2Fimg_bbc_0796961335.png"
+      },
+      "sensitive": false,
+      "published": "2026-08-25T19:05:56.530307Z",
+      "language": {
+        "identifier": "en",
+        "name": "English"
+      },
+      "audience": "https://lemmy.ml/c/technology",
+      "tag": [
+        {
+          "href": "https://lemmy.ml/post/51861708",
+          "name": "#technology",
+          "type": "Hashtag"
+        }
+      ]
+    },
+    "cc": [
+      "https://lemmy.ml/c/technology"
+    ],
+    "type": "Create",
+    "audience": "https://lemmy.ml/c/technology"
+  },
+  "cc": [
+    "https://lemmy.ml/c/technology/followers"
+  ],
+  "type": "Announce",
+  "id": "https://lemmy.ml/activities/announce/create/ac26c395-eddd-4d95-959a-fda8b666e3df"
+}

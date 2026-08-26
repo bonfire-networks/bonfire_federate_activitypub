@@ -1,0 +1,140 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1"
+  ],
+  "attributedTo": "https://piefed.social/c/piefed_meta/moderators",
+  "defaultPostType": "discussion",
+  "endpoints": {
+    "sharedInbox": "https://piefed.social/inbox"
+  },
+  "featured": "https://piefed.social/c/piefed_meta/featured",
+  "followers": "https://piefed.social/c/piefed_meta/followers",
+  "genAI": false,
+  "icon": {
+    "type": "Image",
+    "url": "https://media.piefed.social/communities/NB/1k/NB1kKM4EdyTa9k0.webp"
+  },
+  "id": "https://piefed.social/c/piefed_meta",
+  "inbox": "https://piefed.social/c/piefed_meta/inbox",
+  "language": [
+    {
+      "identifier": "en",
+      "name": "English"
+    },
+    {
+      "identifier": "und",
+      "name": "Undetermined"
+    }
+  ],
+  "lemmy:tagsForPosts": [
+    {
+      "background_color": "#deddda",
+      "blur_images": null,
+      "display_name": "Features",
+      "id": "https://piefed.social/c/piefed_meta/tag/1",
+      "text_color": "#ff0000",
+      "type": "lemmy:CommunityTag"
+    },
+    {
+      "background_color": "#f6f5f4",
+      "blur_images": null,
+      "display_name": "Monthly",
+      "id": "https://piefed.social/c/piefed_meta/tag/4",
+      "text_color": "#ff0000",
+      "type": "lemmy:CommunityTag"
+    },
+    {
+      "background_color": "#deddda",
+      "blur_images": null,
+      "display_name": "Question",
+      "id": "https://piefed.social/c/piefed_meta/tag/2",
+      "text_color": "#000000",
+      "type": "lemmy:CommunityTag"
+    },
+    {
+      "background_color": "#deddda",
+      "blur_images": null,
+      "display_name": "Solved",
+      "id": "https://piefed.social/c/piefed_meta/tag/3",
+      "text_color": "#26a269",
+      "type": "lemmy:CommunityTag"
+    },
+    {
+      "background_color": "#99c1f1",
+      "blur_images": null,
+      "display_name": "Feature request",
+      "id": "https://piefed.social/c/piefed_meta/tag/198",
+      "text_color": "#000000",
+      "type": "lemmy:CommunityTag"
+    }
+  ],
+  "moderators": "https://piefed.social/c/piefed_meta/moderators",
+  "name": "PieFed Meta",
+  "newModsWanted": false,
+  "outbox": "https://piefed.social/c/piefed_meta/outbox",
+  "postUrlType": "friendly",
+  "postingRestrictedToMods": false,
+  "postingWarning": "",
+  "preferredUsername": "piefed_meta",
+  "privateMods": false,
+  "publicKey": {
+    "id": "https://piefed.social/c/piefed_meta#main-key",
+    "owner": "https://piefed.social/c/piefed_meta",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm694+pAd9VdRWjsb84u0\nWGoAI7d/riiQVC5GHHgDJX4EYqTD1tvD2kB3URsHGgj4lf8pCHrjXHk/H3CpogRc\nOwyJ+ZLHrXYKyPz8r9SO0sR8KbM3tfD7EXhDLjgsK91gzPxvQ9OLneghb1n0uSmn\n4cWxbbdebDsB+jyPcF37KkSayAYwkaAjwb2nVNgxLN0w7J3ENnhpO/F6FpOBJEx1\nAHEfstlhHl6Cd2PfLFMiW4hYaryeJNMnGxE2ZqE6JGeRTikY7+ZbiG/Rx6OLXM8v\nAx/92BwQSnIEDIPsLyHOH2fFhfrtlNTA740ujq5mUjeBUz11ueGEn9GwZ5JrVc6S\nxQIDAQAB\n-----END PUBLIC KEY-----\n"
+  },
+  "published": "2024-01-04T08:55:20.668181+00:00",
+  "questionAnswer": false,
+  "sensitive": false,
+  "source": {
+    "content": "Discuss PieFed project direction, provide feedback, ask questions, suggest improvements, and engage in conversations related to the platform organization, policies, features, and community dynamics.  \r\n\r\n## [Wiki](https://piefed.social/community/piefed_meta/wiki/index)",
+    "mediaType": "text/markdown"
+  },
+  "summary": "<p>Discuss PieFed project direction, provide feedback, ask questions, suggest improvements, and engage in conversations related to the platform organization, policies, features, and community dynamics.  </p>\n<h2><a href=\"https://piefed.social/community/piefed_meta/wiki/index\" rel=\"nofollow ugc\" target=\"\">Wiki</a></h2>\n",
+  "tag": [
+    {
+      "backgroundColor": "#deddda",
+      "blurImages": null,
+      "id": "https://piefed.social/c/piefed_meta/tag/1",
+      "preferredUsername": "Features",
+      "textColor": "#ff0000",
+      "type": "CommunityPostTag"
+    },
+    {
+      "backgroundColor": "#f6f5f4",
+      "blurImages": null,
+      "id": "https://piefed.social/c/piefed_meta/tag/4",
+      "preferredUsername": "Monthly",
+      "textColor": "#ff0000",
+      "type": "CommunityPostTag"
+    },
+    {
+      "backgroundColor": "#deddda",
+      "blurImages": null,
+      "id": "https://piefed.social/c/piefed_meta/tag/2",
+      "preferredUsername": "Question",
+      "textColor": "#000000",
+      "type": "CommunityPostTag"
+    },
+    {
+      "backgroundColor": "#deddda",
+      "blurImages": null,
+      "id": "https://piefed.social/c/piefed_meta/tag/3",
+      "preferredUsername": "Solved",
+      "textColor": "#26a269",
+      "type": "CommunityPostTag"
+    },
+    {
+      "backgroundColor": "#99c1f1",
+      "blurImages": null,
+      "id": "https://piefed.social/c/piefed_meta/tag/198",
+      "preferredUsername": "Feature request",
+      "textColor": "#000000",
+      "type": "CommunityPostTag"
+    }
+  ],
+  "theme": "disabled",
+  "type": "Group",
+  "updated": "2026-08-25T17:12:17.806434+00:00",
+  "url": "https://piefed.social/c/piefed_meta"
+}

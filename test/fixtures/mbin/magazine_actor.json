@@ -1,0 +1,40 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://kbin.earth/contexts"
+  ],
+  "attributedTo": "https://kbin.earth/m/testing/moderators",
+  "discoverable": true,
+  "endpoints": {
+    "sharedInbox": "https://kbin.earth/f/inbox"
+  },
+  "featured": "https://kbin.earth/m/testing/pinned",
+  "followers": "https://kbin.earth/m/testing/followers",
+  "icon": {
+    "type": "Image",
+    "url": "https://media.kbin.earth/0c/b7/0cb7d72d53122b283c61cb095a62ab28076d5d9171180c6a84ea7828dee7799b.png"
+  },
+  "id": "https://kbin.earth/m/testing",
+  "inbox": "https://kbin.earth/m/testing/inbox",
+  "indexable": true,
+  "name": "Testing",
+  "outbox": "https://kbin.earth/m/testing/outbox",
+  "postingRestrictedToMods": false,
+  "preferredUsername": "testing",
+  "publicKey": {
+    "id": "https://kbin.earth/m/testing#main-key",
+    "owner": "https://kbin.earth/m/testing",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\r\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAxgkhA9e/OPZbztCweuM7\r\npYIYZxawtLs6xBHScXCThG/7sYwGXBQejl7zy3osHzsa0Tjcii9F43GqHnqlmAwG\r\njb3g1uXGJS7u5WuC9osE8FSur5gCqhOOXxYh6q6D2aAuHIUaI15A3gT2WuDmMISB\r\nUJZtZVVFXJvfN253OrjKGsnVp5nnouLUwdDMDgukybmkGJjUlPzRd6EoDGQ7vjfH\r\n2a+n7auc+eftodY/UCHaeK/RaifMEpi6Z7tFjPkDjH6OF1tBEJcPH9jdIia4vVyC\r\nUtfhrhJnyLE2cQzN8xMKsd4IuRKet4ibMZ2+MWf6Ywd5BC1B4DQxInMCtjFomjm7\r\nz7+QxACW22o0ITx4Axdo++PX4/qwHWHJI7owloXXS0FAdLCQ4tvr2jWTT9ztqQvN\r\nChgQyp+5y/uB/2Z6AP21ZI2EYyT1ngWRfBeWbSZj8RwZlhPwNA0GHeO7Qo7V1JsR\r\nHkL/iEH3IWelFUj7E923RNrEbwIox9ea4mRUcuUl7pUeYgGI2HQDa47q3yq2FOk/\r\nGUGJp304/Xno2qDBVKHXYPMCYeVFyAm+vxp4v3FTF1U2L693OlBjeyK2+7W9Rbux\r\nKJdJ1BW2icwmwiSRz5jD2mV1DSlGoOSUKpqsF6OodT9DMOFeGqDopONfdoGqWwQB\r\nnifU0q1bv6NGk4GbZ/NjZvsCAwEAAQ==\r\n-----END PUBLIC KEY-----"
+  },
+  "published": "2023-12-21T15:10:25+00:00",
+  "sensitive": false,
+  "source": {
+    "content": "A magazine used for testing. Feel free to test the Fediverse here!",
+    "mediaType": "text/markdown"
+  },
+  "summary": "<p>A magazine used for testing. Feel free to test the Fediverse here!</p>\n",
+  "type": "Group",
+  "updated": "2026-06-08T11:10:40+00:00",
+  "url": "https://kbin.earth/m/testing"
+}

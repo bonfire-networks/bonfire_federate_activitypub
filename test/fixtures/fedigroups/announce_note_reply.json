@@ -1,0 +1,14 @@
+{
+  "id": "https://fedigroups.social/users/xmpp/statuses/117155227792265644/activity",
+  "type": "Announce",
+  "actor": "https://fedigroups.social/users/xmpp",
+  "published": "2026-08-25T08:35:08Z",
+  "to": [
+    "https://fedigroups.social/users/xmpp/followers"
+  ],
+  "cc": [
+    "https://social.anoxinon.de/users/eversten",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "object": "https://social.anoxinon.de/users/eversten/statuses/117155208544627883"
+}

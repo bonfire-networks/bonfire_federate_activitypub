@@ -1,0 +1,63 @@
+{
+  "id": "https://community.nodebb.org/post/127#activity/announce/cid/6",
+  "type": "Announce",
+  "actor": "https://community.nodebb.org/category/6",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://community.nodebb.org/category/6/followers"
+  ],
+  "object": {
+    "id": "https://community.nodebb.org/post/127#activity/create/1787700058825",
+    "type": "Create",
+    "actor": "https://community.nodebb.org/uid/47",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://community.nodebb.org/category/6"
+    ],
+    "cc": [
+      "https://community.nodebb.org/uid/47/followers"
+    ],
+    "object": {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        {
+          "toot": "http://joinmastodon.org/ns#",
+          "Emoji": "toot:Emoji"
+        }
+      ],
+      "id": "https://community.nodebb.org/post/127",
+      "type": "Article",
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public",
+        "https://community.nodebb.org/category/6"
+      ],
+      "cc": [
+        "https://community.nodebb.org/uid/47/followers"
+      ],
+      "name": "Cant edit posts",
+      "published": "2013-08-18T02:32:41.152Z",
+      "url": "https://community.nodebb.org/post/127",
+      "attributedTo": "https://community.nodebb.org/uid/47",
+      "context": "https://community.nodebb.org/topic/34",
+      "audience": "https://community.nodebb.org/category/6",
+      "summary": "<p>I try and submit but it doesnt save</p> <p>edit, now it works</p>",
+      "preview": {
+        "type": "Note",
+        "attributedTo": "https://community.nodebb.org/uid/47",
+        "content": "<p>I try and submit but it doesnt save</p>\n<p>edit, now it works</p>\n",
+        "published": "2013-08-18T02:32:41.152Z",
+        "attachment": []
+      },
+      "content": "<p>I try and submit but it doesnt save</p>\n<p>edit, now it works</p>\n",
+      "source": {
+        "content": "I try and submit but it doesnt save\n\nedit, now it works",
+        "mediaType": "text/markdown"
+      },
+      "tag": [],
+      "attachment": [],
+      "replies": "https://community.nodebb.org/post/127/replies"
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "ostatus": "http://ostatus.org#",
+      "atomUri": "ostatus:atomUri",
+      "inReplyToAtomUri": "ostatus:inReplyToAtomUri",
+      "conversation": "ostatus:conversation",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "votersCount": "toot:votersCount",
+      "quote": {
+        "@id": "https://w3id.org/fep/044f#quote",
+        "@type": "@id"
+      },
+      "quoteUri": "http://fedibird.com/ns#quoteUri",
+      "_misskey_quote": "https://misskey-hub.net/ns#_misskey_quote",
+      "quoteAuthorization": {
+        "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+        "@type": "@id"
+      },
+      "gts": "https://gotosocial.org/ns#",
+      "interactionPolicy": {
+        "@id": "gts:interactionPolicy",
+        "@type": "@id"
+      },
+      "canFeature": {
+        "@id": "https://w3id.org/fep/7aa9#canFeature",
+        "@type": "@id"
+      },
+      "canQuote": {
+        "@id": "gts:canQuote",
+        "@type": "@id"
+      },
+      "automaticApproval": {
+        "@id": "gts:automaticApproval",
+        "@type": "@id"
+      },
+      "manualApproval": {
+        "@id": "gts:manualApproval",
+        "@type": "@id"
+      },
+      "Hashtag": "as:Hashtag"
+    }
+  ],
+  "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162",
+  "type": "Note",
+  "summary": null,
+  "inReplyTo": null,
+  "published": "2026-08-14T17:10:33Z",
+  "url": "https://suma-ev.social/@axel/117094969068066162",
+  "attributedTo": "https://suma-ev.social/ap/users/117014855588545854",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://suma-ev.social/ap/users/117014855588545854/followers",
+    "https://fedigroups.social/users/xmpp"
+  ],
+  "sensitive": false,
+  "atomUri": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162",
+  "inReplyToAtomUri": null,
+  "conversation": "https://suma-ev.social/contexts/117014855588545854-117094969068066162",
+  "context": "https://suma-ev.social/contexts/117014855588545854-117094969068066162",
+  "content": "<p>Für die Menschen, die den Wechsel von <a href=\"https://suma-ev.social/tags/Quicksy\" class=\"mention hashtag\" rel=\"tag\">#<span>Quicksy</span></a> zu <a href=\"https://suma-ev.social/tags/Conversations\" class=\"mention hashtag\" rel=\"tag\">#<span>Conversations</span></a> noch nicht vollzogen haben, habe ich nun zusätzlich zu der sehr ausführlichen Anleitung eine kompakte Schnellanleitung (&lt;2 Minuten erstellt):<br /><a href=\"https://makertube.net/w/g6yGQSZvghvHvsLSjzLKpy\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">makertube.net/w/g6yGQSZvghvHvs</span><span class=\"invisible\">LSjzLKpy</span></a></p><p>Play Store Nutzer:innen können die Rabattaktion bis zum 18. August 2026 nutzen: <a href=\"https://gultsch.social/@daniel/117049016300159115\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">gultsch.social/@daniel/1170490</span><span class=\"invisible\">16300159115</span></a></p><p><span class=\"h-card\" translate=\"no\"><a href=\"https://fedigroups.social/@xmpp\" class=\"u-url mention\">@<span>xmpp</span></a></span> <br /><a href=\"https://suma-ev.social/tags/xmpp\" class=\"mention hashtag\" rel=\"tag\">#<span>xmpp</span></a></p>",
+  "contentMap": {
+    "de": "<p>Für die Menschen, die den Wechsel von <a href=\"https://suma-ev.social/tags/Quicksy\" class=\"mention hashtag\" rel=\"tag\">#<span>Quicksy</span></a> zu <a href=\"https://suma-ev.social/tags/Conversations\" class=\"mention hashtag\" rel=\"tag\">#<span>Conversations</span></a> noch nicht vollzogen haben, habe ich nun zusätzlich zu der sehr ausführlichen Anleitung eine kompakte Schnellanleitung (&lt;2 Minuten erstellt):<br /><a href=\"https://makertube.net/w/g6yGQSZvghvHvsLSjzLKpy\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">makertube.net/w/g6yGQSZvghvHvs</span><span class=\"invisible\">LSjzLKpy</span></a></p><p>Play Store Nutzer:innen können die Rabattaktion bis zum 18. August 2026 nutzen: <a href=\"https://gultsch.social/@daniel/117049016300159115\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">gultsch.social/@daniel/1170490</span><span class=\"invisible\">16300159115</span></a></p><p><span class=\"h-card\" translate=\"no\"><a href=\"https://fedigroups.social/@xmpp\" class=\"u-url mention\">@<span>xmpp</span></a></span> <br /><a href=\"https://suma-ev.social/tags/xmpp\" class=\"mention hashtag\" rel=\"tag\">#<span>xmpp</span></a></p>"
+  },
+  "updated": "2026-08-15T07:43:23Z",
+  "interactionPolicy": {
+    "canQuote": {
+      "automaticApproval": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ]
+    }
+  },
+  "attachment": [
+    {
+      "type": "Link",
+      "href": "https://makertube.net/w/g6yGQSZvghvHvsLSjzLKpy"
+    }
+  ],
+  "tag": [
+    {
+      "type": "Mention",
+      "href": "https://fedigroups.social/users/xmpp",
+      "name": "@xmpp@fedigroups.social"
+    },
+    {
+      "type": "Hashtag",
+      "href": "https://suma-ev.social/tags/quicksy",
+      "name": "#quicksy"
+    },
+    {
+      "type": "Hashtag",
+      "href": "https://suma-ev.social/tags/conversations",
+      "name": "#conversations"
+    },
+    {
+      "type": "Hashtag",
+      "href": "https://suma-ev.social/tags/xmpp",
+      "name": "#xmpp"
+    }
+  ],
+  "replies": {
+    "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/replies",
+    "type": "Collection",
+    "first": {
+      "type": "CollectionPage",
+      "next": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/replies?only_other_accounts=true&page=true",
+      "partOf": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/replies",
+      "items": []
+    }
+  },
+  "likes": {
+    "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/likes",
+    "type": "Collection",
+    "totalItems": 2
+  },
+  "shares": {
+    "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/shares",
+    "type": "Collection",
+    "totalItems": 7
+  }
+}

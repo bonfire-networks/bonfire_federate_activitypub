@@ -1,0 +1,14 @@
+{
+  "id": "https://fedigroups.social/users/xmpp/statuses/117095046394628827/activity",
+  "type": "Announce",
+  "actor": "https://fedigroups.social/users/xmpp",
+  "published": "2026-08-14T17:30:13Z",
+  "to": [
+    "https://fedigroups.social/users/xmpp/followers"
+  ],
+  "cc": [
+    "https://suma-ev.social/ap/users/117014855588545854",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "object": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162"
+}
