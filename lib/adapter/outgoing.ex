@@ -40,7 +40,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         else: AdapterUtils.is_local?(subject)
 
     federate_outgoing? =
-      federate_outgoing?(subject)
+      federate_outgoing?(subject, opts)
       |> debug("federate_outgoing?")
 
     if (federate_outgoing? == true or
@@ -59,7 +59,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  def federate_outgoing?(subject \\ nil) do
+  def federate_outgoing?(subject \\ nil, opts \\ []) do
     # settings check first: it's config + at most one Settings read, while the boundary check costs an is_local? classification + a grants query per local subject
     case Bonfire.Federate.ActivityPub.federating?(subject) do
       false ->
@@ -67,7 +67,10 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
       mode ->
         # an actor only federates when its own boundaries grant the activity_pub circle (eg. groups/topics with nonfederated visibility deny it)
-        if AdapterUtils.character_ap_readable?(subject), do: mode, else: false
+        # opts are threaded on so a caller that already established authorisation can say so, notably a DELETE, where the character's grants are deliberately torn down before we announce it with NO subject there is no character to gate on, so fall back to the instance-level status: this check is an ADDITIONAL restriction, not a requirement that a subject exist
+        if is_nil(subject) or AdapterUtils.character_ap_readable?(subject, opts),
+          do: mode,
+          else: false
     end
 
     # and Bonfire.Common.Extend.module_enabled?(
