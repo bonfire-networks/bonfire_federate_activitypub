@@ -6,6 +6,8 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
   # Strings, not atoms: `AdapterUtils.rewrite_actor_type/2` compares against the AS2 type string, and env-provided names must never be turned into atoms anyway.
   @default_rewrite_actor_types [{{"Service", "Group"}, ["fedigroups.social"]}]
 
+  @env Application.compile_env(:bonfire, :env)
+
   def config do
     import Config
 
@@ -28,6 +30,14 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
           prefix: "AP_REWRITE_ACTOR_TYPES",
           transform_keys: &String.capitalize/1
         )
+
+    # Record every document a remote sends us verbatim, pushed or fetched, for interop research — see `Testing.Interop.capture/2`.
+    # Writes unbounded amounts of other instances' traffic to disk, so it stays a dev/test tool: gated on the same `:env` check that decides whether `Testing.Interop` is compiled at all, so the two can't disagree, and off even there unless explicitly asked for.
+    if @env in [:test, :dev] and
+         not Bonfire.Common.EnvConfig.blank?(System.get_env("AP_CAPTURE_JSON")) do
+      config :activity_pub,
+        document_observer: {Bonfire.Federate.ActivityPub.Testing.Interop, :capture}
+    end
 
     # Auto-record (once, at each instance's first boot with this code) the per-instance cutoff that switches NEW actors to the ULID-based AP URL scheme — see `new_actor_scheme?/1` in `Bonfire.Common.URIs` and `Bonfire.Common.Settings.IdCutoffs`. Existing actors keep their username URLs forever. Keyword list so declarations from other extensions deep-merge.
     config :bonfire_common, Bonfire.Common.Settings.IdCutoffs,

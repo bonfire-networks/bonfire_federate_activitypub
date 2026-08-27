@@ -22,7 +22,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
         I.follow("!technology@lemmy.world", as: me)
         # ... wait for their fan-out to arrive ...
         I.incoming(from: "lemmy.world")
-        I.save_fixture(community.data, "lemmy/group_actor.json")
+        I.promote("captured/lemmy.world/Group-1.json", "lemmy/group_actor.json")
 
     Or run a whole scripted flow and get a report:
 
@@ -30,7 +30,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
 
     ## What is real vs what needs the capture hooks
 
-    `incoming/1` reads the `ap_object` table, so it sees activities we successfully INGESTED — it cannot show payloads we rejected or failed to parse, and stored data is post-normalisation. For verbatim wire capture (including rejects) the `AP_CAPTURE_INBOX`/`AP_CAPTURE_OUTBOX` hooks in the activity_pub lib are needed.
+    `incoming/1` reads the `ap_object` table, so it sees activities we successfully INGESTED, as it cannot show payloads we rejected or failed to parse, and stored data is post-normalisation. For verbatim wire capture (including rejects, and including documents we FETCHED rather than received), run with `AP_CAPTURE_JSON=your/directory` which registers `capture/2` as the activity_pub lib's `:document_observer`.
     """
 
     use Bonfire.Common.Utils
@@ -38,11 +38,25 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     import Ecto.Query
     import Untangle
 
+    alias Bonfire.Common.EnvConfig
     alias Bonfire.Federate.ActivityPub.AdapterUtils
     alias ActivityPub.Actor
     alias ActivityPub.Object
 
-    @fixtures_path "forks/activity_pub/test/fixtures"
+    # this extension's own test fixtures, resolved from `__DIR__` rather than the cwd: the extension is built from `deps/` in CI and from `extensions/` locally, and only `__DIR__` is right in both
+    @default_fixtures_path Path.expand("../../test/fixtures", __DIR__)
+
+    @doc "Where captures and fixtures are written: `AP_CAPTURE_JSON` if set, else this extension's fixture tree."
+    def fixtures_path do
+      case System.get_env("AP_CAPTURE_JSON") do
+        path when is_binary(path) and path not in ["yes", "true", "1"] ->
+          if EnvConfig.blank?(path), do: @default_fixtures_path, else: path
+
+        # set as a plain on/off switch rather than a destination, or unset
+        _ ->
+          @default_fixtures_path
+      end
+    end
 
     @doc "Looks up a local user to act as (by username), so probes can be run as a real actor."
     def local_user(username) when is_binary(username) do
@@ -59,7 +73,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     @doc """
     Resolves and fetches a remote actor, accepting any of the group-reference syntaxes in the wild: `!group@host` (threadiverse), `@group@host` / `group@host` (microblog), `&group@host` (Bonfire), or a plain URI.
 
-    Returns the `ActivityPub.Actor` (its `.data` is the wire JSON, ready to `save_fixture/2`).
+    Returns the `ActivityPub.Actor`. Its `.data` is NORMALISED, not what the remote sent, so don't fixture it, run with `AP_CAPTURE_JSON` and `promote/2` the captured document instead.
     """
     def fetch(handle_or_uri, opts \\ []) when is_binary(handle_or_uri) do
       # the binary clause auto-routes: URIs are fetched directly, `name@host` goes via WebFinger
@@ -68,7 +82,6 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
       case Actor.get_cached_or_fetch(query, opts) do
         {:ok, actor} ->
           summarise_actor(actor)
-          maybe_save(actor.data, opts)
           {:ok, actor}
 
         other ->
@@ -167,7 +180,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     @doc """
     Lists recently INGESTED remote activities, newest first — `incoming(from: "lemmy.world", limit: 20)`.
 
-    Only shows what we successfully stored; use the `AP_CAPTURE_INBOX` hook to also see payloads we rejected.
+    Only shows what we successfully stored; use the `AP_CAPTURE_JSON` hook to also see payloads we rejected.
     """
     def incoming(opts \\ []) do
       limit = opts[:limit] || 20
@@ -255,21 +268,97 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     # recording fixtures
     # ------------------------------------------------------------------
 
-    @doc "Saves any map as a pretty-printed fixture, eg. `save_fixture(actor.data, \"lemmy/group_actor.json\")`."
+    @doc """
+    Promotes a capture into the curated (committed) fixture tree: `promote("captured/lemmy.world/Announce-3.json", "lemmy/announce_create_page.json")`.
+
+    Captures are keyed by host and arrival order, which is right for a research dump and wrong for a fixture a test names. Promoting unwraps the `document` from its capture envelope, so the fixture is exactly the bytes the remote sent.
+    """
+    def promote(captured_relative_path, to) do
+      Path.join(fixtures_path(), captured_relative_path)
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.fetch!("document")
+      |> save_fixture(to)
+    end
+
+    @doc """
+    Writes a map as a pretty-printed fixture under `fixtures_path()`.
+
+    Prefer `promote/2`: passing `actor.data` or `object.data` here records the POST-transformer form, which makes any test built on it assert that we produce what we produced.
+    """
     def save_fixture(data, relative_path) when is_map(data) do
-      path = Path.join(@fixtures_path, relative_path)
+      path = Path.join(fixtures_path(), relative_path)
       File.mkdir_p!(Path.dirname(path))
       File.write!(path, Jason.encode!(data, pretty: true))
       IO.puts("saved fixture: #{path}")
       {:ok, path}
     end
 
-    defp maybe_save(data, opts) do
-      case opts[:save_as] do
-        path when is_binary(path) -> save_fixture(data, path)
-        _ -> :ok
+    @doc """
+    A `:document_observer` for the activity_pub lib: writes every document a remote sends us to disk EXACTLY as it arrived, one file per document, under `fixtures_path()/captured/<host>/<Type>-<n>.json`. Captures land beside the curated fixtures, so promoting one with `save_fixture/2` is a copy.
+
+    Covers BOTH ways a document arrives, activities pushed to our inbox and actors/objects/collections we fetched, since both are wire-format JSON and both get normalised away downstream. The `context` records which, along with the signature and user-agent (inbox) or the URL and status (fetch), since which implementation sent it, and how it signed, is usually the thing being investigated.
+
+    Wired up in `Bonfire.Federate.ActivityPub.RuntimeConfig` whenever `AP_CAPTURE_JSON` is set.
+
+    This is the only way to obtain honest interop fixtures. `incoming/1`, `ap_object.data` and `actor.data` are all post-transformer, so a test built from them asserts that we produce what we produced, and they hold nothing at all for the documents we rejected, which are exactly the interesting ones. Fixtures have to be the wire bytes, including the fields we don't understand yet.
+    """
+    def capture(document, context) do
+      dir = Path.join([fixtures_path(), "captured", document_host(document, context)])
+      File.mkdir_p!(dir)
+
+      path = Path.join(dir, "#{safe_name(document["type"])}-#{fingerprint(document)}.json")
+
+      File.write!(
+        path,
+        Jason.encode!(
+          %{"received_with" => normalise_context(context), "document" => document},
+          pretty: true
+        )
+      )
+
+      info(path, "captured #{context[:source]} document")
+    end
+
+    # Names the file after the document's CONTENT, not a counter. `System.unique_integer/1` restarts
+    # at 1 with each VM, so a second probe run silently overwrote the first run's captures (that is
+    # how the `lemmy.world/c/technology` outbox capture was lost to the `c/pics` one). A content
+    # hash also makes re-capturing the same document idempotent rather than duplicating it.
+    defp fingerprint(document) do
+      :crypto.hash(:sha256, :erlang.term_to_binary(document))
+      |> Base.encode16(case: :lower)
+      |> binary_part(0, 8)
+    end
+
+    # header lists aren't JSON-encodable as-is
+    defp normalise_context(%{headers: headers} = context) when is_list(headers) do
+      %{context | headers: Map.new(headers, fn {k, v} -> {to_string(k), v} end)}
+    end
+
+    defp normalise_context(context), do: context
+
+    # a fetched document is filed under the host we fetched it FROM, a pushed one under its actor's host
+    defp document_host(_document, %{url: url}) when is_binary(url), do: host_of(url)
+
+    defp document_host(document, _context) do
+      case ActivityPub.Object.actor_id_from_data(document) do
+        actor when is_binary(actor) -> host_of(actor)
+        _ -> host_of(document["id"])
       end
     end
+
+    defp host_of(uri) when is_binary(uri), do: URI.parse(uri).host || "unknown"
+    defp host_of(_), do: "unknown"
+
+    # the activity's `type` names the file, and it is whatever the remote sent us — a `"type"` of `"../../.."` must not decide where we write
+    defp safe_name(type) when is_binary(type) do
+      case String.replace(type, ~r/[^A-Za-z0-9_-]/, "") do
+        "" -> "unknown"
+        safe -> safe
+      end
+    end
+
+    defp safe_name(_), do: "unknown"
 
     def as_user!(opts) do
       case opts[:as] do

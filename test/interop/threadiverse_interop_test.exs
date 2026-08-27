@@ -42,6 +42,16 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       announces: ["announce_create_page.json", "announce_create_page_text.json"],
       titled: "announce_create_page_text.json"
     },
+    # A second Lemmy community, because image posts are what it's for and `c/technology` has none: all 50 items in its outbox were links. Same software, so it adds no wire shape of its own, but it does carry the third payload kind (see the per-kind tests below).
+    %{
+      name: "Lemmy (image posts)",
+      dir: "lemmy",
+      id: "https://lemmy.world/c/pics",
+      actor: "community_actor_pics.json",
+      announces: ["announce_create_page_image.json"],
+      # an image post becomes Media rather than a titled post, so its title assertion lives in the per-kind tests below, against `metadata.json_ld` instead of `post_content`
+      titled: nil
+    },
     %{
       name: "PieFed",
       dir: "piefed",
@@ -73,6 +83,10 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
   ]
 
   defp with_announces, do: Enum.filter(@implementors, &(&1.announces != []))
+
+  # `titled: nil` means this implementor's fixture doesn't become a titled post at all (a Lemmy image
+  # post becomes Media, whose title lives in `metadata.json_ld` — asserted in the per-kind tests)
+  defp with_titled, do: Enum.filter(@implementors, &(&1.titled not in [nil, []]))
 
   setup do
     mock(fn %{method: :get, url: url} ->
@@ -117,7 +131,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     end
 
     test "keeps its title and original author" do
-      for %{name: name, dir: dir, titled: announce_file} <- with_announces() do
+      for %{name: name, dir: dir, titled: announce_file} <- with_titled() do
         announce = fixture(dir, announce_file)
         object = announce["object"]["object"]
 
@@ -148,30 +162,82 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
            "an announced reply should be threaded locally, not orphaned"
   end
 
-  # A Lemmy self-post is a `Page` with `content` and no `attachment`, whereas a link post is a `Page`
-  # with an `attachment` and no `content`. Only the latter is really media. This pins which local
-  # type each becomes, since that decides whether replies and threading work on it.
-  test "a text thread starter becomes a post, while a link one becomes media" do
-    text = fixture("lemmy", "announce_create_page_text.json")
-    link = fixture("lemmy", "announce_create_page.json")
+  # Lemmy gives every thread starter the same `Page` type, so the KIND of post is carried entirely by the payload, and each kind has to be pinned separately — that is what decides whether replies and threading work on it locally. Captured from `lemmy.world/c/technology` and `/c/pics`:
+  #
+  # | kind  | `content` | `attachment`                                  | `image`            |
+  # |-------|-----------|-----------------------------------------------|--------------------|
+  # | text  | yes       | `[]`                                          | no                 |
+  # | link  | optional  | `[{type: "Link", href, mediaType: text/html}]` | Lemmy-hosted thumb |
+  # | image | yes       | `[{type: "Image", url}]` — `url`, NOT `href`   | Lemmy-hosted thumb |
+  #
+  # `image` is always Lemmy's own re-hosted copy, never the source: for a link post it thumbnails the article's preview image, for an image post it thumbnails the attached image itself.
+  describe "each kind of Lemmy payload" do
+    test "a text thread starter becomes a post you can reply to" do
+      text = fixture("lemmy", "announce_create_page_text.json")
+      receive_announce(text)
 
-    receive_announce(text)
-    receive_announce(link)
+      obj = announced_post!("Lemmy text", text["object"]["object"]["id"])
 
-    text_obj = announced_post!("Lemmy text", text["object"]["object"]["id"])
-    link_obj = announced_post!("Lemmy link", link["object"]["object"]["id"])
+      assert e(obj, :post_content, :html_body, nil),
+             "a self-post has a body, so it should be a post you can reply to, not an attachment"
+    end
 
-    assert e(text_obj, :post_content, :html_body, nil),
-           "a self-post has a body, so it should be a post you can reply to, not an attachment"
+    test "a link thread starter becomes media, keeping its title" do
+      link = fixture("lemmy", "announce_create_page.json")
+      object = link["object"]["object"]
 
-    assert %Bonfire.Files.Media{} = link_obj,
-           "a link post is genuinely media: a title plus a URL"
+      assert object["name"], "fixture should carry a title"
+
+      receive_announce(link)
+      obj = announced_post!("Lemmy link", object["id"])
+
+      assert %Bonfire.Files.Media{} = obj,
+             "a link post is genuinely media: a title plus a URL"
+
+      json = e(obj, :metadata, "json_ld", nil) || e(obj, :metadata, :json_ld, nil)
+
+      assert json["name"] == object["name"],
+             "a link post is titled too, so the title has to survive into the media metadata"
+    end
+
+    # An image post also becomes Media, but unlike a bare link it carries a title AND a body that people actually read. Media keeps those in `metadata.json_ld`, so what matters is that they SURVIVE ingest and stay available to whatever renders the media preview, losing them here would be losing the post's actual content, not just a caption.
+    test "an image thread starter keeps its title and body in its media metadata" do
+      image = fixture("lemmy", "announce_create_page_image.json")
+      object = image["object"]["object"]
+
+      assert object["attachment"] |> List.first() |> Map.get("type") == "Image",
+             "fixture should be an image post"
+
+      assert object["name"] && object["content"],
+             "fixture should carry both a title and a body"
+
+      receive_announce(image)
+      obj = announced_post!("Lemmy image", object["id"])
+
+      assert %Bonfire.Files.Media{} = obj
+
+      json = e(obj, :metadata, "json_ld", nil) || e(obj, :metadata, :json_ld, nil)
+
+      assert json, "the announced object should be kept as media metadata, not discarded"
+
+      assert json["name"] == object["name"],
+             "an image post has a real title and it has to reach the preview component"
+
+      assert json["content"] == object["content"],
+             "an image post's body is its content, so it must survive ingest"
+
+      # preserving it isn't enough on its own: `MediaLinkLive` renders the title via
+      # `Media.media_label/1` and the body via `Media.description/1`, so both have to resolve or the
+      # post's text is stored but invisible
+      assert Bonfire.Files.Media.media_label(obj) == object["name"],
+             "the title has to reach the media preview component"
+
+      assert Bonfire.Files.Media.description(obj) == object["content"],
+             "the body has to reach the media preview component"
+    end
   end
 
-  # A relay is an obvious way to launder blocked content: if unwrapping bypassed MRF, any blocked
-  # instance could still reach us by getting a group to announce its posts. MRF runs inside
-  # `Object.insert/4`, which the unwrapped inner activity goes through like any other Create, so it
-  # should be filtered — asserted rather than assumed.
+  # A relay is an obvious way to launder blocked content: if unwrapping bypassed MRF, any blocked instance could still reach us by getting a group to announce its posts. MRF runs inside `Object.insert/4`, which the unwrapped inner activity goes through like any other Create, so it should be filtered, asserted rather than assumed.
   test "a blocked author's instance cannot reach us via a group relay" do
     %{dir: dir, titled: titled} = Enum.find(@implementors, &(&1.name == "Lemmy"))
     announce = fixture(dir, titled)

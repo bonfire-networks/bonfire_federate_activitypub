@@ -1,0 +1,61 @@
+{
+  "actor": "https://lemmy.world/c/pics",
+  "cc": [
+    "https://lemmy.world/c/pics/followers"
+  ],
+  "id": "https://lemmy.world/activities/announce/create/edc15e33-f85a-4bdb-ab6c-3c115768a04b",
+  "object": {
+    "actor": "https://lemmy.world/u/homesweethomeMrL",
+    "audience": "https://lemmy.world/c/pics",
+    "cc": [
+      "https://lemmy.world/c/pics"
+    ],
+    "id": "https://lemmy.world/activities/create/8553c2b5-3fb3-4bd1-bcf4-c55c94e53661",
+    "object": {
+      "attachment": [
+        {
+          "name": null,
+          "type": "Image",
+          "url": "https://isno.wales/wp-content/uploads/2026/04/163b4011bffb503b.jpg"
+        }
+      ],
+      "attributedTo": "https://lemmy.world/u/homesweethomeMrL",
+      "audience": "https://lemmy.world/c/pics",
+      "cc": [],
+      "content": "<p>cross-posted from: <a href=\"https://isno.wales/?p=3871\">isno.wales/?p=3871</a></p>\n<blockquote>\n<p>#evillesbian</p>\n<p><a href=\"https://piefed.blahaj.zone/c/lascivious_lesbians\" rel=\"nofollow\">@lascivious_lesbians</a> <a href=\"https://isno.wales/tag/evillesbian/\" rel=\"nofollow\">#evillesbian</a></p>\n<p>&lt;img src=“<a href=\"http://isno.wales/wp-content/uploads/2026/04/163b4011bffb503b.jpg\">isno.wales/wp-content/…/163b4011bffb503b.jpg</a>” alt=“” width=“749” height=“693”&gt;</p>\n<p><a href=\"https://isno.wales/tag/lesbian/\" rel=\"nofollow\">#lesbian</a></p>\n</blockquote>\n",
+      "id": "https://lemmy.world/post/51183878",
+      "image": {
+        "type": "Image",
+        "url": "https://lemmy.world/pictrs/image/7a861be7-a049-4b6a-85a4-83a87299f03a.jpeg"
+      },
+      "mediaType": "text/html",
+      "name": "I mean . . .",
+      "published": "2026-08-27T14:31:10.186725Z",
+      "sensitive": false,
+      "source": {
+        "content": "cross-posted from: https://isno.wales/?p=3871\n\n> #evillesbian\n>\n> [@lascivious\\_lesbians](https://piefed.blahaj.zone/c/lascivious_lesbians) [#evillesbian](https://isno.wales/tag/evillesbian/)\n> \n> <img src=\"http://isno.wales/wp-content/uploads/2026/04/163b4011bffb503b.jpg\" alt=\"\" width=\"749\" height=\"693\">\n> \n> [\\#lesbian](https://isno.wales/tag/lesbian/)",
+        "mediaType": "text/markdown"
+      },
+      "tag": [
+        {
+          "href": "https://lemmy.world/post/51183878",
+          "name": "#pics",
+          "type": "Hashtag"
+        }
+      ],
+      "to": [
+        "https://lemmy.world/c/pics",
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "type": "Page"
+    },
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Create"
+  },
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Announce"
+}

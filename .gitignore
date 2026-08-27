@@ -39,6 +39,9 @@ npm-debug.log
 # App and user data
 /data/
 
+# raw captures (Testing.Interop.capture/2), landing beside the fixtures they get promoted into
+/test/fixtures/captured/
+
 # user-local overrides for mess
 deps.path
 /libs/

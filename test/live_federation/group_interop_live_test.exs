@@ -42,11 +42,50 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
              "expected a Group actor, got #{inspect(actor.data["type"])}"
 
       assert actor.data["inbox"]
-      assert actor.data["followers"]
+
+      # NOTE: note asserting `followers`: it's a threadiverse convention rather than a requirement. NodeBB categories publish none (and serve the ACTOR document, 200, at the conventional URL) yet still Accept our Follow, and the only place we read a remote's followers is FEP-171b `automaticApproval` matching, where absent just means no match.
 
       # 1b12 §Group moderation: moderators are exposed as an attributedTo collection
       assert actor.data["attributedTo"],
              "no attributedTo moderators collection — recheck the pass-1 finding for this platform"
+    end
+  end
+
+  describe "the group's outbox" do
+    # How to learn a platform's fan-out shape WITHOUT waiting on someone to post: its outbox already holds the Announces it emitted. Run with `AP_CAPTURE_JSON` and both the collection and its first page are captured verbatim, which is where the per-platform announce fixtures come from.
+    test "is fetchable and shows the announce shape it fans out" do
+      handle = group_handle!()
+      {:ok, group} = Interop.fetch(handle)
+
+      outbox_url =
+        e(group, :data, "outbox", nil) ||
+          flunk("group advertises no outbox: #{inspect(group.data)}")
+
+      assert {:ok, outbox} = fetch_json(outbox_url),
+             "could not fetch #{outbox_url} — Mbin and others require a signed fetch, so this needs the tunnel"
+
+      # outboxes are paged: the collection itself normally carries only `first`
+      {:ok, page} =
+        case outbox["first"] do
+          url when is_binary(url) -> fetch_json(url)
+          %{} = embedded -> {:ok, embedded}
+          _ -> {:ok, outbox}
+        end
+
+      items = page["orderedItems"] || page["items"] || []
+
+      types = items |> Enum.map(& &1["type"]) |> Enum.frequencies()
+      IO.inspect(types, label: "outbox activity types for #{handle}")
+
+      assert items != [],
+             "outbox is empty or unpaged (#{inspect(Map.take(outbox, ["type", "totalItems", "first"]))}) — nothing to learn about its announce shape"
+    end
+
+    # the lib's raw-JSON fetch, so the `:document_observer` sees the wire bytes (`fetch_collection/2` would ingest every entry, which a probe has no business doing)
+    defp fetch_json(url) do
+      ActivityPub.Federator.Fetcher.get_cached_or_fetch_object_json(url,
+        skip_contain_origin_check: true
+      )
     end
   end
 

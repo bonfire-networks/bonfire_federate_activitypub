@@ -17,7 +17,9 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     3. follow it as `as:` user, so we start receiving fan-out
     4. wait `wait:` seconds, then report every activity that arrived from that host
 
-    `I.Groups.group_flow("!lemmyworldtest@lemmy.world", as: me, wait: 180, save: true)`
+    `I.Groups.group_flow("!lemmyworldtest@lemmy.world", as: me, wait: 180)`
+
+    Run it with `AP_CAPTURE_JSON` set and every document involved, fetched or delivered, is recorded verbatim by `Interop.capture/2`. 
 
     What to look for in the report, per the plan's open questions: are announces `Announce{Create{…}}` (embedded activity) or `Announce{<id>}`; is `audience` set and does the group also appear in to/cc; are thread-starters `Page` with `name` or `Note`; do Like/Delete/moderation activities arrive announced too.
     """
@@ -25,13 +27,8 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
       wait = opts[:wait] || 120
       host = host(community)
 
-      # fixtures are grouped by SOFTWARE (eg. "lemmy"), not by instance host — override with `fixtures:`
-      fixtures = opts[:fixtures] || software_slug(host)
-
       with {:ok, actor} <- fetch(community, opts) do
-        if opts[:save], do: save_fixture(actor.data, "#{fixtures}/group_actor.json")
-
-        fetch_moderators(actor, fixtures, opts)
+        fetch_moderators(actor, opts)
 
         IO.puts("following as #{e(as_user!(opts), :character, :username, "?")} …")
         follow(community, opts)
@@ -81,7 +78,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
 
     defp software_slug(other), do: to_string(other)
 
-    defp fetch_moderators(actor, fixtures, opts) do
+    defp fetch_moderators(actor, opts) do
       case e(actor, :data, "attributedTo", nil) do
         url when is_binary(url) ->
           IO.puts("fetching moderators collection: #{url}")
@@ -89,7 +86,6 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
           case ActivityPub.Federator.Fetcher.fetch_object_from_id(url) do
             {:ok, %{data: data}} ->
               IO.inspect(data, label: "moderators collection")
-              if opts[:save], do: save_fixture(data, "#{fixtures}/moderators_collection.json")
 
             other ->
               error(other, "could not fetch moderators collection")
