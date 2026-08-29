@@ -241,6 +241,35 @@ defmodule Bonfire.Federate.ActivityPub.RelayActorCorruptionTest do
       assert restored.pointer_id == local_user.id
     end
 
+    test "a remote actor sharing a local username keeps its own pointer_id" do
+      local_user = fake_user!()
+      {:ok, local_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(local_user.id)
+      username = local_actor.data["preferredUsername"]
+
+      {:ok, user_ap_obj} = ActivityPub.Object.insert(local_actor.data, true, local_user.id)
+
+      # a username is only unique within an instance, so a remote actor can carry the same one
+      {:ok, remote_namesake} =
+        ActivityPub.Object.insert(
+          %{
+            "id" => @remote_instance <> "/users/" <> username,
+            "type" => "Person",
+            "preferredUsername" => username
+          },
+          false
+        )
+
+      other_user = fake_user!()
+      ActivityPub.Object.update_existing(user_ap_obj.id, %{pointer_id: other_user.id})
+
+      RepairCorruptedActorPointers.run()
+
+      assert Bonfire.Common.Repo.get!(ActivityPub.Object, user_ap_obj.id).pointer_id ==
+               local_user.id
+
+      assert is_nil(Bonfire.Common.Repo.get!(ActivityPub.Object, remote_namesake.id).pointer_id)
+    end
+
     test "repair does not affect untouched local users, remote actors, or remote notes" do
       # Two unrelated local users
       local_user1 = fake_user!()
