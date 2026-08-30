@@ -78,6 +78,11 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
   def actor_json("https://mocked.local" = actor_id),
     do: actor_variant(actor_id, "mocked.local", %{"type" => "Application", "url" => actor_id})
 
+  @doc "Build actor JSON for an arbitrary actor id and username, e.g. a numeric-id instance (todon.nl style) whose AP id is `/ap/users/<numeric>` while the web url is `/@username`. Host-scoped fields are derived from the id."
+  def actor_json(actor_id, username, overrides \\ %{})
+      when is_binary(actor_id) and is_binary(username),
+      do: actor_variant(actor_id, username, overrides)
+
   defp actor_variant(actor_id, username, overrides) do
     # derive host-scoped fields from `actor_id` rather than hardcoding, so variants can also live on a DIFFERENT instance (identical output for the `mocked.local` actors)
     origin = actor_origin(actor_id)
