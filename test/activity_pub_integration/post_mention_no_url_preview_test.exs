@@ -66,6 +66,19 @@ defmodule Bonfire.Federate.ActivityPub.PostMentionNoUrlPreviewTest do
     refute @karen_web in urls
   end
 
+  test "a class-less mention anchor at the AP-id /users/ form (a Bonfire instance federating a Mastodon mention) is kept out of the unfurl list by exclude_urls" do
+    # the shape of the reported bug (campground.bonfire.cafe): a post federated from another Bonfire instance mentions a remote Mastodon actor, rendered as a class-less external link to the actor's `/users/...` AP id (rel="nofollow noopener", no `mention`/`u-url` class), so only the tag-based exclude can catch it
+    urls =
+      prepared_urls(
+        ~s(<a rel="nofollow noopener" href="#{@karen_apid}">@karen@mocked.local</a>),
+        [%{"type" => "Mention", "href" => @karen_apid, "name" => "@karen@mocked.local"}],
+        @karen_apid
+      )
+
+    assert @plain_link in urls
+    refute @karen_apid in urls
+  end
+
   test "a numeric-id web-form mention (/@user) is kept out of the unfurl list by the markup filter" do
     urls =
       prepared_urls(
