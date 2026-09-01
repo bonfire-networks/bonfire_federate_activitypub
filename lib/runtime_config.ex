@@ -4,7 +4,8 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
 
   # Keyed by `{declared type, local type}`: that pair IS the key, so defaults and env overrides merge per pair for free.
   # Strings, not atoms: `AdapterUtils.rewrite_actor_type/2` compares against the AS2 type string, and env-provided names must never be turned into atoms anyway.
-  @default_rewrite_actor_types [{{"Service", "Group"}, ["fedigroups.social"]}]
+  # `fedigroups.local` is the stand-in host our captured fixtures carry, so the interop tests exercise this default rather than a hand-configured allowlist
+  @default_rewrite_actor_types [{{"Service", "Group"}, ["fedigroups.social", "fedigroups.local"]}]
 
   @env Application.compile_env(:bonfire, :env)
 

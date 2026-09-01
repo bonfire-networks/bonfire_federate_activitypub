@@ -2,12 +2,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
   @moduledoc """
   Interop pass for the FEP-1b12 threadiverse: Lemmy, PieFed and NodeBB.
 
-  All fixtures are REAL captures from public outboxes (2026-08-26) — `lemmy.ml/c/technology`,
-  `piefed.social/c/piefed_meta`, `community.nodebb.org/category/6`.
+  All fixtures are REAL captures from public outboxes (2026-08-26), with every instance hostname rewritten to a `.local` stand-in so nothing here names a real instance or invites a test to reach one. Shapes, paths and ids are otherwise untouched. Provenance for re-capture lives in the group federation plan.
 
-  **They share one wire shape, which is why this is one module rather than three.** Every item
-  across all three outboxes is `Announce{Create{<object>}}` with `audience` set to the community,
-  differing only in the inner object type (`Page` for Lemmy/PieFed, `Article`/`Note` for NodeBB).
+  **They share one wire shape, which is why this is one module rather than three.** Every item across all three outboxes is `Announce{Create{<object>}}` with `audience` set to the community, differing only in the inner object type (`Page` for Lemmy/PieFed, `Article`/`Note` for NodeBB).
   That makes our inbound gap a single fix rather than one per implementor.
 
   The opposite pole is the mention-triggered bot-group family (`fedigroups_interop_test.exs`):
@@ -18,8 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
   | group addressed via | `cc` + `Mention` tag | community in `to` AND `audience` |
   | thread starter | untitled `Note` | `Page` (Lemmy/PieFed) or `Article` (NodeBB) with `name` |
 
-  ⚠️ Mbin is missing here deliberately: `fedia.io` and `kbin.earth` both return HTTP 500 to an
-  unauthenticated actor fetch, so its fixtures need the signed-fetch/tunnel path.
+  ⚠️ Mbin has an actor and an `Accept` here but no announce: the instances we tried return HTTP 500 to an unauthenticated actor fetch and serve an EMPTY outbox to a signed one, so an Mbin announce can only be captured by following a magazine and receiving a delivery.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 
@@ -37,7 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     %{
       name: "Lemmy",
       dir: "lemmy",
-      id: "https://lemmy.ml/c/technology",
+      id: "https://lemmy.local/c/technology",
       actor: "community_actor.json",
       announces: ["announce_create_page.json", "announce_create_page_text.json"],
       titled: "announce_create_page_text.json"
@@ -46,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     %{
       name: "Lemmy (image posts)",
       dir: "lemmy",
-      id: "https://lemmy.world/c/pics",
+      id: "https://lemmy2.local/c/pics",
       actor: "community_actor_pics.json",
       announces: ["announce_create_page_image.json"],
       # an image post becomes Media rather than a titled post, so its title assertion lives in the per-kind tests below, against `metadata.json_ld` instead of `post_content`
@@ -55,7 +51,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     %{
       name: "PieFed",
       dir: "piefed",
-      id: "https://piefed.social/c/piefed_meta",
+      id: "https://piefed.local/c/piefed_meta",
       actor: "community_actor.json",
       announces: ["announce_create_page.json"],
       titled: "announce_create_page.json"
@@ -63,7 +59,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     %{
       name: "NodeBB",
       dir: "nodebb",
-      id: "https://community.nodebb.org/category/6",
+      id: "https://nodebb.local/category/6",
       actor: "category_actor.json",
       announces: ["announce_create_article.json", "announce_create_note.json"],
       titled: "announce_create_article.json"
@@ -75,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     %{
       name: "Mbin",
       dir: "mbin",
-      id: "https://kbin.earth/m/testing",
+      id: "https://mbin.local/m/testing",
       actor: "magazine_actor.json",
       announces: [],
       titled: nil
@@ -89,11 +85,16 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
   defp with_titled, do: Enum.filter(@implementors, &(&1.titled not in [nil, []]))
 
   setup do
-    mock(fn %{method: :get, url: url} ->
-      case served()[url] do
-        nil -> %Tesla.Env{status: 404, body: ""}
-        body -> json(body)
-      end
+    mock(fn
+      %{method: :get, url: url} ->
+        case served()[url] do
+          nil -> %Tesla.Env{status: 404, body: ""}
+          body -> json(body)
+        end
+
+      # outgoing deliveries (eg. the Follow in the handshake test) go nowhere, but must not raise
+      %{method: :post} ->
+        %Tesla.Env{status: 202, body: ""}
     end)
 
     :ok
@@ -107,6 +108,34 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
         assert %Bonfire.Classify.Category{type: :group} = group,
                "#{name}: a `Group` actor says what it is, so it should need no rewrite"
       end
+    end
+
+    # Joining a threadiverse community IS a Follow, answered with an `Accept` carrying the original Follow embedded rather than referenced by id. The fixture is a real Mbin `Accept` of a Follow our dev instance sent, and the four NodeBB Accepts we captured are the same shape, so one covers the handshake for both.
+    test "the community's Accept of our Follow is understood" do
+      follower = fake_user!()
+      {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
+
+      %{id: community} = Enum.find(@implementors, &(&1.name == "Mbin"))
+      {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      # a follow of a remote actor stays a request until they answer, which is the state the Accept
+      # is supposed to resolve
+      assert {:ok, request} = Bonfire.Social.Graph.Follows.follow(follower, group)
+      refute Bonfire.Social.Graph.Follows.following?(follower, group)
+
+      follow_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(request)
+
+      # bind the captured Accept to this run's Follow, keeping Mbin's own fields (its `f/object` id,
+      # the kbin `@context`, and the `state: "pending"` it adds to the embedded Follow)
+      accept =
+        fixture("mbin", "accept_follow.json")
+        |> put_in(["object", "id"], follow_activity.data["id"])
+        |> put_in(["object", "actor"], follower_actor.ap_id)
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(accept)
+
+      assert Bonfire.Social.Graph.Follows.following?(follower, group),
+             "an Accept of our Follow should leave us following the community"
     end
   end
 
@@ -259,7 +288,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
   end
 
   # Boundaries derived from what the community declares (`Categories.create_remote/2`). Both flags
-  # occur in the wild — `lemmy.ml/c/announcements` really is `postingRestrictedToMods: true` — but
+  # occur in the wild: announcement-style communities really do set `postingRestrictedToMods: true`, but
   # since each is a single boolean, flipping it on a real captured actor covers the permutations
   # without four more fixture files.
   test "every permutation of the declared flags maps to the right boundaries" do
@@ -288,7 +317,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     ]
   end
 
-  defp variant_id(name), do: "https://lemmy.ml/c/variant_#{name}"
+  defp variant_id(name), do: "https://lemmy.local/c/variant_#{name}"
 
   # everything the mock serves: each community actor, each announced object and its author, plus the
   # boundary-permutation variants

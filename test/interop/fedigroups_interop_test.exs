@@ -2,18 +2,11 @@ defmodule Bonfire.Federate.ActivityPub.FediGroupsInteropTest do
   @moduledoc """
   Interop pass for FediGroups: what Bonfire does with a real bot-group Announce.
 
-  The fixtures are REAL captures from `https://fedigroups.social/users/xmpp`'s public outbox
-  (2026-08-25), not hand-written approximations, so these exercise the ingest path against the
-  wire shape that family actually sends. FediGroups is stock Mastodon plus a polling bot, standing
-  in for the whole mention-triggered bot-group family (tootgroup.py, MightyPork's group-actor) —
-  the opposite pole from Lemmy's FEP-1b12 shape.
+  The fixtures are REAL captures from a bot-group's public outbox (2026-08-25), not hand-written approximations, so these exercise the ingest path against the wire shape that family actually sends. Instance hostnames are rewritten to `.local` stand-ins; provenance is in the group federation plan. FediGroups is stock Mastodon plus a polling bot, standing in for the whole mention-triggered bot-group family (tootgroup.py, MightyPork's group-actor), the opposite pole from Lemmy's FEP-1b12 shape.
 
-  What makes this family awkward, and what these tests are really about: the announced post carries
-  **no `audience`**, which is the property FEP-1b12 uses to say "this belongs to that group". The
-  group appears only in `cc` and as a `Mention` tag, so attribution has to fall back to those.
+  What makes this family awkward, and what these tests are really about: the announced post carries **no `audience`**, which is the property FEP-1b12 uses to say "this belongs to that group". The group appears only in `cc` and as a `Mention` tag, so attribution has to fall back to those.
 
-  Tagged `:todo` because the Phase 4 incoming work is not implemented yet — these are its spec, and
-  should be un-tagged as it lands rather than rewritten.
+  Tagged `:todo` because the Phase 4 incoming work is not implemented yet — these are its spec, and should be un-tagged as it lands rather than rewritten.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 
@@ -22,7 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.FediGroupsInteropTest do
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   @fixtures Path.join([__DIR__, "..", "fixtures", "fedigroups"])
-  @group_actor "https://fedigroups.social/users/xmpp"
+  @group_actor "https://fedigroups.local/users/xmpp"
 
   setup do
     note = fixture("announced_note_root.json")
@@ -89,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.FediGroupsInteropTest do
 
   # The degrade-gracefully case: an operator who has opted OUT should still get the post, just from
   # a plain remote actor rather than a group. Note this needs the config explicitly emptied — since
-  # the shipped default allowlists `fedigroups.social`, "didn't configure anything" is now the
+  # the shipped default allowlists `fedigroups.local`, "didn't configure anything" is now the
   # rewritten case, not the unrewritten one.
   test "with the rewrite opted out, the boost still arrives but creates no group", %{
     announce: announce
@@ -153,7 +146,7 @@ defmodule Bonfire.Federate.ActivityPub.FediGroupsInteropTest do
     |> put_in(["publicKey", "owner"], ap_id)
   end
 
-  defp with_rewrite_config(config \\ [{{"Service", "Group"}, ["fedigroups.social"]}], fun) do
+  defp with_rewrite_config(config \\ [{{"Service", "Group"}, ["fedigroups.local"]}], fun) do
     previous = Application.get_env(:bonfire_federate_activitypub, :rewrite_actor_types)
 
     Application.put_env(:bonfire_federate_activitypub, :rewrite_actor_types, config)

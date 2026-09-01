@@ -23,9 +23,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
   @remote_instance "https://mocked.local"
   # resolved relative to this file, NOT to the cwd: CI builds the extension from `deps/`, where an app-root-relative path points at nothing
   @fixture Path.join([__DIR__, "..", "fixtures", "fedigroups", "service_group_actor.json"])
-  @fedigroups_actor "https://fedigroups.social/users/xmpp"
+  @fedigroups_actor "https://fedigroups.local/users/xmpp"
   @other_host_actor "https://elsewhere.local/users/notagroup"
-  @sibling_actor "https://fedigroups.social/users/sibling"
+  @sibling_actor "https://fedigroups.local/users/sibling"
 
   # actors served to the adapter, which fetches/verifies over HTTP
   @remote_actors [
@@ -124,7 +124,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
     end
 
     test "RED: an allowlisted host's Service actor becomes a group Category" do
-      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.local"]}], fn ->
         assert {:ok, character} =
                  Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
 
@@ -137,7 +137,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
     end
 
     test "a Service actor from a NON-configured host is untouched" do
-      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.local"]}], fn ->
         assert {:ok, character} =
                  Adapter.maybe_create_remote_actor(fixture_actor(@other_host_actor))
 
@@ -154,7 +154,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
     end
 
     test "RED: re-fetching keeps it a group and creates no second object" do
-      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.local"]}], fn ->
         assert {:ok, first} = Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
         assert {:ok, again} = Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
 
@@ -166,7 +166,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
     # DECIDED: we record what the remote sent, and decide separately what to make of it locally.
     # Asserted so nobody later "fixes" the AP record into agreeing with the rewrite.
     test "the stored AP object still records the type the remote sent" do
-      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.social"]}], fn ->
+      with_rewrite_config([{{"Service", "Group"}, ["fedigroups.local"]}], fn ->
         assert {:ok, _} = Adapter.maybe_create_remote_actor(fixture_actor(@fedigroups_actor))
         assert {:ok, ap_object} = ActivityPub.Object.get_cached(ap_id: @fedigroups_actor)
 
