@@ -1,0 +1,10 @@
+{
+  "actor": "http://lemmy.local/u/lemmy_beta",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "object": "http://lemmy2.local/comment/1",
+  "cc": ["http://lemmy.local/c/main"],
+  "audience": "https://lemmy.local/c/main",
+  "type": "Delete",
+  "summary": "bad comment",
+  "id": "http://lemmy.local/activities/delete/42ca1a79-f99e-4518-a2ca-ba2df221eb5e"
+}

@@ -3,39 +3,39 @@
     "https://join-lemmy.org/context.json",
     "https://www.w3.org/ns/activitystreams"
   ],
-  "attributedTo": "https://lemmy.world/c/pics/moderators",
+  "attributedTo": "https://lemmy2.local/c/pics/moderators",
   "endpoints": {
-    "sharedInbox": "https://lemmy.world/inbox"
+    "sharedInbox": "https://lemmy2.local/inbox"
   },
-  "featured": "https://lemmy.world/c/pics/featured",
-  "followers": "https://lemmy.world/c/pics/followers",
+  "featured": "https://lemmy2.local/c/pics/featured",
+  "followers": "https://lemmy2.local/c/pics/followers",
   "icon": {
     "type": "Image",
-    "url": "https://lemmy.world/pictrs/image/4095722b-93d8-463e-bd80-4e0451f7efe7.jpeg"
+    "url": "https://lemmy2.local/pictrs/image/4095722b-93d8-463e-bd80-4e0451f7efe7.jpeg"
   },
-  "id": "https://lemmy.world/c/pics",
+  "id": "https://lemmy2.local/c/pics",
   "image": {
     "type": "Image",
-    "url": "https://lemmy.world/pictrs/image/7a45bae3-82ba-485b-a10e-897fbffcf9bd.jpeg"
+    "url": "https://lemmy2.local/pictrs/image/7a45bae3-82ba-485b-a10e-897fbffcf9bd.jpeg"
   },
-  "inbox": "https://lemmy.world/c/pics/inbox",
+  "inbox": "https://lemmy2.local/c/pics/inbox",
   "language": [],
   "name": "pics",
-  "outbox": "https://lemmy.world/c/pics/outbox",
+  "outbox": "https://lemmy2.local/c/pics/outbox",
   "postingRestrictedToMods": false,
   "preferredUsername": "pics",
   "publicKey": {
-    "id": "https://lemmy.world/c/pics#main-key",
-    "owner": "https://lemmy.world/c/pics",
+    "id": "https://lemmy2.local/c/pics#main-key",
+    "owner": "https://lemmy2.local/c/pics",
     "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7QZSSij/0wOhBCabsGA/\nkFFlIuPpnm+xmQ9UTBcW9bG2hvbT4QWRc5k5SNatFrQ5uodsy1Vv4gDxHJIaDkKV\n09ThjnCtUzbxtBa4zp/ipblzMN/vTzIMw1wPEP3nAWzF+38a6J/lDPKiCfXNYIw7\nwbVcN6WSkMwJcL7uKob+THrkPcpch+6XPKA2j8ioYqzoM55EoERaf95QZgD8atO9\nFWXd8ZpCX0nVobsxb4tLFI20djzfQGx1JIoblikHwujEmjTUOzyMBqwW9+V3+zge\n4TcS5ZVxGoxGKjzcHI1So8BIKbJJUgnpdsN57m59OYkyEYeF/BL2QOvhaegHLll2\nTwIDAQAB\n-----END PUBLIC KEY-----\n"
   },
   "published": "2023-06-09T20:49:24.970287Z",
   "sensitive": false,
   "source": {
-    "content": "Rules:\n\n1.. Please mark original photos with [OC] in the title if you're the photographer\n\n2..Pictures containing a politician from any country or planet are prohibited, this is a [community voted on rule.](https://lemmy.world/post/3881121) \n\n3.. Image must be a photograph, no AI or digital art.\n\n4.. No NSFW/Cosplay/Spam/Trolling images.\n\n5.. Be civil. No racism or bigotry.\n\n\nPhoto of the Week Rule(s):\n\n1.. On Fridays, the most upvoted original, marked [OC], photo posted between Friday and Thursday will be the next week's banner and featured photo. \n\n2.. The weekly photos will be saved for an end of the year run off.\n\n[Weeks 2023](https://lemmy.world/post/3436049)\n\nInstance-wide rules always apply. https://mastodon.world/about\n\n\n![](https://img.shields.io/lemmy/pics%40lemmy.world?style=plastic&amp;logo=lemmy&amp;label=Total%20Members&amp;labelColor=11aaaa&amp;color=11aaaa\n)\n",
+    "content": "Rules:\n\n1.. Please mark original photos with [OC] in the title if you're the photographer\n\n2..Pictures containing a politician from any country or planet are prohibited, this is a [community voted on rule.](https://lemmy2.local/post/3881121) \n\n3.. Image must be a photograph, no AI or digital art.\n\n4.. No NSFW/Cosplay/Spam/Trolling images.\n\n5.. Be civil. No racism or bigotry.\n\n\nPhoto of the Week Rule(s):\n\n1.. On Fridays, the most upvoted original, marked [OC], photo posted between Friday and Thursday will be the next week's banner and featured photo. \n\n2.. The weekly photos will be saved for an end of the year run off.\n\n[Weeks 2023](https://lemmy2.local/post/3436049)\n\nInstance-wide rules always apply. https://author3.local/about\n\n\n![](https://img.shields.io/lemmy/pics%40lemmy2.local?style=plastic&amp;logo=lemmy&amp;label=Total%20Members&amp;labelColor=11aaaa&amp;color=11aaaa\n)\n",
     "mediaType": "text/markdown"
   },
-  "summary": "<p>Rules:</p>\n<p>1… Please mark original photos with [OC] in the title if you’re the photographer</p>\n<p>2…Pictures containing a politician from any country or planet are prohibited, this is a <a href=\"https://lemmy.world/post/3881121\" rel=\"nofollow\">community voted on rule.</a></p>\n<p>3… Image must be a photograph, no AI or digital art.</p>\n<p>4… No NSFW/Cosplay/Spam/Trolling images.</p>\n<p>5… Be civil. No racism or bigotry.</p>\n<p>Photo of the Week Rule(s):</p>\n<p>1… On Fridays, the most upvoted original, marked [OC], photo posted between Friday and Thursday will be the next week’s banner and featured photo.</p>\n<p>2… The weekly photos will be saved for an end of the year run off.</p>\n<p><a href=\"https://lemmy.world/post/3436049\" rel=\"nofollow\">Weeks 2023</a></p>\n<p>Instance-wide rules always apply. <a href=\"https://mastodon.world/about\">mastodon.world/about</a></p>\n<p><img src=\"https://img.shields.io/lemmy/pics%40lemmy.world?style=plastic&amp;logo=lemmy&amp;label=Total%20Members&amp;labelColor=11aaaa&amp;color=11aaaa\" alt=\"\" /></p>\n",
+  "summary": "<p>Rules:</p>\n<p>1… Please mark original photos with [OC] in the title if you’re the photographer</p>\n<p>2…Pictures containing a politician from any country or planet are prohibited, this is a <a href=\"https://lemmy2.local/post/3881121\" rel=\"nofollow\">community voted on rule.</a></p>\n<p>3… Image must be a photograph, no AI or digital art.</p>\n<p>4… No NSFW/Cosplay/Spam/Trolling images.</p>\n<p>5… Be civil. No racism or bigotry.</p>\n<p>Photo of the Week Rule(s):</p>\n<p>1… On Fridays, the most upvoted original, marked [OC], photo posted between Friday and Thursday will be the next week’s banner and featured photo.</p>\n<p>2… The weekly photos will be saved for an end of the year run off.</p>\n<p><a href=\"https://lemmy2.local/post/3436049\" rel=\"nofollow\">Weeks 2023</a></p>\n<p>Instance-wide rules always apply. <a href=\"https://author3.local/about\">author3.local/about</a></p>\n<p><img src=\"https://img.shields.io/lemmy/pics%40lemmy2.local?style=plastic&amp;logo=lemmy&amp;label=Total%20Members&amp;labelColor=11aaaa&amp;color=11aaaa\" alt=\"\" /></p>\n",
   "type": "Group",
   "updated": "2024-01-10T03:13:35.696844Z"
 }

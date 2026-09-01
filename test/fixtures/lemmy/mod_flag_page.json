@@ -1,0 +1,9 @@
+{
+  "actor": "http://lemmy2.local/u/lemmy_alpha",
+  "to": ["http://lemmy.local/c/main"],
+  "audience": "http://lemmy.local/u/main",
+  "object": "http://lemmy.local/post/7",
+  "summary": "report this post",
+  "type": "Flag",
+  "id": "http://lemmy2.local/activities/flag/98b0933f-5e45-4a95-a15f-e0dc86361ba4"
+}

@@ -1,0 +1,117 @@
+{
+  "type": "Add",
+  "id": "https://hubzilla.local/activity/63462b77-cef3-4c3a-af03-3099394c5e38",
+  "uuid": "63462b77-cef3-4c3a-af03-3099394c5e38",
+  "published": "2026-06-11T21:50:10Z",
+  "contextHistory": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+  "context": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+  "actor": "https://hubzilla.local/channel/berlin",
+  "object": {
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
+      "https://w3id.org/security/v1",
+      "https://purl.archive.org/socialweb/webfinger",
+      {
+        "zot": "https://hubzilla.local/apschema#",
+        "contextHistory": "https://w3id.org/fep/171b/contextHistory",
+        "schema": "http://schema.org#",
+        "ostatus": "http://ostatus.org#",
+        "diaspora": "https://diasporafoundation.org/ns/",
+        "litepub": "http://litepub.social/ns#",
+        "toot": "http://joinmastodon.org/ns#",
+        "commentPolicy": "zot:commentPolicy",
+        "Bookmark": "zot:Bookmark",
+        "Category": "zot:Category",
+        "Emoji": "toot:Emoji",
+        "directMessage": "litepub:directMessage",
+        "PropertyValue": "schema:PropertyValue",
+        "value": "schema:value",
+        "uuid": "schema:identifier",
+        "conversation": "ostatus:conversation",
+        "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+        "Hashtag": "as:Hashtag",
+        "quoteUrl": "as:quoteUrl",
+        "quoteUri": "http://fedibird.com/ns#quoteUri"
+      }
+    ],
+    "type": "Create",
+    "id": "https://hubzilla.local/activity/3974ab7d-6366-4c13-91d6-787d7339c0c4",
+    "uuid": "3974ab7d-6366-4c13-91d6-787d7339c0c4",
+    "published": "2026-06-11T21:50:09Z",
+    "contextHistory": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+    "context": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+    "actor": "https://hubzilla.local/channel/jabgoe2089",
+    "object": {
+      "type": "Note",
+      "id": "https://hubzilla.local/item/3974ab7d-6366-4c13-91d6-787d7339c0c4",
+      "uuid": "3974ab7d-6366-4c13-91d6-787d7339c0c4",
+      "published": "2026-06-11T21:50:09Z",
+      "commentPolicy": "contacts",
+      "attributedTo": "https://hubzilla.local/channel/jabgoe2089",
+      "inReplyTo": "https://hubzilla.local/item/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+      "contextHistory": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+      "context": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+      "actor": "https://hubzilla.local/channel/jabgoe2089",
+      "content": "hmm .. ich kann hier meine rechtschreibfehler nicht korrigieren ... unschön ...",
+      "source": {
+        "content": "hmm .. ich kann hier meine rechtschreibfehler nicht korrigieren ... unschön ...",
+        "mediaType": "text/bbcode"
+      },
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "cc": [
+        "https://hubzilla.local/followers/jabgoe2089"
+      ]
+    },
+    "target": {
+      "id": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+      "type": "Collection",
+      "attributedTo": "https://hubzilla.local/channel/berlin"
+    },
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+      "https://hubzilla.local/followers/jabgoe2089"
+    ],
+    "diaspora:comment": {
+      "guid": "3974ab7d-6366-4c13-91d6-787d7339c0c4",
+      "parent_guid": "5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+      "text": "hmm .. ich kann hier meine rechtschreibfehler nicht korrigieren ... unschön ...",
+      "author": "jabgoe2089@hubzilla.local",
+      "created_at": "2026-06-11T21:50:09Z",
+      "author_signature": "bLz/WS+NOldbAPFI2+Gkx0kK+HAVCSzp3KwIXH2sxeaQmESxM5dXGz18AvGHvPowAD1BVjAVbec731Ah/b06YXgVihgCCpDuhqysqA/3fKQMpQfzInkxywtpuFfenqV2HLxXMDAxV65J0rml1zVBClc5C92rEnZxBQ/ygtUADj+9zpshHQsO2XXEAZLIYju/FwJQSgztb8KljVYybnIjTeSpdweY4QX6aCjEnHWUBAJRmdFQZrFcj58icH5djC5Y8ThjYaoX5UU7Fg89nN8nwgqZsEjdjG5Jo6aEVt+ioXOUJp2vuzBMZ18rKLpoLMj865ArlVtXYCUjlXub8mFns9lwoYrMk45keuw1tebuU4BWnsgbJzUSwMdCC7bPfEcQ+wTWOUSSTsudkc7G8HT2VI0n4fMPtnSp2IIheObGLnJd7WxQpqhx1jWB2+d644t26RFYT0nhiEL2mq16asRQcuT79LdR5dNUdgv2vVaELEVTfRGV2sjLYwXfiYbiVDCWYaIn4Tsq9Xd7LPmd3/1BCH5nnfdByX4W9DyJs9JR2rW3rY6d0mBteLJwtXvba0gH6flBcZhLvMFQq4WBXWvZCE54s72wlb/XsobbxerRMksaLDro5VlLOr8T3ZD7yH3O0wrtAFysLCCQ1pc+BWY62txrga+LI0fE6BM8eaAAIpU="
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "eddsa-jcs-2022",
+      "created": "2026-06-11T21:50:10Z",
+      "verificationMethod": "https://hubzilla.local/channel/berlin#z6Mkt7SK1YgagNcbms2WTNXDik3PuKMEpcHTXFmYcGni19H8",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z4yJDzb6yv5C6kpd7XFBFAdgujK46Kyqb71Y7Rsen3m4mceHArEvayzbPQ33h7RrjmEVTitRP41dtExQirY1N9hCQ"
+    },
+    "signature": {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://w3id.org/security/v1"
+      ],
+      "type": "RsaSignature2017",
+      "nonce": "40c9c1854186765c525dde7b86ed7827914656d3098d7a0d4286f78b07561adc",
+      "creator": "https://hubzilla.local/channel/berlin",
+      "created": "2026-06-11T21:50:10Z",
+      "signatureValue": "UDnWB3ONQnAZA7BjkgmfB41W3THIar4BVDOQQ2NtJiOCXOk2oe9q2PHYDrbwSUcWp2JhdKqhT+HRI99vzOywNz9kSJi3NT4B27yBj8tMWniQuggyXqzhsCShBTp2/z37MMzX7cstFJp0w3bwvLLflb/cXYz4UogVlmqT4Op29vS5mFVc5B33NBv5unjnp2pKpVrqQe5Bub6BkNXvKbPLWz5tE32lfHbtUWTRyrspQNdWJNjhZ46zClonFexJf7F1oQqkJwNV/8BhPh2pffouczOH55t344AXmriyRoweIZ7o8Fres99lzPXD51bvQz6mdU6cwuRNxhMM/pBkq+FX5daVYYmGa90FYx12GQfrLa34Rsw8dm+OgArf9YDvVF5mn4EgPW/V39xOO4ElEZZHFdNYZSlGFxDLwq8gmuhwGJiogUOqyo/S1bgRh50/dvc9nzJi2/He8uMSPRdc0UeOMH6CGjXC5I66ghhebtbi0y+xoLT3B/KxBb+mZK6zDIzaczA5kMSIi+dcSv1CPsby1kuzBhRiCvPkeBGcHpq9rj/fXdKhfZQraDgbm/ONhn0gG4LID/xFCu3aV16FssaU2ZnlqnbU+L5sw33REYhPb1SwsI6IvxMOA7vNPQYx41qvcNrKDBqJ/n5hXf8BF0m/peGdvhuomj3EuOJcX4wUQXg="
+    }
+  },
+  "target": {
+    "id": "https://hubzilla.local/conversation/5d4e51f7-eb77-52ae-a7dd-7eef0244109b",
+    "type": "Collection",
+    "attributedTo": "https://hubzilla.local/channel/berlin"
+  },
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://hubzilla.local/followers/jabgoe2089"
+  ]
+}

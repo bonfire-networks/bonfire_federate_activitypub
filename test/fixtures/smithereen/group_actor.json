@@ -1,0 +1,166 @@
+{
+  "type": "Group",
+  "id": "https://smithereen.local/groups/4",
+  "attachment": [
+    {
+      "type": "PropertyValue",
+      "name": "Website",
+      "value": "<a href=\"https://vk.com/durov\" rel=\"me\">https://vk.com/durov</a>"
+    }
+  ],
+  "name": "The first real ActivityPub group ever",
+  "icon": {
+    "type": "Image",
+    "width": 1439,
+    "height": 1440,
+    "cropRegion": [
+      0.19230769574642181,
+      0.0,
+      0.754273533821106,
+      1.0
+    ],
+    "image": {
+      "type": "Image",
+      "url": "https://smithereen.local/i/8UWa6Lla4cSaMRG5K814GWjsvrnpZQLsH61cIHFewZY/q:93/bG9jYWw6Ly8vcy91cGxvYWRzLzA0LzAwLzAwL19vVWVOMmNTRGpMTG9BT0pzTW10TFgzNl9lRTNOYkc0c1NYQS53ZWJw.jpg",
+      "mediaType": "image/jpeg",
+      "width": 2560,
+      "height": 1440
+    },
+    "url": "https://smithereen.local/i/C3uWSZRJaVDRUmTHvFUh_JIY-bzDTqCVMge2JrTWMc4/c:1439:1440:nowe:492:0/q:93/bG9jYWw6Ly8vcy91cGxvYWRzLzA0LzAwLzAwL19vVWVOMmNTRGpMTG9BT0pzTW10TFgzNl9lRTNOYkc0c1NYQS53ZWJw.jpg",
+    "mediaType": "image/jpeg"
+  },
+  "summary": "<p>This has an <b>about</b> field. This <a href=\"https://example.com\">can contain the same <b>subset</b> of <i>HTML</i></a> as posts.</p><p>If you want to federate with this group, see <a href=\"https://codeberg.org/fediverse/fep/src/branch/main/fep/400e/fep-400e.md\">FEP-400e</a> for how the wall works.</p>",
+  "url": "https://smithereen.local/wow_look_a_group",
+  "preferredUsername": "wow_look_a_group",
+  "inbox": "https://smithereen.local/groups/4/inbox",
+  "outbox": "https://smithereen.local/groups/4/outbox",
+  "followers": "https://smithereen.local/groups/4/members",
+  "endpoints": {
+    "sharedInbox": "https://smithereen.local/activitypub/sharedInbox",
+    "collectionSimpleQuery": "https://smithereen.local/groups/4/collectionQuery"
+  },
+  "publicKey": {
+    "id": "https://smithereen.local/groups/4#main-key",
+    "owner": "https://smithereen.local/groups/4",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyrDv7J/f5mC9UUNwuGrB\nr1+df65V6JEZdH8MOJ2gNHMcxq3wSPpKFyGH3qZlSyC139OnXy3uw7aek7d3pnZy\ntYuXCUgt/t4xHgX01IwTm7Kh66hKM9DHB0a+TzCHL7MS57Feiam2ehceYcQx9aBf\nA2hU6A46HF6KEJ3yKwKyxYKT9YrPeowZlbp5VIZmbHzjprTIUgKX6vQSWFH4BL8f\nGc+mcYomd0/dyrPQegCv/K3JtX3oSALfKKGjy1HP+Ga8+PXSJIPZhXc8BXxcITXd\n8cXKTpQqsvyOg7wXY3Hn0kR65bCeVjHGczfyMVFHr+VIBdREWrfjNDNlpYUE9dzX\nzQIDAQAB\n-----END PUBLIC KEY-----\n"
+  },
+  "wall": "https://smithereen.local/groups/4/wall",
+  "wallComments": "https://smithereen.local/groups/4/wallComments",
+  "discoverable": true,
+  "indexable": true,
+  "attributedTo": [
+    {
+      "type": "Person",
+      "id": "https://smithereen.local/users/1",
+      "displayOrder": 0,
+      "title": "Group admins can have long titles that explain what they do in this group"
+    }
+  ],
+  "members": "https://smithereen.local/groups/4/members",
+  "accessType": "open",
+  "manuallyApprovesFollowers": false,
+  "capabilities": {
+    "acceptsJoins": true
+  },
+  "photoAlbums": "https://smithereen.local/groups/4/albums",
+  "featureState": {
+    "wall": "sm:Open",
+    "photoAlbums": "sm:Restricted",
+    "board": "sm:Open"
+  },
+  "boardTopics": "https://smithereen.local/groups/4/topics",
+  "pinnedBoardTopics": "https://smithereen.local/groups/4/pinnedTopics",
+  "links": [
+    {
+      "type": "Link",
+      "href": "https://joinmastodon.org",
+      "id": "https://smithereen.local/groups/4/links/4",
+      "name": "Mastodon - Decentralized social media",
+      "displayOrder": 0,
+      "icon": {
+        "type": "Image",
+        "blurhash": "U44x1ZojITW9xNjvayfR9WW8%NojV|f6ogj]",
+        "width": 400,
+        "height": 400,
+        "url": "https://smithereen.local/i/Z7jZQdMlTZDcnh1CYHfDY4u-5HQNO7hTS_8o-ld-7jc/q:93/bG9jYWw6Ly8vcy91cGxvYWRzLzA0LzAwLzAwL1k3ZmZWa2YwNVQ1bDZ3eFhmZmpvVE42cV9odlYzVkVVd1dCWS53ZWJw.jpg",
+        "mediaType": "image/jpeg"
+      }
+    },
+    {
+      "type": "Link",
+      "href": "https://mastodon.social/users/Gargron",
+      "id": "https://smithereen.local/groups/4/links/5",
+      "name": "",
+      "displayOrder": 1,
+      "mediaType": "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\""
+    },
+    {
+      "type": "Link",
+      "href": "https://mastodon.local/@someone/115048875565963031",
+      "id": "https://smithereen.local/groups/4/links/6",
+      "name": "🐸",
+      "displayOrder": 2,
+      "mediaType": "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\""
+    }
+  ],
+  "suspended": false,
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "value": "http://schema.org#value",
+      "PropertyValue": "http://schema.org#PropertyValue",
+      "sm": "http://smithereen.software/ns#",
+      "cropRegion": {
+        "@id": "sm:cropRegion",
+        "@container": "@list"
+      },
+      "wall": {
+        "@id": "sm:wall",
+        "@type": "@id"
+      },
+      "wallComments": {
+        "@id": "sm:wallComments",
+        "@type": "@id"
+      },
+      "collectionSimpleQuery": "sm:collectionSimpleQuery",
+      "toot": "http://joinmastodon.org/ns#",
+      "discoverable": "toot:discoverable",
+      "indexable": "toot:indexable",
+      "displayOrder": "sm:displayOrder",
+      "members": {
+        "@id": "sm:members",
+        "@type": "@id"
+      },
+      "accessType": "sm:accessType",
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "capabilities": "litepub:capabilities",
+      "acceptsJoins": "litepub:acceptsJoins",
+      "litepub": "http://litepub.social/ns#",
+      "vcard": "http://www.w3.org/2006/vcard/ns#",
+      "photoAlbums": {
+        "@id": "sm:photoAlbums",
+        "@type": "@id"
+      },
+      "featureState": "sm:featureState",
+      "board": {
+        "@id": "sm:board",
+        "@type": "@id"
+      },
+      "boardTopics": {
+        "@id": "sm:boardTopics",
+        "@type": "@id"
+      },
+      "pinnedBoardTopics": {
+        "@id": "sm:pinnedBoardTopics",
+        "@type": "@id"
+      },
+      "links": {
+        "@id": "sm:links",
+        "@type": "@id"
+      },
+      "blurhash": "toot:blurhash",
+      "suspended": "toot:suspended"
+    },
+    "https://w3id.org/security/v1"
+  ]
+}

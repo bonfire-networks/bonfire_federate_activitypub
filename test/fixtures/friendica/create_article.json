@@ -1,0 +1,147 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "ostatus": "http://ostatus.org#",
+      "vcard": "http://www.w3.org/2006/vcard/ns#",
+      "dfrn": "http://purl.org/macgirvin/dfrn/1.0/",
+      "diaspora": "https://diasporafoundation.org/ns/",
+      "litepub": "http://litepub.social/ns#",
+      "toot": "http://joinmastodon.org/ns#",
+      "quote": "https://w3id.org/fep/044f#quote",
+      "quoteUri": "http://fedibird.com/ns#quoteUri",
+      "quoteAuthorization": {
+        "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+        "@type": "@id"
+      },
+      "gts": "https://gotosocial.org/ns#",
+      "interactionPolicy": {
+        "@id": "gts:interactionPolicy",
+        "@type": "@id"
+      },
+      "canQuote": {
+        "@id": "gts:canQuote",
+        "@type": "@id"
+      },
+      "automaticApproval": {
+        "@id": "gts:automaticApproval",
+        "@type": "@id"
+      },
+      "manualApproval": {
+        "@id": "gts:manualApproval",
+        "@type": "@id"
+      },
+      "featured": {
+        "@id": "toot:featured",
+        "@type": "@id"
+      },
+      "schema": "http://schema.org#",
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "sensitive": "as:sensitive",
+      "Hashtag": "as:Hashtag",
+      "quoteUrl": "as:quoteUrl",
+      "conversation": "ostatus:conversation",
+      "directMessage": "litepub:directMessage",
+      "discoverable": "toot:discoverable",
+      "PropertyValue": "schema:PropertyValue",
+      "value": "schema:value"
+    }
+  ],
+  "id": "https://friendica.local/objects/39bbe52a-315e-3fd2-9868-659544800091/Create",
+  "type": "Create",
+  "actor": {
+    "id": "https://friendica.local/profile/helpers",
+    "type": "Group",
+    "url": "https://friendica.local/~helpers",
+    "preferredUsername": "helpers",
+    "name": "Friendica Support",
+    "icon": {
+      "type": "Image",
+      "url": "https://friendica.local/photo/contact/349?ts=1743012749"
+    },
+    "image": {
+      "type": "Image",
+      "url": "https://friendica.local/photo/header/39bbe52a5559da609060718338440298?ts=1743012749"
+    },
+    "manuallyApprovesFollowers": false,
+    "discoverable": true
+  },
+  "published": "2020-02-09T09:36:24Z",
+  "instrument": {
+    "id": "https://friendica.local/friendica",
+    "type": "Application",
+    "name": "Friendica 'Blutwurz' 2026.05-1595",
+    "url": "https://friendica.local"
+  },
+  "to": [
+    "https://author8.local/profile/omer",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://friendica.local/followers/helpers"
+  ],
+  "audience": "https://friendica.local/profile/helpers",
+  "object": {
+    "id": "https://friendica.local/objects/39bbe52a-315e-3fd2-9868-659544800091",
+    "type": "Article",
+    "inReplyTo": null,
+    "diaspora:guid": "39bbe52a-315e-3fd2-9868-659544800091",
+    "published": "2020-02-09T09:36:24Z",
+    "url": "https://friendica.local/display/39bbe52a-315e-3fd2-9868-659544800091",
+    "attributedTo": {
+      "id": "https://friendica.local/profile/helpers",
+      "type": "Group",
+      "url": "https://friendica.local/~helpers",
+      "preferredUsername": "helpers",
+      "name": "Friendica Support",
+      "icon": {
+        "type": "Image",
+        "url": "https://friendica.local/photo/contact/349?ts=1743012749"
+      },
+      "image": {
+        "type": "Image",
+        "url": "https://friendica.local/photo/header/39bbe52a5559da609060718338440298?ts=1743012749"
+      },
+      "manuallyApprovesFollowers": false,
+      "discoverable": true
+    },
+    "sensitive": false,
+    "name": "Right-to-Left text support",
+    "content": "<p><span class=\"h-card\"><a href=\"https://author8.local/profile/omer\" class=\"u-url mention\">@<span>omer</span></a></span> wrote in a DM to the forum:</p><p>Hi,</p><p>I'm new to Friendica, and since I'm writing mostly in Hebrew, I wonder if the software can support Right-to-Left text directionality. Is that something that can be implemented on the server side? or even the user side? is there some kind of plugin or whatever?</p><p>Thanks,<br>Omer</p>",
+    "contentMap": {
+      "en": "<p><bdi>@<a href=\"https://author8.local/profile/omer\" class=\"userinfo mention\" title=\"omer\">omer</a></bdi> wrote in a DM to the forum:</p><p>Hi,</p><p>I'm new to Friendica, and since I'm writing mostly in Hebrew, I wonder if the software can support Right-to-Left text directionality. Is that something that can be implemented on the server side? or even the user side? is there some kind of plugin or whatever?</p><p>Thanks,<br>Omer</p>"
+    },
+    "source": {
+      "content": "@[url=https://author8.local/profile/omer]Omer Ori[/url] wrote in a DM to the forum:\r\n\r\nHi,\r\n\r\nI'm new to Friendica, and since I'm writing mostly in Hebrew, I wonder if the software can support Right-to-Left text directionality. Is that something that can be implemented on the server side? or even the user side? is there some kind of plugin or whatever?\r\n\r\nThanks,\r\nOmer",
+      "mediaType": "text/bbcode"
+    },
+    "interactionPolicy": {
+      "canQuote": {
+        "automaticApproval": [
+          "https://www.w3.org/ns/activitystreams#Public"
+        ]
+      }
+    },
+    "attachment": [],
+    "tag": [
+      {
+        "type": "Mention",
+        "href": "https://author8.local/profile/omer",
+        "name": "@omer@author8.local"
+      }
+    ],
+    "replies": {
+      "id": "https://friendica.local/objects/39bbe52a-315e-3fd2-9868-659544800091/replies",
+      "type": "Collection",
+      "totalItems": 3
+    },
+    "to": [
+      "https://author8.local/profile/omer",
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+      "https://friendica.local/followers/helpers"
+    ]
+  }
+}

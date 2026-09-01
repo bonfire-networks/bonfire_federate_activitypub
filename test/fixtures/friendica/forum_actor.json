@@ -1,0 +1,78 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "ostatus": "http://ostatus.org#",
+      "vcard": "http://www.w3.org/2006/vcard/ns#",
+      "dfrn": "http://purl.org/macgirvin/dfrn/1.0/",
+      "diaspora": "https://diasporafoundation.org/ns/",
+      "litepub": "http://litepub.social/ns#",
+      "toot": "http://joinmastodon.org/ns#",
+      "quote": "https://w3id.org/fep/044f#quote",
+      "quoteUri": "http://fedibird.com/ns#quoteUri",
+      "quoteAuthorization": {
+        "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+        "@type": "@id"
+      },
+      "gts": "https://gotosocial.org/ns#",
+      "interactionPolicy": {
+        "@id": "gts:interactionPolicy",
+        "@type": "@id"
+      },
+      "canQuote": {
+        "@id": "gts:canQuote",
+        "@type": "@id"
+      },
+      "automaticApproval": {
+        "@id": "gts:automaticApproval",
+        "@type": "@id"
+      },
+      "manualApproval": {
+        "@id": "gts:manualApproval",
+        "@type": "@id"
+      },
+      "featured": {
+        "@id": "toot:featured",
+        "@type": "@id"
+      },
+      "schema": "http://schema.org#",
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "sensitive": "as:sensitive",
+      "Hashtag": "as:Hashtag",
+      "quoteUrl": "as:quoteUrl",
+      "conversation": "ostatus:conversation",
+      "directMessage": "litepub:directMessage",
+      "discoverable": "toot:discoverable",
+      "PropertyValue": "schema:PropertyValue",
+      "value": "schema:value"
+    }
+  ],
+  "id": "https://friendica.local/profile/helpers",
+  "diaspora:guid": "39bbe52a5559da609060718338440298",
+  "type": "Group",
+  "following": "https://friendica.local/following/helpers",
+  "followers": "https://friendica.local/followers/helpers",
+  "inbox": "https://friendica.local/inbox/helpers",
+  "outbox": "https://friendica.local/outbox/helpers",
+  "featured": "https://friendica.local/featured/helpers",
+  "preferredUsername": "helpers",
+  "name": "helpers",
+  "url": "https://friendica.local/profile/helpers",
+  "manuallyApprovesFollowers": false,
+  "discoverable": false,
+  "publicKey": {
+    "id": "https://friendica.local/profile/helpers#main-key",
+    "owner": "https://friendica.local/profile/helpers",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAyfXeZYOoBdrngNPGlqqg\ni5Bx91OHrbmukgYVmWb3ndvRQNkIn4xwxAn69Bf6J+7020k0AYsO/8jLqSMoG+65\nxetE2XkLSDsyZZRlQntgsTLgDK+kqQCA4grLM8iwDymj+Uu3MuY++c9aS4u8eWGn\nFDT8XMfaQYpfM1pAPMaMzzQJcACA/h3bNc7gBeRWPt8q+CEyI0wN0D/7rnH7A5Lw\ng68HAJBMlf2Uq2zkF0+QdN2DgUnmtDyWmEBefVwK6Q2o4FqfkGblwfxqBsd3NevU\ndPyK9Wu/V+CgKHvabBIpGZPMDsJj2MTDfRuLW38uf3urmwaq1M4G59raEM9WIL5J\nVqlD5dUtPe1OEG6CmzU0o8bhx86PObF3Vyz2N9twL9xDGOlmbGK1LNeipQYBnE4/\nLCtdLSXu9gOSS1ZIn8wL4JVucoOc8nrGITIJET2ATXf522DOjEQPUrzMOAytsBym\ni0X/nqwIB0Q3yO9to65UpZwlXBWyxze4GuhKOGNONRLhoBeZR/l7YLo39cLZMyJ/\nZ3DDv+LXKvh3CWtxnCpwNzZlBXqm6NaOq/OahQaS3ulg3G20tWJL8kaSAWxEjAKn\nh+T36+6K9eh/O1TXsa/aPMvVYrBA9GXicWiGI7i5ycNwdviVmPksaLMotZvRWpg6\nl6PPr4yVQTn/WImdqNdhc38CAwEAAQ==\n-----END PUBLIC KEY-----\n"
+  },
+  "endpoints": {
+    "sharedInbox": "https://friendica.local/inbox"
+  },
+  "generator": {
+    "id": "https://friendica.local/friendica",
+    "type": "Application",
+    "name": "Friendica 'Blutwurz' 2026.05-1595",
+    "url": "https://friendica.local"
+  }
+}

@@ -43,28 +43,28 @@
       "Hashtag": "as:Hashtag"
     }
   ],
-  "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162",
+  "id": "https://author5.local/ap/users/117014855588545854/statuses/117094969068066162",
   "type": "Note",
   "summary": null,
   "inReplyTo": null,
   "published": "2026-08-14T17:10:33Z",
-  "url": "https://suma-ev.social/@axel/117094969068066162",
-  "attributedTo": "https://suma-ev.social/ap/users/117014855588545854",
+  "url": "https://author5.local/@axel/117094969068066162",
+  "attributedTo": "https://author5.local/ap/users/117014855588545854",
   "to": [
     "https://www.w3.org/ns/activitystreams#Public"
   ],
   "cc": [
-    "https://suma-ev.social/ap/users/117014855588545854/followers",
-    "https://fedigroups.social/users/xmpp"
+    "https://author5.local/ap/users/117014855588545854/followers",
+    "https://fedigroups.local/users/xmpp"
   ],
   "sensitive": false,
-  "atomUri": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162",
+  "atomUri": "https://author5.local/ap/users/117014855588545854/statuses/117094969068066162",
   "inReplyToAtomUri": null,
-  "conversation": "https://suma-ev.social/contexts/117014855588545854-117094969068066162",
-  "context": "https://suma-ev.social/contexts/117014855588545854-117094969068066162",
-  "content": "<p>Für die Menschen, die den Wechsel von <a href=\"https://suma-ev.social/tags/Quicksy\" class=\"mention hashtag\" rel=\"tag\">#<span>Quicksy</span></a> zu <a href=\"https://suma-ev.social/tags/Conversations\" class=\"mention hashtag\" rel=\"tag\">#<span>Conversations</span></a> noch nicht vollzogen haben, habe ich nun zusätzlich zu der sehr ausführlichen Anleitung eine kompakte Schnellanleitung (&lt;2 Minuten erstellt):<br /><a href=\"https://makertube.net/w/g6yGQSZvghvHvsLSjzLKpy\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">makertube.net/w/g6yGQSZvghvHvs</span><span class=\"invisible\">LSjzLKpy</span></a></p><p>Play Store Nutzer:innen können die Rabattaktion bis zum 18. August 2026 nutzen: <a href=\"https://gultsch.social/@daniel/117049016300159115\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">gultsch.social/@daniel/1170490</span><span class=\"invisible\">16300159115</span></a></p><p><span class=\"h-card\" translate=\"no\"><a href=\"https://fedigroups.social/@xmpp\" class=\"u-url mention\">@<span>xmpp</span></a></span> <br /><a href=\"https://suma-ev.social/tags/xmpp\" class=\"mention hashtag\" rel=\"tag\">#<span>xmpp</span></a></p>",
+  "conversation": "https://author5.local/contexts/117014855588545854-117094969068066162",
+  "context": "https://author5.local/contexts/117014855588545854-117094969068066162",
+  "content": "<p>Für die Menschen, die den Wechsel von <a href=\"https://author5.local/tags/Quicksy\" class=\"mention hashtag\" rel=\"tag\">#<span>Quicksy</span></a> zu <a href=\"https://author5.local/tags/Conversations\" class=\"mention hashtag\" rel=\"tag\">#<span>Conversations</span></a> noch nicht vollzogen haben, habe ich nun zusätzlich zu der sehr ausführlichen Anleitung eine kompakte Schnellanleitung (&lt;2 Minuten erstellt):<br /><a href=\"https://makertube.net/w/g6yGQSZvghvHvsLSjzLKpy\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">makertube.net/w/g6yGQSZvghvHvs</span><span class=\"invisible\">LSjzLKpy</span></a></p><p>Play Store Nutzer:innen können die Rabattaktion bis zum 18. August 2026 nutzen: <a href=\"https://author7.local/@daniel/117049016300159115\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">author7.local/@daniel/1170490</span><span class=\"invisible\">16300159115</span></a></p><p><span class=\"h-card\" translate=\"no\"><a href=\"https://fedigroups.local/@xmpp\" class=\"u-url mention\">@<span>xmpp</span></a></span> <br /><a href=\"https://author5.local/tags/xmpp\" class=\"mention hashtag\" rel=\"tag\">#<span>xmpp</span></a></p>",
   "contentMap": {
-    "de": "<p>Für die Menschen, die den Wechsel von <a href=\"https://suma-ev.social/tags/Quicksy\" class=\"mention hashtag\" rel=\"tag\">#<span>Quicksy</span></a> zu <a href=\"https://suma-ev.social/tags/Conversations\" class=\"mention hashtag\" rel=\"tag\">#<span>Conversations</span></a> noch nicht vollzogen haben, habe ich nun zusätzlich zu der sehr ausführlichen Anleitung eine kompakte Schnellanleitung (&lt;2 Minuten erstellt):<br /><a href=\"https://makertube.net/w/g6yGQSZvghvHvsLSjzLKpy\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">makertube.net/w/g6yGQSZvghvHvs</span><span class=\"invisible\">LSjzLKpy</span></a></p><p>Play Store Nutzer:innen können die Rabattaktion bis zum 18. August 2026 nutzen: <a href=\"https://gultsch.social/@daniel/117049016300159115\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">gultsch.social/@daniel/1170490</span><span class=\"invisible\">16300159115</span></a></p><p><span class=\"h-card\" translate=\"no\"><a href=\"https://fedigroups.social/@xmpp\" class=\"u-url mention\">@<span>xmpp</span></a></span> <br /><a href=\"https://suma-ev.social/tags/xmpp\" class=\"mention hashtag\" rel=\"tag\">#<span>xmpp</span></a></p>"
+    "de": "<p>Für die Menschen, die den Wechsel von <a href=\"https://author5.local/tags/Quicksy\" class=\"mention hashtag\" rel=\"tag\">#<span>Quicksy</span></a> zu <a href=\"https://author5.local/tags/Conversations\" class=\"mention hashtag\" rel=\"tag\">#<span>Conversations</span></a> noch nicht vollzogen haben, habe ich nun zusätzlich zu der sehr ausführlichen Anleitung eine kompakte Schnellanleitung (&lt;2 Minuten erstellt):<br /><a href=\"https://makertube.net/w/g6yGQSZvghvHvsLSjzLKpy\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">makertube.net/w/g6yGQSZvghvHvs</span><span class=\"invisible\">LSjzLKpy</span></a></p><p>Play Store Nutzer:innen können die Rabattaktion bis zum 18. August 2026 nutzen: <a href=\"https://author7.local/@daniel/117049016300159115\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">author7.local/@daniel/1170490</span><span class=\"invisible\">16300159115</span></a></p><p><span class=\"h-card\" translate=\"no\"><a href=\"https://fedigroups.local/@xmpp\" class=\"u-url mention\">@<span>xmpp</span></a></span> <br /><a href=\"https://author5.local/tags/xmpp\" class=\"mention hashtag\" rel=\"tag\">#<span>xmpp</span></a></p>"
   },
   "updated": "2026-08-15T07:43:23Z",
   "interactionPolicy": {
@@ -83,42 +83,42 @@
   "tag": [
     {
       "type": "Mention",
-      "href": "https://fedigroups.social/users/xmpp",
-      "name": "@xmpp@fedigroups.social"
+      "href": "https://fedigroups.local/users/xmpp",
+      "name": "@xmpp@fedigroups.local"
     },
     {
       "type": "Hashtag",
-      "href": "https://suma-ev.social/tags/quicksy",
+      "href": "https://author5.local/tags/quicksy",
       "name": "#quicksy"
     },
     {
       "type": "Hashtag",
-      "href": "https://suma-ev.social/tags/conversations",
+      "href": "https://author5.local/tags/conversations",
       "name": "#conversations"
     },
     {
       "type": "Hashtag",
-      "href": "https://suma-ev.social/tags/xmpp",
+      "href": "https://author5.local/tags/xmpp",
       "name": "#xmpp"
     }
   ],
   "replies": {
-    "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/replies",
+    "id": "https://author5.local/ap/users/117014855588545854/statuses/117094969068066162/replies",
     "type": "Collection",
     "first": {
       "type": "CollectionPage",
-      "next": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/replies?only_other_accounts=true&page=true",
-      "partOf": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/replies",
+      "next": "https://author5.local/ap/users/117014855588545854/statuses/117094969068066162/replies?only_other_accounts=true&page=true",
+      "partOf": "https://author5.local/ap/users/117014855588545854/statuses/117094969068066162/replies",
       "items": []
     }
   },
   "likes": {
-    "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/likes",
+    "id": "https://author5.local/ap/users/117014855588545854/statuses/117094969068066162/likes",
     "type": "Collection",
     "totalItems": 2
   },
   "shares": {
-    "id": "https://suma-ev.social/ap/users/117014855588545854/statuses/117094969068066162/shares",
+    "id": "https://author5.local/ap/users/117014855588545854/statuses/117094969068066162/shares",
     "type": "Collection",
     "totalItems": 7
   }

@@ -1,0 +1,10 @@
+{
+  "actor": "http://lemmy.local/u/lemmy_beta",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "object": "http://lemmy2.local/u/lemmy_alpha",
+  "cc": ["http://lemmy.local/c/main"],
+  "type": "Remove",
+  "target": "http://lemmy.local/c/main/moderators",
+  "audience": "http://lemmy.local/u/main",
+  "id": "http://lemmy.local/activities/remove/aab114f8-cfbd-4935-a5b7-e1a64603650d"
+}

@@ -1,0 +1,28 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "actor": "https://mbin.local/m/testing",
+  "id": "https://mbin.local/f/object/01a043c9-c5a0-70b4-8a9a-8533b0ece67e",
+  "object": {
+    "actor": "https://bonfire.local/pub/person/01M11WKDEJ9XY51PQ196PWHJ85",
+    "cc": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "id": "https://bonfire.local/pub/objects/a54a73d3-1339-4958-bd4a-70593c963298",
+    "object": "https://mbin.local/m/testing",
+    "published": "2026-08-27T15:14:48.104139Z",
+    "state": "pending",
+    "to": [
+      "https://mbin.local/m/testing",
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Follow"
+  },
+  "to": [
+    "https://bonfire.local/pub/person/01M11WKDEJ9XY51PQ196PWHJ85"
+  ],
+  "type": "Accept"
+}

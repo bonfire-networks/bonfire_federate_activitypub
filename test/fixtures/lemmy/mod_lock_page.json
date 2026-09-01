@@ -1,0 +1,10 @@
+{
+  "id": "http://lemmy.local/activities/lock/cb48761d-9e8c-42ce-aacb-b4bbe6408db2",
+  "actor": "http://lemmy.local/u/lemmy_alpha",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "object": "http://lemmy.local/post/2",
+  "cc": ["http://lemmy.local/c/main"],
+  "type": "Lock",
+  "summary": "A reason for the lock",
+  "audience": "http://lemmy.local/c/main"
+}

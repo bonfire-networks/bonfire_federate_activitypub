@@ -1,0 +1,104 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://purl.archive.org/socialweb/webfinger",
+    {
+      "zot": "https://hubzilla.local/apschema#",
+      "contextHistory": "https://w3id.org/fep/171b/contextHistory",
+      "schema": "http://schema.org#",
+      "ostatus": "http://ostatus.org#",
+      "diaspora": "https://diasporafoundation.org/ns/",
+      "litepub": "http://litepub.social/ns#",
+      "toot": "http://joinmastodon.org/ns#",
+      "commentPolicy": "zot:commentPolicy",
+      "Bookmark": "zot:Bookmark",
+      "Category": "zot:Category",
+      "Emoji": "toot:Emoji",
+      "directMessage": "litepub:directMessage",
+      "PropertyValue": "schema:PropertyValue",
+      "value": "schema:value",
+      "uuid": "schema:identifier",
+      "conversation": "ostatus:conversation",
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "Hashtag": "as:Hashtag",
+      "quoteUrl": "as:quoteUrl",
+      "quoteUri": "http://fedibird.com/ns#quoteUri"
+    }
+  ],
+  "type": "Group",
+  "manuallyApprovesFollowers": false,
+  "id": "https://hubzilla.local/channel/berlin",
+  "preferredUsername": "berlin",
+  "name": "Berliner Diskussionsforum",
+  "updated": "2018-11-05T12:39:46Z",
+  "icon": {
+    "type": "Image",
+    "mediaType": "image/png",
+    "updated": "2018-11-05T12:33:20Z",
+    "url": "https://hubzilla.local/photo/profile/l/38?rev=1541417600",
+    "height": 300,
+    "width": 300
+  },
+  "url": "https://hubzilla.local/channel/berlin",
+  "publicKey": {
+    "id": "https://hubzilla.local/channel/berlin",
+    "owner": "https://hubzilla.local/channel/berlin",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA0XWk8+kegPmoHWLTufF0\nnGrcaCQyL3RRHrkL1UYqQSYzs5uSyV/cP3Wz+g44D1v1uin+t10SNHB2SnZA2ZhV\noC8DdEr/k5EphGEsvuyF7aMMjbVd1bzxdZpgr0ltu0QP3S9ZO8whFt52g294BHq0\npUt6SlK2QhPX69naTsmeCsZ+ZMCocU+lYVthltEl5+hrvYs8ZGmdCMS9dflUQtPJ\n6LLdYigQBx/V6JvRAn949tuD9qV9cumiKp2FKpBTWAeL+wXrIyypl83NquKvwVqH\nV2dZP0DiXgiBpdqOGS6UVvdp01e6jE4F6SnV5VMp4ntDqJH5Z2P1urHYlmYQiPjL\nqAsMC4qbgqHJNfiI0f/jZ9KKAZFFHW2HzQYu+gpWNXyRjwN9TDN3mEAvLIqauYVs\nKZ0wsxJitfRyGZZx1lrktLHOKXjSgk0FJUsbpdYFjHOApRWWL1rqP+LlwqD7UdbT\n6KnIrhZnNL1/T5FCWHSJXAA/6rNSrG4q+BxfRzu9kTifEEjBMuK/if95QxNBap5E\nW20ftsEWlQhqalLPt010syAevP2hUV18Uq+akVNIPkUeOFxGHkMxin9rjKzRDiML\nmQ8wmRm4qP/2+H6409NvxHvTLPeQBboSUz4swwIPH1yBdx0y46YaUtCkT504mFyG\n/VsIqN3B/3HIEehEnWMZCNMCAwEAAQ==\n-----END PUBLIC KEY-----\n"
+  },
+  "tag": [
+    {
+      "type": "PropertyValue",
+      "name": "Protocol",
+      "value": "zot6"
+    },
+    {
+      "type": "PropertyValue",
+      "name": "Protocol",
+      "value": "activitypub"
+    }
+  ],
+  "outbox": "https://hubzilla.local/outbox/berlin",
+  "webfinger": "berlin@hubzilla.local",
+  "inbox": "https://hubzilla.local/inbox/berlin",
+  "followers": "https://hubzilla.local/followers/berlin",
+  "following": "https://hubzilla.local/following/berlin",
+  "endpoints": {
+    "sharedInbox": "https://hubzilla.local/inbox"
+  },
+  "discoverable": true,
+  "assertionMethod": [
+    {
+      "id": "https://hubzilla.local/channel/berlin#z6Mkt7SK1YgagNcbms2WTNXDik3PuKMEpcHTXFmYcGni19H8",
+      "type": "Multikey",
+      "controller": "https://hubzilla.local/channel/berlin",
+      "publicKeyMultibase": "z6Mkt7SK1YgagNcbms2WTNXDik3PuKMEpcHTXFmYcGni19H8"
+    },
+    {
+      "id": "https://hubzilla.local/channel/berlin",
+      "type": "Multikey",
+      "controller": "https://hubzilla.local/channel/berlin",
+      "publicKeyMultibase": "zgghBUVkqmWS8e1izWTWiFnEjwH8DrtuXwbxhzBpqyCTy1VkwRk2WWrRi4GyxH5tKfCnVjQPq6MnfdwJphC3CAtDeEJV88eudYQmbQGar9BTS2tNZYiswq1BQnkLptrBe5BVJ4eddEbCCSgkboQV6CacRQpVAGqhiHqnC7LQiSgGoNjiC1yfQzj1VJfciuzDXekN9wpjbkqCZYj2Es3YEUBvZWqjqvAHtYXmaaLg4LTKyg1xCHDSYeUrDwNaMNtkx5MwpbBJoGXGQZvDbQG5gBtusbBGxa6jHq738UYMT7Pd2K1koCZkwiBitQYX47W6DJyukBFB4yZVbnnLD6HREKqqb4hbqSUN82A4QsqR6r9g2MXhHh5fjSNDmwAUPfkJpAPckMdXU7r1rcsYXo44GPoUztn7Bpb3BVws8K9N884aWDyktX3KfMM6BDHVav5zAoTwTk3UxZBL592hJaGysVEQ5fdMziCCDGgax6pUAtK4U7XrxcyV5rGRUATFfRHa126GcVwXXh4PagNUoHkYDSgzPXyWLh6nnsejhwAoSMf8qwCv2N23SeDowisyRpBKXHa846dH5vStpwWP2BkEu5VMvpMdYoXTonVimfq43DBCaSjzP2jBb1D9VPVAfuAYZMcUWfZPS6qw3BkTAqsuzJkJg4VFUUhHv82ERWhYqtYnohdopGLRk6yQz7exAQwZeyjmSjGC3FPR2pbj1z"
+    }
+  ],
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-01T12:56:20Z",
+    "verificationMethod": "https://hubzilla.local/channel/berlin#z6Mkt7SK1YgagNcbms2WTNXDik3PuKMEpcHTXFmYcGni19H8",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "zNaJzhkMgc6enp2sZki61QVmRYEU1muXv8iXMfRtUdJfLcFLnM4seQDJqPFU1vLhQV3vHW4aSDUnYGoG6AcQxyxD"
+  },
+  "signature": {
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
+      "https://w3id.org/security/v1"
+    ],
+    "type": "RsaSignature2017",
+    "nonce": "bcc3eafe42d5cd03f11709483988201e42135c2c9b4a1edf7f9d2cd73dab75b3",
+    "creator": "https://hubzilla.local/channel/berlin",
+    "created": "2026-09-01T12:56:20Z",
+    "signatureValue": "HTaXGn4XdwIM9Yjkk4GbHQVP68VEmdKpzDGlXB6b0C7k+wX0Zi+6tkiF0lYRknAnCOrSobRuUVZE1G/1B7ZN+g7+OwTx52mAIx0/SxSTDBdJvZ/sI4Y0KrK4uSYymnwXotmFuc7oHAHqcIiIjQQ8maqI58+cXaRqNeE+8OP+g0ITMKVmf08HTrCPEgyTW11oZX6/JLldaBFQIBQdyuQyQ6ziRgNi0eoXlu4fopdGIg5snmAGC6Wt2CyD/wTkI0N2kmhYwbjn7RIKCMffaQgYLEbQHSDoPUC8vORqrIreYz+6U/bpj2oqD/OOqpl7Qx5gC3QJ3p5pctNSWxGJw5Ru5A1DaxT4umqndQfL2/S3LVJSh1rlENyCP8cwxKTSpY2xUtAY/Z8WRsodei3+8zVZSmldrvjp29mu/rFvEnDcecd6tww+9dPPvGtN6M2M44lqR2TnMzPkuqXiBC/ayEz9gN1RxltKGyuwRiNWr+7fo3/X2vTM5q6jJ4r9laH8Rr6aJWlV3tUJUccPqLJuIlE/JJxqygwspVKDtuvR7matCLqol+nBEoS5kzIcZCYgpDG2LEFYU8GJ5XnHgGvjwB6cB9LFliixCFup8Lrk91Bkn/0wZboYCW0hhn9Fcw/Hi6z1E9AR+olMqz6QAAxH9fO2QTv7C+uxwgLNL3XHOrCKnXg="
+  }
+}

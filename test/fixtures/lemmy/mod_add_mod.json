@@ -1,0 +1,10 @@
+{
+  "actor": "http://lemmy.local/u/lemmy_beta",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "object": "http://lemmy2.local/u/lemmy_alpha",
+  "target": "http://lemmy.local/c/main/moderators",
+  "cc": ["http://lemmy.local/c/main"],
+  "audience": "http://lemmy.local/u/main",
+  "type": "Add",
+  "id": "http://lemmy.local/activities/add/ec069147-77c3-447f-88c8-0ef1df10403f"
+}

@@ -4,13 +4,13 @@
     "https://www.w3.org/ns/activitystreams"
   ],
   "type": "Group",
-  "id": "https://lemmy.ml/c/technology",
+  "id": "https://lemmy.local/c/technology",
   "preferredUsername": "technology",
-  "inbox": "https://lemmy.ml/c/technology/inbox",
-  "followers": "https://lemmy.ml/c/technology/followers",
+  "inbox": "https://lemmy.local/c/technology/inbox",
+  "followers": "https://lemmy.local/c/technology/followers",
   "publicKey": {
-    "id": "https://lemmy.ml/c/technology#main-key",
-    "owner": "https://lemmy.ml/c/technology",
+    "id": "https://lemmy.local/c/technology#main-key",
+    "owner": "https://lemmy.local/c/technology",
     "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1enSp/cMIPGr7i22UYr/\n7qPI+N2yppfvYx5H3wO4TPnzJgDz23NzV/LNC7YBYuBi6ovlBDCEXYEOdliDMb+M\nsuKfERYaq3IquSDJFFsy5xTgncfMW8J/psLkEZdT8Byfc1hJVxAZQJ0SlfV/84RJ\na5hdiAtx92pGarRSfBaBpbKMJO3XniR4RvkiZWCaU90LdtJmPdkLMwkkdMgCHSdj\nVWehJetHsLm7ptJg4LXsoCdDRtR8hi9NX/i0zSIJiWMqBYp3DxK8N3FBUZrOtHCR\nqH5ll0qyEu8UbQsDUSnls5Oxd7Ncly3ll3vEz+6MXQLKxIqOACUMbSLUeC5bMYdB\nsQIDAQAB\n-----END PUBLIC KEY-----\n"
   },
   "name": "Technology",
@@ -21,16 +21,16 @@
   },
   "icon": {
     "type": "Image",
-    "url": "https://lemmy.ml/pictrs/image/2QNz7bkA1V.png"
+    "url": "https://lemmy.local/pictrs/image/2QNz7bkA1V.png"
   },
   "sensitive": false,
-  "attributedTo": "https://lemmy.ml/c/technology/moderators",
+  "attributedTo": "https://lemmy.local/c/technology/moderators",
   "postingRestrictedToMods": false,
-  "outbox": "https://lemmy.ml/c/technology/outbox",
+  "outbox": "https://lemmy.local/c/technology/outbox",
   "endpoints": {
-    "sharedInbox": "https://lemmy.ml/inbox"
+    "sharedInbox": "https://lemmy.local/inbox"
   },
-  "featured": "https://lemmy.ml/c/technology/featured",
+  "featured": "https://lemmy.local/c/technology/featured",
   "language": [],
   "published": "2019-04-25T21:58:01.788609Z",
   "updated": "2023-10-30T08:08:07.411525Z"

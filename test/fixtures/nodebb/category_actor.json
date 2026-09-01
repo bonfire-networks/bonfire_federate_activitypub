@@ -4,27 +4,27 @@
     "https://w3id.org/security/v1",
     "https://join-lemmy.org/context.json"
   ],
-  "id": "https://community.nodebb.org/category/6",
-  "url": "https://community.nodebb.org/category/6/bug-reports",
-  "inbox": "https://community.nodebb.org/category/6/inbox",
-  "outbox": "https://community.nodebb.org/category/6/outbox",
+  "id": "https://nodebb.local/category/6",
+  "url": "https://nodebb.local/category/6/bug-reports",
+  "inbox": "https://nodebb.local/category/6/inbox",
+  "outbox": "https://nodebb.local/category/6/outbox",
   "type": "Group",
   "name": "Bug Reports",
   "preferredUsername": "bug-reports",
-  "attributedTo": "https://community.nodebb.org/category/6/moderators",
+  "attributedTo": "https://nodebb.local/category/6/moderators",
   "summary": "<p dir=\"auto\">Found a bug? Why not make a bug report here?</p>\n",
   "icon": {
     "type": "Image",
     "mediaType": "image/png",
-    "url": "https://community.nodebb.org/assets/uploads/category/category-6-icon.png"
+    "url": "https://nodebb.local/assets/uploads/category/category-6-icon.png"
   },
   "postingRestrictedToMods": false,
   "publicKey": {
-    "id": "https://community.nodebb.org/category/6#key",
-    "owner": "https://community.nodebb.org/category/6",
+    "id": "https://nodebb.local/category/6#key",
+    "owner": "https://nodebb.local/category/6",
     "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxzxefEoQmr5Gg9kkgnhX\n08f3yzFfrbTVT+FgJOS56QLRT4DMVShn7NhbffFW6nYl3AihY1dwmDD1sE1ePBAx\nEB8wu7pKIfSQqULPz+vqMQQIxZ5cRQ3GSik5MNDlq3NJ4MTJkfa0NinOq86CeLnu\nF8Lv4vgnYgBkreXgvlf47sNkwGJEFw4fWqx1iWYMRSlsDxs6oV1Lp3hNbMXlr1zk\njexIljrBCRBhmIF1sxnodvutpIU6o9qPpyeC73xKlH3me/GfByBxBDymTmylRzuL\ncBZRB2mICZDDsjIS1Q+P7LmCbhKtjqmWkCIMRcLyrwl0O0O21KncRZe72bgajjzW\nEQIDAQAB\n-----END PUBLIC KEY-----\n"
   },
   "endpoints": {
-    "sharedInbox": "https://community.nodebb.org/inbox"
+    "sharedInbox": "https://nodebb.local/inbox"
   }
 }
