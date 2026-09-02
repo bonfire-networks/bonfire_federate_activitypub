@@ -1,0 +1,53 @@
+{
+    "id": "https://funkwhale.local/federation/actors/antistamina",
+    "outbox": "https://funkwhale.local/federation/actors/antistamina/outbox",
+    "inbox": "https://funkwhale.local/federation/actors/antistamina/inbox",
+    "preferredUsername": "antistamina",
+    "type": "Person",
+    "name": "Antistamina",
+    "followers": "https://funkwhale.local/federation/actors/antistamina/followers",
+    "following": "https://funkwhale.local/federation/actors/antistamina/following",
+    "manuallyApprovesFollowers": false,
+    "url": [
+        {
+            "type": "Link",
+            "href": "https://funkwhale.local/channels/antistamina",
+            "mediaType": "text/html"
+        },
+        {
+            "type": "Link",
+            "href": "https://funkwhale.local/api/v2/channels/antistamina/rss",
+            "mediaType": "application/rss+xml"
+        }
+    ],
+    "icon": {
+        "type": "Image",
+        "url": "https://funkwhale.local/media/attachments/8a/25/9c/2.jpg",
+        "mediaType": "image/jpeg"
+    },
+    "attributedTo": "https://funkwhale.local/federation/actors/skeyby",
+    "category": "music",
+    "tag": [
+        {
+            "type": "Hashtag",
+            "name": "#SkaPunk"
+        }
+    ],
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://w3id.org/security/v1",
+        "https://funkwhale.audio/ns",
+        {
+            "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+            "Hashtag": "as:Hashtag"
+        }
+    ],
+    "publicKey": {
+        "owner": "https://funkwhale.local/federation/actors/antistamina",
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApz7NCq5GSLDBShzFa2cM\nRxu9ts0rfU1JK27qVzeSyEZxaFn+vWFKqwvO3ohgXXWJ87+DhXffPV1KoZN5ZPiQ\nurCsm2tmmG0kmbTy6elZFhs82660aaH4Z6xsWqAPEKPaFZ54efbmB1St6p6u/nht\nJjU+KsByI3Bhd6lZyM2t+dVFav8CH+jzdpkCi91NjeYi7KXisVkMe8h9P70XYOWy\n3362IANjevpDlMVXQo/gDfQtzp6bfbBQf4EZZ0jolZIRYg4Rpr8VII7XZbae2svJ\nxauD2RsPdl8Q0fa0tzOgiX4USnoGynjm7/gnaFSXtTjrRx5DrLznIZ/mSQa1fMl5\n9QIDAQAB\n-----END PUBLIC KEY-----\n",
+        "id": "https://funkwhale.local/federation/actors/antistamina#main-key"
+    },
+    "endpoints": {
+        "sharedInbox": "https://funkwhale.local/federation/shared/inbox"
+    }
+}

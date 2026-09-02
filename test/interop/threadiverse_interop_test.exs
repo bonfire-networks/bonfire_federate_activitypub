@@ -320,6 +320,26 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     end
   end
 
+  # PieFed batches deliveries to receivers it believes can cope, sending ONE `Announce` whose `object` is a LIST of activities. It only does this for `piefed` and `pylova` receivers, so no outbox will ever hand us one and this fixture is CONSTRUCTED from the shape its source emits: a documented exception to "fixtures are real captures", justified because what is under test is our robustness rather than their wire shape.
+  # The failure it guards against is silent: a list falls through to the bare-id clause, which does the wrong thing with a whole batch rather than erroring.
+  test "a batched Announce ingests every activity in the batch, not just the first" do
+    announce = fixture("piefed", "announce_create_page.json")
+    second = variant_of(announce, "batched")
+
+    batch = Map.put(announce, "object", [announce["object"], second["object"]])
+
+    receive_announce(batch)
+
+    for {a, which} <- [{announce, "first"}, {second, "second"}] do
+      id = a["object"]["object"]["id"]
+
+      assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: id),
+             "the #{which} activity in the batch should have been ingested"
+
+      refute is_nil(pointer_id), "and linked to a local record"
+    end
+  end
+
   # NodeBB is the only one of the three whose community outbox carries replies at all — Lemmy and
   # PieFed outboxes list only top-level posts.
   test "NodeBB: an announced reply keeps its inReplyTo" do

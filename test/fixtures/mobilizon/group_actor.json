@@ -1,0 +1,176 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://w3id.org/security/v1",
+        {
+            "addressRegion": "sc:addressRegion",
+            "timezone": {
+                "@id": "mz:timezone",
+                "@type": "sc:Text"
+            },
+            "isOnline": {
+                "@id": "mz:isOnline",
+                "@type": "sc:Boolean"
+            },
+            "pt": "https://joinpeertube.org/ns#",
+            "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+            "inLanguage": "sc:inLanguage",
+            "address": {
+                "@id": "sc:address",
+                "@type": "sc:PostalAddress"
+            },
+            "status": {
+                "@id": "ical:status",
+                "@type": "ical:status"
+            },
+            "discoverable": "toot:discoverable",
+            "repliesModerationOption": {
+                "@id": "mz:repliesModerationOption",
+                "@type": "mz:repliesModerationOptionType"
+            },
+            "sc": "http://schema.org#",
+            "mz": "https://mobilizon.org/ns#",
+            "category": "sc:category",
+            "joinModeType": {
+                "@id": "mz:joinModeType",
+                "@type": "rdfs:Class"
+            },
+            "Hashtag": "as:Hashtag",
+            "propertyID": "sc:propertyID",
+            "PostalAddress": "sc:PostalAddress",
+            "discussions": {
+                "@id": "mz:discussions",
+                "@type": "@id"
+            },
+            "remainingAttendeeCapacity": "sc:remainingAttendeeCapacity",
+            "streetAddress": "sc:streetAddress",
+            "anonymousParticipationEnabled": {
+                "@id": "mz:anonymousParticipationEnabled",
+                "@type": "sc:Boolean"
+            },
+            "externalParticipationUrl": {
+                "@id": "mz:externalParticipationUrl",
+                "@type": "sc:URL"
+            },
+            "addressLocality": "sc:addressLocality",
+            "joinMode": {
+                "@id": "mz:joinMode",
+                "@type": "mz:joinModeType"
+            },
+            "location": {
+                "@id": "sc:location",
+                "@type": "sc:Place"
+            },
+            "toot": "http://joinmastodon.org/ns#",
+            "participantCount": {
+                "@id": "mz:participantCount",
+                "@type": "sc:Integer"
+            },
+            "uuid": "sc:identifier",
+            "maximumAttendeeCapacity": "sc:maximumAttendeeCapacity",
+            "participationMessage": {
+                "@id": "mz:participationMessage",
+                "@type": "sc:Text"
+            },
+            "openness": {
+                "@id": "mz:openness",
+                "@type": "@id"
+            },
+            "members": {
+                "@id": "mz:members",
+                "@type": "@id"
+            },
+            "events": {
+                "@id": "mz:events",
+                "@type": "@id"
+            },
+            "resources": {
+                "@id": "mz:resources",
+                "@type": "@id"
+            },
+            "addressCountry": "sc:addressCountry",
+            "posts": {
+                "@id": "mz:posts",
+                "@type": "@id"
+            },
+            "commentsEnabled": {
+                "@id": "pt:commentsEnabled",
+                "@type": "sc:Boolean"
+            },
+            "value": "sc:value",
+            "PropertyValue": "sc:PropertyValue",
+            "repliesModerationOptionType": {
+                "@id": "mz:repliesModerationOptionType",
+                "@type": "rdfs:Class"
+            },
+            "todos": {
+                "@id": "mz:todos",
+                "@type": "@id"
+            },
+            "ical": "http://www.w3.org/2002/12/cal/ical#",
+            "postalCode": "sc:postalCode",
+            "memberCount": {
+                "@id": "mz:memberCount",
+                "@type": "sc:Integer"
+            },
+            "@language": "und"
+        }
+    ],
+    "discoverable": true,
+    "discussions": "https://mobilizon.local/@framasoft/discussions",
+    "endpoints": {
+        "discussions": "https://mobilizon.local/@framasoft/discussions",
+        "events": "https://mobilizon.local/@framasoft/events",
+        "members": "https://mobilizon.local/@framasoft/members",
+        "posts": "https://mobilizon.local/@framasoft/posts",
+        "resources": "https://mobilizon.local/@framasoft/resources",
+        "sharedInbox": "https://mobilizon.local/inbox",
+        "todos": "https://mobilizon.local/@framasoft/todos"
+    },
+    "events": "https://mobilizon.local/@framasoft/events",
+    "followers": "https://mobilizon.local/@framasoft/followers",
+    "following": "https://mobilizon.local/@framasoft/following",
+    "icon": {
+        "mediaType": "image/jpeg",
+        "type": "Image",
+        "url": "https://mobilizon.local/media/890f5396ef80081a6b1b18a5db969746cf8bb340e8a4e657d665e41f6646c539.jpg?name=framasoft%27s%20avatar.jpg"
+    },
+    "id": "https://mobilizon.local/@framasoft",
+    "image": {
+        "mediaType": "image/jpeg",
+        "type": "Image",
+        "url": "https://mobilizon.local/media/a8227a16cc80b3d20ff5ee549a29c1b20a0ca1547f8861129aae9f00c3c69d12.jpg?name=framasoft%27s%20banner.jpg"
+    },
+    "inbox": "https://mobilizon.local/@framasoft/inbox",
+    "location": {
+        "address": {
+            "addressCountry": "France",
+            "addressLocality": "Lyon",
+            "addressRegion": "Auvergne-Rhône-Alpes",
+            "postalCode": "69007",
+            "streetAddress": "10 bis rue Jangot",
+            "type": "PostalAddress"
+        },
+        "id": "https://mobilizon.local/address/0438c134-963c-4c2e-bae1-3fec8e9dbe33",
+        "name": "Lyon",
+        "type": "Place"
+    },
+    "manuallyApprovesFollowers": false,
+    "memberCount": 12,
+    "members": "https://mobilizon.local/@framasoft/members",
+    "name": "Framasoft",
+    "openness": "moderated",
+    "outbox": "https://mobilizon.local/@framasoft/outbox",
+    "posts": "https://mobilizon.local/@framasoft/posts",
+    "preferredUsername": "framasoft",
+    "publicKey": {
+        "id": "https://mobilizon.local/@framasoft#main-key",
+        "owner": "https://mobilizon.local/@framasoft",
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuy0YgN9pPTSzMHhEnRCy\nXf98xQV8fRqKcAAo53edoFa7Cpkow5mMXowJGi7uqsMpLnyOEKvify7Y7gfLzbH8\nIuCfJxLJ19EsTte+xzWDkiqMZ9HC3HPQ0ZEIkBIeDbExBZZwPRbku9ft5ZxU+PRq\nn1E93pcPM9qEC0vQ2f+LggDX4x89M6UGLPbXVOMPMQwizt5Zi4b5WpZOi7YL4nIE\nUodkqAZAtVO51HGTtBX64uGxg3xQTt2cl/fOO6LwWus4wu0HALMQGy/CMG7oDBic\ncDYEshDLRmORxWukG1iYSUgphLXZb0kssT+if9DwBA6S6WpIJ7/BiZxv/aqTIlGA\nIQIDAQAB\n-----END PUBLIC KEY-----\n\n"
+    },
+    "resources": "https://mobilizon.local/@framasoft/resources",
+    "summary": "",
+    "todos": "https://mobilizon.local/@framasoft/todos",
+    "type": "Group",
+    "url": "https://mobilizon.local/@framasoft"
+}

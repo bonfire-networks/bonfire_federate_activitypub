@@ -1,0 +1,14 @@
+{
+  "id": "https://mastodon.local/users/Gargron/statuses/117200973443800425/activity",
+  "type": "Announce",
+  "actor": "https://mastodon.local/users/Gargron",
+  "published": "2026-09-02T10:28:51Z",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://beige.local/users/Lana",
+    "https://mastodon.local/users/Gargron/followers"
+  ],
+  "object": "https://beige.local/users/Lana/statuses/117199176134302013"
+}

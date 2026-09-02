@@ -1,0 +1,73 @@
+{
+  "id": "https://mastodon.local/users/Gargron/statuses/117196620735631188/activity",
+  "type": "Create",
+  "actor": "https://mastodon.local/users/Gargron",
+  "published": "2026-09-01T16:01:54Z",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://mastodon.local/users/Gargron/followers",
+    "https://kind.local/users/TheLongestJohns"
+  ],
+  "object": {
+    "id": "https://mastodon.local/users/Gargron/statuses/117196620735631188",
+    "type": "Note",
+    "summary": null,
+    "inReplyTo": "https://kind.local/users/TheLongestJohns/statuses/117196613741701493",
+    "published": "2026-09-01T16:01:54Z",
+    "url": "https://mastodon.local/@Gargron/117196620735631188",
+    "attributedTo": "https://mastodon.local/users/Gargron",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+      "https://mastodon.local/users/Gargron/followers",
+      "https://kind.local/users/TheLongestJohns"
+    ],
+    "sensitive": false,
+    "atomUri": "https://mastodon.local/users/Gargron/statuses/117196620735631188",
+    "inReplyToAtomUri": "https://kind.local/users/TheLongestJohns/statuses/117196613741701493",
+    "conversation": "https://kind.local/contexts/110650372146049331-117196613741701493",
+    "context": "https://kind.local/contexts/110650372146049331-117196613741701493",
+    "content": "<p><span class=\"h-card\" translate=\"no\"><a href=\"https://kind.local/@TheLongestJohns\" class=\"u-url mention\">@<span>TheLongestJohns</span></a></span> Nice! Looking forward.</p>",
+    "contentMap": {
+      "en": "<p><span class=\"h-card\" translate=\"no\"><a href=\"https://kind.local/@TheLongestJohns\" class=\"u-url mention\">@<span>TheLongestJohns</span></a></span> Nice! Looking forward.</p>"
+    },
+    "interactionPolicy": {
+      "canQuote": {
+        "automaticApproval": [
+          "https://www.w3.org/ns/activitystreams#Public"
+        ]
+      }
+    },
+    "attachment": [],
+    "tag": [
+      {
+        "type": "Mention",
+        "href": "https://kind.local/users/TheLongestJohns",
+        "name": "@TheLongestJohns@kind.local"
+      }
+    ],
+    "replies": {
+      "id": "https://mastodon.local/users/Gargron/statuses/117196620735631188/replies",
+      "type": "Collection",
+      "first": {
+        "type": "CollectionPage",
+        "next": "https://mastodon.local/users/Gargron/statuses/117196620735631188/replies?only_other_accounts=true&page=true",
+        "partOf": "https://mastodon.local/users/Gargron/statuses/117196620735631188/replies",
+        "items": []
+      }
+    },
+    "likes": {
+      "id": "https://mastodon.local/users/Gargron/statuses/117196620735631188/likes",
+      "type": "Collection",
+      "totalItems": 0
+    },
+    "shares": {
+      "id": "https://mastodon.local/users/Gargron/statuses/117196620735631188/shares",
+      "type": "Collection",
+      "totalItems": 0
+    }
+  }
+}
