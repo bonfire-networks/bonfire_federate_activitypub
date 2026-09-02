@@ -113,6 +113,33 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # |> Enum.map(&id(&1))
   end
 
+  # paged variant (AP followers collection): same visibility semantics as the 2-arity, but
+  # paged + ordered in SQL so one page never materialises the whole follower list
+  def get_follower_local_ids(actor, purpose_or_current_actor, opts) when is_list(opts) do
+    maybe_apply(
+      Bonfire.Social.Graph.Follows,
+      :page_follower_ids,
+      [
+        AdapterUtils.character_id_from_actor(actor),
+        AdapterUtils.set_list_follow_opts(purpose_or_current_actor, :subject_id_only) ++ opts
+      ],
+      fallback_return: []
+    )
+    |> List.flatten()
+  end
+
+  def count_followers(actor, purpose_or_current_actor \\ nil) do
+    maybe_apply(
+      Bonfire.Social.Graph.Follows,
+      :count_followers,
+      [
+        AdapterUtils.character_id_from_actor(actor),
+        AdapterUtils.set_list_follow_opts(purpose_or_current_actor, :subject_id_only)
+      ],
+      fallback_return: 0
+    )
+  end
+
   def get_following_local_ids(%Actor{} = actor, purpose_or_current_actor \\ nil) do
     with {:ok, character} <- Characters.by_username(actor.username) do
       maybe_apply(
@@ -125,6 +152,63 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
       # |> Enum.map(&id(&1))
     end
+  end
+
+  # paged variant — see get_follower_local_ids/3
+  def get_following_local_ids(%Actor{} = actor, purpose_or_current_actor, opts)
+      when is_list(opts) do
+    with {:ok, character} <- Characters.by_username(actor.username) do
+      maybe_apply(
+        Bonfire.Social.Graph.Follows,
+        :page_followed_ids,
+        [
+          character,
+          AdapterUtils.set_list_follow_opts(purpose_or_current_actor, :object_id_only) ++ opts
+        ],
+        fallback_return: []
+      )
+      |> List.flatten()
+    end
+  end
+
+  def count_following(%Actor{} = actor, purpose_or_current_actor \\ nil) do
+    with {:ok, character} <- Characters.by_username(actor.username) do
+      maybe_apply(
+        Bonfire.Social.Graph.Follows,
+        :count_followed,
+        [
+          character,
+          AdapterUtils.set_list_follow_opts(purpose_or_current_actor, :object_id_only)
+        ],
+        fallback_return: 0
+      )
+    end
+  end
+
+  @doc """
+  URI-only batch sibling of `get_actors_by_ids/1` (for AP collection pages): resolves pointer ids
+  straight to canonical ap_ids — one batched load + one batched preload, NO actor formatting and
+  nothing written into the actor cache. Input order preserved; unknown ids dropped.
+  """
+  def get_actor_ap_ids_by_ids([]), do: []
+
+  def get_actor_ap_ids_by_ids(ids) when is_list(ids) do
+    known =
+      ids
+      |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+      # `character: [:peered]` gives remote actors their canonical_uri and locals their username;
+      # `:shared_user` lets `canonical_url` type organisations vs persons without a lazy preload
+      |> repo().maybe_preload([:shared_user, character: [:peered]], prune: true)
+      |> Map.new(&{&1.id, &1})
+
+    ids
+    |> Enum.map(fn id ->
+      case known[id] do
+        nil -> nil
+        character -> URIs.canonical_url(character, preload_if_needed: false)
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   # NOTE: for anything already addressed at publish time (see `AdapterUtils.determine_recipients/4`, which puts boundary-granted recipients in `bto`/`bcc`), those recipients arrive here in `addressed_pointer_ids` and are excluded at the SQL level by `get_followers`, so the expensive `bonfire_boundaries_summary` grants query is skipped by the `followers != []` guard rather than being re-run.
