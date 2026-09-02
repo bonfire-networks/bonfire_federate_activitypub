@@ -342,6 +342,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
               AdapterUtils.maybe_fix_image_object(data["image"]),
               character
             )
+        },
+        # what the actor declares about ITSELF, which the profile fields above don't carry. A character module that needs them (currently groups) re-applies these on update, so a community that promotes a moderator or flips `postingRestrictedToMods` is not stuck with whatever it declared the day we first saw it.
+        remote_declarations: %{
+          attributed_to: data["attributedTo"],
+          manually_approves_followers: data["manuallyApprovesFollowers"] == true,
+          posting_restricted_to_mods: data["postingRestrictedToMods"] == true
         }
       }
       |> debug("params")

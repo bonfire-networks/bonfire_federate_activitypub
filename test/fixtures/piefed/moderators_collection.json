@@ -1,0 +1,12 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1"
+  ],
+  "id": "https://piefed.local/c/piefed_meta/moderators",
+  "orderedItems": [
+    "https://piefed.local/u/rimu"
+  ],
+  "totalItems": 1,
+  "type": "OrderedCollection"
+}

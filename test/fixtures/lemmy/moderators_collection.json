@@ -1,0 +1,11 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "type": "OrderedCollection",
+  "id": "https://lemmy.local/c/technology/moderators",
+  "orderedItems": [
+    "https://lemmy.local/u/MinutePhrase"
+  ]
+}

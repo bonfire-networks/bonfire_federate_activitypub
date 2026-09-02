@@ -66,7 +66,6 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
            "an open forum, which is what maps to `membership: open`"
   end
 
-  @tag :todo
   test "an Add of a member's Create ingests the post, still attributed to the member", %{
     add: add,
     note: note
@@ -84,7 +83,6 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
            "attribution belongs to the member who wrote it, not the forum that added it"
   end
 
-  @tag :todo
   test "the added post lands in the forum's feed", %{add: add, note: note} do
     receive_add(add)
 
@@ -102,7 +100,6 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
   # Replying into a 171b conversation means quoting the container back, so the id has to survive
   # ingest. `transformer.ex` already reads `context || conversation || inReplyTo`, so this asserts
   # the property we depend on rather than new behaviour.
-  @tag :todo
   test "the conversation container id survives ingest", %{add: add, note: note} do
     receive_add(add)
 
@@ -110,6 +107,28 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
 
     assert object.data["context"] == note["context"],
            "the `/conversation/<uuid>` id is what a reply must carry back, so it must not be dropped"
+  end
+
+  # `Add` is a general verb: "put this object in that collection". Only a container owner adding to
+  # its OWN container is the 1b12-equivalent relay, so these two must not be mistaken for one.
+  describe "what is NOT a container relay" do
+    # It may well succeed, handled as an ordinary collection Add. What it must not do is ingest and
+    # relay the wrapped activity as though a container had distributed it.
+    test "an Add with no context does not relay the wrapped activity", %{add: add, note: note} do
+      add |> Map.drop(["context"]) |> receive_add()
+
+      assert {:error, :not_found} = ActivityPub.Object.get_cached(ap_id: note["id"]),
+             "without a container named in `context` there is nothing to relay into"
+    end
+
+    test "an Add naming a container on another host is refused", %{add: add, note: note} do
+      add
+      |> Map.put("context", "https://elsewhere.local/conversation/1")
+      |> receive_add()
+
+      assert {:error, :not_found} = ActivityPub.Object.get_cached(ap_id: note["id"]),
+             "adding someone else's activity to a container you do not own must not become a boost by you"
+    end
   end
 
   defp receive_add(add) do

@@ -377,21 +377,22 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     receive_activity_fallback(activity, object)
   end
 
-  # The collection "type" of an activity's `target` (e.g. "featured"), for dispatch-by-target —
-  # determined by which collection property on the *actor* points at the target. Works for our own
-  # ids and remote/Mastodon (`{actor}/collections/featured`) alike. `target` and `actor` were already
-  # resolved into the activity by earlier `receive_activity/1` clauses.
+  # The collection "type" of an activity's `target` (e.g. "featured"), for dispatch-by-target, determined by which collection property on the *actor* points at the target. Works for our own ids and remote/Mastodon (`{actor}/collections/featured`) alike. `target` and `actor` were already resolved into the activity by earlier `receive_activity/1` clauses.
   defp collection_target_type(%{data: %{"target" => target} = data}) do
-    with target_id when is_binary(target_id) <-
-           (is_binary(target) && target) || e(target, "id", nil) || e(target, :data, "id", nil),
-         actor_ap_id when is_binary(actor_ap_id) <-
-           e(data, "actor", "id", nil) || e(data, "actor", nil),
-         {:ok, %{data: actor_data}} when is_map(actor_data) <-
-           ActivityPub.Actor.get_cached(ap_id: actor_ap_id) do
-      # the type is the actor property whose value is the target id (e.g. "featured", "keyPackages")
-      Enum.find_value(actor_data, fn
-        {key, value} when is_binary(value) and value == target_id -> key
-        _ -> nil
+    with target_id when is_binary(target_id) <- AdapterUtils.collection_target_id(target) do
+      # `get_cached` deliberately, never a fetch: an addressing field must not be able to make us fetch arbitrary URLs, and a collection owner we have never seen is not one we mirror anyway
+      Enum.find_value(AdapterUtils.collection_owner_candidates(data), fn candidate ->
+        with {:ok, %{data: actor_data}} when is_map(actor_data) <-
+               ActivityPub.Actor.get_cached(ap_id: candidate) do
+          # the type is the actor property whose value is the target id (e.g. "featured",
+          # "keyPackages", or "attributedTo" for a community's moderators)
+          Enum.find_value(actor_data, fn
+            {key, value} when is_binary(value) and value == target_id -> key
+            _ -> nil
+          end)
+        else
+          _ -> nil
+        end
       end)
     else
       _ -> nil
@@ -553,6 +554,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           previous_pointer_id
         )
 
+        maybe_apply_comments_enabled(character, object, pointable_object_id)
+
         if publish_after_create? do
           info("Local C2S activity handled by the fallback module, federating it now")
           ActivityPub.Federator.publish(activity)
@@ -628,8 +631,23 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       end
       |> debug("pointer_id update")
 
+      # an Update can also REOPEN a thread it previously closed, which a create cannot
+      maybe_apply_comments_enabled(character, object, id || pointable_object_id,
+        updating: e(activity, :data, "type", nil) == "Update"
+      )
+
       {:ok, pointable_object}
     end
+  end
+
+  # A thread's reply status can arrive ON THE OBJECT as `commentsEnabled` (the threadiverse's way of saying it, where a `Lock` activity says a change to it). Applied here rather than in each context module because it belongs to any threaded object, whatever it becomes locally: a `Post`, an `Article`, a poll `Question`, or the `Media` that a link post becomes.
+  defp maybe_apply_comments_enabled(character, object, pointable_object_id, opts \\ []) do
+    Utils.maybe_apply(
+      Bonfire.Social.Threads,
+      :ap_receive_comments_enabled,
+      [{:ok, pointable_object_id}, character, e(object, :data, %{}), opts],
+      fallback_return: nil
+    )
   end
 
   # defp handle_activity_with(_module, {:error, _}, activity, _) do

@@ -50,6 +50,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       System.get_env("AP_BASE_PATH", "/pub")
   end
 
+  @doc """
+  Actors an activity names that might own a collection it targets: its `actor`, plus everyone it addresses.
+
+  The owner of a collection is whoever DECLARES it, which need not be the activity's actor: a moderator adding another moderator acts on the COMMUNITY's collection, and names the community in `cc`. So these are candidates only, never an answer: what identifies an owner is that actor's own data pointing at the target, which a caller has to check.
+  """
+  @doc "The id of the collection an activity targets, whether it arrived as a bare URL or was already fetched into an object by `Incoming.receive_activity/1`."
+  def collection_target_id(%{"target" => target}), do: collection_target_id(target)
+  def collection_target_id(target) when is_binary(target), do: target
+  def collection_target_id(%{} = target), do: e(target, "id", nil) || e(target, :data, "id", nil)
+  def collection_target_id(_), do: nil
+
+  def collection_owner_candidates(data) do
+    ([e(data, "actor", "id", nil) || e(data, "actor", nil)] ++
+       List.wrap(data["cc"]) ++ List.wrap(data["to"]) ++ List.wrap(data["audience"]))
+    |> Enum.filter(&is_binary/1)
+    |> Enum.reject(&(&1 in ActivityPub.Config.public_uris()))
+    |> Enum.uniq()
+  end
+
   def is_public?(%{public: first} = _object, %{public: second} = _activity) do
     case {first, second} do
       {true, true} -> true
@@ -1712,6 +1731,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                             actor.data["manuallyApprovesFollowers"] == true,
                           posting_restricted_to_mods:
                             actor.data["postingRestrictedToMods"] == true,
+                          # who the group says moderates it: a collection URL (Lemmy, PieFed, NodeBB, Mbin), inline Person objects (Smithereen), or absent (Hubzilla, Friendica)
+                          attributed_to: actor.data["attributedTo"],
                           # FIXME: don't query again (Instances.get_or_create already has)
                           custom_circles: [
                             silence_my_instance:
