@@ -170,7 +170,9 @@ defmodule Bonfire.Federate.ActivityPub.FollowersCollectionPagingTest do
 
     test "paging a page costs a constant number of queries", %{user: user} do
       {_ids, count} =
-        with_query_count(fn -> Follows.page_follower_ids(user, page: 1, page_size: @page_size) end)
+        with_query_count(fn ->
+          Follows.page_follower_ids(user, page: 1, page_size: @page_size)
+        end)
 
       assert count <= 2, "expected <= 2 queries for one page of ids, got #{count}"
     end

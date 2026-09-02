@@ -96,17 +96,40 @@ defmodule Bonfire.Federate.ActivityPub.GroupMicroblogInteropTest do
            "and it joins that thread rather than starting one of its own"
   end
 
-  # Threading is local plumbing; this is what members of the group actually see. A remote reply that
-  # threads but never reaches the group's feed would mean people browsing the group miss every reply
-  # from a microblog consumer, which is most of the fediverse.
-  # The LOCAL reply is the control: if replies do not show in a group's feed at all, then the remote
-  # one behaving the same way is consistency, not a federation gap. Whatever a local reply does, a
-  # remote reply to the same thread should do.
-  test "a remote reply reaches the group's feed exactly as a local reply does", %{
-    post: post,
-    post_ap_id: post_ap_id,
-    group: group
-  } do
+  # Threading is local plumbing; this is what members of the group actually see. A remote reply that threads but never reaches the group's feed would mean people browsing the group miss every reply from a microblog consumer, which is most of the fediverse.
+  # The LOCAL reply is the control: if replies do not show in a group's feed at all, then the remote one behaving the same way is consistency, not a federation gap. Whatever a local reply does, a remote reply to the same thread should do.
+  # ⚠️ Uses a LOCAL group, deliberately, because that is the case we are responsible for. When the group is a mirror of a remote community, the origin also announces the reply back to us, so the feed can fill by that route and the gap is hidden. For a group of OURS nobody else will file it.
+  test "a remote reply reaches a LOCAL group's feed exactly as a local reply does" do
+    group_creator = fake_user!()
+    group = Bonfire.Classify.Simulate.fake_group!(group_creator)
+
+    # a PUBLIC federated group, which is what this plan is about. `fake_group!` defaults to members-only participation, under which excluding a non-member's reply is correct rather than a bug, so without this the test would be asking the wrong question of the wrong group.
+    assert :ok =
+             Bonfire.Classify.Boundaries.apply(group, group_creator, %{
+               membership: "open",
+               visibility: "global",
+               participation: "anyone",
+               default_content_visibility: "public"
+             })
+
+    assert {:ok, post} =
+             Bonfire.Posts.publish(
+               current_user: group_creator,
+               post_attrs: %{
+                 post_content: %{html_body: "<p>a thread in our own group</p>"},
+                 context_id: uid(group),
+                 mentions: [uid(group)]
+               },
+               boundary: "public",
+               context_id: uid(group),
+               mentions: [uid(group)]
+             )
+
+    post_ap_id =
+      post
+      |> repo().maybe_preload([:peered, created: [creator: [character: [:peered]]]])
+      |> canonical_url()
+
     local_member = fake_user!()
 
     # what the UI actually submits when someone replies inside a group thread: the thread as
