@@ -113,8 +113,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # |> Enum.map(&id(&1))
   end
 
-  # paged variant (AP followers collection): same visibility semantics as the 2-arity, but
-  # paged + ordered in SQL so one page never materialises the whole follower list
+  # paged variant: same visibility semantics as the 2-arity, but paged + ordered in SQL
   def get_follower_local_ids(actor, purpose_or_current_actor, opts) when is_list(opts) do
     maybe_apply(
       Bonfire.Social.Graph.Follows,
@@ -186,9 +185,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   @doc """
-  URI-only batch sibling of `get_actors_by_ids/1` (for AP collection pages): resolves pointer ids
-  straight to canonical ap_ids — one batched load + one batched preload, NO actor formatting and
-  nothing written into the actor cache. Input order preserved; unknown ids dropped.
+  URI-only sibling of `get_actors_by_ids/1` (for AP collection pages): one batched load + preload,
+  no actor formatting, nothing written to the actor cache. Input order kept; unknown ids dropped.
   """
   def get_actor_ap_ids_by_ids([]), do: []
 
@@ -196,8 +194,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     known =
       ids
       |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
-      # `character: [:peered]` gives remote actors their canonical_uri and locals their username;
-      # `:shared_user` lets `canonical_url` type organisations vs persons without a lazy preload
+      # exactly what `canonical_url` reads: `peered` for remote URIs, `username` for local ones,
+      # `shared_user` to type organisations vs persons — all batched, none lazily
       |> repo().maybe_preload([:shared_user, character: [:peered]], prune: true)
       |> Map.new(&{&1.id, &1})
 
