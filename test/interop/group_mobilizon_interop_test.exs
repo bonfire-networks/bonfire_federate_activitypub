@@ -43,9 +43,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupMobilizonInteropTest do
            "a mirrored group should be browsable, which starts with its own name"
   end
 
-  # ⚠️ RED deliberately: the mis-mirroring the capture uncovered. Bonfire already separates joining
-  # from following, so this is a mapping gap rather than a modelling one.
-  @tag :todo
+  # Fixed 2026-09-02: `remote_dims/1` reads `openness` before falling back to
+  # `manuallyApprovesFollowers`. The AS2 field describes FOLLOWING, which only coincides with joining
+  # where a group has no membership of its own — true across the threadiverse, false here.
   test "mirrors moderated JOINING, which is not the same as open following" do
     actor = fixture("group_actor.json")
 

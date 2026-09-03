@@ -386,6 +386,24 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   # TODO: refactor & move to Me context(s)?
 
+  @doc """
+  What an actor declares about ITSELF, which the flattened profile params do not carry.
+
+  Built in one place and passed under one key, because an actor reaches us two ways (created on first sight or updated on a later fetch).
+
+  Vendor vocabularies are already normalised by the AP library (`ActivityPub.Federator.Transformer.fix_openness/1` fills `openness` in from AS2's `manuallyApprovesFollowers`), so this only picks fields, it does not translate them.
+  """
+  def remote_declarations(data) do
+    %{
+      # who the group says moderates it: a collection URL (Lemmy, PieFed, NodeBB, Mbin), inline `Person` objects (Smithereen), or absent (Hubzilla, Friendica)
+      attributed_to: data["attributedTo"],
+      # who may JOIN: `open` / `moderated` / `invite_only`
+      openness: data["openness"],
+      # who may start threads: the threadiverse's `lemmy:` term, which PeerTube emits too
+      posting_restricted_to_mods: data["postingRestrictedToMods"] == true
+    }
+  end
+
   def update_remote_actor(%{pointer_id: pointer_id} = actor) when is_binary(pointer_id) do
     AdapterUtils.get_character_by_id(pointer_id)
     |> debug("character pre-update")
@@ -426,11 +444,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
             )
         },
         # what the actor declares about ITSELF, which the profile fields above don't carry. A character module that needs them (currently groups) re-applies these on update, so a community that promotes a moderator or flips `postingRestrictedToMods` is not stuck with whatever it declared the day we first saw it.
-        remote_declarations: %{
-          attributed_to: data["attributedTo"],
-          manually_approves_followers: data["manuallyApprovesFollowers"] == true,
-          posting_restricted_to_mods: data["postingRestrictedToMods"] == true
-        }
+        remote_declarations: remote_declarations(data)
       }
       |> debug("params")
 

@@ -1726,13 +1726,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                           local: false,
                           #  several AS2 types share one context module (Service/Application/Organization all map to SharedUsers), so pass the type along, since picking the module discards which one it was
                           actor_type: actor_type,
-                          # policy the actor declares about itself, which the flattened params above don't carry: `manuallyApprovesFollowers` is AS2, `postingRestrictedToMods` is the threadiverse extension (Lemmy/Mbin/PieFed)
-                          manually_approves_followers:
-                            actor.data["manuallyApprovesFollowers"] == true,
-                          posting_restricted_to_mods:
-                            actor.data["postingRestrictedToMods"] == true,
-                          # who the group says moderates it: a collection URL (Lemmy, PieFed, NodeBB, Mbin), inline Person objects (Smithereen), or absent (Hubzilla, Friendica)
-                          attributed_to: actor.data["attributedTo"],
+                          # what the actor declares about ITSELF, which the flattened profile params
+                          # above don't carry. Same shape as the update path in `Adapter`, so a
+                          # character module reads one thing however the actor reached us
+                          remote_declarations: Adapter.remote_declarations(actor.data),
                           # FIXME: don't query again (Instances.get_or_create already has)
                           custom_circles: [
                             silence_my_instance:
@@ -2017,13 +2014,71 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       |> Enum.uniq()
       |> debug("direct_recipients")
 
+    audience = maybe_determine_audience(object)
+
     %{
       to: if(is_public?, do: [public_uri()], else: []),
-      cc: cc,
+      # a group is addressed as well as named: Lemmy reads addressing from `to`/`cc` alone, so a post
+      # carrying the group only in `audience` is delivered and then not filed
+      cc: Enum.uniq(cc ++ audience),
       bcc: if(is_public?, do: [], else: boundary_granted_recipients(subject, object)),
-      mentions: mentions
+      mentions: mentions,
+      audience: audience
     }
     |> debug("determined recipients")
+  end
+
+  @doc """
+  Puts addressing onto outgoing activity params, on the activity AND its object.
+
+  Every addressing field belongs in both places, and each publisher used to assemble them by hand, so adding one meant editing every caller — and missing one meant a whole object type federating wrong. `audience` was exactly that: easy to add for posts and forget for polls and media, where a link post is the single most common thing the threadiverse federates.
+
+  Takes what `determine_recipients/4` returned, which the caller usually needs anyway for `mentions` while building the object.
+  """
+  def put_addressing(params, subject, object, is_public?, opts \\ []),
+    do: put_addressing(params, determine_recipients(subject, object, is_public?, opts))
+
+  @doc """
+  Same as `put_addressing/5`, for a caller that already has the recipients.
+
+  Publishers that build their object from `mentions` (posts, polls) have to call `determine_recipients/4` first anyway, and it does real work (resolving tags to actors, and querying boundary-granted recipients) so they pass what they got rather than having it computed twice.
+  """
+  def put_addressing(params, %{} = recipients) do
+    to = recipients[:to] || []
+
+    params
+    |> Map.put(:to, to)
+    |> Map.update(:additional, addressing(%{}, recipients), &addressing(&1 || %{}, recipients))
+    |> Map.update(:object, nil, fn
+      %{} = object -> object |> addressing(recipients) |> Map.put("to", to)
+      other -> other
+    end)
+  end
+
+  defp addressing(map, recipients) do
+    map
+    |> Map.put("cc", recipients[:cc] || [])
+    |> Enums.maybe_put("bcc", recipients[:bcc])
+    # FEP-1b12's marker for "this belongs to that group". On the object as well as the activity:
+    # Lemmy puts it on the `Page` too, while Friendica puts it ONLY on the `Create`, so anything
+    # reading one and not the other misses half the fediverse — as our own ingest had to learn.
+    |> Enums.maybe_put("audience", recipients[:audience])
+  end
+
+  # FEP-1b12 marks belonging with `audience` naming the group, which is what every threadiverse implementation reads to decide a post is a group's. Derived from the same place a reply's group comes from, so "which group is this in" has one answer across incoming and outgoing.
+  defp maybe_determine_audience(object) do
+    case maybe_apply(Bonfire.Classify.Categories, :group_of_object, [object],
+           fallback_return: nil
+         ) do
+      {:ok, _object, %{} = group} ->
+        case ActivityPub.Actor.get_cached(pointer: group) do
+          {:ok, %{ap_id: ap_id}} when is_binary(ap_id) -> [ap_id]
+          _ -> []
+        end
+
+      _ ->
+        []
+    end
   end
 
   defp boundary_granted_recipients(subject, object) do
