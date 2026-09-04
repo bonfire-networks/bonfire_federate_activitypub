@@ -61,6 +61,74 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def collection_target_id(%{} = target), do: e(target, "id", nil) || e(target, :data, "id", nil)
   def collection_target_id(_), do: nil
 
+  @doc """
+  The LOCAL groups or topics an incoming object says it belongs to, in the order it named them.
+
+  Only for ones we HOST, where this is the whole signal. For a group we FOLLOW, belonging comes from that group's own `Announce`, and it must keep coming from there: a remote naming someone else's group proves nothing. Here the group is ours, so the claim is addressed to the one authority that can settle it, and settling it is what our `Announce` then publishes.
+
+  `audience` is read first because FEP-1b12 marks belonging with it, then `to` and `cc`, which is where Lemmy reads addressing and where our own outgoing posts also name the group. Both the object and the activity are searched, since Friendica puts `audience` only on the `Create` while Lemmy puts it on both.
+
+  Returns a LIST because `audience` may name several: a post can belong to more than one taxonomy, each announcing it to its own followers.
+  """
+  def local_group_audiences(activity_data, object_data \\ %{}) do
+    ([object_data["audience"], activity_data["audience"]] ++
+       List.wrap(object_data["to"]) ++
+       List.wrap(object_data["cc"]) ++
+       List.wrap(activity_data["to"]) ++ List.wrap(activity_data["cc"]))
+    |> Enum.filter(&is_binary/1)
+    |> Enum.reject(&(&1 in ActivityPub.Config.public_uris()))
+    |> Enum.uniq()
+    # a string comparison, so the ordinary case (a remote author, their followers collection, Public) reaches no query at all
+    |> Enum.filter(&String.starts_with?(&1, Bonfire.Common.URIs.base_url()))
+    |> Enum.map(&actor_id_segment/1)
+    |> Enum.reject(&is_nil/1)
+    |> ordered_local_categories()
+  end
+
+  # Fetched as a SET rather than one candidate at a time: a post mentioning several local people would otherwise cost a query each to discover that none of them is a category. Two queries at worst, one in practice, none when nothing local is addressed.
+  #
+  # ALL of them, not the first: `audience` may be a list, which is the ForumWG's answer for a post belonging to several taxonomies, each announcing to its own followers. Order is still kept, `audience` before `to`/`cc`, because the first is taken as the tree parent downstream.
+  defp ordered_local_categories([]), do: []
+
+  defp ordered_local_categories(segments) do
+    categories = local_categories(segments)
+
+    segments
+    |> Enum.flat_map(fn segment ->
+      Enum.filter(
+        categories,
+        &(Enums.id(&1) == segment or e(&1, :character, :username, nil) == segment)
+      )
+    end)
+    |> Enum.uniq_by(&Enums.id/1)
+  end
+
+  defp local_categories(segments) do
+    {ids, usernames} = Enum.split_with(segments, &Types.is_uid?/1)
+
+    categories_by(:id, ids) ++ categories_by(:username, usernames)
+  end
+
+  defp categories_by(_filter, []), do: []
+
+  defp categories_by(filter, values) do
+    maybe_apply(
+      Bonfire.Classify.Categories,
+      :list,
+      [[{filter, values}], [skip_boundary_check: true, preload: :character]],
+      fallback_return: nil
+    )
+    |> e(:edges, [])
+  end
+
+  # both forms are live: a ULID id (`/pub/group/01J3…`) for actors created since the instance's cutoff, and the older `/pub/actors/<username>`, which is also what tests get unless the cutoff is primed
+  defp actor_id_segment(ap_id) do
+    case URI.parse(ap_id).path |> to_string() |> String.split("/", trim: true) do
+      [_ | _] = segments -> List.last(segments)
+      _ -> nil
+    end
+  end
+
   def collection_owner_candidates(data) do
     ([e(data, "actor", "id", nil) || e(data, "actor", nil)] ++
        List.wrap(data["cc"]) ++ List.wrap(data["to"]) ++ List.wrap(data["audience"]))
@@ -2019,8 +2087,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     %{
       to: if(is_public?, do: [public_uri()], else: []),
       # a group is addressed as well as named: Lemmy reads addressing from `to`/`cc` alone, so a post
-      # carrying the group only in `audience` is delivered and then not filed
-      cc: Enum.uniq(cc ++ audience),
+      # carrying the group only in `audience` is delivered and then not filed. `audience` is a scalar (see `maybe_determine_audience/1`) but addressing is always a list
+      cc: Enum.uniq(cc ++ List.wrap(audience)),
       bcc: if(is_public?, do: [], else: boundary_granted_recipients(subject, object)),
       mentions: mentions,
       audience: audience
@@ -2066,18 +2134,20 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   # FEP-1b12 marks belonging with `audience` naming the group, which is what every threadiverse implementation reads to decide a post is a group's. Derived from the same place a reply's group comes from, so "which group is this in" has one answer across incoming and outgoing.
+  # Returns a bare ap_id or nil, NOT a list. Lemmy types `audience` as `Option<ObjectId<ApubCommunity>>` on both its `Note` and `Page`, and unlike `to`/`cc` it has no `deserialize_one_or_many`, so an array is rejected outright: a live post into a real community answered `400 data did not match any variant of untagged enum AnnouncableActivities` until this was scalar.
+  # Every capture we hold sends a bare string too.
   defp maybe_determine_audience(object) do
     case maybe_apply(Bonfire.Classify.Categories, :group_of_object, [object],
            fallback_return: nil
          ) do
       {:ok, _object, %{} = group} ->
         case ActivityPub.Actor.get_cached(pointer: group) do
-          {:ok, %{ap_id: ap_id}} when is_binary(ap_id) -> [ap_id]
-          _ -> []
+          {:ok, %{ap_id: ap_id}} when is_binary(ap_id) -> ap_id
+          _ -> nil
         end
 
       _ ->
-        []
+        nil
     end
   end
 

@@ -156,7 +156,8 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
                    name: opts[:title]
                  }
                },
-               to_circles: [uid(target)],
+               # `publish_in:` is what makes this a post IN the group rather than one merely addressed to it: the group becomes the object's context, which is where `audience` and the group's place in `to`/`cc` are derived from. Addressing it as a recipient circle instead produced `to: [Public], cc: []` with no reference to the group at all, so the live probe was measuring nothing, and read as "the remote ignored us".
+               publish_in: target,
                to_boundaries: opts[:boundary] || "public"
              ) do
         IO.puts("published #{uid(post)} — outgoing JSON:")
@@ -194,19 +195,56 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     @doc """
     Polls until an INGESTED incoming activity matches, or the timeout passes. Returns the `ActivityPub.Object` or nil.
 
-    Filters: `type:` (eg. "Accept"), `from:` (actor ap_id), `about:` (an ap_id the activity's object references, at any nesting). Opts: `seconds:` (default 90), `every:` ms between polls.
+    Filters: `type:` (eg. "Accept"), `from:` (actor ap_id), `about:` (an ap_id the activity's object references, at any nesting), `audience:` (an ap_id it is addressed to, in `audience`/`to`/`cc`). Opts: `seconds:` (default 90), `every:` ms between polls.
 
         Interop.await_incoming(type: "Accept", from: group.ap_id)
         Interop.await_incoming([type: "Announce", from: group.ap_id, about: post_ap_id], seconds: 180)
+        Interop.await_incoming([type: "Create", audience: group.ap_id], seconds: 300)
     """
     def await_incoming(filters, opts \\ []) do
       deadline = System.monotonic_time(:second) + (opts[:seconds] || 90)
-      do_await(filters, deadline, opts[:every] || 3_000)
+
+      # only rows that arrive from NOW on can satisfy this. Live tests run with `db_sandbox: false`,
+      # so everything a previous run ingested is still in the table, and without this an await is
+      # satisfied by a stale row: on 2026-09-04 the "remote Accepts our Follow" assertion passed in
+      # three consecutive runs on an Accept received hours earlier, while nothing at all was arriving,
+      # which hid the reason the announce assertions were failing.
+      since = opts[:since] || DateTime.utc_now()
+      do_await(filters, deadline, opts[:every] || 3_000, since)
     end
 
-    defp do_await(filters, deadline, every) do
+    @doc """
+    Polls until an ingested object has a LOCAL pointer, or the timeout passes. Returns the pointer id or nil.
+
+    Storing the AP object and creating the Bonfire object are not the same step: the inbox stores and queues, and the local object appears when that job runs. So a live test that checks for a pointer the moment the activity lands is asking a question the server has not been given time to answer, and will report a bug that is not there.
+    """
+    def await_pointer(ap_id, opts \\ []) do
+      deadline = System.monotonic_time(:second) + (opts[:seconds] || 60)
+      do_await_pointer(ap_id, deadline, opts[:every] || 2_000)
+    end
+
+    defp do_await_pointer(ap_id, deadline, every) do
+      case Object.get_cached(ap_id: ap_id) do
+        {:ok, %{pointer_id: pointer_id}} when is_binary(pointer_id) ->
+          pointer_id
+
+        _ ->
+          if System.monotonic_time(:second) >= deadline do
+            nil
+          else
+            Process.sleep(every)
+            do_await_pointer(ap_id, deadline, every)
+          end
+      end
+    end
+
+    defp do_await(filters, deadline, every, since) do
       found =
-        from(o in Object, where: o.local == false, order_by: [desc: o.id], limit: 100)
+        from(o in Object,
+          where: o.local == false and o.inserted_at >= ^since,
+          order_by: [desc: o.id],
+          limit: 100
+        )
         |> repo().all()
         |> Enum.find(&matches?(&1.data, filters))
 
@@ -219,7 +257,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
 
         true ->
           Process.sleep(every)
-          do_await(filters, deadline, every)
+          do_await(filters, deadline, every, since)
       end
     end
 
@@ -228,9 +266,23 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
         {:type, type} -> data["type"] == type
         {:from, actor} -> Object.get_ap_id(data["actor"]) == actor
         {:about, ap_id} -> references?(data["object"], ap_id)
+        {:audience, ap_id} -> addressed_to?(data, ap_id)
         _ -> true
       end)
     end
+
+    @doc """
+    Whether an activity (or its embedded object) is ADDRESSED to `ap_id`, in `audience`, `to` or `cc`.
+
+    How a post reaches a group: nothing in `object` names the group, so `references?/2` cannot see it. Implementations disagree about which of the three fields carries it and whether it sits on the activity or the object, so all six places count.
+    """
+    def addressed_to?(data, ap_id) when is_map(data) do
+      Enum.any?(["audience", "to", "cc"], fn field ->
+        ap_id in (List.wrap(data[field]) |> Enum.map(&Object.get_ap_id/1))
+      end) or addressed_to?(data["object"], ap_id)
+    end
+
+    def addressed_to?(_, _), do: false
 
     @doc "Whether an activity object references `ap_id` — as a bare id, an embedded object, or a wrapped activity (1b12 `Announce{Create{…}}`)."
     def references?(object, ap_id) do
@@ -262,6 +314,62 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
       end
 
       IO.puts("──────────────────────────────────────────────\n")
+    end
+
+    defp captured_deliveries do
+      Path.join([fixtures_path(), "captured", "**", "*.json"])
+      |> Path.wildcard()
+      |> Enum.flat_map(fn path ->
+        with {:ok, body} <- File.read(path),
+             {:ok, %{"received_with" => %{"source" => "delivery"} = context} = capture} <-
+               Jason.decode(body) do
+          [%{path: path, context: context, document: capture["document"]}]
+        else
+          _ -> []
+        end
+      end)
+      |> Enum.sort_by(& &1.path, :desc)
+    end
+
+    defp print_deliveries(deliveries) do
+      IO.puts("\n── deliveries (#{length(deliveries)}) ─────────────")
+
+      for %{context: context, document: document} <- deliveries do
+        status = context["status"]
+        outcome = if is_integer(status) and status in 200..299, do: "OK ", else: "REJ"
+
+        IO.puts("  #{outcome} #{status} #{document["type"]} → #{context["url"]}")
+
+        # the body is where a receiver says WHY, and the reason we record deliveries at all
+        case context["body"] do
+          body when is_binary(body) and body != "" ->
+            IO.puts("      #{String.slice(body, 0, 300)}")
+
+          _ ->
+            :ok
+        end
+      end
+
+      IO.puts("──────────────────────────────────────────────\n")
+    end
+
+    @doc """
+    What remotes made of what we SENT: every captured delivery, with the receiver's status and body.
+
+    The outgoing counterpart to `incoming/1`, and the only way to answer "does that implementation accept this shape". A delivery leaves NO trace in `ap_object`, so a 202 and a 400 are equally invisible there; only the `:delivery` observer sees the answer. Needs `AP_CAPTURE_JSON` set, like every other capture.
+
+        I.deliveries()
+        I.deliveries(to: "lemmy.world")
+        I.deliveries(rejected: true)
+    """
+    def deliveries(opts \\ []) do
+      captured_deliveries()
+      |> Enum.filter(fn %{context: context} ->
+        (is_nil(opts[:to]) or host_of(context["url"]) =~ opts[:to]) and
+          (!opts[:rejected] or context["status"] not in 200..299)
+      end)
+      |> Enum.take(opts[:limit] || 20)
+      |> tap(&print_deliveries/1)
     end
 
     # ------------------------------------------------------------------

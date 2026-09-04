@@ -1,0 +1,54 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "actor": "https://lemmy.local/u/mayel",
+  "audience": "https://bonfire.local/pub/group/GROUP",
+  "cc": [
+    "https://bonfire.local/pub/group/GROUP",
+    "https://bonfire.local/pub/person/AUTHOR"
+  ],
+  "id": "https://lemmy.local/activities/create/aa873a83-29ff-4dea-a465-3f8abd8b53dc",
+  "object": {
+    "attachment": [],
+    "attributedTo": "https://lemmy.local/u/mayel",
+    "audience": "https://bonfire.local/pub/group/GROUP",
+    "cc": [
+      "https://bonfire.local/pub/group/GROUP",
+      "https://bonfire.local/pub/person/AUTHOR"
+    ],
+    "content": "<p>a comment</p>\n",
+    "distinguished": false,
+    "id": "https://lemmy.local/comment/27985030",
+    "inReplyTo": "https://bonfire.local/pub/objects/PARENT",
+    "mediaType": "text/html",
+    "published": "2026-09-04T20:13:12.337770Z",
+    "source": {
+      "content": "a comment",
+      "mediaType": "text/markdown"
+    },
+    "tag": [
+      {
+        "href": "https://bonfire.local/pub/person/AUTHOR",
+        "name": "@author@bonfire.local",
+        "type": "Mention"
+      }
+    ],
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Note"
+  },
+  "tag": [
+    {
+      "href": "https://bonfire.local/pub/person/AUTHOR",
+      "name": "@author@bonfire.local",
+      "type": "Mention"
+    }
+  ],
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Create"
+}

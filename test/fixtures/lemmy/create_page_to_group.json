@@ -1,0 +1,44 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "actor": "https://lemmy.local/u/mayel",
+  "audience": "https://bonfire.local/pub/group/GROUP",
+  "cc": [
+    "https://bonfire.local/pub/group/GROUP"
+  ],
+  "id": "https://lemmy.local/activities/create/276fa9b4-68a5-4bea-a553-8ef3a6536a6d",
+  "object": {
+    "attachment": [],
+    "attributedTo": "https://lemmy.local/u/mayel",
+    "audience": "https://bonfire.local/pub/group/GROUP",
+    "cc": [],
+    "content": "<p>hello <em>world</em> :)</p>\n",
+    "id": "https://lemmy.local/post/67072971",
+    "mediaType": "text/html",
+    "name": "a post from lemmy to a bonfire group",
+    "published": "2026-09-04T19:43:14.578943Z",
+    "sensitive": false,
+    "source": {
+      "content": "hello *world* :)",
+      "mediaType": "text/markdown"
+    },
+    "tag": [
+      {
+        "href": "https://lemmy.local/post/67072971",
+        "name": "#Johns_Barton",
+        "type": "Hashtag"
+      }
+    ],
+    "to": [
+      "https://bonfire.local/pub/group/GROUP",
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Page"
+  },
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Create"
+}

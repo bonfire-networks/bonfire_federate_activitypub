@@ -44,6 +44,71 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     end
 
     @doc """
+    The OUTBOUND half, which no automated test covers: does a remote FILE what one of OUR groups announces?
+
+    Every other probe here has us following them, which only shows what they send. This needs the remote to follow US, and since a tunnel host is not somewhere anyone can be asked to keep an account, you do the follow by hand while this waits.
+
+        # terminal: a tunnelled dev instance, on a bore port the remote has no failure history for
+        just dev-federate-tunnel 7
+
+        # in its IEx, with capture on so deliveries and their responses are recorded
+        I.Groups.hosted_group_flow(as: "myuser", wait: 600)
+
+    It prints the group's handle, waits for a `Follow` to arrive, publishes a post once one does, and then reports every delivery with the receiver's status and body. What it CANNOT tell you is whether the remote filed the post: check that in the remote's own UI, because our 2xx only means it accepted the payload.
+
+    ⚠️ a remote that has been unable to reach this host backs off per instance (Lemmy waits `1.25^(fail_count - 1)` seconds, capped at a day), so a host used in earlier runs may be silently unreachable for hours. That is what `BORE_PORT`/the bore port argument is for.
+    """
+    def hosted_group_flow(opts \\ []) do
+      me = as_user!(opts)
+      wait = opts[:wait] || 600
+
+      group =
+        maybe_apply(Bonfire.Classify.Simulate, :fancy_fake_category!, [me, [type: :group]],
+          fallback_return: nil
+        ) ||
+          raise "could not create a group to host"
+
+      IO.puts("""
+
+      ── follow this group from the remote you want to test ─────────
+        handle:  @#{group[:username]}
+        actor:   #{group[:canonical_url]}
+        browse:  #{group[:friendly_url]}
+      ───────────────────────────────────────────────────────────────
+      waiting #{wait}s for a Follow to arrive …
+      """)
+
+      case Interop.await_incoming([type: "Follow"], seconds: wait) do
+        nil ->
+          IO.puts("no Follow arrived — nothing to measure, so not posting")
+          {:error, :no_follower}
+
+        follow ->
+          IO.puts("followed by #{inspect(Object.get_ap_id(follow.data["actor"]))} — posting now")
+
+          {:ok, post} =
+            Bonfire.Posts.publish(
+              current_user: me,
+              post_attrs: %{
+                post_content: %{
+                  html_body:
+                    "<p>Bonfire group relay probe #{System.unique_integer([:positive])}</p>"
+                }
+              },
+              publish_in: uid(group[:category]),
+              boundary: "public"
+            )
+
+          IO.inspect(Interop.outgoing_json(post), label: "the post we published")
+          # both shapes of the group's announce, with what each receiver said
+          Interop.deliveries()
+
+          IO.puts("\nnow check the remote's UI: a 2xx above only means the payload was accepted")
+          {:ok, %{group: group, post: post}}
+      end
+    end
+
+    @doc """
     Whether the group only accepts posts from its moderators (`postingRestrictedToMods`, a Lemmy extension also emitted by Mbin/PieFed/NodeBB).
 
     Worth checking before any posting probe: against such a group NO non-mod post can be accepted, so a failure there says nothing about our addressing.

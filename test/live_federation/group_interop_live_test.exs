@@ -105,7 +105,10 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       assert is_binary(follow_json["object"]),
              "our Follow embeds the target actor instead of referencing its id: #{inspect(follow_json["object"])}"
 
-      assert Interop.await_incoming(type: "Accept", from: group.ap_id),
+      # generous: this is usually FIRST contact with the remote, which has to fetch and parse our
+      # actor before it can accept, and a large instance queues that work. The 90s default is not
+      # enough against lemmy.world even from a host it has no backoff against
+      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: 300),
              "no Accept received from #{group.ap_id} — the remote could not parse/verify our Follow or our actor"
     end
   end
@@ -121,8 +124,18 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       refute Groups.posting_restricted?(handle),
              "#{handle} only accepts posts from its moderators — set #{@group_env} to an open group"
 
+      {:ok, group} = Interop.fetch(handle)
+
       # join first: not required by Lemmy (its `verify_person_in_community` is a ban check, not a membership one), but it's what a real user does and other platforms do gate on membership
       Interop.follow(handle, as: me)
+
+      # a SECOND follower who is not the author. Lemmy announces to community followers, and the open question is whether the author is skipped: with someone else following too, an announce that arrives proves the fan-out reaches us and only the author was excluded, while still nothing points elsewhere, either Lemmy skipping our whole instance as the post's origin, or our own ingest declining to store an announce whose inner object is already local
+      lurker = fake_user!()
+      Interop.follow(handle, as: lurker)
+
+      # and WAIT for the Accept before posting. The group announces a new post to its followers at the moment it accepts the post, so posting before we are a follower means the announce is sent to everyone except us and the assertion below fails while everything actually worked, which is exactly what happened on 2026-09-04, when the post appeared on lemmy.world and nothing came back
+      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: 180),
+             "never became a follower, so no announce can reach us"
 
       assert {:ok, post} =
                Interop.post_to(
@@ -135,12 +148,72 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
         Interop.outgoing_json(post)["id"] ||
           flunk("no outgoing AP id for the post — did federation prepare it?")
 
+      assert Interop.await_incoming([type: "Announce", from: group.ap_id, about: post_ap_id],
+               # generous on purpose: a large instance queues outgoing federation, and we are a brand new unknown host it has no delivery history with
+               seconds: 300
+             ),
+             "the group never announced our post back. Check the community in a browser before believing this: on 2026-09-04 the post WAS there and the announce simply never reached us"
+    end
+
+    # Splits the problem in half. A top-level post is rejected by Lemmy because their `Note` IS their comment type and requires `inReplyTo`, so a thread-starter has to be a `Page`, but a REPLY is a `Note` with an `inReplyTo`, which is exactly what we already emit. So replies may already work where posts cannot, and that is worth knowing before building per-receiver type transformation.
+    test "a reply to an existing post in the group comes back announced" do
+      handle = group_handle!()
+      me = fake_user!()
       {:ok, group} = Interop.fetch(handle)
 
-      assert Interop.await_incoming([type: "Announce", from: group.ap_id, about: post_ap_id],
-               seconds: 120
+      parent_id =
+        first_post_id(group) ||
+          flunk(
+            "#{handle} has no posts to reply to — set #{@group_env} to a community with content"
+          )
+
+      assert {:ok, %{pointer_id: parent_pointer}} =
+               ActivityPub.Federator.Fetcher.fetch_object_from_id(parent_id)
+
+      assert is_binary(parent_pointer),
+             "ingested #{parent_id} but it has no local pointer to reply to"
+
+      Interop.follow(handle, as: me)
+
+      assert {:ok, reply} =
+               Bonfire.Posts.publish(
+                 current_user: me,
+                 post_attrs: %{
+                   reply_to_id: parent_pointer,
+                   post_content: %{
+                     html_body: "<p>Bonfire reply probe #{System.unique_integer([:positive])}</p>"
+                   }
+                 },
+                 publish_in: uid(group),
+                 boundary: "public"
+               )
+
+      reply_ap_id =
+        Interop.outgoing_json(reply)["id"] || flunk("no outgoing AP id for the reply")
+
+      assert Interop.await_incoming([type: "Announce", from: group.ap_id, about: reply_ap_id],
+               # generous on purpose: a large instance queues outgoing federation, and we are a brand
+               # new unknown host it has no delivery history with
+               seconds: 300
              ),
-             "the group never announced our post back — it was not attributed to the group (expected until `audience` addressing ships)"
+             "the group never announced our reply back. Read the delivery captures for the status and body: a 400 here means our `Note` is wrong in some way beyond the thread-starter type"
+    end
+
+    # the newest announced object in the community's outbox, which is what a real reply targets
+    defp first_post_id(group) do
+      with outbox_url when is_binary(outbox_url) <- e(group, :data, "outbox", nil),
+           {:ok, outbox} <- fetch_json(outbox_url),
+           {:ok, page} <-
+             (case outbox["first"] do
+                url when is_binary(url) -> fetch_json(url)
+                %{} = embedded -> {:ok, embedded}
+                _ -> {:ok, outbox}
+              end) do
+        (page["orderedItems"] || page["items"] || [])
+        |> Enum.find_value(fn item -> e(item, "object", "object", "id", nil) end)
+      else
+        _ -> nil
+      end
     end
   end
 end

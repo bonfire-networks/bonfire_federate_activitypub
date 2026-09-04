@@ -13,9 +13,16 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 
+  import Tesla.Mock
+
   alias Bonfire.Classify.Simulate
   alias Bonfire.Federate.ActivityPub.Outgoing
+  alias Bonfire.Federate.ActivityPub.Simulate, as: APSimulate
+  alias Bonfire.Social.Graph.Follows
+  alias ActivityPub.Federator.APPublisher
   alias ActivityPub.Web.ObjectView
+
+  @remote_actor "https://mocked.local/users/karen"
 
   defp public_group(creator) do
     group = Simulate.fake_group!(creator)
@@ -68,22 +75,34 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
     post = post_in_group(creator, group, "<p>a post for the group</p>")
 
-    activity = Outgoing.ap_activity!(post)
-    data = activity.data
+    data = Outgoing.ap_activity!(post).data
     group_ap_id = group_ap_id(group)
-
-    assert group_ap_id in List.wrap(data["audience"]),
-           "FEP-1b12 marks belonging with `audience`, so a group post without it is just a post"
-
-    assert group_ap_id in (List.wrap(data["to"]) ++ List.wrap(data["cc"])),
-           "Lemmy reads addressing from `to`/`cc` alone, so the group has to be there as well"
 
     # the stored object, which is what we SERVE and what a remote fetch returns, rather than whatever
     # the activity happens to carry inline
     assert {:ok, %{data: object_data}} = ActivityPub.Object.get_cached(pointer: post)
 
-    assert group_ap_id in List.wrap(object_data["audience"]),
-           "and on the object too: code that only checks the activity misses Friendica, code that only checks the object misses us"
+    # a SCALAR, not a list: Lemmy types `audience` as `Option<ObjectId<ApubCommunity>>` on both its
+    # `Note` and `Page`, and unlike `to`/`cc` it carries no `deserialize_one_or_many`, so an array
+    # fails to parse and the whole activity is rejected with a 400. Every capture we hold sends a
+    # bare string. `List.wrap` here would pass for either shape and so assert nothing.
+    assert object_data["audience"] == group_ap_id,
+           "and on the object too: code that only checks the activity misses Friendica, code that only checks the object misses us. Got #{inspect(object_data["audience"])}"
+
+    assert data["audience"] == group_ap_id,
+           "FEP-1b12 marks belonging with `audience`, so a group post without it is just a post"
+
+    assert group_ap_id in (List.wrap(data["to"]) ++ List.wrap(data["cc"])),
+           "Lemmy reads addressing from `to`/`cc` alone, so the group has to be there as well"
+  end
+
+  # Regression guard for a shape bug only the ACTIVITY showed, while the object stayed correct: `BoundariesMRF.filter_recipients_field/8` filters each addressing field through a list, and used to write the filtered LIST back even when handed a single value, so a scalar `audience` became `["<group>"]` inside `ActivityPub.Object.insert/4`, after every place that builds addressing.
+  test "the activity's audience is a scalar, as every implementation sends it" do
+    creator = fake_user!()
+    group = public_group(creator)
+    post = post_in_group(creator, group, "<p>a post for the group</p>")
+
+    assert Outgoing.ap_activity!(post).data["audience"] == group_ap_id(group)
   end
 
   test "the group announces a post published in it" do
@@ -136,7 +155,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
     assert {:ok, %{data: reply_data}} = ActivityPub.Object.get_cached(pointer: reply)
 
-    assert group_ap_id(group) in List.wrap(reply_data["audience"]),
+    assert reply_data["audience"] == group_ap_id(group),
            "a comment belongs to the group as much as its thread starter does, and the replier never named the group"
   end
 
@@ -162,6 +181,85 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
     refute Map.has_key?(outbox, "last"),
            "with everything inline there is nothing further back to link to, and a `last` pointing at the page you are holding says nothing"
+  end
+
+  # The fan-out rather than the shaping: `prepare_publish_params/2` is where one activity becomes one payload per inbox, so it is where a second shape has to appear. It resolves recipients through the adapter, so it needs a group actor backed by a local pointer and a remote follower to have an inbox at all, which is why this lives here rather than in the AP lib's own tests.
+  describe "a group relay goes out as both shapes" do
+    setup do
+      mock(fn
+        %{method: :get, url: @remote_actor} ->
+          json(APSimulate.actor_json(@remote_actor))
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+
+        %{method: :get} ->
+          %Tesla.Env{status: 404, body: ""}
+      end)
+
+      :ok
+    end
+
+    defp remote_follower do
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, remote_user} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+      remote_user
+    end
+
+    defp announce_of_group_post do
+      creator = fake_user!()
+      group = public_group(creator)
+
+      {:ok, _} = Follows.follow(remote_follower(), group, skip_boundary_check: true)
+
+      post = post_in_group(creator, group, "<p>a post for the group</p>")
+
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: group)
+      {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+
+      announce = ActivityPub.Object.get_existing_announce(actor.ap_id, ap_post)
+      assert %{data: %{"type" => "Announce"}} = announce
+
+      %{creator: creator, group: group, actor: actor, post: post, announce: announce}
+    end
+
+    test "publishing a group relay yields both shapes for the same inbox" do
+      %{actor: actor, announce: announce} = announce_of_group_post()
+
+      params = APPublisher.prepare_publish_params(actor, announce)
+
+      assert length(params) == 2
+
+      assert params |> Enum.map(& &1.inbox) |> Enum.uniq() |> length() == 1,
+             "both shapes go to the same recipient, as two deliveries rather than two audiences"
+
+      assert params |> Enum.map(& &1.id) |> Enum.uniq() |> length() == 2,
+             "each carries its own id, which is what the receiver stores and may re-fetch"
+
+      shapes = Enum.map(params, &Jason.decode!(&1.json)["object"]["type"])
+
+      assert "Create" in shapes,
+             "the 1b12 shape, which Lemmy and the threadiverse require"
+
+      assert Enum.any?(shapes, &(&1 in ["Note", "Page", "Article", "Question"])),
+             "and the object shape, which the Pleroma/Misskey/GoToSocial family require"
+    end
+
+    test "publishing a person's boost yields one" do
+      %{post: post} = announce_of_group_post()
+
+      booster = fake_user!()
+      {:ok, _} = Follows.follow(remote_follower(), booster, skip_boundary_check: true)
+      assert {:ok, _} = Bonfire.Social.Boosts.boost(booster, post)
+
+      {:ok, booster_actor} = ActivityPub.Actor.get_cached(pointer: booster)
+      {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+
+      boost = ActivityPub.Object.get_existing_announce(booster_actor.ap_id, ap_post)
+
+      assert length(APPublisher.prepare_publish_params(booster_actor, boost)) == 1,
+             "one actor repeating an object is not a group relaying an activity"
+    end
   end
 
   # The `last` link is what keeps history reachable once a group outgrows one capped collection,

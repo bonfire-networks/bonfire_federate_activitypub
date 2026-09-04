@@ -127,6 +127,35 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     |> List.flatten()
   end
 
+  @doc """
+  Whether this actor already has a LIVE interaction of this type with this object, so the lib can
+  discard a duplicate before ingesting it.
+
+  Answered from the EDGE, not from stored activities, which is what makes a repeat-after-undo work:
+  `Boosts.unboost/3` deletes the edge, so a genuine re-announce is not suppressed, while a remote's
+  dual emission (two announces of the same object, seconds apart) is.
+  """
+  def activity_exists?(type, actor_ap_id, object) do
+    with {:ok, module} <-
+           Bonfire.Federate.ActivityPub.FederationModules.federation_module(type),
+         {:ok, subject} <- AdapterUtils.get_character_by_ap_id(actor_ap_id),
+         {:ok, pointable} <- AdapterUtils.return_pointable(object, skip_boundary_check: true) do
+      # ask the owning module first, so anything that is not edge-shaped can still answer for itself; otherwise fall back to trying as an Edge, which covers the interactions that are (boost, like, flag, follow). `Edges.exists?/4` takes the context module, which is exactly what the registry hands back, so neither path needs a per-type mapping here
+      if Code.ensure_loaded?(module) and function_exported?(module, :exists?, 2) do
+        module.exists?(subject, pointable)
+      else
+        maybe_apply(
+          Bonfire.Social.Edges,
+          :exists?,
+          [module, subject, pointable, [skip_boundary_check: true]],
+          fallback_return: false
+        )
+      end == true
+    else
+      _ -> false
+    end
+  end
+
   def count_followers(actor, purpose_or_current_actor \\ nil) do
     maybe_apply(
       Bonfire.Social.Graph.Follows,

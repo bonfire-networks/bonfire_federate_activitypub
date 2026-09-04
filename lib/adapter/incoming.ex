@@ -536,22 +536,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           "AP - created object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
         )
 
-        unless local? do
-          # save a Peer for instance and Peered URI (only for remote objects)
-          Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
-            pointable_object_id,
-            ap_id,
-            type: :object
-          )
-          |> debug("saved canonical uri for peered object")
-        end
-
-        # attach the local pointer to the AP object (for both local C2S and remote)
-        maybe_set_pointer_on_ap_object(
-          object,
-          activity,
-          pointable_object_id,
-          previous_pointer_id
+        link_ap_object(object, pointable_object_id,
+          activity: activity,
+          ap_id: ap_id,
+          local?: local?,
+          previous_pointer_id: previous_pointer_id
         )
 
         maybe_apply_comments_enabled(character, object, pointable_object_id)
@@ -659,6 +648,50 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
     {:no_federation_module_match, :ignore}
+  end
+
+  @doc """
+  Links an INCOMING AP object to the local object created from it: the `Peered` canonical URI, and the pointer on the `ap_object` row.
+
+  Called from two places on purpose, and it is the same work either way. `Bonfire.Social.Acts.Federate` calls it INSIDE the creation epic, so later acts in that epic can resolve the object and federate it: that is what lets a group relay a post it has just accepted, and a remote post mentioning a local category be boosted into it. `receive_object/…` calls it afterwards for everything that never runs an epic (media, unrecognised activities), where it is the only link there is.
+
+  The second call in an ingest costs a map lookup rather than two writes: both happen in the same process, so what has already been linked is remembered there.
+  """
+  def link_ap_object(object, pointer_id, opts \\ [])
+
+  def link_ap_object(_object, nil, _opts), do: nil
+
+  def link_ap_object(object, pointer_id, opts) do
+    ap_id = opts[:ap_id] || e(object, :data, "id", nil) || e(object, "id", nil)
+
+    # keyed on the ROW rather than the AP id: an `Update` for the same object arrives as a different `ap_object` row and still has to be linked, so keying on the id would skip it
+    marker = {:ap_linked, id(object) || ap_id}
+
+    # ⚠️ a nil object alone does NOT mean there is nothing to link: an activity with no object of its own (a `Question`) still has an `ap_object` row, which `maybe_set_pointer_on_ap_object/4` reaches through the activity. Only with neither is there nothing to do, which is how an epic creating an object with no incoming AP one (a locally composed poll) gets here
+    cond do
+      is_nil(object) and is_nil(opts[:activity]) ->
+        debug(pointer_id, "no incoming AP object or activity to link this to")
+
+      Process.get(marker) == pointer_id ->
+        debug(ap_id, "already linked to its local object in this ingest, so nothing to do")
+
+      true ->
+        # a Peer for the instance and a Peered URI, for remote objects only
+        if !opts[:local?] do
+          Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(pointer_id, ap_id, type: :object)
+          |> debug("saved canonical uri for peered object")
+        end
+
+        # attach the local pointer to the AP object (for both local C2S and remote)
+        maybe_set_pointer_on_ap_object(
+          object,
+          opts[:activity],
+          pointer_id,
+          opts[:previous_pointer_id]
+        )
+
+        Process.put(marker, pointer_id)
+    end
   end
 
   defp maybe_set_pointer_on_ap_object(object, activity, pointer_id, previous_pointer_id) do

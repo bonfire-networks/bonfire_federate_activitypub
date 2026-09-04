@@ -491,19 +491,23 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         )
 
       recipient when is_binary(recipient) ->
-        Map.put(
-          activity,
-          field,
-          filter_actors(
-            activity,
-            [recipient],
-            block_types,
-            rejects,
-            local_author_ids,
-            local_recipient_ids,
-            opts
-          )
-        )
+        # filtering needs a list, but the field must go back the way it came: `audience` is a SINGLE value for the threadiverse (Lemmy types it `Option<ObjectId<ApubCommunity>>`, with no `deserialize_one_or_many` unlike `to`/`cc`), so wrapping it here silently turned every outgoing group post into one Lemmy answers with `400 data did not match any variant of untagged enum AnnouncableActivities`.
+        case filter_actors(
+               activity,
+               [recipient],
+               block_types,
+               rejects,
+               local_author_ids,
+               local_recipient_ids,
+               opts
+             ) do
+          [kept] ->
+            Map.put(activity, field, kept)
+
+          # nothing survived: keep the empty LIST rather than dropping the key, because "addressed to nobody" is how the publisher decides not to federate at all. Removing it instead reads as "never addressed" and lets a fully filtered activity through
+          filtered ->
+            Map.put(activity, field, filtered)
+        end
 
       _ ->
         if !recursing do
