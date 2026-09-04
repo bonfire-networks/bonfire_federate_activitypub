@@ -69,8 +69,17 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   `audience` is read first because FEP-1b12 marks belonging with it, then `to` and `cc`, which is where Lemmy reads addressing and where our own outgoing posts also name the group. Both the object and the activity are searched, since Friendica puts `audience` only on the `Create` while Lemmy puts it on both.
 
   Returns a LIST because `audience` may name several: a post can belong to more than one taxonomy, each announcing it to its own followers.
+
+  A REPLY that names nothing falls back to the group of the thread it is answering. That is the only route a microblog reply has, since Mastodon, Akkoma, GoToSocial and the Misskey family send `Create{Note}` with no `audience` at all, and it is the same rule our own replies follow outgoing. Only consulted when the addressing named nothing, so the threadiverse case (where the group IS named) costs no extra lookup.
   """
   def local_group_audiences(activity_data, object_data \\ %{}) do
+    case addressed_local_categories(activity_data, object_data) do
+      [] -> List.wrap(group_of_thread(object_data["inReplyTo"]))
+      categories -> categories
+    end
+  end
+
+  defp addressed_local_categories(activity_data, object_data) do
     ([object_data["audience"], activity_data["audience"]] ++
        List.wrap(object_data["to"]) ++
        List.wrap(object_data["cc"]) ++
@@ -84,6 +93,22 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enum.reject(&is_nil/1)
     |> ordered_local_categories()
   end
+
+  defp group_of_thread(in_reply_to) when is_binary(in_reply_to) do
+    with {:ok, %{pointer_id: pointer_id}} when is_binary(pointer_id) <-
+           ActivityPub.Object.get_cached(ap_id: in_reply_to),
+         {:ok, _object, %{} = group} <-
+           maybe_apply(Bonfire.Classify.Categories, :group_of_object, [pointer_id],
+             fallback_return: nil
+           ) do
+      debug(group, "the reply inherits the group of the thread it is in")
+      group
+    else
+      _ -> nil
+    end
+  end
+
+  defp group_of_thread(_), do: nil
 
   # Fetched as a SET rather than one candidate at a time: a post mentioning several local people would otherwise cost a query each to discover that none of them is a category. Two queries at worst, one in practice, none when nothing local is addressed.
   #

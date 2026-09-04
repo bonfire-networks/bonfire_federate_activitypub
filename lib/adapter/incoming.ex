@@ -516,6 +516,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       # A local C2S activity is not federated by `ActivityPub.create/2` (which skips `maybe_federate` when `from_c2s`), so it has to be published from here, but it still needs a local object first: the `ActivityPub.Object` stored by `Object.insert` is not a pointable and never reaches a feed.
       publish_after_create? = local? and module == fallback_module
 
+      # TODO: derive the local groups this object belongs to ONCE here (`AdapterUtils.local_group_audiences/2`) and pass them to every module through the `opts` argument that `ap_receive_activity/4` already takes but this dispatch never fills. Today only `Bonfire.Posts` reads them, so a remote post addressed to one of our groups is filed correctly while a poll (`Question`) or anything landing in the `APActivities` fallback is not. Media and Articles inherit it only because their `Page` clause delegates to `Bonfire.Posts`.
       with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
              Utils.maybe_apply(
                module,
