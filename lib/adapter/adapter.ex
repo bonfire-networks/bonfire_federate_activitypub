@@ -83,7 +83,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # preload-at-source guard per member (collection members are mixed types — pinned objects and
     # actors — hence the superset + `prune: true`)
     shape_members(pointer_ids, :pointers)
-    |> repo().maybe_preload([:peered, character: [:peered], created: [:peered]], prune: true)
+    # `:shared_user` because `canonical_url/1` picks the `/pub/<type>/` segment from it (a person vs an organisation), needed by any collection whose members are ACTORS — `moderators` is the first, `featured` holds objects
+    |> repo().maybe_preload(
+      [:peered, :shared_user, character: [:peered], created: [:peered]],
+      prune: true
+    )
     |> Enum.map(&URIs.canonical_url/1)
     |> Enum.reject(&is_nil/1)
   end

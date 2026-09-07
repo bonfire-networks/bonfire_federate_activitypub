@@ -1526,6 +1526,40 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     actor_collection(actor_id, collection)
   end
 
+  # What a Group declares about its own rules, so remote software can honour them rather than guess. These are the same fields we READ when mirroring a remote community (`Categories.remote_dims/1`), and the values come from the group's dimension slugs so what we advertise cannot drift from what we enforce.
+  #
+  # `postingRestrictedToMods` is a Lemmy extension that Mbin, PieFed and NodeBB also honour by hiding the compose button, so a moderators-only group that stays silent invites posts it will never accept. 
+  # `manuallyApprovesFollowers` is the AS2 field Mastodon reads to show a join as pending. 
+  #  `openness` comes from Mobilizon and is more specific, describing JOINING where the AS2 boolean describes FOLLOWING, which is why our own ingest reads it first.
+  #
+  # Emitted for groups only, and stated either way rather than omitted: an absent flag reads as unknown, not as open.
+  defp group_declarations(group, "Group") do
+    dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
+
+    manually_approves? = dims[:membership] == "on_request"
+
+    %{
+      # the mod team, as a URI so removing someone changes what the endpoint serves rather than sticking in every remote's cache. Only for a group whose own visibility already shows them (the About tab lists moderators to anyone who can see the group), so the wire never says more than the web does
+      "attributedTo" =>
+        if Bonfire.Boundaries.Presets.slug_scope(dims[:visibility]) not in ["members", nil] do
+          ActivityPub.Utils.collection_ap_id("moderators", id(group))
+        end
+    }
+    |> Enums.filter_empty(%{})
+    |> Map.merge(%{
+      "postingRestrictedToMods" => dims[:participation] == "moderators",
+      "manuallyApprovesFollowers" => manually_approves?,
+      "openness" =>
+        case dims[:membership] do
+          "on_request" -> "moderated"
+          "invite_only" -> "invite_only"
+          _ -> "open"
+        end
+    })
+  end
+
+  defp group_declarations(_character, _type), do: %{}
+
   def format_actor(user_etc, type \\ "Person")
 
   def format_actor(%struct{id: _pointer_id} = user_etc, type) when struct in @types_characters do
@@ -1721,7 +1755,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       %Actor{
         id: user_etc.id,
-        data: data,
+        data: Map.merge(data, group_declarations(user_etc, type)),
         keys: e(user_etc, :actor, :signing_key, nil),
         local: local?,
         ap_id: id,
@@ -2559,6 +2593,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     []
   end
 
+  @doc "The AP fields stating who may interact with an outgoing object: `interactionPolicy` (what Mastodon reads) and `commentsEnabled` (what the PeerTube family reads), both derived from the same boundary check so they cannot contradict each other. Returned as a map for the caller to merge into the object."
   def ap_prepare_outgoing_interaction_policy(subject, object, opts \\ []) do
     circles_to_check =
       Bonfire.Boundaries.Circles.list_user_built_ins(subject,
@@ -2610,6 +2645,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       )
     end)
     |> debug("interaction_policy")
+    |> then(fn policy ->
+      %{
+        "interactionPolicy" => policy,
+        # the same fact `canReply` states, in the vocabulary the PeerTube family reads: our captures have `commentsEnabled` from Pixelfed, PieFed, PeerTube and Mobilizon, and `interactionPolicy` from Mastodon, PieFed and Lemmy. Read off the policy rather than asked of boundaries again, so the two cannot disagree — `policy_circles_urls/2` maps the `:activity_pub` circle to the Public URI, so its presence in `canReply` IS the answer, and a moderator's `:lock` drops that circle from both at once
+        "commentsEnabled" =>
+          ActivityPub.Config.public_uri() in e(policy, "canReply", "automaticApproval", [])
+      }
+    end)
   end
 
   defp policy_circles_urls(actor_id, circles) do
