@@ -532,7 +532,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   @doc """
   Whether the character's own boundaries permit federating it as an actor.
 
-  Eg. groups/topics preset visibility grants or explicitly denies the `activity_pub` circle, which is the source of truth for whether a group federates (see `Bonfire.Classify.Boundaries.maybe_deny_activity_pub/3`). The subject checked must be the `activity_pub` circle, NOT guest, so nonfederated group visibilities deliberately let web guests see/read while denying federation. 
+  Eg. groups/topics preset visibility grants or explicitly denies the `activity_pub` circle, which is the source of truth for whether a group federates (see `Bonfire.Classify.Boundaries.sync_activity_pub_visibility/3`). The subject checked must be the `activity_pub` circle, NOT guest, so nonfederated group visibilities deliberately let web guests see/read while denying federation. 
   """
   # opts are threaded into the boundary check so a caller that has already established authorisation can say so: during a DELETE the character's grants have deliberately been torn down first (they must really be gone before we tell other instances they are), and without the caller's opts this check would then deny federating their own `Delete`
   def character_ap_readable?(character, opts \\ []) do

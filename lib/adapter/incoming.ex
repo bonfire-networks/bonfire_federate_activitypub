@@ -520,14 +520,19 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              Utils.maybe_apply(
                module,
                :ap_receive_activity,
-               [
-                 character,
-                 if(not is_map(object),
-                   do: Map.merge(activity, %{pointer_id: pointer_id}),
-                   else: activity
-                 ),
-                 if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
-               ],
+               ap_receive_args(
+                 module,
+                 [
+                   character,
+                   if(not is_map(object),
+                     do: Map.merge(activity, %{pointer_id: pointer_id}),
+                     else: activity
+                   ),
+                   if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
+                 ],
+                 activity,
+                 object
+               ),
                no_argument_rescue: true,
                fallback_fun: &no_federation_module_match/2
              )
@@ -599,7 +604,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
            Utils.maybe_apply(
              module,
              :ap_receive_activity,
-             [character, activity, object],
+             ap_receive_args(module, [character, activity, object], activity, object),
              no_argument_rescue: true,
              fallback_fun: &no_federation_module_match/2
            ) do
@@ -626,6 +631,21 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       )
 
       {:ok, pointable_object}
+    end
+  end
+
+  # Which local groups an activity was addressed to is a property of the DELIVERY rather than of whatever the object turns out to be locally, so it is derived once here and handed to every handler, the same reasoning as `maybe_apply_comments_enabled/4` below. 
+  # Only handlers that accept a 4th argument get it: `Utils.maybe_apply/4` picks the function by the arity of the args it is given, so passing four to a `/3` handler would find nothing and fall through to `no_federation_module_match/2` rather than degrading.
+  # Takes the argument list a call site has already built (they differ: the creation path merges `pointer_id` into what it passes) and appends the derived opts to it.
+  defp ap_receive_args(module, args, activity, object) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :ap_receive_activity, 4) do
+      groups =
+        AdapterUtils.local_group_audiences(e(activity, :data, %{}), e(object, :data, %{}))
+        |> debug("local groups or topics this activity is addressed to, if any")
+
+      args ++ [[publish_in: Enums.ids(groups)]]
+    else
+      args
     end
   end
 
@@ -691,6 +711,27 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         )
 
         Process.put(marker, pointer_id)
+    end
+  end
+
+  @doc """
+  Ties an incoming AP object to the record just created for it, THEN tags that record (which files it into any groups among the tags, and auto-boosts them).
+
+  For handlers that run no epic, and so get neither ordering for free. The order is the whole point: the group's auto-boost federates an `Announce` that resolves the boosted object through its AP object, so tagging first means the boost is published while nothing is linked yet, `Boosts.ap_publish_activity/3` finds no AP object, and the group relays nothing — silently, since a local boost is still created and everything looks filed from the inside.
+
+  Epic-based handlers get the same ordering from `Bonfire.Social.Acts.Federate` (which links) running before `Bonfire.Tags.Acts.AutoBoost`.
+  """
+  def link_and_tag(ap_object, pointer_id, creator, tags, opts \\ []) do
+    link_ap_object(ap_object, pointer_id, Keyword.put_new(opts, :local?, false))
+
+    case List.wrap(tags) do
+      [] ->
+        nil
+
+      tags ->
+        Utils.maybe_apply(Bonfire.Tag, :maybe_tag, [creator, pointer_id, tags],
+          fallback_return: nil
+        )
     end
   end
 
