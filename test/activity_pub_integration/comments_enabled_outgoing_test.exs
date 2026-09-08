@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.CommentsEnabledOutgoingTest do
     creator = fake_user!()
     post = post!(creator, "<p>this one gets closed</p>")
 
-    assert {:ok, _} = Bonfire.Boundaries.Blocks.block(post, :lock, current_user: creator)
+    assert {:ok, _} = Bonfire.Boundaries.Blocks.lock(post, current_user: creator)
     assert {:ok, _} = Outgoing.maybe_federate(creator, :update, post)
 
     assert object_data(post)["commentsEnabled"] == false,
@@ -52,7 +52,7 @@ defmodule Bonfire.Federate.ActivityPub.CommentsEnabledOutgoingTest do
     assert data["interactionPolicy"]["canReply"]["automaticApproval"] != []
   end
 
-  # A post only its mentions can see lists nobody public under `canReply` because of who it is ADDRESSED to, not because anyone closed it, and the field cannot tell those apart. Saying `false` there is read by the receiving instance as a lock (`Threads.ap_receive_comments_enabled/4` applies the same `:lock` block a moderator would), which closes the conversation against the very people it was sent to — the dance tests caught it as the mentioned user being refused permission to reply.
+  # A post only its mentions can see lists nobody public under `canReply` because of who it is ADDRESSED to, not because anyone closed it, and the field cannot tell those apart. so it says nothing. `false` there is read by the receiving instance as a lock (`Threads.ap_receive_comments_enabled/4` applies the same `:lock` block a moderator would), which would close the conversation against the very people it was sent to.
   test "a post nobody public can read says nothing about comments" do
     creator = fake_user!()
     mentioned = fake_user!()
@@ -72,7 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.CommentsEnabledOutgoingTest do
     open = post!(creator, "<p>open</p>")
     locked = post!(creator, "<p>closed</p>")
 
-    assert {:ok, _} = Bonfire.Boundaries.Blocks.block(locked, :lock, current_user: creator)
+    assert {:ok, _} = Bonfire.Boundaries.Blocks.lock(locked, current_user: creator)
     assert {:ok, _} = Outgoing.maybe_federate(creator, :update, locked)
 
     for post <- [open, locked] do
@@ -98,7 +98,7 @@ defmodule Bonfire.Federate.ActivityPub.CommentsEnabledOutgoingTest do
     locked = post!(creator, "<p>closed</p>")
     open = post!(creator, "<p>open</p>")
 
-    assert {:ok, _} = Bonfire.Boundaries.Blocks.block(locked, :lock, current_user: creator)
+    assert {:ok, _} = Bonfire.Boundaries.Blocks.lock(locked, current_user: creator)
     assert {:ok, _} = Outgoing.maybe_federate(creator, :update, locked)
 
     assert object_data(locked)["commentsEnabled"] == false

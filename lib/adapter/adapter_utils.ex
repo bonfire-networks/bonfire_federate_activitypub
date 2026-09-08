@@ -1526,14 +1526,19 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     actor_collection(actor_id, collection)
   end
 
-  # What a Group declares about its own rules, so remote software can honour them rather than guess. These are the same fields we READ when mirroring a remote community (`Categories.remote_dims/1`), and the values come from the group's dimension slugs so what we advertise cannot drift from what we enforce.
+  # Whether follows of this character are held for approval, which is `manuallyApprovesFollowers` on the wire. Read from the boundary that ENFORCES it (the `activity_pub` circle's `:follow` grant, which `request_before_follow` denies at signup) so the declaration cannot outlive a boundary changed by other means. It is the same question `Follows.check_follow/3` asks before deciding between a follow and a request.
+  defp manually_approves_followers?(character, opts \\ []) do
+    Bonfire.Boundaries.can?(:activity_pub, :follow, character, opts) != true
+  end
+
+  # What an actor declares about its own rules, so remote software can honour them rather than guess. For a group these are the same fields we READ when mirroring a remote community (`Categories.remote_dims/1`), and they come from its dimension slugs so what we advertise cannot drift from what we enforce.
   #
   # `postingRestrictedToMods` is a Lemmy extension that Mbin, PieFed and NodeBB also honour by hiding the compose button, so a moderators-only group that stays silent invites posts it will never accept. 
   # `manuallyApprovesFollowers` is the AS2 field Mastodon reads to show a join as pending. 
   #  `openness` comes from Mobilizon and is more specific, describing JOINING where the AS2 boolean describes FOLLOWING, which is why our own ingest reads it first.
   #
-  # Emitted for groups only, and stated either way rather than omitted: an absent flag reads as unknown, not as open.
-  defp group_declarations(group, "Group") do
+  # Stated either way rather than omitted: an absent flag reads as unknown, not as open.
+  defp actor_declarations(group, "Group") do
     dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
 
     manually_approves? = dims[:membership] == "on_request"
@@ -1547,7 +1552,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     }
     |> Enums.filter_empty(%{})
     |> Map.merge(%{
-      "postingRestrictedToMods" => dims[:participation] == "moderators",
+      # an ARCHIVED group accepts nothing from anyone (`soft_delete/2` locks it), which this field is the only way to say. Read from the archive flag rather than from boundaries on purpose: a circle-level check cannot tell a locked group from one only its MEMBERS may post in, and marking the latter restricted would hide the compose button from people who can in fact post
+      "postingRestrictedToMods" =>
+        dims[:participation] == "moderators" or not is_nil(e(group, :deleted_at, nil)),
       "manuallyApprovesFollowers" => manually_approves?,
       "openness" =>
         case dims[:membership] do
@@ -1558,7 +1565,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     })
   end
 
-  defp group_declarations(_character, _type), do: %{}
+  # Any other actor declares only the follow rule, the one boundary of its own a Person states on the wire. Skipped for a remote actor, whose own instance is the authority on it and whose local boundaries here answer a different question.
+  defp actor_declarations(character, _type) do
+    if is_local?(character) do
+      %{"manuallyApprovesFollowers" => manually_approves_followers?(character)}
+    else
+      %{}
+    end
+  end
 
   def format_actor(user_etc, type \\ "Person")
 
@@ -1755,7 +1769,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       %Actor{
         id: user_etc.id,
-        data: Map.merge(data, group_declarations(user_etc, type)),
+        data: Map.merge(data, actor_declarations(user_etc, type)),
         keys: e(user_etc, :actor, :signing_key, nil),
         local: local?,
         ap_id: id,

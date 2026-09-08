@@ -48,9 +48,8 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
       assert activity.__struct__ == Bonfire.Data.Social.APActivity
-      assert is_map(activity.json["object"])
-      assert activity.json["object"]["type"] == type
-      assert is_binary(activity.json["object"]["content"])
+      assert activity.json["type"] == type
+      assert is_binary(activity.json["content"])
 
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
     end
@@ -75,9 +74,8 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
       assert activity.__struct__ == Bonfire.Data.Social.APActivity
-      assert is_map(activity.json["object"])
-      assert activity.json["object"]["type"] == type
-      assert is_binary(activity.json["object"]["content"])
+      assert activity.json["type"] == type
+      assert is_binary(activity.json["content"])
 
       assert {:error, _} = Bonfire.Social.Objects.read(activity.id)
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id, current_user: recipient)

@@ -303,7 +303,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
     end
   end
 
-  # The other side of deriving the group ONCE for every handler: the derivation now also meets objects that can never belong to one. A reply naming no group falls back to the group of the thread it answers, and the thread here is a DM, whose parent is a `Message`, a schema with no `tree` assoc at all. Preloading an assoc a schema does not have raises rather than answering nothing (Bonfire treats it as a bug at the call site), and this one raises inside the inbox request, so the reply is answered with a 500 and never delivered. Which is how the message dance test found it.
+  # The other side of deriving the group ONCE for every handler: the derivation also meets objects that can never belong to one. A reply naming no group falls back to the group of the thread it answers, and the thread here is a DM, whose parent is a `Message`, a schema with no `tree` assoc at all. Asking which group such an object is in has to answer "none", since preloading an assoc a schema does not have raises rather than answering nothing (Bonfire treats that as a bug at the call site), and this call site sits inside the inbox request, where a raise is a 500 and a lost delivery.
   test "a reply to a message belongs to no group, and says so without failing", %{
     creator: creator
   } do

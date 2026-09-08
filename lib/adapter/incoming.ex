@@ -242,7 +242,15 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       when is_binary(activity_type) and (is_binary(object_type) or is_list(object_type)) do
     info(object_type, "AP Match#1 - with activity_type: #{activity_type} and object_type:")
 
+    fallback_module = fallback_federation_module()
+
     with {:ok, subject} <- AdapterUtils.activity_character(activity) |> info("activity_character"),
+         # a type claimed via `APActivities.handle_object_types` is kept whole, beating any module handling one of the document's OTHER types: e.g. when configure in :handle_object_types a recipe with type `["Note", "Preparation"]` is a Preparation we keep as APActivity, not a Post with the recipe discarded
+         {:no_federation_module_match, _} <-
+           if(handled_as_ap_activity?(object_type, fallback_module),
+             do: handle_activity_with({:ok, fallback_module}, subject, activity, object),
+             else: {:no_federation_module_match, "no type handled as an APActivity"}
+           ),
          {:no_federation_module_match, _} <-
            if(activity_type && object_type,
              do:
@@ -423,9 +431,24 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     end
   end
 
+  defp fallback_federation_module,
+    do:
+      Bonfire.Common.Config.get(
+        [__MODULE__, :federation_fallback_module],
+        Bonfire.Social.APActivities
+      )
+
+  # does the document declare a type listed in `APActivities`' `handle_object_types`, i.e. one we store whole as an APActivity instead of mapping onto a native type? Asks the module directly rather than the registry, which is cached and so would not see a config change
+  defp handled_as_ap_activity?(object_type, fallback_module \\ fallback_federation_module()) do
+    claimed =
+      maybe_apply(fallback_module, :federation_module, [], fallback_return: [])
+      |> List.wrap()
+
+    Enum.any?(List.wrap(object_type), &(&1 in claimed))
+  end
+
   defp receive_activity_fallback(activity, object, subject \\ nil) do
-    module =
-      Application.get_env(:bonfire, :federation_fallback_module, Bonfire.Social.APActivities)
+    module = fallback_federation_module()
 
     if module do
       info("AP - handling activity with fallback module")
@@ -510,8 +533,7 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         "AP - handle_activity_with OK: #{module} to Create #{ap_id} as #{inspect(pointer_id)} using #{module}"
       )
 
-      fallback_module =
-        Application.get_env(:bonfire, :federation_fallback_module, Bonfire.Social.APActivities)
+      fallback_module = fallback_federation_module()
 
       # A local C2S activity is not federated by `ActivityPub.create/2` (which skips `maybe_federate` when `from_c2s`), so it has to be published from here, but it still needs a local object first: the `ActivityPub.Object` stored by `Object.insert` is not a pointable and never reaches a feed.
       publish_after_create? = local? and module == fallback_module

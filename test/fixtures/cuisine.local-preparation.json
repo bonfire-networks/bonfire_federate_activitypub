@@ -1,0 +1,95 @@
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "id": "https://cuisine.local/api/ap/object/preparation/213?v=1787595526",
+  "type": ["Note", "Preparation"],
+  "actor": "https://cuisine.local/api/ap/actor/1",
+  "attributedTo": "https://cuisine.local/api/ap/actor/1",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "cc": ["https://cuisine.local/api/ap/actor/1/followers"],
+  "context": "https://cuisine.local/api/ap/object/preparation/213?v=1787595526",
+  "url": "https://cuisine.local/dmathieu/p/213",
+  "published": "2026-08-24T18:18:46Z",
+  "updated": "2026-08-24T18:21:05Z",
+  "summary": "",
+  "content": "<p>\n<strong>Salade de boulgour</strong>\n</p>\n<p>#cuisine #salade</p>\n<p><a href=\"https://cuisine.local/dmathieu/p/213\">Voir la préparation complète</a></p>\n",
+  "contentMap": {
+    "fr": "<p>\n<strong>Salade de boulgour</strong>\n</p>\n<p>#cuisine #salade</p>\n<p><a href=\"https://cuisine.local/dmathieu/p/213\">Voir la préparation complète</a></p>\n"
+  },
+  "nameMap": { "fr": "Salade de boulgour" },
+  "descriptionMap": { "fr": "#cuisine #salade" },
+  "servingTypeMap": { "fr": "personnes" },
+  "serving": 6,
+  "preparedAt": "2026-08-24",
+  "recipe": "https://cuisine.local/api/ap/object/recipe/202",
+  "tag": [
+    { "name": "#cuisine", "type": "Hashtag" },
+    { "name": "#salade", "type": "Hashtag" }
+  ],
+  "attachment": [
+    {
+      "mediaType": "image/jpeg",
+      "name": "La salade, dans son saladier.",
+      "type": "Image",
+      "url": [
+        {
+          "href": "https://cuisine.local/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsiZGF0YSI6MjA5MywicHVyIjoiYmxvYl9pZCJ9fQ==--0ef173715f815099b12d2926c2a2360c90bb5cca/1596.jpg",
+          "mediaType": "image/jpeg",
+          "type": "Link"
+        }
+      ]
+    }
+  ],
+  "ingredients": [
+    {
+      "id": "https://cuisine.local/api/ap/object/baking/213?v=1787595526#ingredient_1000",
+      "nameMap": { "fr": "Boulgour" },
+      "position": 1,
+      "quantity": 250.0,
+      "unit": "g"
+    },
+    {
+      "id": "https://cuisine.local/api/ap/object/baking/213?v=1787595526#ingredient_1001",
+      "nameMap": { "fr": "Lardons" },
+      "position": 2,
+      "quantity": 200.0,
+      "unit": "g"
+    },
+    {
+      "id": "https://cuisine.local/api/ap/object/baking/213?v=1787595526#ingredient_1002",
+      "nameMap": { "fr": "Aubergine" },
+      "position": 3,
+      "quantity": 1.0,
+      "unit": ""
+    }
+  ],
+  "steps": [
+    {
+      "contentMap": {
+        "fr": "Faire bouillir de l'eau dans une casserole. Ajouter le boulgour et laisser cuire le temps indiqué.\nÉgoutter et réserver au frais."
+      },
+      "id": "https://cuisine.local/api/ap/object/baking/213?v=1787595526#step_990",
+      "position": 1,
+      "type": "PreparationContent"
+    },
+    {
+      "contentMap": {
+        "fr": "Mettre les lardons à cuire dans une poêle à feu moyen.\nLorsqu'ils sont grillés, les déposer sur un papier absorbant."
+      },
+      "id": "https://cuisine.local/api/ap/object/baking/213?v=1787595526#step_991",
+      "position": 2,
+      "type": "PreparationContent"
+    }
+  ],
+  "likes": {
+    "first": "https://cuisine.local/api/ap/object/preparation/213/likes?page=1",
+    "id": "https://cuisine.local/api/ap/object/preparation/213/likes",
+    "totalItems": 0,
+    "type": "Collection"
+  },
+  "shares": {
+    "first": "https://cuisine.local/api/ap/object/preparation/213/shares?page=1",
+    "id": "https://cuisine.local/api/ap/object/preparation/213/shares",
+    "totalItems": 1,
+    "type": "Collection"
+  }
+}
