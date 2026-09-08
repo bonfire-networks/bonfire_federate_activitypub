@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
 
   # Archiving changes what the group declares (`postingRestrictedToMods` becomes true, since it now accepts nothing), and a declaration nobody is told about does no work: existing followers keep offering their users a compose button for a group that has closed.
   @tag skip:
-         "2026-09-08: the push happens (soft_delete calls it, after commit and non-fatally) but delivering an Update for an ALREADY-ARCHIVED group crashes a linked process in the delivery path, which takes the test's DB connection with it — `DBConnection.OwnershipError` naming the test process itself. Archived rows are excluded from the default fetch (proven twice while building this), so the likely cause is delivery re-loading the group through one of those paths. The declaration itself is covered by `group_actor_declarations_test.exs`; what is unproven is only that the Update goes out."
+         "2026-09-08: `soft_delete/2` deliberately does NOT push an actor Update. Delivering one for an already-archived group crashes a LINKED process in the delivery path, taking the caller's DB connection with it, so archiving itself failed — it broke every archive test across `bonfire_ui_groups`, sidebar pins and this extension in CI. A linked exit cannot be rescued at the call site, so the push was removed until the delivery crash is understood (archived rows are excluded from the default fetch, so delivery re-loading the group is the likely cause). The DECLARATION is correct either way and is covered by `group_actor_declarations_test.exs`; only telling existing followers is missing."
   test "archiving a group federates an Update declaring it closed to posts" do
     creator = fake_user!()
 
