@@ -15,6 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
   alias Bonfire.Classify.Simulate
   alias Bonfire.Federate.ActivityPub.Simulate, as: APSimulate
   alias ActivityPub.Federator.Transformer
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   @fixtures Path.join([__DIR__, "..", "fixtures"])
 
@@ -300,5 +301,49 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
       assert %{data: %{"type" => "Announce"}} = announce_by_group(object_id, group_ap_id),
              "the fallback keeps the object and files it, so the group should relay it like anything else it holds"
     end
+  end
+
+  # The other side of deriving the group ONCE for every handler: the derivation now also meets objects that can never belong to one. A reply naming no group falls back to the group of the thread it answers, and the thread here is a DM, whose parent is a `Message`, a schema with no `tree` assoc at all. Preloading an assoc a schema does not have raises rather than answering nothing (Bonfire treats it as a bug at the call site), and this one raises inside the inbox request, so the reply is answered with a 500 and never delivered. Which is how the message dance test found it.
+  test "a reply to a message belongs to no group, and says so without failing", %{
+    creator: creator
+  } do
+    assert {:ok, remote_author} = AdapterUtils.get_or_fetch_and_create_by_uri(@other_author)
+
+    assert {:ok, dm} =
+             Bonfire.Messages.send(
+               creator,
+               %{post_content: %{html_body: "<p>a message, not a group post</p>"}},
+               remote_author
+             )
+
+    assert {:ok, %{data: %{"id" => dm_ap_id}}} = ActivityPub.Object.get_cached(pointer: dm)
+
+    creator_ap_id = ActivityPub.Actor.get_cached!(pointer: creator).ap_id
+    reply_id = "#{@other_author}/statuses/reply-to-a-dm"
+
+    incoming = %{
+      "@context" => "https://www.w3.org/ns/activitystreams",
+      "type" => "Create",
+      "id" => "#{reply_id}/activity",
+      "actor" => @other_author,
+      "to" => [creator_ap_id],
+      "cc" => [],
+      "object" => %{
+        "id" => reply_id,
+        "type" => "Note",
+        "attributedTo" => @other_author,
+        "content" => "<p>answering you privately</p>",
+        "inReplyTo" => dm_ap_id,
+        "to" => [creator_ap_id],
+        "cc" => []
+      }
+    }
+
+    assert {:ok, _} = Transformer.handle_incoming(incoming)
+
+    assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: reply_id)
+
+    assert is_binary(pointer_id),
+           "a private reply is delivered like any other, and asking which group it is in must not be able to lose it"
   end
 end

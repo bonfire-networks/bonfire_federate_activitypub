@@ -2646,12 +2646,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end)
     |> debug("interaction_policy")
     |> then(fn policy ->
-      %{
-        "interactionPolicy" => policy,
-        # the same fact `canReply` states, in the vocabulary the PeerTube family reads: our captures have `commentsEnabled` from Pixelfed, PieFed, PeerTube and Mobilizon, and `interactionPolicy` from Mastodon, PieFed and Lemmy. Read off the policy rather than asked of boundaries again, so the two cannot disagree — `policy_circles_urls/2` maps the `:activity_pub` circle to the Public URI, so its presence in `canReply` IS the answer, and a moderator's `:lock` drops that circle from both at once
-        "commentsEnabled" =>
-          ActivityPub.Config.public_uri() in e(policy, "canReply", "automaticApproval", [])
-      }
+      public_uri = ActivityPub.Config.public_uri()
+
+      %{"interactionPolicy" => policy}
+      # the same fact `canReply` states, in the vocabulary the PeerTube family reads, so read off the policy rather than asked of boundaries again. Stated only for an object the public can reach at all: a mentions-only post names nobody public under ANY verb by virtue of its addressing, and `false` there is read on the other side as a lock (`Threads.ap_receive_comments_enabled/4`), refusing the reply of the very person it was addressed to
+      |> Enums.maybe_put(
+        "commentsEnabled",
+        if Enum.any?(policy, fn {_verb, %{"automaticApproval" => urls}} -> public_uri in urls end) do
+          public_uri in e(policy, "canReply", "automaticApproval", [])
+        end
+      )
     end)
   end
 

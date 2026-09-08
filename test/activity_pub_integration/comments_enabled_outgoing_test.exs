@@ -10,15 +10,8 @@ defmodule Bonfire.Federate.ActivityPub.CommentsEnabledOutgoingTest do
 
   alias Bonfire.Federate.ActivityPub.Outgoing
 
-  defp post!(creator, html_body) do
-    assert {:ok, post} =
-             Bonfire.Posts.publish(
-               current_user: creator,
-               post_attrs: %{post_content: %{html_body: html_body}},
-               boundary: "public"
-             )
-
-    post
+  defp post!(creator, html_body, boundary \\ "public") do
+    Bonfire.Posts.Fake.fake_post!(creator, boundary, %{post_content: %{html_body: html_body}})
   end
 
   defp object_data(post) do
@@ -57,6 +50,20 @@ defmodule Bonfire.Federate.ActivityPub.CommentsEnabledOutgoingTest do
 
     assert data["commentsEnabled"] == true
     assert data["interactionPolicy"]["canReply"]["automaticApproval"] != []
+  end
+
+  # A post only its mentions can see lists nobody public under `canReply` because of who it is ADDRESSED to, not because anyone closed it, and the field cannot tell those apart. Saying `false` there is read by the receiving instance as a lock (`Threads.ap_receive_comments_enabled/4` applies the same `:lock` block a moderator would), which closes the conversation against the very people it was sent to — the dance tests caught it as the mentioned user being refused permission to reply.
+  test "a post nobody public can read says nothing about comments" do
+    creator = fake_user!()
+    mentioned = fake_user!()
+
+    post =
+      post!(creator, "<p>just between us @#{mentioned.character.username}</p>", "mentions")
+
+    assert {:ok, %{object: %{data: data}}} = Outgoing.push_now!(post)
+
+    refute Map.has_key?(data, "commentsEnabled"),
+           "the field states whether a thread is CLOSED, so an object nobody public could reply to anyway has to omit it rather than answer a question that was not asked"
   end
 
   # Both fields answer the same question for different readers, so they are built together from one boundary check (`AdapterUtils.ap_prepare_outgoing_interaction_policy/3`) rather than queried twice. Asserted so a future change cannot let them disagree.
