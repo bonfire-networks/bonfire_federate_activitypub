@@ -6,7 +6,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupMobilizonInteropTest do
 
   What they do NOT have is group-actor relay: distribution goes through an instance-level relay actor, and Mobilizon's own docs say federation "fully works only between Mobilizon instances". So there is no announce shape here for us to consume, and these tests are about the ACTOR — what a Mobilizon group becomes when we mirror it.
 
-  ⚠️ The capture (2026-09-02, live public group, hosts rewritten) surfaced a mapping bug: it declares `manuallyApprovesFollowers: false` AND `openness: "moderated"`. Those do not contradict each other, because following and joining are different acts here, and Bonfire models them separately too — `Categories.join_group/3` adds someone to the members circle, and has its own branch for people who already follow. We nevertheless read `manuallyApprovesFollowers` as the membership signal, which is only correct where follow IS join, as in the threadiverse.
+  ⚠️ The capture (2026-09-02, live public group, hosts rewritten) surfaced a mapping bug: it declares `manuallyApprovesFollowers: false` AND `openness: "moderated"`. Those do not contradict each other, because following and joining are different acts here, and Bonfire models them separately too — `Categories.join_and_follow_group/3` adds someone to the members circle, and has its own branch for people who already follow. We nevertheless read `manuallyApprovesFollowers` as the membership signal, which is only correct where follow IS join, as in the threadiverse.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 

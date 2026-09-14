@@ -419,6 +419,38 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     |> push_actor_update()
   end
 
+  @doc """
+  Accepts an incoming activity on behalf of `accepter`, addressed back to whoever sent it.
+
+  Answers in the verb we were sent, by handing the received activity straight to `ActivityPub.accept/1`: a `Join` is answered with `Accept{Join}` and a `Follow` with `Accept{Follow}`, so a peer hears back in the vocabulary it used rather than ours.
+
+  Non-fatal, which every caller relies on: whatever the activity asked for is already recorded by the time this runs, and in allowlist-only or archipelago mode delivering the reply to a non-allowlisted remote is legitimately filtered out. A failure is warned and returned, never raised.
+  """
+  def send_accept(accepter, activity) do
+    with {:ok, actor} <- accepter_actor(accepter),
+         {:ok, accept} <-
+           ActivityPub.accept(%{
+             actor: actor,
+             to: [e(activity, :data, "actor", nil) || e(activity, "actor", nil)],
+             object: activity_to_accept(activity),
+             local: true
+           }) do
+      {:ok, accept}
+    else
+      e ->
+        warn(e, "Could not accept the activity (what it asked for was still recorded)")
+        {:error, e}
+    end
+  end
+
+  defp accepter_actor(%ActivityPub.Actor{} = actor), do: {:ok, actor}
+  defp accepter_actor(accepter), do: ActivityPub.Actor.get_cached(pointer: accepter)
+
+  # prefer the already-resolved activity, so `accept` doesn't have to look it up by ap_id, which can miss (eg. in allowlist-only or archipelago mode) and return nil
+  defp activity_to_accept(%ActivityPub.Object{} = activity), do: activity
+  defp activity_to_accept(%{data: data}) when is_map(data), do: data
+  defp activity_to_accept(data), do: data
+
   def push_now!(activity) do
     activity = ap_activity!(activity)
 
