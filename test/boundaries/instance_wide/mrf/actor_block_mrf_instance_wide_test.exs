@@ -1,7 +1,7 @@
 defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
   use Bonfire.Federate.ActivityPub.DataCase, async: false
   import Tesla.Mock
-  alias ActivityPub.Config
+  use Bonfire.Common.Config
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
   alias Bonfire.Data.ActivityPub.Peered
 
@@ -9,14 +9,15 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
   @local_actor "alice"
 
   setup_all do
-    orig = Config.get!(:boundaries)
+    # `:activity_pub` named on each call: the config lives under `config :activity_pub, :boundaries`, which ours otherwise resolves to `:bonfire` and fails to find. Note the arg order differs — `get!` takes the app SECOND (it has no default, since it raises), `put` takes it third
+    orig = Config.get!(:boundaries, :activity_pub)
 
     # local_user = fake_user!(@local_actor)
 
-    Config.put(:boundaries,
-      block: [],
-      silence_them: [],
-      ghost_them: []
+    Config.put(
+      :boundaries,
+      [block: [], silence_them: [], ghost_them: []],
+      :activity_pub
     )
 
     # TODO: move this into fixtures
@@ -26,13 +27,13 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
     end)
 
     on_exit(fn ->
-      Config.put(:boundaries, orig)
+      Config.put(:boundaries, orig, :activity_pub)
     end)
   end
 
   describe "block when" do
     test "there's a remote actor with instance-wide blocked actor (in config)" do
-      Config.put([:boundaries, :block], ["mocked.local/users/karen"])
+      Process.put([:activity_pub, :boundaries, :block], ["mocked.local/users/karen"])
 
       remote_actor = remote_actor_json()
 
@@ -51,7 +52,8 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
 
   describe "block when recipients filtered because" do
     test "there's a local activity with instance-wide blocked actor as recipient (in config)" do
-      Config.put([:boundaries, :block], ["mocked.local/users/karen"])
+      # `Process.put`, not `Config.put`: the latter writes Application env, which outlives the test and leaves the block in place for whatever runs next
+      Process.put([:activity_pub, :boundaries, :block], ["mocked.local/users/karen"])
       local_activity = local_activity_json_to(@remote_actor)
 
       assert reject_or_no_recipients?(BoundariesMRF.filter(local_activity, true))
@@ -94,7 +96,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
 
   describe "filter recipients when" do
     test "there's a local activity with instance-wide blocked actor as recipient (in config)" do
-      Config.put([:boundaries, :block], ["mocked.local/users/karen"])
+      Process.put([:activity_pub, :boundaries, :block], ["mocked.local/users/karen"])
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
       assert BoundariesMRF.filter(local_activity, true) ==

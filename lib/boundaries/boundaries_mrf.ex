@@ -698,7 +698,8 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
   defp rejects_regex(block_types) do
     (filter_empty(block_types, []) ++ [:block])
     # |> debug()
-    |> Enum.map(&ActivityPub.Config.get([:boundaries, &1]))
+    # `Bonfire.Common.Config` rather than `ActivityPub.Config`, reading the same `:activity_pub` app: only this one checks the process dictionary in test env, so a test can prime it with `Process.put` instead of `Config.put`, which writes Application env globally and leaks into whatever runs next
+    |> Enum.map(&Bonfire.Common.Config.get([:boundaries, &1], nil, :activity_pub))
     |> filter_empty([])
     # |> debug()
     |> MRF.subdomains_regex()

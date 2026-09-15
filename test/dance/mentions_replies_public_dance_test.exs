@@ -155,9 +155,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPublicTest do
     #        ),
     #        "reply 31 with mention should have federated and be in remote feed"
 
-    Logger.metadata(action: info("check that reply-only 27 is NOT in OP's notifications"))
+    Logger.metadata(action: info("check that reply-only 27 IS in OP's notifications"))
 
-    refute Bonfire.Social.FeedLoader.feed_contains?(
+    # 27 answers the OP's own post, so it notifies them whether or not it mentions them. What does NOT notify them is a reply further down the thread, which is pinned by `bonfire_social/test/feeds/reply_parent_notifications_test.exs` rather than here
+    assert Bonfire.Social.FeedLoader.feed_contains?(
              notifications,
              post27_attrs.post_content.html_body
            )

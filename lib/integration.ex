@@ -164,12 +164,20 @@ defmodule Bonfire.Federate.ActivityPub do
 
         # callers that already enforce blocks (e.g. via `can?`) can pass `skip_block_check: true`
         # to avoid the redundant block query
+        #
+        # `local_user` is threaded in because a PER-USER block is a question about whose list to read, and the publisher identifies the blocker with `by_actor` rather than `current_user`: without this, fanning a post out to followers consults only instance-wide blocks, so someone I ghosted keeps receiving my posts
+        block_opts =
+          case local_user do
+            nil -> opts
+            user -> Keyword.put_new(Utils.to_options(opts), :current_user, user)
+          end
+
         not_blocked =
           opts[:skip_block_check] == true or
             !Bonfire.Federate.ActivityPub.Peered.actor_blocked?(
               subject_to_check,
               block_types,
-              opts
+              block_opts
             )
 
         # local subjects don't have Peered records and are always allowed;

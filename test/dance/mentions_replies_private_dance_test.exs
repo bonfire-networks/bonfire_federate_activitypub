@@ -116,9 +116,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
 
     ## back to primary instance
 
-    Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
+    Logger.metadata(action: info("check that the reply-only post IS in OP's feed, as a notification"))
 
-    refute Bonfire.Social.FeedLoader.feed_contains?(:my, post2_attrs.post_content.html_body,
+    # `:my` is follow-driven AND carries notifications, so pin that no follow is involved: the reply belongs here because it answers the OP, not because they subscribed
+    refute Bonfire.Social.Graph.Follows.following?(local_user, get_remote_on_local(context))
+
+    # directly answering someone's post notifies them whether or not it mentions them, and `:my` carries notifications, so this belongs in the OP's feed despite no follow between them
+    assert Bonfire.Social.FeedLoader.feed_contains?(:my, post2_attrs.post_content.html_body,
              current_user: local_user
            )
            |> debug("feeeed")
@@ -132,7 +136,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     # post3remote = List.first(feed).activity.object
     # assert post3remote.post_content.html_body =~ "try out federated reply with mention 31"
 
-    %{edges: feed} = Bonfire.Social.FeedLoader.feed(:notifications, current_user: local_user)
+    # `limit:` widened deliberately. The test-env default page is 2, and this thread puts three replies ahead of the one being asserted on, so the default page would cut it off for reasons that have nothing to do with federation
+    %{edges: feed} =
+      Bonfire.Social.FeedLoader.feed(:notifications, current_user: local_user, limit: 100)
 
     assert activity =
              Bonfire.Social.FeedLoader.feed_contains?(
