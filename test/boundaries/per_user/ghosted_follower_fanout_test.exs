@@ -119,7 +119,7 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
   test "a post is delivered to a follower nobody ghosted", %{author: author} do
     remote_follower_of(author, @elsewhere)
 
-    assert @elsewhere <> "/inbox" in inboxes_delivered_to(author),
+    assert (@elsewhere <> "/inbox") in inboxes_delivered_to(author),
            "the control: this is what delivery looks like when nothing is blocked"
   end
 
@@ -128,7 +128,7 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
 
     assert {:ok, _} = Blocks.block(ghosted, :ghost, current_user: author)
 
-    refute @ghosted <> "/inbox" in inboxes_delivered_to(author),
+    refute (@ghosted <> "/inbox") in inboxes_delivered_to(author),
            "ghosting means they cannot see me, and not delivering is what enforces it"
   end
 
@@ -143,9 +143,9 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
 
     inboxes = inboxes_delivered_to(author)
 
-    refute @ghosted <> "/inbox" in inboxes
+    refute (@ghosted <> "/inbox") in inboxes
 
-    assert @neighbour <> "/inbox" in inboxes,
+    assert (@neighbour <> "/inbox") in inboxes,
            "sharing an instance with someone I ghosted is nothing to do with them"
   end
 

@@ -116,7 +116,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
 
     ## back to primary instance
 
-    Logger.metadata(action: info("check that the reply-only post IS in OP's feed, as a notification"))
+    Logger.metadata(
+      action: info("check that the reply-only post IS in OP's feed, as a notification")
+    )
 
     # `:my` is follow-driven AND carries notifications, so pin that no follow is involved: the reply belongs here because it answers the OP, not because they subscribed
     refute Bonfire.Social.Graph.Follows.following?(local_user, get_remote_on_local(context))
