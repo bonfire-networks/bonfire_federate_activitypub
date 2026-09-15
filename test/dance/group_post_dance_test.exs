@@ -23,8 +23,19 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
          context do
       user = context[:local][:user]
 
+      # An OPEN, globally visible group, stated rather than defaulted, since this test is about one
+      # instance reaching another: `resolve_dims/1` gives a group that states nothing
+      # `local:unlisted`, whose actor the peer cannot fetch at all. `type: :group` matters too —
+      # without it `init_boundaries/4` takes the TOPIC branch, which applies no membership
+      # dimension, so the actor declares the fail-closed `openness: "invite_only"` and the peer
+      # mirrors a community nobody there may follow
       group =
-        fancy_fake_category!(user)
+        fancy_fake_category!(user,
+          type: :group,
+          membership: "open",
+          visibility: "global",
+          participation: "anyone"
+        )
         |> debug("thegroup")
 
       id = id(group[:category])
