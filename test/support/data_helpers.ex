@@ -168,9 +168,15 @@ defmodule Bonfire.Federate.ActivityPub.DataHelpers do
     user
   end
 
+  @doc """
+  Whether the MRF decided this activity does not go out, by any of the routes it has to say so.
+
+  `:ignore` is the answer for a LOCAL activity whose recipients were all filtered: it is stronger than an emptied `to`, since nothing is queued and no AP object is written at all.
+  """
   def reject_or_no_recipients?(activity) do
     case activity do
       {:reject, _} -> true
+      :ignore -> true
       {:ok, %{to: []}} -> true
       {:ok, %{"to" => []}} -> true
       _ -> false

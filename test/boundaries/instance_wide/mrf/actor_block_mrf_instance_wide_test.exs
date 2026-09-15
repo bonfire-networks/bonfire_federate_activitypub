@@ -67,6 +67,29 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
 
       assert reject_or_no_recipients?(BoundariesMRF.filter(local_activity, true))
     end
+
+    # Pins the EXACT answer, not just "some form of refusal". `reject_or_no_recipients?/1` accepts four shapes, and a local activity that loses every recipient must not go out AT ALL rather than go out with an empty `to`: `:ignore` writes no AP object and queues nothing. The two are easy to confuse because both look like a refusal through the helper, and only one of them actually stops delivery.
+    test "a local activity whose only recipient is blocked is not federated at all" do
+      {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+
+      assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
+      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
+
+      assert :ignore =
+               @remote_actor
+               |> local_activity_json_to()
+               |> BoundariesMRF.filter(true)
+    end
+
+    # The positive control for the two above: without a block the same activity keeps its recipient, so a refusal there means the block did it rather than the fixture never having been deliverable.
+    test "the same local activity federates when its recipient is not blocked" do
+      assert {:ok, filtered} =
+               @remote_actor
+               |> local_activity_json_to()
+               |> BoundariesMRF.filter(true)
+
+      assert @remote_actor in List.wrap(ed(filtered, :to, []))
+    end
   end
 
   describe "filter recipients when" do
