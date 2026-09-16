@@ -109,7 +109,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       remote =
         remote_group!(context, %{
           membership: "local:members",
-          visibility: "nonfederated:discoverable",
+          visibility: "nonfederated:preview",
           participation: "local:contributors",
           default_content_visibility: "nonfederated"
         })
