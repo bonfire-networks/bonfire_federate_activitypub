@@ -35,7 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
     group = Simulate.fake_group!(creator)
 
     assert :ok =
-             Bonfire.Classify.Boundaries.apply(group, creator, %{
+             Bonfire.Classify.Boundaries.replace(group, creator, %{
                membership: "open",
                visibility: "global",
                participation: "anyone",
@@ -194,7 +194,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
   describe "an invite-only group" do
     setup %{creator: creator, group: group} do
       assert :ok =
-               Bonfire.Classify.Boundaries.apply(group, creator, %{
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
                  membership: "invite_only",
                  visibility: "global",
                  participation: "group_members",

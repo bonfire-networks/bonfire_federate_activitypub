@@ -22,7 +22,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       TestInstanceRepo.apply(fn ->
         group = fake_group!(creator, %{type: :group})
-        :ok = Bonfire.Classify.Boundaries.apply(group, creator, dims)
+        :ok = Bonfire.Classify.Boundaries.replace(group, creator, dims)
 
         [
           group: group,

@@ -187,7 +187,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupLiveTest do
     group = Simulate.fancy_fake_category!(creator, type: :group)
 
     assert :ok =
-             Bonfire.Classify.Boundaries.apply(group[:category], creator, %{
+             Bonfire.Classify.Boundaries.replace(group[:category], creator, %{
                membership: "open",
                visibility: "global",
                participation: "anyone",

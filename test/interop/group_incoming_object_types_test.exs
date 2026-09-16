@@ -49,7 +49,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
     group = Simulate.fake_group!(creator)
 
     assert :ok =
-             Bonfire.Classify.Boundaries.apply(group, creator, %{
+             Bonfire.Classify.Boundaries.replace(group, creator, %{
                membership: "open",
                visibility: "global",
                participation: "anyone",

@@ -105,7 +105,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupMicroblogInteropTest do
 
     # a PUBLIC federated group, which is what this plan is about. `fake_group!` defaults to members-only participation, under which excluding a non-member's reply is correct rather than a bug, so without this the test would be asking the wrong question of the wrong group.
     assert :ok =
-             Bonfire.Classify.Boundaries.apply(group, group_creator, %{
+             Bonfire.Classify.Boundaries.replace(group, group_creator, %{
                membership: "open",
                visibility: "global",
                participation: "anyone",
