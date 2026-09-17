@@ -149,7 +149,7 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
            "sharing an instance with someone I ghosted is nothing to do with them"
   end
 
-  # ⚠️ THE CASE FILTERING CANNOT REACH, and the reason the `also_unfollow` toggle exists. Ghosting one of three followers on a host leaves two, and `length(ids) > 1` sends ONE post to that host's `sharedInbox` rather than addressing anyone individually — the SAME delivery it would make with nobody ghosted. The ghosted person's server receives it and files it for everyone there who follows me.
+  # ⚠️ THE CASE FILTERING CANNOT REACH, and the reason the `also_unfollow_and_notify` toggle exists. Ghosting one of three followers on a host leaves two, and `length(ids) > 1` sends ONE post to that host's `sharedInbox` rather than addressing anyone individually — the SAME delivery it would make with nobody ghosted. The ghosted person's server receives it and files it for everyone there who follows me.
   #
   # Asserted as a comparison, because no single assertion here can tell ghosted from not: the delivery is identical either way, and that identity IS the finding.
   test "ghosting changes nothing about a shared-inbox delivery to a host with two other followers",
@@ -170,10 +170,11 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
   end
 
   # The same setup WITH the toggle, which is what closes the gap above. The delivery is unchanged — two others on that host still warrant the shared-inbox post, but the ghosted person is no longer among the followers it is built from so their server has no reason to show it to them. That last step happens on their side, so what is checkable here is that they left the set.
-  test "also_unfollow removes a ghosted follower from the set the fan-out is built from", %{
-    author: author,
-    author_actor: author_actor
-  } do
+  test "also_unfollow_and_notify removes a ghosted follower from the set the fan-out is built from",
+       %{
+         author: author,
+         author_actor: author_actor
+       } do
     ghosted = remote_follower_of(author, @ghosted)
     remote_follower_of(author, @neighbour)
     remote_follower_of(author, @third)
@@ -181,7 +182,8 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
     assert id(ghosted) in Adapter.get_follower_local_ids(author_actor, :publish),
            "the control: they are a follower until the toggle says otherwise"
 
-    assert {:ok, _} = Blocks.block(ghosted, :ghost, current_user: author, also_unfollow: true)
+    assert {:ok, _} =
+             Blocks.block(ghosted, :ghost, current_user: author, also_unfollow_and_notify: true)
 
     refute id(ghosted) in Adapter.get_follower_local_ids(author_actor, :publish),
            "off my followers list, so a shared-inbox post their server receives is not one it holds a subscription for"
@@ -235,24 +237,48 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
   end
 
   # The other half of the toggle, and the only thing that reaches a ghosted follower who shares an instance with someone else. It costs what the default avoids: they can tell, and `unblock/3` will not give it back.
-  test "ghosting with also_unfollow severs their follow of me", %{author: author} do
+  test "ghosting with also_unfollow_and_notify severs their follow of me", %{author: author} do
     follower = remote_follower_of(author, @ghosted)
 
     assert {:ok, _} =
-             Blocks.block(follower, :ghost, current_user: author, also_unfollow: true)
+             Blocks.block(follower, :ghost, current_user: author, also_unfollow_and_notify: true)
 
     refute Follows.following?(follower, author),
            "asking for it is what removes them from my followers, so a shared inbox no longer carries my posts to them"
   end
 
+  # The follow being severed is THEIRS, so the only instance that could undo it over the wire is theirs, so an `Undo{Follow}` naming them as actor is applied locally but unsendable. What their server hears is the `Block`.
+  test "and does so without trying to send an Undo{Follow} as them", %{author: author} do
+    follower = remote_follower_of(author, @ghosted)
+
+    assert {:ok, _} =
+             Blocks.block(follower, :ghost, current_user: author, also_unfollow_and_notify: true)
+
+    undos_of_follows =
+      ActivityPub.Object
+      |> repo().all()
+      |> Enum.filter(
+        &(&1.data["type"] == "Undo" and get_in(&1.data, ["object", "type"]) == "Follow")
+      )
+
+    assert undos_of_follows == [],
+           "we cannot sign as the person we just ghosted, so their unfollow is a local record change with nothing to announce"
+
+    refute Follows.following?(follower, author),
+           "control: the severance itself still happened, it is only the announcing that is skipped"
+  end
+
   # Direction matters: ghosting severs THEIR follow of me, not mine of them, since it is my posts that must stop reaching them. Done with a LOCAL pair because following a REMOTE actor yields a pending `Request` rather than a `Follow` until they Accept, so there would be no outgoing follow here to leave alone.
-  test "ghosting with also_unfollow severs only their follow, not mine of them", %{author: author} do
+  test "ghosting with also_unfollow_and_notify severs only their follow, not mine of them", %{
+    author: author
+  } do
     other = fake_user!("mutually_following")
 
     {:ok, _} = Follows.follow(other, author, skip_boundary_check: true)
     {:ok, _} = Follows.follow(author, other, skip_boundary_check: true)
 
-    assert {:ok, _} = Blocks.block(other, :ghost, current_user: author, also_unfollow: true)
+    assert {:ok, _} =
+             Blocks.block(other, :ghost, current_user: author, also_unfollow_and_notify: true)
 
     refute Follows.following?(other, author),
            "they stop following me, which is what stops my posts reaching them"
