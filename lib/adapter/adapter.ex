@@ -582,16 +582,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     nil
   end
 
+  # Resolved to the character's id first, because `URIs.path/1` turns an id into its TYPED path (a group lands on its group page), whereas a bare username can only be read as a person's `/@name`. Unboundarised on purpose: this builds a path rather than serving anything, and the page it leads to applies the viewer's own boundaries. The AP-gated `AdapterUtils.get_character_by_username/2` would refuse exactly the private groups a browser most needs sending somewhere useful.
   defp get_url_by_username(username) do
-    case URIs.path(username) do
-      path when is_binary(path) ->
-        path
-
-      _ ->
-        case AdapterUtils.get_character_by_username(username) do
-          {:ok, user_etc} -> URIs.path(user_etc)
-          {:error, _} -> "/404"
-        end
+    with {:ok, %{id: id}} <- Bonfire.Me.Characters.by_username(username),
+         path when is_binary(path) <- URIs.path(id) do
+      path
+    else
+      _ -> URIs.path(username) || "/404"
     end
   end
 
