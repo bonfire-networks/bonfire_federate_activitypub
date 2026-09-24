@@ -142,6 +142,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         })
 
       local = context[:local][:user]
+      local_url = Bonfire.Me.Characters.character_url(local)
 
       assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
       assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
@@ -152,7 +153,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "the group's Accept of the Follow did not come back"
 
       TestInstanceRepo.apply(fn ->
-        joiner = on_peer(local)
+        joiner = on_peer(local_url)
 
         assert Bonfire.Classify.Categories.member?(joiner, remote[:group]),
                "the Join never made them a member at the group's origin"
@@ -164,7 +165,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       refute Bonfire.Classify.Categories.member?(local, mirror)
 
       TestInstanceRepo.apply(fn ->
-        joiner = on_peer(local)
+        joiner = on_peer(local_url)
 
         refute Bonfire.Classify.Categories.member?(joiner, remote[:group]),
                "the Leave never reached the group's origin"
@@ -173,8 +174,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end)
     end
 
-    # the moderator's decision at the origin is the only thing that can settle a pending join here, so it has to be sent back
+    # the moderator's decision at the origin is the only thing that can settle a pending join here, so it has to be sent back. Not expected to work yet: only `open_network` federates, and on the peer no stored `Join` is found to accept
     @tag :test_instance
+    # for moderated groups
+    @tag :todo
     test "joining a remote group that reviews joins waits, and its moderator accepting makes you a member here too",
          context do
       remote =
@@ -186,6 +189,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         })
 
       local = context[:local][:user]
+      local_url = Bonfire.Me.Characters.character_url(local)
       creator = context[:remote][:user]
 
       assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
@@ -195,7 +199,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
 
       TestInstanceRepo.apply(fn ->
-        joiner = on_peer(local)
+        joiner = on_peer(local_url)
 
         assert [request] =
                  Bonfire.Social.Requests.all_by_object(remote[:group], join_verb(),

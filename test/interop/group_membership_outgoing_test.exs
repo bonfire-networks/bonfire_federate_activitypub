@@ -39,11 +39,17 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
 
     # served too, since sending re-fetches the actor, and a refetch that states no `openness` re-mirrors the group as open
     mock(fn
-      %{method: :get, url: @remote_group} -> json(group_json)
+      %{method: :get, url: @remote_group} ->
+        json(group_json)
+
       %{method: :get, url: @stranger} ->
         json(APSimulate.actor_json(@stranger, "bakers", %{"type" => "Group"}))
-      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
-      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+
+      %{method: :post} ->
+        %Tesla.Env{status: 202, body: ""}
+
+      %{method: :get} ->
+        %Tesla.Env{status: 404, body: ""}
     end)
 
     {:ok, group} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(group_json)
@@ -76,8 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
   end
 
   defp join_requested?(user, group),
-    do:
-      Bonfire.Social.Requests.requested?(user, Bonfire.Boundaries.Verbs.get_id!(:join), group)
+    do: Bonfire.Social.Requests.requested?(user, Bonfire.Boundaries.Verbs.get_id!(:join), group)
 
   describe "joining an open remote group" do
     test "sends a Join and a Follow as them, and makes them a member" do

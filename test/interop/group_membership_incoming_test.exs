@@ -126,6 +126,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
     )
   end
 
+  # the `Accept`s the group sent for the remote actor's activities of this type
+  defp accepts_of(type, group_ap_id) do
+    ActivityPub.Object
+    |> repo().all()
+    |> Enum.filter(fn %{local: local, data: data} ->
+      object = data["object"]
+
+      local and data["type"] == "Accept" and data["actor"] == group_ap_id and
+        is_map(object) and object["type"] == type and object["actor"] == @remote_actor
+    end)
+  end
+
   describe "an incoming Join" do
     # A peer that sends `Join` (Mobilizon) sends `Follow` separately, but gets a group's content by being a member. Our delivery goes to followers, so a remote member is made a LOCAL follower: recorded here, federated nowhere, and tied to the `Join` so leaving removes it.
     test "makes them a member and a local follower, sending nothing as them", %{
@@ -151,7 +163,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
     } do
       assert {:ok, _} = Transformer.handle_incoming(membership_activity("Join", group_ap_id))
       user = remote_user()
-      assert Bonfire.Social.Graph.Follows.following?(user, group), "control: the Join made them one"
+
+      assert Bonfire.Social.Graph.Follows.following?(user, group),
+             "control: the Join made them one"
 
       assert {:ok, _} = Transformer.handle_incoming(membership_activity("Leave", group_ap_id))
 
@@ -277,6 +291,30 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
       assert Categories.member?(user, group)
       assert Bonfire.Social.Graph.Follows.following?(user, group)
       assert local_follows_made() == [], "nothing may go out as them"
+
+      assert [_] = accepts_of("Join", group_ap_id),
+             "accepted here, but their own instance is never told, so it still shows them waiting"
+    end
+
+    # ignoring is how a moderator declines, and nothing is sent for it
+    test "ignoring an incoming Join sends nothing back", %{
+      creator: creator,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Join", group_ap_id))
+
+      assert [request] =
+               Bonfire.Social.Requests.all_by_object(
+                 group,
+                 Bonfire.Boundaries.Verbs.get_id!(:join),
+                 skip_boundary_check: true
+               )
+
+      assert {:ok, _} = Bonfire.Social.Requests.ignore(request, current_user: creator)
+
+      refute Categories.member?(remote_user(), group)
+      assert accepts_of("Join", group_ap_id) == []
     end
   end
 
