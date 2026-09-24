@@ -121,6 +121,98 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "nonfederated visibility denies the `activity_pub` circle, and being absent from feeds is not the same as being unfetchable — only a peer can show the difference"
     end
 
+    defp join_verb, do: Bonfire.Boundaries.Verbs.get_id!(:join)
+
+    # the local person as the peer knows them. Takes the URL rather than the user, because it has to be computed HERE, before `TestInstanceRepo.apply/1` switches to the peer's host config
+    defp on_peer(url) do
+      {:ok, there} = AdapterUtils.get_or_fetch_and_create_by_uri(url)
+      there
+    end
+
+    # Pressing Join sends both a `Follow` and a `Join`, and leaving sends `Leave` and `Undo{Follow}`, so both instances have to agree on each half at every step
+    @tag :test_instance
+    test "joining an open remote group makes you a member and a follower on both sides, and leaving ends both",
+         context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      local = context[:local][:user]
+
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
+
+      assert Bonfire.Classify.Categories.member?(local, mirror)
+
+      assert Follows.following?(local, mirror),
+             "the group's Accept of the Follow did not come back"
+
+      TestInstanceRepo.apply(fn ->
+        joiner = on_peer(local)
+
+        assert Bonfire.Classify.Categories.member?(joiner, remote[:group]),
+               "the Join never made them a member at the group's origin"
+
+        assert Follows.following?(joiner, remote[:group])
+      end)
+
+      assert {:ok, _} = Bonfire.Classify.Categories.leave_and_unfollow_group(local, mirror)
+      refute Bonfire.Classify.Categories.member?(local, mirror)
+
+      TestInstanceRepo.apply(fn ->
+        joiner = on_peer(local)
+
+        refute Bonfire.Classify.Categories.member?(joiner, remote[:group]),
+               "the Leave never reached the group's origin"
+
+        refute Follows.following?(joiner, remote[:group])
+      end)
+    end
+
+    # the moderator's decision at the origin is the only thing that can settle a pending join here, so it has to be sent back
+    @tag :test_instance
+    test "joining a remote group that reviews joins waits, and its moderator accepting makes you a member here too",
+         context do
+      remote =
+        remote_group!(context, %{
+          membership: "on_request",
+          visibility: "global",
+          participation: "group_members",
+          default_content_visibility: "public"
+        })
+
+      local = context[:local][:user]
+      creator = context[:remote][:user]
+
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
+
+      refute Bonfire.Classify.Categories.member?(local, mirror), "the group has not decided yet"
+      assert Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
+
+      TestInstanceRepo.apply(fn ->
+        joiner = on_peer(local)
+
+        assert [request] =
+                 Bonfire.Social.Requests.all_by_object(remote[:group], join_verb(),
+                   skip_boundary_check: true
+                 ),
+               "the Join did not arrive as a join request at the group's origin"
+
+        assert {:ok, _} = Bonfire.Classify.Categories.accept_join_request(creator, request)
+        assert Bonfire.Classify.Categories.member?(joiner, remote[:group])
+      end)
+
+      assert Bonfire.Classify.Categories.member?(local, mirror),
+             "accepted at the origin, but no Accept of the Join came back, so the joiner's own instance still shows them waiting"
+
+      refute Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
+    end
+
     @tag :test_instance
     test "can lookup group actors from AP API with username, AP ID and with friendly URL",
          context do
