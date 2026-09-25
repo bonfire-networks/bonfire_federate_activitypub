@@ -543,6 +543,23 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  @doc """
+  Whether another server can reach this object, which is what makes interacting with it from there possible at all: false for a local character whose boundaries deny the `activity_pub` circle (eg. a non-federated group), true for anything remote.
+
+  Takes an id as well as a struct, loading it with its locality. Meant for the cold path of a logged-out visitor's Join or Follow, whose buttons hold only an id, so the load happens there rather than on every page.
+  """
+  def remotely_reachable?(id) when is_binary(id) do
+    case Bonfire.Common.Needles.get(id, skip_boundary_check: true) do
+      {:ok, object} -> remotely_reachable?(object)
+      _ -> false
+    end
+  end
+
+  def remotely_reachable?(%{} = object),
+    do: object |> preload_peered() |> character_ap_readable?()
+
+  def remotely_reachable?(_), do: false
+
   def get_character_by_id(id, opts \\ [skip_boundary_check: true])
 
   def get_character_by_id(id, opts)
