@@ -97,6 +97,21 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
     )
   end
 
+  # Published IN the group, not only boosted into its feed: the group is its tree parent, and it carries the group's moderators ACL, so the group's moderators (a remote group's included, once mirrored) can moderate it like anything else published there
+  # two assertions rather than one boolean, so a failure says which half is missing
+  defp assert_published_in_group(pointer_id, group) do
+    assert {:ok, _, %{id: group_id}} = Bonfire.Classify.Categories.group_of_object(pointer_id)
+    assert group_id == id(group), "its tree parent is the group"
+
+    {:ok, acl} = Bonfire.Boundaries.Scaffold.Groups.moderators_acl(group)
+
+    assert id(acl) in Enum.map(
+             Bonfire.Boundaries.Controlleds.list_on_object(pointer_id),
+             & &1.acl_id
+           ),
+           "it carries the group's moderators ACL, so its moderators can moderate it"
+  end
+
   # Being filed locally and being relayed are different things, and the second fails silently: if `Acts.Federate` never tied the incoming AP object to the new record, the auto-boost still creates a local boost while the `Announce` resolves to nothing. From the outside that group looks like it dropped the object.
   defp announce_by_group(object_id, group_ap_id) do
     assert {:ok, ap_object} = ActivityPub.Object.get_cached(ap_id: object_id)
@@ -136,6 +151,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
 
       assert filed_as_group?(pointer_id, group, creator),
              "an Article routes through `Posts`, which derives the group from the addressing — if this fails, the filing is broken for every type rather than only the ones below"
+    end
+
+    test "is published in it, with its moderators' ACL", %{
+      incoming: incoming,
+      object_id: object_id,
+      group: group
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(incoming)
+      assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: object_id)
+
+      # sent INTO the group, so it is the group's as much as anything published there
+      assert_published_in_group(pointer_id, group)
     end
 
     test "and the group announces it onward", %{
@@ -186,6 +213,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
 
       assert filed_as_group?(pointer_id, group, creator),
              "the activity names the group in `audience` and `to`, so a poll asked of a group belongs to it as much as a post does"
+    end
+
+    test "is published in it, with its moderators' ACL", %{
+      incoming: incoming,
+      object_id: object_id,
+      group: group
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(incoming)
+      assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: object_id)
+
+      # sent INTO the group, so it is the group's as much as anything published there
+      assert_published_in_group(pointer_id, group)
     end
 
     test "and the group announces it onward", %{
@@ -240,6 +279,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
              "image posts are what a picture community is FOR, so a group that files text and drops images has nothing in it"
     end
 
+    test "is published in it, with its moderators' ACL", %{
+      incoming: incoming,
+      object_id: object_id,
+      group: group
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(incoming)
+      assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: object_id)
+
+      # sent INTO the group, so it is the group's as much as anything published there
+      assert_published_in_group(pointer_id, group)
+    end
+
     test "and the group announces it onward", %{
       incoming: incoming,
       object_id: object_id,
@@ -289,6 +340,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingObjectTypesTest do
 
       assert filed_as_group?(pointer_id, group, creator),
              "we may not understand what it is, but the sender was unambiguous about where it goes"
+    end
+
+    test "is published in it, with its moderators' ACL", %{
+      incoming: incoming,
+      object_id: object_id,
+      group: group
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(incoming)
+      assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: object_id)
+
+      # sent INTO the group, so it is the group's as much as anything published there
+      assert_published_in_group(pointer_id, group)
     end
 
     test "and the group announces it onward", %{

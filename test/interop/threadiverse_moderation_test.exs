@@ -156,6 +156,16 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
     } do
       someone = fake_user!()
 
+      # standing comes from boundaries, like anyone's: the moderator is in the mirror's moderators circle (filled from the community's `attributedTo`), and the group's moderators ACL is on what was published in it. Asserted first, so a refusal below says which half is missing
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      {:ok, mod_user} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(moderator)
+
+      assert id(mod_user) in Enum.map(Bonfire.Classify.Categories.moderators(mirror), &id/1),
+             "control: the community's declared moderator is a moderator of our mirror"
+
       # a link post and a self-post, which are different local objects (`Media` and `Post`) sharing
       # the `replied` mixin, so both have a thread and both are lockable
       for locked <- [link_post, text_post] do
@@ -164,6 +174,20 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
         assert Bonfire.Boundaries.can?(someone, :reply, post),
                "#{locked}: the thread should start out open, or this test proves nothing"
+
+        assert {:ok, _, %{id: parent_id}} =
+                 Bonfire.Classify.Categories.group_of_object(pointer_id)
+
+        assert parent_id == id(mirror),
+               "control, #{locked}: published IN the mirror (its tree parent), not only boosted into its feed"
+
+        {:ok, mods_acl} = Bonfire.Boundaries.Scaffold.Groups.moderators_acl(mirror)
+
+        assert id(mods_acl) in Enum.map(
+                 Bonfire.Boundaries.Controlleds.list_on_object(pointer_id),
+                 & &1.acl_id
+               ),
+               "control, #{locked}: published in the mirror, so it carries the mirror's moderators ACL"
 
         # Lemmy's asset names its own test community, so point the lock at the community this post is
         # actually in, and at a moderator on that host. Authority is same-origin with the GROUP.

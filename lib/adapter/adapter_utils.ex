@@ -72,6 +72,37 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   A REPLY that names nothing falls back to the group of the thread it is answering. That is the only route a microblog reply has, since Mastodon, Akkoma, GoToSocial and the Misskey family send `Create{Note}` with no `audience` at all, and it is the same rule our own replies follow outgoing. Only consulted when the addressing named nothing, so the threadiverse case (where the group IS named) costs no extra lookup.
   """
+  @doc """
+  Our mirror of a remote group, given its ap_id, or nil. Only one we already hold, since this is called with ids that arrive in deliveries, and looking one up must never make us fetch an actor someone named.
+
+  For the group that RELAYED an activity (FEP-1b12): its `Announce` shows it accepted the post, which is what makes the post published in our mirror of it, where merely being named in `audience` proves nothing (see `local_group_audiences/2`).
+  """
+  #
+  # `create: true` is for the group that RELAYED an activity: it is the deliverer rather than an id someone named, so resolving it (and making its mirror) is what handling its `Announce` does anyway. Without this the first post a community relays to us would miss it, since the mirror is otherwise only made a moment later, when its `Announce` is handled as a boost
+  def mirrored_group(ap_id, opts \\ [])
+
+  def mirrored_group(ap_id, opts) when is_binary(ap_id) do
+    case get_character_by_ap_id(ap_id) do
+      # by `__struct__` rather than `%Category{}`, since classify compiles after this extension
+      {:ok, %{__struct__: Bonfire.Classify.Category} = group} ->
+        group
+
+      _ ->
+        # `get_cached_or_fetch` because this is the RELAYER, the same actor the `Announce`'s boost clause resolves right after: on a real delivery it is already cached from checking the signature, and when the activity was handed over otherwise (e.g. fetched, or a test) it is fetched here rather than a moment later
+        with true <- opts[:create] == true,
+             {:ok, %{data: %{"type" => "Group"}}} <-
+               ActivityPub.Actor.get_cached_or_fetch(ap_id: ap_id),
+             {:ok, %{__struct__: Bonfire.Classify.Category} = group} <-
+               Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(ap_id) do
+          group
+        else
+          _ -> nil
+        end
+    end
+  end
+
+  def mirrored_group(_, _), do: nil
+
   def local_group_audiences(activity_data, object_data \\ %{}) do
     case addressed_local_categories(activity_data, object_data) do
       [] -> List.wrap(group_of_thread(object_data["inReplyTo"]))
@@ -1555,17 +1586,25 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   #  `openness` comes from Mobilizon and is more specific, describing JOINING where the AS2 boolean describes FOLLOWING, which is why our own ingest reads it first.
   #
   # Stated either way rather than omitted: an absent flag reads as unknown, not as open.
+  @doc """
+  The id of a group's moderators collection, or nil when the group does not publish who moderates it: only a group whose own visibility already shows them (the About tab lists moderators to anyone who can see the group) declares it, so the wire never says more than the web does. Read both by the actor's `attributedTo` and by the `Add`/`Remove` sent when its moderators change, so neither names a moderator the other withholds.
+  """
+  def moderators_collection_ap_id(group, dims \\ nil) do
+    dims = dims || Bonfire.Boundaries.Presets.group_dimension_slugs(group)
+
+    if Bonfire.Boundaries.Presets.slug_scope(dims[:visibility]) not in ["members", nil] do
+      ActivityPub.Utils.collection_ap_id("moderators", id(group))
+    end
+  end
+
   defp actor_declarations(group, "Group") do
     dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
 
     manually_approves? = dims[:membership] == "on_request"
 
     %{
-      # the mod team, as a URI so removing someone changes what the endpoint serves rather than sticking in every remote's cache. Only for a group whose own visibility already shows them (the About tab lists moderators to anyone who can see the group), so the wire never says more than the web does
-      "attributedTo" =>
-        if Bonfire.Boundaries.Presets.slug_scope(dims[:visibility]) not in ["members", nil] do
-          ActivityPub.Utils.collection_ap_id("moderators", id(group))
-        end
+      # the mod team, as a URI so removing someone changes what the endpoint serves rather than sticking in every remote's cache
+      "attributedTo" => moderators_collection_ap_id(group, dims)
     }
     |> Enums.filter_empty(%{})
     |> Map.merge(%{
@@ -2549,7 +2588,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ...>   "canQuote" => %{"automaticApproval" => "https://example.org/users/someone"}
       ...> }
       iex> ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
-      [ {:guest, :react}, {:followers, :participate}, {:local, :cannot_critique} ]
+      [ {:guest, :react}, {:followers, :participate}, {:local, :cannot_critique_or_more} ]
   """
   def ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
       when is_map(interaction_policy) do
@@ -2562,10 +2601,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     }
 
     negative_role_map = %{
-      "canLike" => :cannot_react,
-      "canAnnounce" => :cannot_share,
-      "canReply" => :cannot_participate,
-      "canQuote" => :cannot_critique
+      "canLike" => :cannot_react_or_more,
+      "canAnnounce" => :cannot_share_or_more,
+      "canReply" => :cannot_participate_or_more,
+      "canQuote" => :cannot_critique_or_more
     }
 
     actor =

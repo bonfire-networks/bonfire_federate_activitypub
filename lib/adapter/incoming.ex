@@ -662,8 +662,10 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   defp ap_receive_args(module, args, activity, object) do
     if Code.ensure_loaded?(module) and function_exported?(module, :ap_receive_activity, 4) do
       groups =
-        AdapterUtils.local_group_audiences(e(activity, :data, %{}), e(object, :data, %{}))
-        |> debug("local groups or topics this activity is addressed to, if any")
+        (AdapterUtils.local_group_audiences(e(activity, :data, %{}), e(object, :data, %{})) ++
+           List.wrap(AdapterUtils.mirrored_group(e(activity, :relayed_by, nil), create: true)))
+        |> Enum.uniq_by(&Enums.id/1)
+        |> debug("groups or topics this activity is addressed to or relayed by, if any")
 
       args ++ [[publish_in: Enums.ids(groups)]]
     else
@@ -752,6 +754,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
       tags ->
         Utils.maybe_apply(Bonfire.Tag, :maybe_tag, [creator, pointer_id, tags],
+          fallback_return: nil
+        )
+
+        # tagging boosts it into the group's feed; publishing it IN the group (tree parent, and the group's ACLs, so its moderators can moderate it) is what the Tag act and `SetBoundaries` do for anything that runs an epic, which this object did not
+        Utils.maybe_apply(
+          Bonfire.Classify,
+          :publish_existing_in,
+          [pointer_id, creator, tags],
           fallback_return: nil
         )
     end

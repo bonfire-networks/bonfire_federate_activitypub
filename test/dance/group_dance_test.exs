@@ -174,6 +174,48 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end)
     end
 
+    # the origin tells its followers, as `Announce{Add}`, so the mirror does not wait for its next refetch of the group
+    @tag :test_instance
+    test "promoting a moderator at the group's origin shows them as a moderator of a follower's mirror",
+         context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      local = context[:local][:user]
+
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
+      assert Follows.following?(local, mirror), "control: only a follower is told"
+
+      promoted_url =
+        TestInstanceRepo.apply(fn ->
+          promoted = fake_user!()
+
+          assert {:ok, _} =
+                   Bonfire.Classify.Categories.add_moderator(
+                     context[:remote][:user],
+                     remote[:group],
+                     id(promoted)
+                   )
+
+          Bonfire.Me.Characters.character_url(promoted)
+        end)
+
+      mirrored_moderators =
+        Bonfire.Classify.Categories.moderators(mirror)
+        |> repo().maybe_preload(character: [:peered])
+        # their AP id, since here they are a remote person
+        |> Enum.map(&Bonfire.Common.URIs.canonical_url/1)
+
+      assert promoted_url in mirrored_moderators,
+             "the Announce{Add} did not reach the follower, or did not re-sync its mirror.\nmirror's moderators: #{inspect(mirrored_moderators)}"
+    end
+
     # the moderator's decision at the origin is the only thing that can settle a pending join here, so it has to be sent back. Not expected to work yet: only `open_network` federates, and on the peer no stored `Join` is found to accept
     # # for moderated groups
     # @tag :todo

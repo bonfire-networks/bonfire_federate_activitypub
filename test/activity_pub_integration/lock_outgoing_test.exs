@@ -76,7 +76,8 @@ defmodule Bonfire.Federate.ActivityPub.LockOutgoingTest do
 
   # The echo guard. Applying an incoming lock goes through the very same `Blocks.lock/2` (from the `Lock` handler, and from `Threads.ap_receive_comments_enabled/4` for the `commentsEnabled` form) so without this, receiving a lock would re-announce the origin's decision back at the fediverse as though it were ours.
   test "locking a REMOTE object federates nothing" do
-    author = fake_user!()
+    # an instance admin, who may close any thread here; a plain user may not lock someone else's post at all
+    admin = fake_admin!()
 
     # a genuinely remote object has to ARRIVE, not be published here on their behalf: a locally-published post has no AP object of the origin's
     ap_id = "#{@remote_actor}/statuses/theirs"
@@ -99,7 +100,7 @@ defmodule Bonfire.Federate.ActivityPub.LockOutgoingTest do
 
     assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: ap_id)
 
-    assert {:ok, _} = Blocks.lock(pointer_id, current_user: author)
+    assert {:ok, _} = Blocks.lock(pointer_id, current_user: admin)
 
     refute activity_for(ap_id, "Lock"),
            "the origin decides whether its own thread is closed; re-announcing that would be us speaking for them"

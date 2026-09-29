@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.CommentsEnabledOutgoingTest do
 
   `commentsEnabled` is how the threadiverse states a thread's reply status ON THE OBJECT, where a `Lock` activity states a CHANGE to it. We already read it on the way in (`Threads.ap_receive_comments_enabled/4`, applied at the type-agnostic ingest seam), turning `false` into the same `:lock` block a local moderator would apply. Emitting it is the other half, and without it a locked Bonfire thread federates as open: remote software offers a reply box, the reply is delivered, and our boundaries refuse it — the author finds out by being ignored.
 
-  Locally a lock is a `:cannot_participate` grant to the guest, local and activity_pub circles on the object's own ACL (`Blocks.mutate(:block, …, :lock, …)`), so what is asserted here is that the wire field follows the boundary actually in force rather than a separate flag that can drift from it.
+  Locally a lock is a `:cannot_participate_or_more` grant to the guest, local and activity_pub circles on the object's own ACL (`Blocks.mutate(:block, …, :lock, …)`), so what is asserted here is that the wire field follows the boundary actually in force rather than a separate flag that can drift from it.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 
