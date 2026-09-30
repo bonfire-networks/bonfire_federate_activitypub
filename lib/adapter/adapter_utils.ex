@@ -2183,10 +2183,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     * `:cc` — extra AP ids to append to `cc` (e.g. FEP-044f quote authorisation)
   """
   def determine_recipients(subject, object, is_public?, opts \\ []) do
-    mentions =
+    mentioned_characters =
       maybe_apply(Bonfire.Social.Tags, :list_tags_mentions, [object, subject],
         fallback_return: []
       )
+
+    mentions =
+      mentioned_characters
       |> ActivityPub.Actor.list_cached()
       |> debug("mentions to actors")
 
@@ -2220,6 +2223,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       cc: Enum.uniq(cc ++ List.wrap(audience)),
       bcc: if(is_public?, do: [], else: boundary_granted_recipients(subject, object)),
       mentions: mentions,
+      # the same mentions as local characters rather than AP actors, for what needs them locally (eg. `ap_prepare_outgoing_interaction_policy/3` checking what they may do)
+      mentioned_characters: mentioned_characters,
       audience: audience
     }
     |> debug("determined recipients")
@@ -2550,15 +2555,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> recipients_boundary_circles(activity, is_public?, object["interactionPolicy"])
   end
 
+  @doc "The boundary and `to_circles` for an incoming object: its recipients, plus its `interactionPolicy` as per-verb grants and denials (`{circle, verbs: [verb: true | false]}`, see `ap_incoming_interaction_policy_to_verb_grants/2`)."
   def recipients_boundary_circles(recipients, activity, is_public?, interaction_policy \\ []) do
+    policy_circles = ap_incoming_interaction_policy_to_verb_grants(activity, interaction_policy)
+
     if is_public? do
       # For public content, DON'T populate to_circles with recipients
       # The "public_remote" → "public" preset already grants appropriate access
-      # Only include interaction policies that RESTRICT access (e.g., canReply: followers only)
-      interaction_circles =
-        ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
-
-      {"public_remote", interaction_circles}
+      {"public_remote", policy_circles}
     else
       # For private/direct content, keep recipient-specific grants
       is_local? = e(activity, :local, nil)
@@ -2566,47 +2570,24 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       to_circles =
         Enum.map(recipients || [], fn {_, character} ->
           if is_local? || Bonfire.Federate.ActivityPub.federating?(character), do: id(character)
-        end) ++ ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+        end)
 
-      {"custom", to_circles}
+      {"custom", to_circles ++ policy_circles}
     end
   end
 
   @doc """
-  Converts an interaction_policy map to a list of {circle_name, role} tuples.
+  An incoming object's `interactionPolicy` as `to_circles` entries granting or denying single verbs, `{circle, verbs: [verb: true | false]}`, per policy key:
 
-  Only known verbs and circles are included. Supports multiple circles per verb.
-  Looks up followers/following URLs from the actor object if present.
+  1. key absent: nothing, the object's own boundary decides;
+  2. `automaticApproval` lists a circle (Public, the author's followers, who the author follows): its verbs, and only those, for that circle;
+  3. only the author listed, and nobody else under `manualApproval`: its verbs denied to local users (on a private object that includes its recipients, as the author asked);
+  4. only the author listed, others under `manualApproval`: nothing, the defaults apply (quoting and following send requests, and other activities may be accepted or rejected by the remote author).
 
-  Handles the special case: if automaticApproval contains only the author's identifier, this means "nobody can" and emits a negative role for all local users.
-
-  ## Examples
-
-      iex> interaction_policy = %{
-      ...>   "canLike" => %{"automaticApproval" => ["https://www.w3.org/ns/activitystreams#Public"]},
-      ...>   "canReply" => %{"automaticApproval" => "https://example.org/users/someone/followers"},
-      ...>   "canQuote" => %{"automaticApproval" => "https://example.org/users/someone"}
-      ...> }
-      iex> ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
-      [ {:guest, :react}, {:followers, :participate}, {:local, :cannot_critique_or_more} ]
+  What the object's boundary already gives, or already withholds, is dropped when it's cast (`Bonfire.Boundaries.Acls.prepare_cast/3`), so only what changes someone's permissions is kept.
   """
-  def ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+  def ap_incoming_interaction_policy_to_verb_grants(activity, interaction_policy)
       when is_map(interaction_policy) do
-    # Map of known policy verbs to roles
-    verb_role_map = %{
-      "canLike" => :react,
-      "canAnnounce" => :share,
-      "canReply" => :participate,
-      "canQuote" => :critique
-    }
-
-    negative_role_map = %{
-      "canLike" => :cannot_react_or_more,
-      "canAnnounce" => :cannot_share_or_more,
-      "canReply" => :cannot_participate_or_more,
-      "canQuote" => :cannot_critique_or_more
-    }
-
     actor =
       case e(activity, "actor", nil) || e(activity, :data, "actor", nil) do
         actor when is_map(actor) ->
@@ -2619,51 +2600,82 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           nil
       end
 
-    followers_url = e(actor, "followers", nil)
-    following_url = e(actor, "following", nil)
     author_id = e(actor, "id", nil)
-    public_uri = ActivityPub.Config.public_uri()
 
-    Enum.flat_map(interaction_policy, fn
-      {policy_verb, %{"automaticApproval" => urls}} ->
-        role = Map.get(verb_role_map, policy_verb)
-        negative_role = Map.get(negative_role_map, policy_verb)
-        urls = List.wrap(urls)
+    # the policy's audiences we have a circle for
+    circles_by_url =
+      [
+        {ActivityPub.Config.public_uri(), :local},
+        {e(actor, "followers", nil), :followers},
+        {e(actor, "following", nil), :followed}
+      ]
+      |> Map.new()
+      |> Map.delete(nil)
 
-        cond do
-          urls == [author_id] and negative_role ->
-            [{:local, negative_role}]
+    # an `interactionPolicy` key, and the verbs it's about
+    policy_verbs =
+      Config.get_ext(:bonfire_federate_activitypub, :interaction_policy_verbs, %{
+        "canLike" => [:like],
+        "canAnnounce" => [:boost],
+        "canReply" => [:reply],
+        "canQuote" => [:quote]
+      })
 
-          role ->
-            Enum.flat_map(urls, fn url ->
-              circle =
-                cond do
-                  url == public_uri -> :local
-                  followers_url && url == followers_url -> :followers
-                  following_url && url == following_url -> :followed
-                  true -> nil
-                end
+    Enum.flat_map(interaction_policy, fn {policy_key, rule} ->
+      verbs = Map.get(policy_verbs, policy_key, [])
+      automatic = List.wrap(e(rule, "automaticApproval", []))
+      manual = List.wrap(e(rule, "manualApproval", []))
 
-              if circle, do: [{circle, role}], else: []
-            end)
+      cond do
+        verbs == [] ->
+          []
 
-          true ->
-            []
-        end
+        # 3. only the author, nobody else even with approval
+        automatic == [author_id] and manual -- [author_id] == [] ->
+          [{:local, verbs: Enum.map(verbs, &{&1, false})}]
 
-      _ ->
-        # TODO: also support denial of manualApproval (but should be per-verb rather than denying :request for all verbs)
-        []
+        # 4. only the author, others may ask: the defaults apply
+        automatic == [author_id] ->
+          []
+
+        # 2. approved for a circle
+        true ->
+          for url <- automatic,
+              circle = circles_by_url[url],
+              circle,
+              do: {circle, verbs: verbs}
+      end
     end)
-    |> debug("interaction_policy to_circles")
+    |> debug("interaction_policy verb_grants")
   end
 
-  def ap_incoming_interaction_policy_to_circle_roles(_, interaction_policy) do
+  def ap_incoming_interaction_policy_to_verb_grants(_, interaction_policy) do
     debug(interaction_policy, "no valid interaction_policy")
     []
   end
 
-  @doc "The AP fields stating who may interact with an outgoing object: `interactionPolicy` (what Mastodon reads) and `commentsEnabled` (what the PeerTube family reads), both derived from the same boundary check so they cannot contradict each other. Returned as a map for the caller to merge into the object."
+  # replaced by `ap_incoming_interaction_policy_to_verb_grants/2`: roles are ladders, so a policy about one verb granted or denied several (an author-only `canLike` also blocked replies), and a grant included reading, opening a private object to people it wasn't sent to
+  # def ap_incoming_interaction_policy_to_circle_roles(activity, interaction_policy)
+  #     when is_map(interaction_policy) do
+  #   verb_role_map = %{"canLike" => :react, "canAnnounce" => :share, "canReply" => :participate, "canQuote" => :critique}
+  #   negative_role_map = %{"canLike" => :cannot_react_or_more, "canAnnounce" => :cannot_share_or_more, "canReply" => :cannot_participate_or_more, "canQuote" => :cannot_critique_or_more}
+  #   (... the author, followers, following and public URLs as in `ap_incoming_interaction_policy_to_verb_grants/2`)
+  #   Enum.flat_map(interaction_policy, fn
+  #     {policy_verb, %{"automaticApproval" => urls}} ->
+  #       role = Map.get(verb_role_map, policy_verb)
+  #       negative_role = Map.get(negative_role_map, policy_verb)
+  #       urls = List.wrap(urls)
+  #       cond do
+  #         urls == [author_id] and negative_role -> [{:local, negative_role}]
+  #         role -> (each url's circle: public → :local, followers → :followers, following → :followed) as `[{circle, role}]`
+  #         true -> []
+  #       end
+  #     _ -> []
+  #   end)
+  # end
+  # def ap_incoming_interaction_policy_to_circle_roles(_, _interaction_policy), do: []
+
+  @doc "The AP fields stating who may interact with an outgoing object: `interactionPolicy` (what Mastodon reads) and `commentsEnabled` (what the PeerTube family reads), both derived from the same boundary check so they cannot contradict each other. Returned as a map for the caller to merge into the object. Pass `mentioned_characters:` (from `determine_recipients/4`) so a verb its mentioned recipients may all do isn't stated author-only on an object the public can't reach."
   def ap_prepare_outgoing_interaction_policy(subject, object, opts \\ []) do
     circles_to_check =
       Bonfire.Boundaries.Circles.list_user_built_ins(subject,
@@ -2714,6 +2726,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         )
       )
     end)
+    |> maybe_unrestrict_for_recipients(
+      opts[:mentioned_characters] || [],
+      object,
+      include_verbs,
+      actor_id
+    )
     |> debug("interaction_policy")
     |> then(fn policy ->
       public_uri = ActivityPub.Config.public_uri()
@@ -2722,11 +2740,46 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # the same fact `canReply` states, in the vocabulary the PeerTube family reads, so read off the policy rather than asked of boundaries again. Stated only for an object the public can reach at all: a mentions-only post names nobody public under ANY verb by virtue of its addressing, and `false` there is read on the other side as a lock (`Threads.ap_receive_comments_enabled/4`), refusing the reply of the very person it was addressed to
       |> Enums.maybe_put(
         "commentsEnabled",
-        if Enum.any?(policy, fn {_verb, %{"automaticApproval" => urls}} -> public_uri in urls end) do
+        if Enum.any?(policy, fn {_verb, rule} ->
+             public_uri in e(rule, "automaticApproval", [])
+           end) do
           public_uri in e(policy, "canReply", "automaticApproval", [])
         end
       )
     end)
+  end
+
+  # A mentioned user may interact unless a non-empty `automaticApproval` leaves them out. So on an object the public can't reach, a verb stated author-only that every mentioned recipient may do is stated as `{}` instead, which the spec reads as "anyone who can see it", and so its recipients. The mentioned come from the caller's `determine_recipients/4`
+  defp maybe_unrestrict_for_recipients(
+         policy,
+         mentioned_characters,
+         object,
+         include_verbs,
+         actor_id
+       ) do
+    public_uri = ActivityPub.Config.public_uri()
+
+    if mentioned_characters == [] or
+         Enum.any?(policy, fn {_verb, rule} -> public_uri in e(rule, "automaticApproval", []) end) do
+      policy
+    else
+      # their locality decides which of their circles apply, so preloaded once here rather than per check
+      mentioned_characters = repo().maybe_preload(mentioned_characters, character: [:peered])
+
+      Map.new(include_verbs, fn {verb_slug, policy_verb} ->
+        key = "can#{policy_verb}"
+        rule = policy[key]
+
+        author_only? =
+          rule["automaticApproval"] == [actor_id] and
+            (rule["manualApproval"] || []) -- [actor_id] == []
+
+        if author_only? and
+             Enum.all?(mentioned_characters, &Bonfire.Boundaries.can?(&1, verb_slug, object)),
+           do: {key, %{}},
+           else: {key, rule}
+      end)
+    end
   end
 
   defp policy_circles_urls(actor_id, circles) do

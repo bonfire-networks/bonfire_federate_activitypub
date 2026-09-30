@@ -1,4 +1,11 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
+  @moduledoc """
+  User story: I post publicly, mentioning someone on another instance, and they answer me privately in different ways. Private replies to a public post are posts, not direct messages, and each reaches only the people it's addressed to:
+
+  - a private reply that doesn't mention me: NOT in my notifications, since my bell on my post is off (this test turns it off; `MentionsRepliesPrivateTest` turns it on);
+  - a private reply that mentions me: in my notifications, readable by me but not boostable, since it's private;
+  - private replies further down (to their own private reply): federated to me, and not visible to anyone else.
+  """
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
@@ -48,6 +55,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
       Bonfire.Me.Characters.character_url(local_user)
       |> info("local_ap_id")
 
+    # my bell on my own posts is OFF (a per-user setting, read with `Settings.get(current_user: author)` when I publish; with it off no bell rings for replies below); `MentionsRepliesPrivateTest` covers it ON
+    local_user =
+      Bonfire.Common.Utils.current_user(
+        Bonfire.Common.Settings.put([:notifications, :notify_any_replies], false,
+          current_user: local_user
+        )
+      )
+
+    # I post publicly, mentioning someone on another instance
     {:ok, post1} =
       Posts.publish(current_user: local_user, post_attrs: post1_attrs, boundary: "public")
 
@@ -70,6 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
     TestInstanceRepo.apply(fn ->
       remote_user = context[:remote][:user]
 
+      # they're notified of it, as a post (my post was public, so not a direct message)
       %{edges: feed} = Bonfire.Social.FeedLoader.feed(:notifications, current_user: remote_user)
 
       assert activity =
@@ -78,12 +95,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
                )
 
       assert post1remote = activity.object
+      # ⚠️ not asserted (a bare comparison, its result discarded)
       Bonfire.Common.Types.object_type(post1remote) == Bonfire.Data.Social.Post
 
       # debug("post 1 wasn't federated to instance of mentioned actor")
 
       # %{edges: [feed_entry | _]} = feed
 
+      # they answer me privately, in three ways:
+      # 1. without mentioning me
       Logger.metadata(action: info("make a mentions-only reply on remote"))
 
       {:ok, post2} =
@@ -93,6 +113,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
           boundary: "mentions"
         )
 
+      # 2. mentioning me
       Logger.metadata(action: info("make a reply with mention on remote"))
 
       {:ok, post3} =
@@ -102,6 +123,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
           boundary: "mentions"
         )
 
+      # 3. without mentioning me (sent as `mentions`, like 1.), then replying to that further down
       Logger.metadata(action: info("make a reply without mention on remote"))
 
       {:ok, post4} =
@@ -123,6 +145,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
 
     ## back to primary instance
 
+    # 1. the private reply that doesn't mention me is NOT in my notifications, since my bell on my post is off
     Logger.metadata(action: info("check that reply-only is NOT in OP's feed"))
 
     %{edges: feed} = Bonfire.Social.FeedLoader.feed(:notifications, current_user: local_user)
@@ -135,11 +158,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
       action: info("check that reply with mention was federated and is in OP's feed")
     )
 
+    # 2. the private reply that mentions me is in my notifications, as a post, readable by me but not boostable, since it's private
     assert activity =
              Bonfire.Social.FeedLoader.feed_contains?(feed, post3_text, current_user: local_user)
 
     assert post3remote = activity.object
 
+    # ⚠️ not asserted (a bare comparison, its result discarded), so "as a post rather than a DM", this test's title, isn't checked
     Bonfire.Common.Types.object_type(post3remote) == Bonfire.Data.Social.Post
 
     # Add check: cannot boost mentions-only reply
@@ -159,6 +184,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
       action: info("check that replies without mention were federated and are in fediverse feed")
     )
 
+    # 3. the replies further down are federated to me, in the fediverse feed
     assert %{edges: feed} =
              Bonfire.Social.FeedActivities.feed(:remote, current_user: local_user)
 
@@ -172,8 +198,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
 
     assert post4remote = activity.object
 
+    # ⚠️ not asserted (a bare comparison, its result discarded)
     Bonfire.Common.Types.object_type(post4remote) == Bonfire.Data.Social.Post
 
+    # ⚠️ stale: these replies are sent as `mentions`, not public
     #  "if the post is public, the actor we are replying to should be CCed even if not mentioned"
 
     assert activity =
@@ -184,10 +212,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsPrivateReplyToPublicTest do
 
     assert post5remote = activity.object
 
+    # ⚠️ not asserted (a bare comparison, its result discarded)
     Bonfire.Common.Types.object_type(post5remote) == Bonfire.Data.Social.Post
 
+    # ⚠️ stale: these replies are sent as `mentions`, not public
     #  "if the post is public, the actor who started the thread should be CCed even if not mentioned"
 
+    # and none of the private replies is visible to anyone else on my instance
     Logger.metadata(action: info("check that replies are not visible to others"))
 
     new_random_user = fake_user!()
