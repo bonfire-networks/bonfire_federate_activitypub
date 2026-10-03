@@ -81,6 +81,10 @@ defmodule Bonfire.Federate.ActivityPub.ActivityFallbackTest do
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id, current_user: recipient)
     end
 
+    # the location is processed into a Geolocate object, so this needs the extension (eg. it's disabled on YugabyteDB, which lacks PostGIS)
+    if not Bonfire.Common.Extend.extension_enabled?(:bonfire_geolocate),
+      do: @tag(skip: "bonfire_geolocate is disabled")
+
     test "Arrive activity is recorded as public APActivity with processed location" do
       data =
         "../fixtures/place-arrive.json"
