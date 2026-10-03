@@ -1447,6 +1447,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         # TODO?
         {:error, :is_local}
 
+      # the fetch was refused, eg. federation with that instance isn't allowed
+      not_allowed when not_allowed in [:not_allowed, {:error, :not_allowed}] ->
+        {:error, :not_allowed}
+
       nil ->
         error(opts, "expected an object, but got nil, with opts")
         {:error, :not_found}
