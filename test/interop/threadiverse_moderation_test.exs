@@ -190,7 +190,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                "control, #{locked}: published in the mirror, so it carries the mirror's moderators ACL"
 
         # Lemmy's asset names its own test community, so point the lock at the community this post is
-        # actually in, and at a moderator on that host. Authority is same-origin with the GROUP.
+        # actually in, and at a moderator on that host. Authority is that moderator being listed by the community, as asserted above, not being on the same host: same-origin alone is refused.
         lock =
           fixture("mod_lock_page.json")
           |> Map.merge(%{

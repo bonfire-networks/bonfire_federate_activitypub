@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.LockOutgoingTest do
   @moduledoc """
   Closing a thread tells the instances holding it.
 
-  We already READ an incoming `Lock`: `Blocks.ap_receive_activity/3` applies it as the same `:lock` block a local author or moderator applies, checking standing first (`moderation_authority/3` accepts the object's author, or an actor with authority over the group named in `audience`). Emitting it is the other half — without it, a Bonfire thread closes for everyone here and stays open everywhere else, so remote software keeps offering a reply box for replies our boundaries then refuse.
+  We already READ an incoming `Lock`: `Blocks.ap_receive_activity/3` applies it as the same `:lock` block a local author or moderator applies, through the same check (`Blocks.may_lock/2`: `:grant` or `:mediate` on the object). The object's author has those, and so does a remote moderator listed by the group, since they're in our mirror's moderators circle, whose ACL is on what was published in the group. Emitting it is the other half — without it, a Bonfire thread closes for everyone here and stays open everywhere else, so remote software keeps offering a reply box for replies our boundaries then refuse.
 
   The AUTHOR case comes first and is not group-specific: the actor is the object's `attributedTo`, which every receiver can verify, and it is what our own ingest already accepts. A moderator closing someone else's thread additionally names the group in `audience`, which is what lets the receiver check standing.
 
