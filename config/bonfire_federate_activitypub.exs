@@ -23,6 +23,14 @@ config :bonfire_federate_activitypub, :interaction_policy_verbs, %{
   "canQuote" => [:quote]
 }
 
+# Deleting one of these takes an activity back, so it federates as its module's `Undo` (`ap_publish_activity(_, :delete, _)`) rather than a `Delete`. Only list types whose module has that clause: any other falls into its catch-all and publishes a create
+config :bonfire_federate_activitypub, :undo_on_delete_types, [
+  Bonfire.Data.Social.Boost,
+  Bonfire.Data.Social.Like,
+  Bonfire.Data.Social.Follow,
+  Bonfire.Label
+]
+
 # config :bonfire, Bonfire.Instance,
 # hostname: hostname,
 # description: desc

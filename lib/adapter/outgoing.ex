@@ -4,6 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   import Untangle
   import Bonfire.Federate.ActivityPub
   use Bonfire.Common.E
+  use Bonfire.Common.Config
   import ActivityPub.Config, only: [is_in: 2]
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Federate.ActivityPub.BoundariesMRF
@@ -88,7 +89,22 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     push_actor_update(character)
   end
 
-  defp maybe_prepare_and_queue(subject, :delete, thing, opts) do
+  defp maybe_prepare_and_queue(subject, :delete, %{__struct__: type} = thing, opts) do
+    # taking back a boost, like, follow or label is an `Undo`, which only its own module knows how to build
+    if type in Config.get_ext(:bonfire_federate_activitypub, :undo_on_delete_types, [
+         Bonfire.Data.Social.Boost,
+         Bonfire.Data.Social.Like,
+         Bonfire.Data.Social.Follow,
+         Bonfire.Label
+       ]),
+       do: prepare_and_queue(subject, :delete, thing, type, opts),
+       else: maybe_push_delete(subject, thing, opts)
+  end
+
+  defp maybe_prepare_and_queue(subject, :delete, thing, opts),
+    do: maybe_push_delete(subject, thing, opts)
+
+  defp maybe_push_delete(subject, thing, opts) do
     case not is_nil(thing) and
            push_delete(Types.object_type(thing), subject, thing, opts)
            |> debug("result of push_delete") do

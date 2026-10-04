@@ -72,6 +72,36 @@ defmodule Bonfire.Federate.ActivityPub.LikeIntegrationTest do
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(like)
     end
 
+    # taking a like back has to reach the servers the like reached, or they keep counting it
+    test "unliking federates an Undo of the like" do
+      user = fake_user!()
+      liker = fake_user!()
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: user,
+          post_attrs: %{post_content: %{html_body: "content"}},
+          boundary: "public"
+        )
+
+      {:ok, like} = Likes.like(liker, post)
+      {:ok, liker_actor} = ActivityPub.Actor.get_cached(pointer: liker)
+
+      assert %ActivityPub.Object{data: %{"type" => "Like", "id" => like_ap_id}} =
+               Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(like),
+             "control: the like was federated, so there is a Like to undo"
+
+      assert {:ok, _} = Likes.unlike(liker, post)
+
+      assert ActivityPub.Object
+             |> repo().all()
+             |> Enum.any?(
+               &(&1.data["type"] == "Undo" and &1.data["actor"] == liker_actor.ap_id and
+                   ActivityPub.Object.get_ap_id(&1.data["object"]) == like_ap_id)
+             ),
+             "unliking sent no Undo, so remote servers keep counting the like"
+    end
+
     test "like receiving works" do
       user = fake_user!()
 

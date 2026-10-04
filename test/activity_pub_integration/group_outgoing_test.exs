@@ -124,6 +124,29 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
     assert announce["actor"] == group_ap_id(group)
   end
 
+  # removing a post from the group takes the group's boost back, which other servers' copies of the group only learn of from the group's `Undo{Announce}`
+  test "removing a post from the group federates the group's Undo of its Announce" do
+    creator = fake_user!()
+    group = public_group(creator)
+    post = post_in_group(creator, group, "<p>a post the group will drop</p>")
+
+    assert {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+
+    assert %{data: announce} =
+             ActivityPub.Object.get_existing_announce(group_ap_id(group), ap_post),
+           "control: the group announced it, so there is an Announce to undo"
+
+    assert {:ok, _} = Bonfire.Classify.Categories.remove_post_from_group(creator, group, post)
+
+    assert ActivityPub.Object
+           |> repo().all()
+           |> Enum.any?(
+             &(&1.data["type"] == "Undo" and &1.data["actor"] == group_ap_id(group) and
+                 ActivityPub.Object.get_ap_id(&1.data["object"]) == announce["id"])
+           ),
+           "the group took its boost back here but told nobody, so remote copies of the group keep showing the post"
+  end
+
   test "the group announces a reply in its thread" do
     creator = fake_user!()
     group = public_group(creator)
