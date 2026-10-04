@@ -63,6 +63,48 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert dims[:membership] == "on_request"
     end
 
+    # Unlisted is about LISTING, not access: the peer still mirrors the group, just without granting anyone `see`, so it stays out of the directory there too. Lemmy 1.0 reads `discoverable: false` the same way (its Unlisted visibility)
+    @tag :test_instance
+    test "an unlisted group stays unlisted on a peer", context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "unlisted",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      assert {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(username: remote[:username])
+
+      assert actor.data["discoverable"] == false,
+             "an unlisted group that declares itself discoverable gets listed by every peer"
+
+      assert {:ok, %Bonfire.Classify.Category{} = mirror} =
+               AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+
+      assert Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)[:visibility] == "unlisted"
+    end
+
+    # the control for the test above: without it, a peer that declared every group undiscoverable would pass
+    @tag :test_instance
+    test "a listed group stays listed on a peer", context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      assert {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(username: remote[:username])
+      assert actor.data["discoverable"] == true
+
+      assert {:ok, %Bonfire.Classify.Category{} = mirror} =
+               AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+
+      assert Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)[:visibility] == "global"
+    end
+
     @tag :test_instance
     test "its moderators collection can be dereferenced from a peer", context do
       remote =

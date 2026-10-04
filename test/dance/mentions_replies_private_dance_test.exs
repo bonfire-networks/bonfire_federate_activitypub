@@ -147,58 +147,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MentionsRepliesPrivateTest do
     # `:my` is follow-driven AND carries notifications, so pin that no follow is involved: the reply belongs here because it answers the OP, not because they subscribed
     refute Bonfire.Social.Graph.Follows.following?(local_user, get_remote_on_local(context))
 
-    # TEMP probe
-    import Ecto.Query
-
-    local_post2_id =
-      Bonfire.Common.Repo.one(
-        from(pc in Bonfire.Data.Social.PostContent,
-          where: ilike(pc.html_body, "%mentions-only 21%"),
-          order_by: [desc: pc.id],
-          select: pc.id,
-          limit: 1
-        )
-      )
-
-    Untangle.warn(
-      {local_post2_id, Bonfire.Boundaries.can?(local_user, :see, local_post2_id),
-       Bonfire.Boundaries.can?(local_user, :read, local_post2_id),
-       Bonfire.Boundaries.Controlleds.list_on_object(local_post2_id) |> Enum.map(& &1.acl_id),
-       Bonfire.Boundaries.Presets.preset_boundary_tuple_from_acl(
-         Bonfire.Boundaries.Controlleds.list_on_object(local_post2_id)
-       )},
-      "DEBUG local post2 {id, local_user can see?, can read?, acl ids, preset}"
-    )
-
-    # TEMP probe: which feeds the local copy of the reply was published in, against my own feeds
-    post2_feed_ids =
-      Bonfire.Common.Repo.all(
-        from(fp in Bonfire.Data.Social.FeedPublish,
-          join: a in Bonfire.Data.Social.Activity,
-          on: a.id == fp.id,
-          where: a.object_id == ^local_post2_id,
-          select: fp.feed_id
-        )
-      )
-
-    my_character = Bonfire.Common.Repo.maybe_preload(local_user, :character).character
-
-    assert Bonfire.Social.FeedLoader.feed_contains?(
-             :notifications,
-             post2_attrs.post_content.html_body,
-             current_user: local_user,
-             include_hidden: true,
-             limit: 100
-           ),
-           "DEBUG: no notification row at all, even unfiltered. The reply #{local_post2_id} is in feeds #{inspect(post2_feed_ids)}; mine are notifications #{my_character.notifications_id}, inbox #{my_character.inbox_id}, outbox #{my_character.outbox_id}"
-
     assert Bonfire.Social.FeedLoader.feed_contains?(
              :notifications,
              post2_attrs.post_content.html_body,
              current_user: local_user,
              limit: 100
            ),
-           "DEBUG: the reply isn't in my notifications at all"
+           "the reply isn't in my notifications"
 
     # 1. the private reply that doesn't mention me is in my feed:
     # directly answering someone's post notifies them whether or not it mentions them, and `:my` carries notifications, so this belongs in the OP's feed despite no follow between them

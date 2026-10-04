@@ -113,6 +113,61 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
     end
   end
 
+  # The live half of `group_membership_outgoing_test.exs`' "where following is joining" cases: a threadiverse group never answers our `Join`, so its answer to our `Follow` has to settle the join. Only Lemmy 1.0's private communities approve followers, and someone moderating one has to approve ours while this waits, eg.
+  #
+  #     LIVE_TEST_APPROVING_GROUP='!yourcommunity@voyager.lemmy.ml' just test-federation-live-DRAGONS extensions/bonfire_federate_activitypub/test/live_federation/group_interop_live_test.exs:<line>
+  describe "joining a group that approves followers" do
+    @approving_group_env "LIVE_TEST_APPROVING_GROUP"
+
+    @tag skip:
+           if(!System.get_env(@approving_group_env),
+             do: "set #{@approving_group_env} to a group whose moderator will approve the follow"
+           )
+    @tag timeout: :timer.minutes(20)
+    test "its Accept of our Follow also makes us a member" do
+      handle = System.get_env(@approving_group_env)
+      me = fake_user!()
+
+      {:ok, actor} = Interop.fetch(handle)
+
+      assert actor.data["manuallyApprovesFollowers"] == true and is_nil(actor.data["members"]),
+             "#{handle} doesn't approve followers, or declares `members`, so this proves nothing about item 4"
+
+      {:ok, pointer} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(actor,
+          skip_boundary_check: true
+        )
+
+      {:ok, group} = Bonfire.Classify.Categories.get(id(pointer), skip_boundary_check: true)
+
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(me, group)
+
+      join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+      assert Bonfire.Social.Requests.requested?(me, join_verb, group),
+             "no pending join request, so there's nothing for the Accept to settle"
+
+      {:ok, me_actor} = ActivityPub.Actor.get_cached(pointer: me)
+
+      IO.puts("""
+
+      ── approve this follower now ───────────────────
+        in:  #{handle}
+        who: #{me_actor.ap_id}
+      waiting up to 15 minutes
+      ────────────────────────────────────────────────
+      """)
+
+      assert Interop.await_incoming([type: "Accept", from: actor.ap_id], seconds: 900),
+             "no Accept from #{actor.ap_id}: was the follow approved?"
+
+      assert Bonfire.Classify.Categories.member?(me, group),
+             "the group accepted our Follow and will never answer the Join, so we should be a member now"
+
+      refute Bonfire.Social.Requests.requested?(me, join_verb, group)
+    end
+  end
+
   describe "posting into a remote group" do
     # EXPECTED TO FAIL until the plan's phase 3 (outgoing `audience` + group in to/cc): we currently emit no reference to the group at all, so there is nothing for the remote to attribute.
     # Kept as the acceptance test for that phase.

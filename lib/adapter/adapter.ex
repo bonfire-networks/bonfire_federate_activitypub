@@ -433,7 +433,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       # who may JOIN: `open` / `moderated` / `invite_only`
       openness: data["openness"],
       # who may start threads: the threadiverse's `lemmy:` term, which PeerTube emits too
-      posting_restricted_to_mods: data["postingRestrictedToMods"] == true
+      posting_restricted_to_mods: data["postingRestrictedToMods"] == true,
+      # whether it's listed: Lemmy 1.0 sends `false` for an Unlisted community, which "doesn't appear in community list"
+      discoverable: data["discoverable"]
     }
   end
 

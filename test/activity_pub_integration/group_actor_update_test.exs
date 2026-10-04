@@ -122,9 +122,12 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
 
     assert {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
 
-    refute Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)[:participation] ==
-             "moderators",
+    before = Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)
+
+    refute before[:participation] == "moderators",
            "control: the mirror does not start out moderators-only, so the assertion below means something"
+
+    assert before[:visibility], "control: creation gives the mirror a visibility to keep"
 
     restricted =
       APSimulate.actor_json(@remote_group, "tests", %{
@@ -147,8 +150,14 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
 
     assert {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
 
-    assert Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)[:participation] ==
-             "moderators",
+    after_update = Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)
+
+    assert after_update[:participation] == "moderators",
            "a community that restricts posting to its moderators has to reach our mirror, or our members write posts the origin will never accept"
+
+    # all three, not only the one that changed: re-applying declarations without a subject once dropped the grants that need one, so every refetch left a mirror reading as invite-only with no visibility, while this test still passed on `participation` alone
+    assert Map.take(after_update, [:membership, :visibility]) ==
+             Map.take(before, [:membership, :visibility]),
+           "the Update changed only who may post, so the rest must come through as it was"
   end
 end

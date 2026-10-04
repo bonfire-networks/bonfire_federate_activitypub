@@ -1252,13 +1252,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
           # Some servers (e.g. single-user instances) use the root URL as their AP actor ID.
           # Try local cache first (fast), then network fetch, before falling back to instance circle.
-          case get_character_by_ap_id(q) |> debug("ROOTURI_DEBUG get_character_by_ap_id") do
+          case get_character_by_ap_id(q) do
             {:ok, actor} ->
               {:ok, actor}
 
             _ ->
-              case fetch_and_return_ap_object(q, opts)
-                   |> debug("ROOTURI_DEBUG fetch_and_return_ap_object") do
+              case fetch_and_return_ap_object(q, opts) do
                 {:ok, actor} ->
                   {:ok, actor}
 
@@ -1612,10 +1611,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     }
     |> Enums.filter_empty(%{})
     |> Map.merge(%{
+      # declared whatever the visibility, since the URI says nothing about who is in it (serving it is what checks visibility, see `Categories.collection_items/2`). Declaring one is how a remote server tells that membership here is not following, as with Mobilizon and Smithereen, unlike the threadiverse
+      "members" => ActivityPub.Utils.collection_ap_id("members", id(group)),
       # an ARCHIVED group accepts nothing from anyone (`soft_delete/2` locks it), which this field is the only way to say. Read from the archive flag rather than from boundaries on purpose: a circle-level check cannot tell a locked group from one only its MEMBERS may post in, and marking the latter restricted would hide the compose button from people who can in fact post
       "postingRestrictedToMods" =>
         dims[:participation] == "moderators" or not is_nil(e(group, :deleted_at, nil)),
       "manuallyApprovesFollowers" => manually_approves?,
+      # whether peers should list it, from whether the fediverse may `see` it here (an unlisted visibility grants read but not see), so what we declare can't drift from what we enforce. Overrides the user-level `undiscoverable` setting `do_format_actor/2` puts in, which says nothing about a group. Lemmy 1.0 reads `false` as Unlisted
+      "discoverable" => Bonfire.Boundaries.can?(:activity_pub, :see, group) == true,
       "openness" =>
         case dims[:membership] do
           "on_request" -> "moderated"
@@ -1793,6 +1796,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             "proxyUrl" => base_url <> ap_base_path <> "/proxy_remote_object"
           },
           # whether user should appear in directories and search engines
+          # TODO: derive from a boundary check (eg. `can?(:activity_pub, :see, user_etc)`) rather than the setting, as `actor_declarations/2` does for groups, so what we declare can't drift from what the profile's boundaries enforce. Part of https://github.com/bonfire-networks/bonfire-app/issues/883
           "discoverable" =>
             Bonfire.Common.Settings.get([Bonfire.Me.Users, :undiscoverable], nil,
               current_user: user_etc

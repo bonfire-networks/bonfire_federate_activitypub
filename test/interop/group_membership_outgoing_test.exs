@@ -33,9 +33,12 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
     :ok
   end
 
-  defp remote_group(openness) do
+  defp remote_group(openness) when is_binary(openness),
+    do: remote_group(%{"openness" => openness})
+
+  defp remote_group(%{} = declares) do
     group_json =
-      APSimulate.actor_json(@remote_group, "cooks", %{"type" => "Group", "openness" => openness})
+      APSimulate.actor_json(@remote_group, "cooks", Map.put(declares, "type", "Group"))
 
     # served too, since sending re-fetches the actor, and a refetch that states no `openness` re-mirrors the group as open
     mock(fn
@@ -105,6 +108,22 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
 
       refute Categories.member?(user, group)
       assert [_] = sent("Leave", user)
+    end
+
+    # what goes on the wire, not what we store: preparing it for sending used to swap the group's id for its whole cached actor document, as it once did for `Follow`, and implementations type the object as a link (seen live against Lemmy 1.0, 3 October)
+    test "the Join and the Leave reference the group by its id" do
+      user = fake_user!()
+      group = remote_group("open")
+      assert {:ok, _} = Categories.join_group(user, group)
+      assert {:ok, _} = Categories.leave_group(user, group)
+
+      for type <- ["Join", "Leave"] do
+        assert [activity] = sent(type, user)
+        assert {:ok, json} = Transformer.prepare_outgoing(activity.data)
+
+        assert json["object"] == @remote_group,
+               "the #{type} embeds the group instead of naming it: #{inspect(json["object"])}"
+      end
     end
 
     # the pair of the test above: a `Leave` from someone the group never had is noise at best
@@ -179,6 +198,80 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
       refute Categories.member?(user, group)
       refute join_requested?(user, group)
       assert sent("Leave", user) == [], "the group said no, so there is nothing to leave"
+    end
+  end
+
+  # Lemmy, PieFed, Mbin and NodeBB never answer a `Join`, since following is joining there. Their actors declare no `members` collection, which is how we tell them apart from a group that answers joins itself. Not `openness`: we fill that in on storage from `manuallyApprovesFollowers` (`Transformer.fix_openness/1`), so every stored group that reviews followers has one
+  describe "joining a remote group where following is joining, which reviews followers" do
+    @follow_is_join %{"manuallyApprovesFollowers" => true}
+
+    test "its Accept of the Follow also makes them a member" do
+      user = fake_user!()
+      group = remote_group(@follow_is_join)
+      assert {:ok, _} = Categories.join_and_follow_group(user, group)
+      assert join_requested?(user, group)
+      assert [follow] = sent("Follow", user)
+
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", follow))
+
+      assert Categories.member?(user, group), "the group will never answer the Join"
+      refute join_requested?(user, group)
+    end
+
+    test "its Reject of the Follow drops the join request" do
+      user = fake_user!()
+      group = remote_group(@follow_is_join)
+      assert {:ok, _} = Categories.join_and_follow_group(user, group)
+      assert [follow] = sent("Follow", user)
+
+      Transformer.handle_incoming(answer("Reject", follow))
+
+      refute Categories.member?(user, group)
+
+      refute join_requested?(user, group),
+             "left pending forever, since no answer to the Join will come"
+    end
+
+    # following without pressing Join is only following, even where the group itself makes no difference
+    test "accepting a Follow nobody asked to join with makes nobody a member" do
+      user = fake_user!()
+      group = remote_group(@follow_is_join)
+      assert {:ok, _} = Categories.follow_group(user, group)
+      assert [follow] = sent("Follow", user)
+
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", follow))
+
+      assert Bonfire.Social.Graph.Follows.following?(user, group),
+             "the Accept never landed, so this test proves nothing"
+
+      refute Categories.member?(user, group)
+    end
+  end
+
+  describe "joining a remote group that answers joins itself" do
+    # Smithereen declares only `members`; Mobilizon and Bonfire declare `openness` too
+    for {software, declares} <- [
+          {"Smithereen", %{"members" => "#{@remote_group}/members"}},
+          {"Mobilizon or Bonfire",
+           %{"members" => "#{@remote_group}/members", "openness" => "moderated"}}
+        ] do
+      @declares Map.put(declares, "manuallyApprovesFollowers", true)
+
+      test "its Accept of the Follow leaves the join pending (#{software}-shaped)" do
+        user = fake_user!()
+        group = remote_group(@declares)
+        assert {:ok, _} = Categories.join_and_follow_group(user, group)
+        assert join_requested?(user, group)
+        assert [follow] = sent("Follow", user)
+
+        assert {:ok, _} = Transformer.handle_incoming(answer("Accept", follow))
+
+        assert Bonfire.Social.Graph.Follows.following?(user, group),
+               "the Accept never landed, so this test proves nothing"
+
+        refute Categories.member?(user, group), "accepting a follow there is not accepting a join"
+        assert join_requested?(user, group)
+      end
     end
   end
 end
