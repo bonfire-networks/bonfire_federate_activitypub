@@ -115,4 +115,67 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
       refute Federation.federation_allowed?(@remote_actor)
     end
   end
+
+  # The federation HTTP client checks the lists itself on every request, so no AP-related fetch can skip them. The HTTP adapter is mocked and reports every request it gets, so a refused fetch is one the mock never got.
+  describe "AP-related fetches respect the block/allow lists" do
+    setup do
+      test_pid = self()
+
+      Tesla.Mock.mock(fn env ->
+        send(test_pid, {:hit, env.url})
+        %Tesla.Env{status: 200, headers: [{"content-type", "text/html"}], body: "<html></html>"}
+      end)
+
+      :ok
+    end
+
+    defp block_instance! do
+      {:ok, peer} = Instances.get_or_create(@remote_actor)
+      Bonfire.Boundaries.Blocks.block(peer, :total, :instance_wide)
+    end
+
+    test "an unblocked instance is fetched from" do
+      assert {:ok, %{status: 200}} = ActivityPub.Federator.HTTP.get(@remote_instance <> "/page")
+      assert_received {:hit, _}
+    end
+
+    test "a blocked instance is never fetched from, with no options passed" do
+      block_instance!()
+
+      assert {:error, :not_allowed} = ActivityPub.Federator.HTTP.get(@remote_instance <> "/page")
+      refute_received {:hit, _}
+    end
+
+    test "in allowlist-only mode, an instance that isn't allowlisted is never fetched from" do
+      Process.put(:federating, :allowlist_only)
+
+      assert {:error, :not_allowed} = ActivityPub.Federator.HTTP.get(@remote_instance <> "/page")
+      refute_received {:hit, _}
+    end
+
+    test "a user's own block of an instance applies to fetches made for them, and not for others" do
+      user = fake_user!()
+      {:ok, peer} = Instances.get_or_create(@remote_actor)
+      Bonfire.Boundaries.Blocks.block(peer, :total, current_user: user)
+
+      ActivityPub.Federator.Fetcher.fetch_object_from_id(@remote_instance <> "/objects/1",
+        current_user: user
+      )
+
+      refute_received {:hit, _}
+
+      ActivityPub.Federator.Fetcher.fetch_object_from_id(@remote_instance <> "/objects/1",
+        current_user: fake_user!()
+      )
+
+      assert_received {:hit, _}
+    end
+
+    test "a link preview of a blocked instance's URL doesn't fall back to fetching it as a plain web page" do
+      block_instance!()
+
+      refute match?({:ok, _, _}, Bonfire.Files.Media.ap_aware_fetch(@remote_instance <> "/page"))
+      refute_received {:hit, _}
+    end
+  end
 end
