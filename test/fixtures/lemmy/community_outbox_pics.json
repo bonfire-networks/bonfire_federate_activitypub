@@ -1,0 +1,188 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "id": "https://lemmy2.local/c/pics/outbox",
+  "orderedItems": [
+    {
+      "actor": "https://lemmy2.local/c/pics",
+      "cc": [
+        "https://lemmy2.local/c/pics/followers"
+      ],
+      "id": "https://lemmy2.local/activities/announce/create/52917959-e4ec-4c4f-94c5-c7bcae1a0a52",
+      "object": {
+        "actor": "https://lemmy2.local/u/Theprogressivist",
+        "audience": "https://lemmy2.local/c/pics",
+        "cc": [
+          "https://lemmy2.local/c/pics"
+        ],
+        "id": "https://lemmy2.local/activities/create/4740f805-3e23-45aa-a761-5c75d30d3324",
+        "object": {
+          "attachment": [],
+          "attributedTo": "https://lemmy2.local/u/Theprogressivist",
+          "audience": "https://lemmy2.local/c/pics",
+          "cc": [],
+          "content": "<p>We have been seeing a big influx of memes and non Pic posts. This is a reminder that this community is meant for Pics which is just that -  pictures taken with a camera. Any non Pic posts will be taken down and frequent infracture of that rule will lead to a temp ban.</p>\n<p>We have also been seeing an uptick on Violent posts and manifestos. This is not the community for this type of post. No violent, NSFW posts are allowed. These will lead to an immediate temp ban. I understand with tensions today that people are rightfully upset about society, but there are other communities that allow such posts.</p>\n<p>Any questions feel free to reply to this post or DM me. Happy posting.</p>\n",
+          "id": "https://lemmy2.local/post/44033550",
+          "mediaType": "text/html",
+          "name": "Memes and Violent Posts",
+          "published": "2026-03-09T13:18:39.816036Z",
+          "sensitive": false,
+          "source": {
+            "content": "We have been seeing a big influx of memes and non Pic posts. This is a reminder that this community is meant for Pics which is just that -  pictures taken with a camera. Any non Pic posts will be taken down and frequent infracture of that rule will lead to a temp ban. \n\nWe have also been seeing an uptick on Violent posts and manifestos. This is not the community for this type of post. No violent, NSFW posts are allowed. These will lead to an immediate temp ban. I understand with tensions today that people are rightfully upset about society, but there are other communities that allow such posts. \n\nAny questions feel free to reply to this post or DM me. Happy posting. ",
+            "mediaType": "text/markdown"
+          },
+          "tag": [
+            {
+              "href": "https://lemmy2.local/post/44033550",
+              "name": "#pics",
+              "type": "Hashtag"
+            }
+          ],
+          "to": [
+            "https://lemmy2.local/c/pics",
+            "https://www.w3.org/ns/activitystreams#Public"
+          ],
+          "type": "Page"
+        },
+        "to": [
+          "https://www.w3.org/ns/activitystreams#Public"
+        ],
+        "type": "Create"
+      },
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "type": "Announce"
+    },
+    {
+      "actor": "https://lemmy2.local/c/pics",
+      "cc": [
+        "https://lemmy2.local/c/pics/followers"
+      ],
+      "id": "https://lemmy2.local/activities/announce/create/82e6bf11-7f70-4003-8ed1-457f2f5aeda8",
+      "object": {
+        "actor": "https://piefed2.local/u/SatansMaggotyCumFart",
+        "audience": "https://lemmy2.local/c/pics",
+        "cc": [
+          "https://lemmy2.local/c/pics"
+        ],
+        "id": "https://lemmy2.local/activities/create/2ab4dfd5-e43e-45cc-ba0c-97aa77ebc45c",
+        "object": {
+          "attachment": [
+            {
+              "name": "",
+              "type": "Image",
+              "url": "https://media.piefed.local/posts/8O/jB/8OjBfFAHiQqNM2y.jpg"
+            }
+          ],
+          "attributedTo": "https://piefed2.local/u/SatansMaggotyCumFart",
+          "audience": "https://lemmy2.local/c/pics",
+          "cc": [],
+          "content": "",
+          "id": "https://piefed2.local/c/pics/p/1361266/snake",
+          "image": {
+            "type": "Image",
+            "url": "https://lemmy2.local/pictrs/image/090863c2-5a68-443e-8c45-2aa4c28f4260.jpeg"
+          },
+          "language": {
+            "identifier": "en",
+            "name": "English"
+          },
+          "mediaType": "text/html",
+          "name": "Snake",
+          "published": "2026-08-26T22:20:16.134405Z",
+          "sensitive": false,
+          "source": {
+            "content": "",
+            "mediaType": "text/markdown"
+          },
+          "tag": [
+            {
+              "href": "https://piefed2.local/c/pics/p/1361266/snake",
+              "name": "#pics",
+              "type": "Hashtag"
+            }
+          ],
+          "to": [
+            "https://lemmy2.local/c/pics",
+            "https://www.w3.org/ns/activitystreams#Public"
+          ],
+          "type": "Page"
+        },
+        "to": [
+          "https://www.w3.org/ns/activitystreams#Public"
+        ],
+        "type": "Create"
+      },
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "type": "Announce"
+    },
+    {
+      "actor": "https://lemmy2.local/c/pics",
+      "cc": [
+        "https://lemmy2.local/c/pics/followers"
+      ],
+      "id": "https://lemmy2.local/activities/announce/create/660c9052-28bf-4f17-a4e9-a3ddbb4487d0",
+      "object": {
+        "actor": "https://lemmy2.local/u/mongooseofrevenge",
+        "audience": "https://lemmy2.local/c/pics",
+        "cc": [
+          "https://lemmy2.local/c/pics"
+        ],
+        "id": "https://lemmy2.local/activities/create/2fd13b21-f295-47cd-aab4-454fb3328c49",
+        "object": {
+          "attachment": [
+            {
+              "name": "A scorpion in the middle of a dust covered, concrete floor. ",
+              "type": "Image",
+              "url": "https://lemmy2.local/pictrs/image/63786226-b60c-4d70-9e55-e674f58e0046.jpeg"
+            }
+          ],
+          "attributedTo": "https://lemmy2.local/u/mongooseofrevenge",
+          "audience": "https://lemmy2.local/c/pics",
+          "cc": [],
+          "content": "<p>I opened the door to a shed and found this guy sitting in the middle of the floor. It’s been a long time since I’ve seen one this big in the wild. My coworker said it was nice enough to be out in the open and not hiding somewhere I had to put my hands.</p>\n<p><img src=\"https://lemmy2.local/pictrs/image/192e3d05-c0a1-4a36-a996-505abc7785f4.jpeg\" alt=\"\" /></p>\n<p><img src=\"https://lemmy2.local/pictrs/image/1bda0d38-c58d-477f-b8ce-dd920e9373df.jpeg\" alt=\"\" /></p>\n",
+          "id": "https://lemmy2.local/post/51128313",
+          "image": {
+            "type": "Image",
+            "url": "https://lemmy2.local/pictrs/image/66fcbb44-b072-4da7-9ecb-56d66aa4f84e.jpeg"
+          },
+          "mediaType": "text/html",
+          "name": "I had a run in with a scorpion at work the other day",
+          "published": "2026-08-26T08:21:49.656168Z",
+          "sensitive": false,
+          "source": {
+            "content": "I opened the door to a shed and found this guy sitting in the middle of the floor. It's been a long time since I've seen one this big in the wild. My coworker said it was nice enough to be out in the open and not hiding somewhere I had to put my hands. \n\n![](https://lemmy2.local/pictrs/image/192e3d05-c0a1-4a36-a996-505abc7785f4.jpeg)\n\n![](https://lemmy2.local/pictrs/image/1bda0d38-c58d-477f-b8ce-dd920e9373df.jpeg)",
+            "mediaType": "text/markdown"
+          },
+          "tag": [
+            {
+              "href": "https://lemmy2.local/post/51128313",
+              "name": "#pics",
+              "type": "Hashtag"
+            }
+          ],
+          "to": [
+            "https://lemmy2.local/c/pics",
+            "https://www.w3.org/ns/activitystreams#Public"
+          ],
+          "type": "Page"
+        },
+        "to": [
+          "https://www.w3.org/ns/activitystreams#Public"
+        ],
+        "type": "Create"
+      },
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "type": "Announce"
+    }
+  ],
+  "totalItems": 50,
+  "type": "OrderedCollection"
+}

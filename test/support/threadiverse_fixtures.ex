@@ -48,6 +48,22 @@ defmodule Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures do
     end)
   end
 
+  @doc "What a mock should serve for a community's outbox, as `{url, body}` pairs: the outbox itself, and each item's Announce, Create, announced object and its author, so whatever fetching the outbox dereferences is served."
+  def outbox_served(outbox) do
+    [{outbox["id"], outbox}] ++
+      Enum.flat_map(outbox["orderedItems"], fn announce ->
+        create = announce["object"]
+        object = create["object"]
+
+        [
+          {announce["id"], announce},
+          {create["id"], create},
+          {object["id"], object},
+          {object["attributedTo"], author_actor(object["attributedTo"])}
+        ]
+      end)
+  end
+
   def receive_announce(announce) do
     case ActivityPub.Federator.Transformer.handle_incoming(announce) do
       {:ok, activity} -> Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)

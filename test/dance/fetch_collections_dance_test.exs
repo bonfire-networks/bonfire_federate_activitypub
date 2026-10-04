@@ -80,6 +80,63 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FetchCollectionsTest do
                    15_000
   end
 
+  # what "Get latest activities" on a mirrored group's page does: the same fetch, for a group hosted on the other instance
+  test "fetch_outbox of a remote group files its posts in our mirror of the group", context do
+    creator = context[:remote][:user]
+
+    {remote_group_url, post_urls} =
+      TestInstanceRepo.apply(fn ->
+        group = Bonfire.Classify.Simulate.fake_group!(creator, %{type: :group})
+
+        :ok =
+          Bonfire.Classify.Boundaries.replace(group, creator, %{
+            membership: "open",
+            visibility: "global",
+            participation: "anyone",
+            default_content_visibility: "public"
+          })
+
+        # the boundary stated, because `group` still holds the settings it was created with, from before `replace/3` stored the public default
+        posts =
+          for html <- ["<p>group outbox post one</p>", "<p>group outbox post two</p>"],
+              do:
+                Bonfire.Classify.Simulate.fake_post_in_group!(creator, group, html,
+                  boundary: "public"
+                )
+
+        {Bonfire.Me.Characters.character_url(group),
+         Enum.map(posts, &Bonfire.Common.URIs.canonical_url(&1, preload_if_needed: true))}
+      end)
+
+    assert {:ok, group} = AdapterUtils.get_or_fetch_and_create_by_uri(remote_group_url)
+
+    for url <- post_urls do
+      refute match?({:ok, _}, ActivityPub.Object.get_cached(ap_id: url)),
+             "control: #{url} isn't here before the fetch"
+    end
+
+    # the same options as the button's handler (`Bonfire.Me.Users.LiveHandler`, "fetch_outbox")
+    Fetcher.fetch_outbox([pointer: group],
+      mode: :async,
+      fetch_collection: :async,
+      fetch_collection_entries: true,
+      triggered_by: "dance_test:fetch_outbox"
+    )
+
+    for url <- post_urls do
+      assert {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: url),
+             "#{url} wasn't fetched"
+
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: group,
+               current_user: group
+             ),
+             "#{url} should be filed in our mirror of the group"
+    end
+  end
+
   test "fetch_thread syncs remote replies and they are received via PubSub",
        context do
     local_user = context[:local][:user]

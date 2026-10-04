@@ -124,6 +124,29 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
     assert announce["actor"] == group_ap_id(group)
   end
 
+  # the options the Mastodon API publishes a group post with when no visibility is given (`Bonfire.Posts.API.MastoAdapter`): the audience in `to_boundaries`, the group in `context_id`, and no `boundary` or `publish_in`
+  test "the group announces a post whose audience was given as `to_boundaries`" do
+    creator = fake_user!()
+    group = public_group(creator)
+
+    assert {:ok, post} =
+             Bonfire.Posts.publish(
+               current_user: creator,
+               post_attrs: %{post_content: %{html_body: "<p>a post for the group</p>"}},
+               to_boundaries: ["public"],
+               context_id: uid(group)
+             )
+
+    assert {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+
+    assert ActivityPub.Utils.public?(ap_post.data),
+           "the post is public, so its object has to be addressed to Public. Got to: #{inspect(ap_post.data["to"])}, cc: #{inspect(ap_post.data["cc"])}"
+
+    assert %{data: %{"type" => "Announce"}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id(group), ap_post),
+           "a group only announces a public post"
+  end
+
   # removing a post from the group takes the group's boost back, which other servers' copies of the group only learn of from the group's `Undo{Announce}`
   test "removing a post from the group federates the group's Undo of its Announce" do
     creator = fake_user!()
