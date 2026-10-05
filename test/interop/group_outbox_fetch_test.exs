@@ -39,7 +39,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutboxFetchTest do
         %Tesla.Env{status: 202, body: ""}
     end)
 
-    {:ok, group} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => @community})
+    {:ok, group} =
+      Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => @community})
 
     {:ok, group: group, user: fake_user!()}
   end
