@@ -4,35 +4,40 @@
     "https://www.w3.org/ns/activitystreams#Public"
   ],
   "object": {
-    "id": "https://lemmy.local/activities/create/44a2c847-516e-4fed-a7d3-42f077f57d46",
-    "actor": "https://lemmy.local/u/yogthos",
+    "id": "https://lemmy.local/activities/create/b448cfaa-8d33-4492-8cd6-a5bd318679b9",
+    "actor": "https://lemmy.local/u/J12t",
     "to": [
       "https://www.w3.org/ns/activitystreams#Public"
     ],
     "object": {
       "type": "Page",
-      "id": "https://lemmy.local/post/51861708",
-      "attributedTo": "https://lemmy.local/u/yogthos",
+      "id": "https://lemmy.local/post/37126933",
+      "attributedTo": "https://lemmy.local/u/J12t",
       "to": [
         "https://lemmy.local/c/technology",
         "https://www.w3.org/ns/activitystreams#Public"
       ],
-      "name": "BBC Looks at China's Robot Revolution: “I Went to Sleep, and the World Changed”",
+      "name": "The New Stack: Everything Big Starts Small: Building Open Social Web Apps",
       "cc": [],
+      "content": "<p>Nice coverage of some of the announcements and the keynote at this week’s FediForum.</p>\n",
       "mediaType": "text/html",
+      "source": {
+        "content": "Nice coverage of some of the announcements and the keynote at this week's FediForum.",
+        "mediaType": "text/markdown"
+      },
       "attachment": [
         {
-          "href": "https://pandaily.com/bbc-china-robot-revolution-world-factory-industrial-robots-aug2026",
+          "href": "https://thenewstack.io/everything-big-starts-small-building-open-social-web-apps/",
           "mediaType": "text/html; charset=utf-8",
           "type": "Link"
         }
       ],
       "image": {
         "type": "Image",
-        "url": "https://lemmy.local/api/v3/image_proxy?url=https%3A%2F%2Fcms-image.pandaily.com%2F1%2Fimg_bbc_0796961335.png"
+        "url": "https://lemmy.local/pictrs/image/0e79e449-12fb-4658-8c0f-844f1b56ed10.jpeg"
       },
       "sensitive": false,
-      "published": "2026-08-25T19:05:56.530307Z",
+      "published": "2025-10-09T21:15:09.499335Z",
       "language": {
         "identifier": "en",
         "name": "English"
@@ -40,8 +45,8 @@
       "audience": "https://lemmy.local/c/technology",
       "tag": [
         {
-          "href": "https://lemmy.local/post/51861708",
-          "name": "#technology",
+          "href": "https://lemmy.local/post/37126933",
+          "name": "#fediverse_press",
           "type": "Hashtag"
         }
       ]
@@ -56,5 +61,5 @@
     "https://lemmy.local/c/technology/followers"
   ],
   "type": "Announce",
-  "id": "https://lemmy.local/activities/announce/create/ac26c395-eddd-4d95-959a-fda8b666e3df"
+  "id": "https://lemmy.local/activities/announce/create/40a949ff-db2d-4ba5-b185-1871e400f8aa"
 }

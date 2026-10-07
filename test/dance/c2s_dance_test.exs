@@ -23,8 +23,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.C2STest do
     # assert email = e(user, :account, :email, :email_address, nil)
     assert password = context[:test_password]
 
-    # All endpoints should point to the secondary instance (port 4002)
-    base_url = "http://localhost:4002"
+    # All endpoints should point to the secondary instance, at whatever host it is configured with (e.g. an IDN one, see `just test-federation-dance-idn`)
+    base_url = Bonfire.Web.FakeRemoteEndpoint.url()
     discovery_uri = base_url <> "/.well-known/openid-configuration"
 
     {:ok, discovery_doc} =

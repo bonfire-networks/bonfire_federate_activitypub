@@ -188,19 +188,20 @@ defmodule Bonfire.Federate.ActivityPub.Simulate do
     user
   end
 
-  def webfingered() do
+  @doc "A WebFinger JRD for `username` on the host of `actor_id`, pointing to `actor_id`."
+  def webfingered(username \\ "karen", actor_id \\ "https://mocked.local/users/karen") do
     %{
       "aliases" => [
-        "https://mocked.local/users/karen"
+        actor_id
       ],
       "links" => [
         %{
-          "href" => "https://mocked.local/users/karen",
+          "href" => actor_id,
           "rel" => "self",
           "type" => "application/activity+json"
         }
       ],
-      "subject" => "acct:karen@mocked.local"
+      "subject" => "acct:#{username}@#{URI.parse(actor_id).host}"
     }
   end
 end
