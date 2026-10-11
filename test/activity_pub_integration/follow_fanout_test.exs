@@ -15,6 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowFanoutTest do
   @follower_b "https://follower-b.local/users/bob"
   @followed "https://followed.local/users/carol"
   @remote_actors [@follower_a, @follower_b, @followed]
+  @remote_note "https://followed.local/users/carol/statuses/1"
 
   setup do
     test_pid = self()
@@ -23,6 +24,18 @@ defmodule Bonfire.Federate.ActivityPub.FollowFanoutTest do
       %{method: :post, url: url, body: body} ->
         send(test_pid, {:delivered, url, body})
         %Tesla.Env{status: 202, body: ""}
+
+      %{method: :get, url: @remote_note} ->
+        json(%{
+          "@context" => "https://www.w3.org/ns/activitystreams",
+          "id" => @remote_note,
+          "type" => "Note",
+          "attributedTo" => @followed,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => [@followed <> "/followers"],
+          "content" => "<p>a public post by someone else</p>",
+          "published" => "2026-10-08T12:00:00Z"
+        })
 
       %{method: :get, url: url} = env ->
         if url in @remote_actors do
@@ -193,5 +206,35 @@ defmodule Bonfire.Federate.ActivityPub.FollowFanoutTest do
 
     assert undo["object"]["id"] == follow_activity.data["id"],
            "the Undo has to name the very Follow the remote is holding, or it has nothing to match it against"
+  end
+
+  # A Like is addressed to the post's author only (`make_like_data`), so it is not public and skips the follower fan-out above. It used to hit the publisher's fallback instead, `Adapter.external_followers_for_activity`, which returns every remote follower allowed to see the liked post: for a public post, all of them (fedizen.net: each like queued ~470 times)
+  describe "interacting with someone else's post" do
+    setup do
+      {:ok, post} = Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(@remote_note)
+      drain_and_flush()
+      %{post: post}
+    end
+
+    test "a Like is delivered to the post's author only", %{author: author, post: post} do
+      {:ok, like} = Bonfire.Social.Likes.like(author, post)
+      {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(like)
+
+      assert %{"Like" => ["followed.local"]} = delivered_hosts_by_type(),
+             "liking someone's post is between me and them, not news for my followers' servers"
+    end
+
+    test "an unlike (Undo of the Like) is delivered to the post's author only", %{
+      author: author,
+      post: post
+    } do
+      {:ok, like} = Bonfire.Social.Likes.like(author, post)
+      {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(like)
+      drain_and_flush()
+
+      assert {:ok, _} = Bonfire.Social.Likes.unlike(author, post)
+
+      assert %{"Undo" => ["followed.local"]} = delivered_hosts_by_type()
+    end
   end
 end
