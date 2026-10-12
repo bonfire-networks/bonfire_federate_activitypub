@@ -192,6 +192,41 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
     end
   end
 
+  # A report withdrawn here has to be withdrawn wherever it went, or it stays open in other moderators' queues: an `Undo` of each `Flag` that went out, from the same actor, since only the sender may undo it
+  describe "withdrawing a report" do
+    test "sends an Undo for each report that went out, as whoever sent it", %{text_post: reported} do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: reported)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      reporter = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(reporter, post,
+                 comment: "withdrawn later",
+                 forward: true,
+                 forward_to_group: true
+               )
+
+      objects = fn -> Bonfire.Common.Repo.all(ActivityPub.Object) end
+
+      sent =
+        objects.()
+        # by `content`, which both carry (`summary` is only on one naming the group)
+        |> Enum.filter(&(&1.data["type"] == "Flag" and &1.data["content"] == "withdrawn later"))
+
+      assert length(sent) == 2,
+             "control: the anonymous report to the author's instance and the named one to the group"
+
+      assert {:ok, _} = Bonfire.Social.Flags.unflag(reporter, post)
+
+      undone =
+        for %{data: %{"type" => "Undo", "object" => %{"id" => flag_id}} = undo} <- objects.(),
+            flag_id in Enum.map(sent, & &1.data["id"]),
+            do: {flag_id, undo["actor"]}
+
+      assert Enum.sort(undone) == Enum.sort(Enum.map(sent, &{&1.data["id"], &1.data["actor"]}))
+    end
+  end
+
   describe "what we do with them" do
     # This family puts the reason in `summary`, where Mastodon-family senders use `content`. We read
     # both, since a report reaching a moderator without its reason is barely a report.
