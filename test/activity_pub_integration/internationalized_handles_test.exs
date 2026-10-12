@@ -27,8 +27,7 @@ defmodule Bonfire.Federate.ActivityPub.InternationalizedHandlesTest do
   @swicg_examples [
     {"user1", "ตัวอย่าง.example", "acct:user1@xn--72c1a1bt4awk9o.example"},
     {"renée", "উদাহরণ.example", "acct:ren%C3%A9e@xn--d5b6ci4b4b3a.example"},
-    {"иван", "எடுத்துக்காட்டு.example",
-     "acct:%D0%B8%D0%B2%D0%B0%D0%BD@xn--4kcoa2bca5aa0vzacf2mdd.example"},
+    {"иван", "எடுத்துக்காட்டு.example", "acct:%D0%B8%D0%B2%D0%B0%D0%BD@xn--4kcoa2bca5aa0vzacf2mdd.example"},
     {"ελπίδα", "ఉదాహరణ.example",
      "acct:%CE%B5%CE%BB%CF%80%CE%AF%CE%B4%CE%B1@xn--noc6ci4b4b3a.example"},
     {"小明", "მაგალითი.example", "acct:%E5%B0%8F%E6%98%8E@xn--lodafveble.example"},
@@ -60,17 +59,17 @@ defmodule Bonfire.Federate.ActivityPub.InternationalizedHandlesTest do
                         URI.encode_query(%{"resource" => acct}), actor_id}
                    end)
   @webfinger_urls Map.merge(@webfinger_urls, %{
-    "https://mocked.local/.well-known/webfinger?resource=acct%3Ajos%25C3%25A9%40mocked.local" =>
-      "https://mocked.local/users/jose_u",
-    "https://mocked.local/.well-known/webfinger?resource=acct%3A%25E4%25BD%25A0%25E5%25A5%25BD%40mocked.local" =>
-      "https://mocked.local/users/nihao",
-    "https://mocked.local/.well-known/webfinger?resource=acct%3Afirst.last%40mocked.local" =>
-      "https://mocked.local/users/first.last",
-    "https://xn--bcher-kva.local/.well-known/webfinger?resource=acct%3Ajos%25C3%25A9%40xn--bcher-kva.local" =>
-      "https://xn--bcher-kva.local/users/jose_u",
-    "https://xn--6qq79v.local/.well-known/webfinger?resource=acct%3A%25E4%25BD%25A0%25E5%25A5%25BD%40xn--6qq79v.local" =>
-      "https://xn--6qq79v.local/users/nihao"
-  })
+                    "https://mocked.local/.well-known/webfinger?resource=acct%3Ajos%25C3%25A9%40mocked.local" =>
+                      "https://mocked.local/users/jose_u",
+                    "https://mocked.local/.well-known/webfinger?resource=acct%3A%25E4%25BD%25A0%25E5%25A5%25BD%40mocked.local" =>
+                      "https://mocked.local/users/nihao",
+                    "https://mocked.local/.well-known/webfinger?resource=acct%3Afirst.last%40mocked.local" =>
+                      "https://mocked.local/users/first.last",
+                    "https://xn--bcher-kva.local/.well-known/webfinger?resource=acct%3Ajos%25C3%25A9%40xn--bcher-kva.local" =>
+                      "https://xn--bcher-kva.local/users/jose_u",
+                    "https://xn--6qq79v.local/.well-known/webfinger?resource=acct%3A%25E4%25BD%25A0%25E5%25A5%25BD%40xn--6qq79v.local" =>
+                      "https://xn--6qq79v.local/users/nihao"
+                  })
 
   setup do
     Process.put(:federating, true)

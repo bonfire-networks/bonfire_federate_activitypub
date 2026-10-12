@@ -134,6 +134,64 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
     end
   end
 
+  # Reporting a post in a community we follow reaches its moderators only if the report is sent to the community. Lemmy accepts a report only from a PERSON (`Report.actor` is an `ApubPerson`, verified with `verify_person_in_site_or_community`), so this one is sent as the reporter, unlike the anonymous one to the author's instance, and only when the reporter asks for it
+  describe "reporting a post in a community we follow" do
+    test "sends the reporter's Flag to the community when asked, and nothing to it otherwise", %{
+      text_post: reported,
+      announced_by: community
+    } do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: reported)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      flags_by = fn user ->
+        {:ok, %{ap_id: ap_id}} = ActivityPub.Actor.get_cached(pointer: user)
+
+        Bonfire.Common.Repo.all(ActivityPub.Object)
+        |> Enum.filter(&(&1.data["type"] == "Flag" and &1.data["actor"] == ap_id))
+      end
+
+      reporter = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(reporter, post,
+                 comment: "spam",
+                 forward_to_group: true
+               )
+
+      assert [%{data: flag}] = flags_by.(reporter), "one Flag, from the reporter"
+      assert List.wrap(flag["to"]) == [community], "to the community, as Lemmy requires"
+      assert flag["audience"] == community
+      assert reported in List.wrap(flag["object"])
+      assert flag["summary"] == "spam", "the reason where Lemmy reads it"
+
+      flags_saying = fn reason ->
+        Bonfire.Common.Repo.all(ActivityPub.Object)
+        |> Enum.filter(&(&1.data["type"] == "Flag" and &1.data["summary"] == reason))
+      end
+
+      # sent to the author's instance only: the same anonymous report, from our service actor, names the group too (which Lemmy drops, and Bonfire groups accept)
+      anonymous = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(anonymous, post,
+                 comment: "anonymous spam",
+                 forward: true
+               )
+
+      assert flags_by.(anonymous) == [], "not asked to, so nothing goes out as the reporter"
+      assert [%{data: anonymous_flag}] = flags_saying.("anonymous spam")
+      assert anonymous_flag["actor"] == ActivityPub.Utils.service_actor!().ap_id
+      assert List.wrap(anonymous_flag["to"]) == [community]
+      assert anonymous_flag["audience"] == community
+
+      # neither ticked: nothing leaves the instance
+      local_only = fake_user!()
+      assert {:ok, _} = Bonfire.Social.Flags.flag(local_only, post, comment: "local spam")
+      assert flags_by.(local_only) == []
+      assert flags_saying.("local spam") == []
+    end
+  end
+
   describe "what we do with them" do
     # This family puts the reason in `summary`, where Mastodon-family senders use `content`. We read
     # both, since a report reaching a moderator without its reason is barely a report.
@@ -211,6 +269,304 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
         refute Bonfire.Boundaries.can?(someone, :reply, post),
                "#{locked}: a Lock closes a thread to further replies, and dropping it loses a moderator's decision"
       end
+    end
+
+    # How Lemmy actually delivers a moderator's lock to a community's followers: wrapped in the COMMUNITY's `Announce` (`send_activity_in_community`). The community already announced the post itself, so this must not be mistaken for a duplicate of that boost (it is an activity ABOUT the post), nor recorded as another boost of it
+    test "a Lock relayed by the community closes a thread the community already shares", %{
+      text_post: locked,
+      announced_by: community,
+      community_moderator: moderator
+    } do
+      someone = fake_user!()
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: locked)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post),
+             "control: the thread starts out open"
+
+      lock =
+        fixture("mod_lock_page.json")
+        |> Map.merge(%{
+          "object" => locked,
+          "audience" => community,
+          "actor" => moderator,
+          "id" => "#{fixture("mod_lock_page.json")["id"]}/relayed"
+        })
+
+      relayed = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/lock/relayed",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => lock
+      }
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(relayed),
+             "a relayed activity about a post the community shares is not a duplicate of its boost"
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post),
+             "the relayed Lock closes the thread"
+    end
+
+    # A community relays its members' votes the same way (`Announce{Like}`), which is how a follower's instance counts votes cast elsewhere. An upvote is a `Like`; a downvote is a `Dislike`, which we have no concept for yet
+    test "a vote relayed by the community counts here", %{
+      text_post: voted,
+      announced_by: community,
+      community_moderator: voter
+    } do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: voted)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      like = %{
+        "type" => "Like",
+        "id" => "#{voter}/activities/like/relayed",
+        "actor" => voter,
+        "object" => voted,
+        "audience" => community
+      }
+
+      relayed = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/like/relayed",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => like
+      }
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(relayed)
+
+      {:ok, voter_user} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(voter)
+
+      assert Bonfire.Social.Likes.liked?(voter_user, post), "the relayed vote counts here"
+    end
+
+    # Lemmy's mod "remove" is a `Delete` of the post by the moderator, its reason in `summary` ("if summary is present, this is a mod action (Remove in Lemmy terms)"), which Lemmy itself applies as REMOVING the post from the community. Read as a plain delete, a moderator elsewhere would erase someone's post from their own profile here, which no moderator of a group has the standing to do
+    test "a moderator's Delete with a reason removes the post from the group, without deleting it",
+         %{
+           text_post: removed,
+           announced_by: community,
+           community_moderator: moderator
+         } do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      {:ok, mod_user} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(moderator)
+
+      # standing, asserted first so a refusal below says which half is missing: removing from a GROUP takes `:mediate` on the group, where a `Lock` takes it on the post
+      assert id(mod_user) in Enum.map(Bonfire.Classify.Categories.moderators(mirror), &id/1),
+             "control: the community's declared moderator is a moderator of our mirror"
+
+      assert Bonfire.Boundaries.can?(mod_user, :mediate, mirror),
+             "control: and so may moderate the mirror itself"
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: removed)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      reader = fake_user!()
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: mirror,
+               current_user: reader
+             ),
+             "control: the post is in the group to begin with"
+
+      remove =
+        fixture("mod_remove_note.json")
+        |> Map.merge(%{"object" => removed, "audience" => community, "actor" => moderator})
+
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+      Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+
+      assert {:ok, _} = Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true),
+             "a moderator's removal must not delete the post itself"
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: mirror,
+               current_user: reader
+             ),
+             "the removal takes it out of the group"
+    end
+
+    # How a Bonfire group relays a member's post: a plain `Announce` of the post, which a follower's instance fetches as it handles the announce, with no `Create` or `Announce{Create}` before it. The post's own `audience` names the group and the group announced it, so it is published in the mirror like a post the group relayed as an activity, and carries the moderators ACL that gives the group's moderators standing over it
+    test "a Lock closes a post that reached us only as the group's plain Announce of it", %{
+      reported: served_post,
+      announced_by: community,
+      community_moderator: moderator,
+      served: served
+    } do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      # an author the mocks already serve
+      {:ok, %{data: %{"attributedTo" => author}}} =
+        ActivityPub.Object.get_cached(ap_id: served_post)
+
+      post_id = "#{community |> String.split("/c/") |> List.first()}/post/announced-only"
+
+      post_data =
+        fixture("create_page_to_group.json")["object"]
+        |> Map.merge(%{
+          "id" => post_id,
+          "attributedTo" => author,
+          "audience" => community,
+          "to" => [community, "https://www.w3.org/ns/activitystreams#Public"]
+        })
+
+      serve(Map.put(served, post_id, post_data))
+
+      boost = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/announced-only",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => post_id
+      }
+
+      assert {:ok, boosted} = ActivityPub.Federator.Transformer.handle_incoming(boost)
+      Bonfire.Federate.ActivityPub.Incoming.receive_activity(boosted)
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: post_id)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      someone = fake_user!()
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post),
+             "control: the thread starts out open"
+
+      {:ok, mods_acl} = Bonfire.Boundaries.Scaffold.Groups.moderators_acl(mirror)
+
+      assert id(mods_acl) in Enum.map(
+               Bonfire.Boundaries.Controlleds.list_on_object(pointer_id),
+               & &1.acl_id
+             ),
+             "its audience names the group that announced it, so it carries the mirror's moderators ACL"
+
+      lock =
+        fixture("mod_lock_page.json")
+        |> Map.merge(%{
+          "object" => post_id,
+          "audience" => community,
+          "actor" => moderator,
+          "id" => "#{fixture("mod_lock_page.json")["id"]}/announced-only"
+        })
+
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(lock)
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity),
+             "the group's moderator has standing over a post the group announced"
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post), "the Lock closes the thread"
+    end
+
+    # A post can belong to a group we follow only through the group's boost: its `Create` reached us straight from the author, and the group's plain `Announce` came after. Its `audience` does not name the group (as with a Mastodon post a group boosts), so nothing published it IN our mirror, and the group a removal is from has to come from the `Delete` itself (its `audience`), not from the post
+    test "a moderator's Delete removes a post that is in the group only through its boost", %{
+      reported: served_post,
+      announced_by: community,
+      community_moderator: moderator,
+      served: served
+    } do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      # an author the mocks already serve
+      {:ok, %{data: %{"attributedTo" => author}}} =
+        ActivityPub.Object.get_cached(ap_id: served_post)
+
+      post_id = "#{community |> String.split("/c/") |> List.first()}/post/boost-only"
+
+      create =
+        fixture("create_page_to_group.json")
+        |> put_in(["actor"], author)
+        |> put_in(["id"], "#{post_id}/create")
+        |> Map.update!(
+          "object",
+          &(Map.merge(&1, %{
+              "id" => post_id,
+              "attributedTo" => author,
+              # "audience" => community,
+              "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+            })
+            # no `audience` naming the group (commented out above, as was `community` in `to`): one that did would be published in the mirror when the group announces it (see the test above), which is not the case this one covers
+            |> Map.delete("audience"))
+        )
+
+      # its origin still serves it, as it does a post a moderator only removed: a 404 here would read as a verified deletion
+      serve(Map.put(served, post_id, create["object"]))
+
+      assert {:ok, created} = ActivityPub.Federator.Transformer.handle_incoming(create)
+      Bonfire.Federate.ActivityPub.Incoming.receive_activity(created)
+
+      boost = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/boost-only",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => post_id
+      }
+
+      assert {:ok, boosted} = ActivityPub.Federator.Transformer.handle_incoming(boost)
+      Bonfire.Federate.ActivityPub.Incoming.receive_activity(boosted)
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: post_id)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      reader = fake_user!()
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, pointer_id,
+               by: mirror,
+               current_user: reader
+             ),
+             "control: the group's boost put it in the group"
+
+      refute match?(
+               {:ok, _, %{id: mirror_id}} when mirror_id == mirror.id,
+               Bonfire.Classify.Categories.group_of_object(pointer_id)
+             ),
+             "control: it was not published IN the mirror, so only the activity can say which group"
+
+      remove =
+        fixture("mod_remove_note.json")
+        |> Map.merge(%{"object" => post_id, "audience" => community, "actor" => moderator})
+
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+      Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+
+      assert {:ok, _} = Bonfire.Common.Needles.get(id(post), skip_boundary_check: true)
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:user_activities, pointer_id,
+               by: mirror,
+               current_user: reader
+             ),
+             "the removal takes it out of the group, which only the Delete's audience names"
+    end
+
+    # not every sender marks a removal with `summary`: what makes it one is that its origin still has the object (so it is not a deletion) and the actor is not its author (so it is not theirs to delete)
+    test "a moderator's Delete with no reason is a removal too, when its origin still has the post",
+         %{text_post: removed, announced_by: community, community_moderator: moderator} do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: removed)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      reader = fake_user!()
+
+      remove =
+        fixture("mod_remove_note.json")
+        |> Map.drop(["summary"])
+        |> Map.merge(%{"object" => removed, "audience" => community, "actor" => moderator})
+
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+      Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+
+      assert {:ok, _} = Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true)
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: mirror,
+               current_user: reader
+             )
     end
 
     # A `Lock` closes someone's thread, so who may send one matters as much as what it does. The

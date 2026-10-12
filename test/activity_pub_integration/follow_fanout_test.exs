@@ -94,7 +94,10 @@ defmodule Bonfire.Federate.ActivityPub.FollowFanoutTest do
     receive do
       {:delivered, url, body} ->
         type = Jason.decode!(body)["type"]
-        acc |> Map.update(type, [URI.parse(url).host], &[URI.parse(url).host | &1]) |> collect_deliveries()
+
+        acc
+        |> Map.update(type, [URI.parse(url).host], &[URI.parse(url).host | &1])
+        |> collect_deliveries()
     after
       0 -> Map.new(acc, fn {type, hosts} -> {type, hosts |> Enum.uniq() |> Enum.sort()} end)
     end
@@ -211,7 +214,9 @@ defmodule Bonfire.Federate.ActivityPub.FollowFanoutTest do
   # A Like is addressed to the post's author only (`make_like_data`), so it is not public and skips the follower fan-out above. It used to hit the publisher's fallback instead, `Adapter.external_followers_for_activity`, which returns every remote follower allowed to see the liked post: for a public post, all of them (fedizen.net: each like queued ~470 times)
   describe "interacting with someone else's post" do
     setup do
-      {:ok, post} = Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(@remote_note)
+      {:ok, post} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(@remote_note)
+
       drain_and_flush()
       %{post: post}
     end

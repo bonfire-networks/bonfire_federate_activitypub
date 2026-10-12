@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupGuestRedirectTest do
     username = group.character.username
 
     for path <- [Bonfire.Common.URIs.path(group), "/&#{username}"] do
-      conn = get(build_conn(),path)
+      conn = get(build_conn(), path)
       assert redirected_to(conn, 302) == @community, "#{path} should redirect to the origin"
     end
   end
@@ -66,7 +66,7 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupGuestRedirectTest do
         default_content_visibility: "public"
       })
 
-    conn = get(build_conn(),Bonfire.Common.URIs.path(group))
+    conn = get(build_conn(), Bonfire.Common.URIs.path(group))
     assert conn.status == 200
   end
 end

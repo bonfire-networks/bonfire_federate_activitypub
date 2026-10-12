@@ -30,7 +30,8 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
     local_user = fake_user!()
     assert {:ok, instance} = Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
 
-    assert {:ok, _} = Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
+    assert {:ok, _} =
+             Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
 
     assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
              current_user: local_user

@@ -26,7 +26,9 @@ defmodule Bonfire.Federate.ActivityPub.ConnCase do
       import Bonfire.UI.Common.Testing.Helpers
 
       import PhoenixTest
-      import Phoenix.LiveViewTest
+
+      # `open_browser` is PhoenixTest's, which takes the session these tests pipe, as in the UI extensions' ConnCases; importing both made any call to it a compile error
+      import Phoenix.LiveViewTest, except: [open_browser: 1, open_browser: 2]
       # import Bonfire.Federate.ActivityPub.ConnCase
       import Bonfire.Federate.ActivityPub.Test.ConnHelpers
 

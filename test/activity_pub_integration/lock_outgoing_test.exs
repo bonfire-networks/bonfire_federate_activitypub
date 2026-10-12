@@ -53,6 +53,89 @@ defmodule Bonfire.Federate.ActivityPub.LockOutgoingTest do
     assert object == ap_id or e(object, "id", nil) == ap_id
   end
 
+  # Lemmy writes its modlog row from the `Lock` it receives, taking the reason from `summary` and logging a default one when there is none (`crates/apub/activities/src/community/lock.rs`), so a reason given here that isn't sent is lost everywhere else
+  test "a lock with a reason federates it as the Lock's summary" do
+    author = fake_user!()
+
+    post =
+      Bonfire.Posts.Fake.fake_post!(author, "public", %{
+        post_content: %{html_body: "<p>closing this, with a reason</p>"}
+      })
+
+    ap_id = ap_id!(post)
+
+    assert {:ok, _} =
+             Blocks.lock(post, current_user: author, reason: "the thread went off topic")
+
+    assert %{data: %{"summary" => "the thread went off topic"}} = activity_for(ap_id, "Lock")
+  end
+
+  # a moderator closing SOMEONE ELSE's thread: the receiver can only check their standing against the group the `Lock` names, as Lemmy sends it on every community lock
+  test "a moderator locking a member's post in a group names the group in the Lock's audience" do
+    moderator = fake_user!()
+
+    group =
+      Bonfire.Classify.Simulate.fake_group!(moderator, %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+
+    member = fake_user!()
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(member, group)
+
+    post =
+      Bonfire.Classify.Simulate.fake_post_in_group!(member, group, "<p>a member's thread</p>",
+        boundary: "public"
+      )
+
+    ap_id = ap_id!(post)
+    assert {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: group)
+
+    assert {:ok, _} = Blocks.lock(post, current_user: moderator)
+
+    assert %{data: %{"audience" => ^group_ap_id}} = activity_for(ap_id, "Lock")
+  end
+
+  # The group's followers only hear of a moderator's action through the group, which relays it as Lemmy's `send_activity_in_community` does for every activity in a community it hosts: the moderator's own followers are not the group's
+  test "the group relays a lock in it, and the reopening, to its followers" do
+    moderator = fake_user!()
+
+    group =
+      Bonfire.Classify.Simulate.fake_group!(moderator, %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+
+    member = fake_user!()
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(member, group)
+
+    post =
+      Bonfire.Classify.Simulate.fake_post_in_group!(member, group, "<p>to be relayed</p>",
+        boundary: "public"
+      )
+
+    ap_id = ap_id!(post)
+    assert {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: group)
+
+    assert {:ok, _} = Blocks.lock(post, current_user: moderator)
+    assert %{data: %{"id" => lock_id}} = lock = activity_for(ap_id, "Lock")
+
+    assert %{data: %{"type" => "Announce", "actor" => ^group_ap_id}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id, lock),
+           "the group's followers only hear of it through the group"
+
+    assert {:ok, _} = Blocks.unlock(post, current_user: moderator)
+    assert %{} = undo = activity_for(lock_id, "Undo")
+
+    assert %{data: %{"type" => "Announce", "actor" => ^group_ap_id}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id, undo),
+           "and of its reopening"
+  end
+
   test "reopening it federates an Undo of the Lock" do
     author = fake_user!()
 

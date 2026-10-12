@@ -147,6 +147,130 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
            "a group only announces a public post"
   end
 
+  # the group's followers got the post through the group, so they only see the edit if the group relays it too, as Lemmy's `send_activity_in_community` does for an author's `Update`
+  test "the group relays an edit of a post published in it" do
+    creator = fake_user!()
+    group = public_group(creator)
+    post = post_in_group(creator, group, "<p>before the edit</p>")
+    assert {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+    assert {:ok, _} =
+             Bonfire.Social.PostContents.edit(creator, id(post), %{
+               html_body: "<p>after the edit</p>"
+             })
+
+    assert %{} = update = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Update"),
+           "control: the edit federated an Update"
+
+    assert %{data: %{"type" => "Announce"}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id(group), update),
+           "the group's followers keep the old version unless the group relays the edit"
+  end
+
+  test "the group relays its author deleting a post published in it" do
+    creator = fake_user!()
+    group = public_group(creator)
+    post = post_in_group(creator, group, "<p>soon gone</p>")
+    assert {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+    assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: creator)
+
+    assert %{} = delete = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
+           "control: the deletion federated a Delete"
+
+    assert %{data: %{"type" => "Announce"}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id(group), delete),
+           "the group's followers keep a deleted post unless the group relays its deletion"
+  end
+
+  # a moderator may delete a member's post (the moderate role includes `:delete`), and that delete takes the same path as an author's
+  test "the group relays a moderator deleting a member's post" do
+    moderator = fake_user!()
+    group = public_group(moderator)
+    member = fake_user!()
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(member, group)
+
+    post = post_in_group(member, group, "<p>a member's post</p>")
+    assert {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+    assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: moderator),
+           "control: a moderator may delete a member's post"
+
+    assert %{} = delete = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete")
+
+    assert %{data: %{"type" => "Announce"}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id(group), delete)
+  end
+
+  # A like reaches the post's author and the group, and nobody else: followers' instances only count a vote the group relays, as Lemmy, PieFed, Mbin and NodeBB all do. Without it a post's count on their copy of the group is only their own users' votes
+  describe "the group relays votes on a post published in it" do
+    setup do
+      mock(fn
+        %{method: :get, url: @remote_actor} -> json(APSimulate.actor_json(@remote_actor))
+        _ -> %Tesla.Env{status: 404, body: ""}
+      end)
+
+      creator = fake_user!()
+      group = public_group(creator)
+      post = post_in_group(creator, group, "<p>a post to vote on</p>")
+      assert {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+
+      {:ok, group: group, post: post, ap_post: ap_post}
+    end
+
+    test "a member's like", %{group: group, post: post, ap_post: ap_post} do
+      liker = fake_user!()
+      assert {:ok, _} = Bonfire.Social.Likes.like(liker, post)
+      {:ok, %{ap_id: liker_ap_id}} = ActivityPub.Actor.get_cached(pointer: liker)
+
+      assert %{} = like = ActivityPub.Object.get_existing_like(liker_ap_id, ap_post.data["id"]),
+             "control: the like federated"
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id(group), like)
+    end
+
+    test "and its undoing", %{group: group, post: post, ap_post: ap_post} do
+      liker = fake_user!()
+      assert {:ok, _} = Bonfire.Social.Likes.like(liker, post)
+      {:ok, %{ap_id: liker_ap_id}} = ActivityPub.Actor.get_cached(pointer: liker)
+
+      %{data: %{"id" => like_id}} =
+        ActivityPub.Object.get_existing_like(liker_ap_id, ap_post.data["id"])
+
+      assert {:ok, _} = Bonfire.Social.Likes.unlike(liker, post)
+
+      assert %{} = undo = ActivityPub.Object.get_activity_for_object_ap_id(like_id, "Undo"),
+             "control: the unlike federated an Undo"
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id(group), undo)
+    end
+
+    # most votes on a busy group's posts come from other instances, delivered to the group's inbox
+    test "a remote voter's like", %{group: group, post: post, ap_post: ap_post} do
+      like = %{
+        "type" => "Like",
+        "id" => "#{@remote_actor}/likes/group-post",
+        "actor" => @remote_actor,
+        "object" => ap_post.data["id"],
+        "to" => [ap_post.data["attributedTo"]],
+        "cc" => [group_ap_id(group)]
+      }
+
+      # the transformer hands a remote activity to the adapter itself, as a real delivery does, so applying it again here would relay it twice
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(like)
+
+      {:ok, remote_user} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+
+      assert Bonfire.Social.Likes.liked?(remote_user, post),
+             "control: the remote like was applied here"
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id(group), activity)
+    end
+  end
+
   # removing a post from the group takes the group's boost back, which other servers' copies of the group only learn of from the group's `Undo{Announce}`
   test "removing a post from the group federates the group's Undo of its Announce" do
     creator = fake_user!()
@@ -168,6 +292,43 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
                  ActivityPub.Object.get_ap_id(&1.data["object"]) == announce["id"])
            ),
            "the group took its boost back here but told nobody, so remote copies of the group keep showing the post"
+  end
+
+  # Lemmy ignores an `Undo{Announce}` (it is in neither inbox list), and removes a post from a community on a moderator's `Delete` carrying a `summary`. So removing someone's post from our group sends that too, relayed by the group, while the post itself stays here: the removal is from the group, not of the post
+  test "a moderator removing a member's post from the group also sends a moderator's Delete with a reason, and keeps the post" do
+    moderator = fake_user!()
+    group = public_group(moderator)
+    member = fake_user!()
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(member, group)
+
+    post = post_in_group(member, group, "<p>a member's post the group will drop</p>")
+    assert {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+    assert {:ok, %{ap_id: moderator_ap_id}} = ActivityPub.Actor.get_cached(pointer: moderator)
+    group_ap_id = group_ap_id(group)
+
+    # no reason given, as the UI doesn't ask for one yet
+    assert {:ok, _} = Bonfire.Classify.Categories.remove_post_from_group(moderator, group, post)
+
+    assert %{
+             data: %{
+               "actor" => ^moderator_ap_id,
+               "summary" => summary,
+               "audience" => ^group_ap_id
+             }
+           } = delete = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete")
+
+    assert is_binary(summary) and summary != "",
+           "without a summary, Lemmy reads a Delete as the author deleting their own post"
+
+    assert %{data: %{"type" => "Announce"}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id, delete),
+           "relayed by the group, as every activity in a group we host"
+
+    assert {:ok, _} = Bonfire.Common.Needles.get(id(post), skip_boundary_check: true),
+           "removed from the group, not deleted"
+
+    assert {:ok, %{data: %{"type" => type}}} = ActivityPub.Object.get_cached(ap_id: ap_id)
+    refute type == "Tombstone", "and our own copy of its AP object stays as it was"
   end
 
   test "the group announces a reply in its thread" do

@@ -2278,18 +2278,67 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # FEP-1b12 marks belonging with `audience` naming the group, which is what every threadiverse implementation reads to decide a post is a group's. Derived from the same place a reply's group comes from, so "which group is this in" has one answer across incoming and outgoing.
   # Returns a bare ap_id or nil, NOT a list. Lemmy types `audience` as `Option<ObjectId<ApubCommunity>>` on both its `Note` and `Page`, and unlike `to`/`cc` it has no `deserialize_one_or_many`, so an array is rejected outright: a live post into a real community answered `400 data did not match any variant of untagged enum AnnouncableActivities` until this was scalar.
   # Every capture we hold sends a bare string too.
-  defp maybe_determine_audience(object) do
+  # Public for activities ABOUT an object in a group as well (a `Lock` names the group whose moderator closed the thread), so "which group is this in" has the one answer.
+  def maybe_determine_audience(object) do
+    case group_actor_of(object) do
+      {:ok, %{ap_id: ap_id}} when is_binary(ap_id) -> ap_id
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Has the group an object is in relay an activity about it to the group's followers, if it is a group we host.
+
+  A group's followers hear of what happens in it through the group, not through whoever acted: a moderator closing a thread, an author editing or deleting their post. Lemmy announces every activity in a community it hosts this way (`send_activity_in_community`). Not for a `Create`, which the group's auto-boost already announces, and never for a group we only mirror, which would be announcing on its origin's behalf.
+
+  Each publisher calls this once its activity exists, rather than the AP library inferring it from `audience`.
+  """
+  def maybe_group_relays(object, activity) do
+    with {:ok, %{local: true} = group_actor} <- group_actor_of(object),
+         {:error, e} <-
+           ActivityPub.announce(%{actor: group_actor, object: activity},
+             # a vote is addressed to the post's author and the group rather than Public, so the announce's own check would refuse it: relayed when the POST is public, as the threadiverse relays votes
+             skip_public_check: object_ap_public?(object)
+           ) do
+      warn(e, "the group could not relay the activity to its followers")
+    end
+  end
+
+  # judged the way `ActivityPub.announce/2` judges what it announces, so "public" means the same on both sides
+  defp object_ap_public?(object) do
+    case ActivityPub.Object.get_cached(pointer: object) do
+      {:ok, %{data: data}} -> ActivityPub.Utils.public?(data)
+      _ -> false
+    end
+  end
+
+  @doc """
+  Publishes a moderator REMOVING an object from the group it was posted in: a `Delete` of it by the moderator, with the reason as `summary` (`Bonfire.Social.Moderations.summary/2`, which falls back to `hide`'s default when none is given) and the group as `audience`, relayed by the group.
+
+  The threadiverse's mod "remove", which Lemmy applies as taking the post out of the community. The object is NOT deleted here (`keep_object: true`): it was removed from the group, and stays on its author's profile.
+  """
+  def publish_moderator_delete(moderator, object, reason \\ nil) do
+    with {:ok, %{ap_id: moderator_ap_id}} <- ActivityPub.Actor.get_cached(pointer: moderator),
+         {:ok, ap_object} <- ActivityPub.Object.get_cached(pointer: object),
+         {:ok, activity} <-
+           ActivityPub.delete(ap_object, true,
+             keep_object: true,
+             subject: moderator_ap_id,
+             # `hide`: the moderation log's verb for taking a post out of a group
+             summary: Bonfire.Social.Moderations.summary(reason, :hide),
+             audience: maybe_determine_audience(object)
+           ) do
+      maybe_group_relays(object, activity)
+      {:ok, activity}
+    end
+  end
+
+  defp group_actor_of(object) do
     case maybe_apply(Bonfire.Classify.Categories, :group_of_object, [object],
            fallback_return: nil
          ) do
-      {:ok, _object, %{} = group} ->
-        case ActivityPub.Actor.get_cached(pointer: group) do
-          {:ok, %{ap_id: ap_id}} when is_binary(ap_id) -> ap_id
-          _ -> nil
-        end
-
-      _ ->
-        nil
+      {:ok, _object, %{} = group} -> ActivityPub.Actor.get_cached(pointer: group)
+      _ -> nil
     end
   end
 

@@ -359,21 +359,26 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   # delete anything else
-  defp push_delete(_other, subject, %{id: id} = _thing, opts) do
+  defp push_delete(_other, subject, %{id: id} = thing, opts) do
     with %{} = subject <- ActivityPub.Actor.get_cached!(pointer: subject),
          %{} = object <-
            (opts[:ap_object] ||
               ActivityPub.Object.get_cached!(pointer: id))
            |> debug("delete_object") do
-      ActivityPub.delete(
-        object,
-        true,
-        opts ++
-          [
-            subject: AdapterUtils.the_ap_id(subject),
-            bcc: AdapterUtils.ids_or_object_ids(opts[:ap_bcc])
-          ]
-      )
+      with {:ok, activity} = deleted <-
+             ActivityPub.delete(
+               object,
+               true,
+               opts ++
+                 [
+                   subject: AdapterUtils.the_ap_id(subject),
+                   bcc: AdapterUtils.ids_or_object_ids(opts[:ap_bcc])
+                 ]
+             ) do
+        # the group's followers got the post through the group, so they hear of its deletion through it too
+        AdapterUtils.maybe_group_relays(thing, activity)
+        deleted
+      end
     else
       e ->
         preparation_error("Could not find the AP object to delete", "Delete", e)
