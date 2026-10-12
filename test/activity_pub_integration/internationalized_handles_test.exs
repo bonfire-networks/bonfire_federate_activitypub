@@ -23,19 +23,54 @@ defmodule Bonfire.Federate.ActivityPub.InternationalizedHandlesTest do
     {"你好", "你好.local", "https://xn--6qq79v.local/users/nihao"}
   ]
 
+  # the userpart and host examples from https://swicg.github.io/activitypub-webfinger/internationalized, with their `acct:` URIs as given there (userpart percent-encoded, host as A-label)
+  @swicg_examples [
+    {"user1", "ตัวอย่าง.example", "acct:user1@xn--72c1a1bt4awk9o.example"},
+    {"renée", "উদাহরণ.example", "acct:ren%C3%A9e@xn--d5b6ci4b4b3a.example"},
+    {"иван", "எடுத்துக்காட்டு.example",
+     "acct:%D0%B8%D0%B2%D0%B0%D0%BD@xn--4kcoa2bca5aa0vzacf2mdd.example"},
+    {"ελπίδα", "ఉదాహరణ.example",
+     "acct:%CE%B5%CE%BB%CF%80%CE%AF%CE%B4%CE%B1@xn--noc6ci4b4b3a.example"},
+    {"小明", "მაგალითი.example", "acct:%E5%B0%8F%E6%98%8E@xn--lodafveble.example"},
+    {"किरण", "example.հայ", "acct:%E0%A4%95%E0%A4%BF%E0%A4%B0%E0%A4%A3@example.xn--y9a3aq"},
+    {"ليلى", "ምሳሌ.example", "acct:%D9%84%D9%8A%D9%84%D9%89@xn--mxd7a1d.example"},
+    {"שרה", "example.net", "acct:%D7%A9%D7%A8%D7%94@example.net"},
+    {"anne.o'neill+notes", "example.مصر", "acct:anne.o'neill+notes@example.xn--wgbh1c"},
+    {"민수", "example.中国", "acct:%EB%AF%BC%EC%88%98@example.xn--fiqs8s"},
+    {"さくら", "café.example", "acct:%E3%81%95%E3%81%8F%E3%82%89@xn--caf-dma.example"}
+  ]
+
+  @swicg_remotes (for {{username, host, acct}, i} <- Enum.with_index(@swicg_examples) do
+                    [_, a_label_host] = String.split(acct, "@")
+                    {username, host, "https://#{a_label_host}/users/swicg#{i}"}
+                  end)
+
+  @remotes @remotes ++ @swicg_remotes
+
+  # ' and + are only supported by lookup, not in typed mentions
+  @typeable_remotes Enum.reject(@remotes, fn {username, _, _} -> username =~ ~r/['+]/ end)
+
   # hard-coded rather than built with `URI.encode_query`, so a change in how handles get encoded fails here. Only A-label hosts are mocked, so a lookup that sends a U-label host gets a 404.
-  @webfinger_urls %{
-    "https://mocked.local/.well-known/webfinger?resource=acct%3Ajos%C3%A9%40mocked.local" =>
+  @webfinger_urls (for {{_username, _host, acct}, {_, _, actor_id}} <-
+                         Enum.zip(@swicg_examples, @swicg_remotes),
+                       into: %{} do
+                     [_, a_label_host] = String.split(acct, "@")
+
+                     {"https://#{a_label_host}/.well-known/webfinger?" <>
+                        URI.encode_query(%{"resource" => acct}), actor_id}
+                   end)
+  @webfinger_urls Map.merge(@webfinger_urls, %{
+    "https://mocked.local/.well-known/webfinger?resource=acct%3Ajos%25C3%25A9%40mocked.local" =>
       "https://mocked.local/users/jose_u",
-    "https://mocked.local/.well-known/webfinger?resource=acct%3A%E4%BD%A0%E5%A5%BD%40mocked.local" =>
+    "https://mocked.local/.well-known/webfinger?resource=acct%3A%25E4%25BD%25A0%25E5%25A5%25BD%40mocked.local" =>
       "https://mocked.local/users/nihao",
     "https://mocked.local/.well-known/webfinger?resource=acct%3Afirst.last%40mocked.local" =>
       "https://mocked.local/users/first.last",
-    "https://xn--bcher-kva.local/.well-known/webfinger?resource=acct%3Ajos%C3%A9%40xn--bcher-kva.local" =>
+    "https://xn--bcher-kva.local/.well-known/webfinger?resource=acct%3Ajos%25C3%25A9%40xn--bcher-kva.local" =>
       "https://xn--bcher-kva.local/users/jose_u",
-    "https://xn--6qq79v.local/.well-known/webfinger?resource=acct%3A%E4%BD%A0%E5%A5%BD%40xn--6qq79v.local" =>
+    "https://xn--6qq79v.local/.well-known/webfinger?resource=acct%3A%25E4%25BD%25A0%25E5%25A5%25BD%40xn--6qq79v.local" =>
       "https://xn--6qq79v.local/users/nihao"
-  }
+  })
 
   setup do
     Process.put(:federating, true)
@@ -88,7 +123,7 @@ defmodule Bonfire.Federate.ActivityPub.InternationalizedHandlesTest do
   end
 
   describe "Link: non-ASCII and dotted handles are linkified in in-band mentions" do
-    for {username, host, _actor_id} <- @remotes do
+    for {username, host, _actor_id} <- @typeable_remotes do
       test "@#{username}@#{host}" do
         handle = "#{unquote(username)}@#{unquote(host)}"
 
@@ -108,7 +143,7 @@ defmodule Bonfire.Federate.ActivityPub.InternationalizedHandlesTest do
   end
 
   describe "Send: local users can send activities to a remote account with a non-ASCII handle" do
-    for {username, host, actor_id} <- @remotes do
+    for {username, host, actor_id} <- @typeable_remotes do
       test "a post typed with @#{username}@#{host} is addressed to that actor" do
         me = fake_user!()
 

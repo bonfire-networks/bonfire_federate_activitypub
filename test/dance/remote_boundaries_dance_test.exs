@@ -99,16 +99,24 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
       attrs = "try out federated post"
       # on remote instance, bob_remote publish a post
-      TestInstanceRepo.apply(fn ->
-        post_attrs = %{post_content: %{html_body: attrs}}
+      post_url =
+        TestInstanceRepo.apply(fn ->
+          post_attrs = %{post_content: %{html_body: attrs}}
 
-        {:ok, post} =
-          Posts.publish(
-            current_user: bob_remote,
-            post_attrs: post_attrs,
-            boundary: "public"
-          )
-      end)
+          {:ok, post} =
+            Posts.publish(
+              current_user: bob_remote,
+              post_attrs: post_attrs,
+              boundary: "public"
+            )
+
+          Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
+        end)
+
+      # on local instance, alice_local can still open the post by direct link
+      assert {:ok, post_on_local} = AdapterUtils.get_by_url_ap_id_or_username(post_url)
+      assert {:ok, _view, html} = live(conn, "/post/#{post_on_local.id}")
+      assert html =~ attrs
     end
 
     test "i'll not see any @ mentions from them", context do
