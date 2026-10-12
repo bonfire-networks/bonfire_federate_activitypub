@@ -43,7 +43,7 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
     {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
     assert {:ok, activity} =
-             Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+             {:ok, activity.pointer}
              |> repo().maybe_preload(choices: [:post_content])
 
     #  fallback if bonfire_poll is not enabled
@@ -87,9 +87,10 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
 
       {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(update_activity)
 
+      # forced: the adapter's result already carries the choices it had before the update
       assert {:ok, updated_poll} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
-               |> repo().maybe_preload(choices: [:post_content])
+               {:ok, activity.pointer}
+               |> repo().maybe_preload([choices: [:post_content]], force: true)
 
       assert updated_poll.post_content.name == "Updated poll name"
       updated_names = Enum.map(updated_poll.choices, & &1.post_content.name)
@@ -258,7 +259,7 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
       {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
       assert {:ok, question} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               {:ok, activity.pointer}
                |> repo().maybe_preload(choices: [:post_content])
 
       choice =
@@ -305,7 +306,7 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
       {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
       assert {:ok, question} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               {:ok, activity.pointer}
                |> repo().maybe_preload(choices: [:post_content])
 
       assert question.voting_format == "multiple"

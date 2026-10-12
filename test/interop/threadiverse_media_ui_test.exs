@@ -180,8 +180,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseMediaUITest do
       fixture("lemmy", "create_note_reply_in_group.json")
       |> put_in(["object", "inReplyTo"], link_id)
 
-    {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(reply)
-    Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+    {:ok, _activity} = ActivityPub.Federator.Transformer.handle_incoming(reply)
+    # the transformer already handed it to the adapter, so this applied it a second time
+    # Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
     reply_text =
       reply["object"]["content"]

@@ -288,7 +288,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert params.object["content"] == activity.object.data["content"]
 
       assert {:ok, post} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               {:ok, activity.pointer}
                |> repo().maybe_preload(:post_content)
 
       assert post.post_content.html_body =~ params.object["content"]
@@ -331,6 +331,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert actor.data["id"] == activity.data["actor"]
       assert activity.object.data["content"] =~ link_url
 
+      # the ONLY application here: these params leave `local` at its default (true), so `ActivityPub.create/1` stored it as ours and skipped the adapter
       assert {:ok, post} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
                |> repo().maybe_preload([:post_content, :media])
@@ -368,7 +369,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert params.object["content"] == activity.object.data["content"]
 
       assert {:ok, post} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               {:ok, activity.pointer}
                |> repo().maybe_preload(:post_content)
 
       assert post.post_content.html_body =~ params.object["content"]
@@ -404,7 +405,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert params.object["content"] == activity.object.data["content"]
 
       assert {:ok, post} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               {:ok, activity.pointer}
                |> repo().maybe_preload(:post_content)
 
       assert post.post_content.html_body =~ params.object["content"]
@@ -436,7 +437,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert params.object["content"] == activity.object.data["content"]
 
       assert {:ok, post} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               {:ok, activity.pointer}
                |> repo().maybe_preload(:post_content)
 
       assert post.post_content.html_body =~ params.object["content"]
@@ -471,7 +472,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       {:ok, activity} = ActivityPub.create(params)
 
-      assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      assert {:ok, post} = {:ok, activity.pointer}
 
       reply_object = %{
         "id" => @remote_instance <> "/pub/" <> Needle.UID.generate(),
@@ -508,7 +509,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       {:ok, activity} = ActivityPub.create(params)
 
-      assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      assert {:ok, post} = {:ok, activity.pointer}
 
       to = [
         recipient_actor.ap_id
@@ -552,7 +553,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert actor.data["id"] == activity.data["actor"]
       assert params.object["content"] == activity.object.data["content"]
 
-      assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      assert {:ok, post} = {:ok, activity.pointer}
 
       assert Bonfire.Boundaries.Circles.circles()[:guest] not in Bonfire.Social.FeedActivities.feeds_for_activity(
                post.activity

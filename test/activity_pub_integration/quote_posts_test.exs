@@ -70,7 +70,7 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
       |> debug("processed quote post activity")
 
     {:ok, quote_post} =
-      Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      {:ok, activity.pointer}
       |> repo().maybe_preload([:post_content, :tags, :media])
 
     quote_post

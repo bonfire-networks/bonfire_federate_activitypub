@@ -1,0 +1,21 @@
+{
+  "actor": "http://lemmy.local/u/lemmy_beta",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "object": {
+    "actor": "http://lemmy.local/u/lemmy_beta",
+    "to": ["https://www.w3.org/ns/activitystreams#Public"],
+    "object": "http://lemmy2.local/u/lemmy_alpha",
+    "cc": ["http://lemmy.local/c/main"],
+    "audience": "http://lemmy.local/u/main",
+    "target": "http://lemmy.local/c/main",
+    "type": "Block",
+    "removeData": true,
+    "summary": "spam post",
+    "endTime": "2021-11-01T12:23:50.151874Z",
+    "id": "http://lemmy.local/activities/block/726f43ab-bd0e-4ab3-89c8-627e976f553c"
+  },
+  "cc": ["http://lemmy.local/c/main"],
+  "audience": "http://lemmy.local/u/main",
+  "type": "Undo",
+  "id": "http://lemmy.local/activities/undo/06a20ffb-3e32-42fb-8f4c-674b36d7c557"
+}

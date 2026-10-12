@@ -1,0 +1,13 @@
+{
+  "actor": "http://lemmy.local/u/lemmy_beta",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "object": "http://lemmy2.local/u/lemmy_alpha",
+  "cc": ["http://lemmy.local/c/main"],
+  "audience": "http://lemmy.local/u/main",
+  "target": "http://lemmy.local/c/main",
+  "type": "Block",
+  "removeData": true,
+  "summary": "spam post",
+  "endTime": "2021-11-01T12:23:50.151874Z",
+  "id": "http://lemmy.local/activities/block/5d42fffb-0903-4625-86d4-0b39bb344fc2"
+}

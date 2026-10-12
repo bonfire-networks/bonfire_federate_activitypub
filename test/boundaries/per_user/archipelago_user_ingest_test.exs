@@ -48,8 +48,9 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoUserIngestTest do
 
     params = remote_activity_json_with_mentions(actor, recipient_actor, %{"content" => text})
 
+    # `ActivityPub.create/1` already hands a remote activity to the adapter (a second `Incoming.receive_activity/1` applied it twice), whose result is the activity's `pointer`
     with {:ok, activity} <- ActivityPub.create(params) do
-      Incoming.receive_activity(activity)
+      {:ok, activity.pointer}
     end
   end
 
@@ -73,12 +74,7 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoUserIngestTest do
     assert received_message?(alice, text)
   end
 
-  # FIXME (#2088): currently RED — the DM from a non-allowlisted actor IS received. The per-user
-  # allowlist deny is only enforced in the MRF at the delivery boundary; this ingest path
-  # (`ActivityPub.create` + `Incoming.receive_activity`, the same approximation used by
-  # message_integration_test.exs) skips inbound MRF, and nothing later in Bonfire's processing
-  # re-checks the allowlist. Anything that enters by another door (relays, forwarded objects,
-  # thread backfill / remote-reply fetching) lands regardless of allowlist-only mode.
+  # FIXME (#2088): currently RED — the DM from a non-allowlisted actor IS received. The per-user allowlist deny is only enforced in the MRF at the delivery boundary; this ingest path (`ActivityPub.create` + `Incoming.receive_activity`, the same approximation used by message_integration_test.exs) skips inbound MRF, and nothing later in Bonfire's processing re-checks the allowlist. Anything that enters by another door (relays, forwarded objects, thread backfill / remote-reply fetching) lands regardless of allowlist-only mode.
   @tag :todo
   test "deny path: DM from non-allowlisted actor does not arrive", %{alice: alice} do
     alice = set_allowlist_only(alice)
@@ -110,10 +106,14 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoUserIngestTest do
     create_result = ActivityPub.create(params)
 
     with {:ok, activity} <- create_result do
-      IO.inspect(activity.data["to"], label: "DIAG activity.to after create")
-      IO.inspect(Incoming.receive_activity(activity) |> elem(0), label: "DIAG receive result tag")
+      # IO.inspect(activity.data["to"], label: "DIAG activity.to after create")
+      Incoming.receive_activity(activity)
+      # |> elem(0)
+      # |> IO.inspect(label: "DIAG receive result tag")
     else
-      other -> IO.inspect(other, label: "DIAG create rejected")
+      other ->
+        other
+        # |> IO.inspect(label: "DIAG create rejected")
     end
 
     refute received_message?(alice, text)

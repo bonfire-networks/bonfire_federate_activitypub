@@ -80,6 +80,47 @@ defmodule Bonfire.Federate.ActivityPub.GroupModeratorsOutgoingTest do
            )
   end
 
+  # Someone local can be promoted directly, and is made a member with it (the first test's `person` never joined). Someone on another instance can't be made a member by us, which takes their own `Follow` or `Join`, so they are promoted only once they are one
+  test "someone on another instance can be made a moderator only once they are a member",
+       %{creator: creator} do
+    remote_actor = "https://mocked.local/users/karen"
+
+    mock(fn
+      %{method: :get, url: ^remote_actor} ->
+        json(Bonfire.Federate.ActivityPub.Simulate.actor_json(remote_actor))
+
+      %{method: :post} ->
+        %Tesla.Env{status: 202, body: ""}
+
+      %{method: :get} ->
+        %Tesla.Env{status: 404, body: ""}
+    end)
+
+    group = federated_group(creator)
+    {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: remote_actor)
+    {:ok, remote_person} = Bonfire.Me.Users.by_ap_id(remote_actor)
+
+    refute Categories.member?(remote_person, group)
+
+    assert {:error, _not_member} = Categories.add_moderator(creator, group, id(remote_person))
+
+    refute id(remote_person) in Enum.map(Categories.moderators(group), &id/1)
+
+    # their own Follow of the group, which is how they join an open one
+    assert {:ok, _} =
+             ActivityPub.Federator.Transformer.handle_incoming(%{
+               "type" => "Follow",
+               "id" => "#{remote_actor}/follows/the-group",
+               "actor" => remote_actor,
+               "object" => ap_id(group)
+             })
+
+    assert Categories.member?(remote_person, group), "control: their Follow made them a member"
+
+    assert {:ok, _} = Categories.add_moderator(creator, group, id(remote_person))
+    assert id(remote_person) in Enum.map(Categories.moderators(group), &id/1)
+  end
+
   # paired with the first test, which is what shows a promotion does send when it may
   test "promoting a moderator of a group that does not federate sends nothing",
        %{creator: creator, person: person} do

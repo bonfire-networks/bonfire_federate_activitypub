@@ -74,11 +74,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
     serve(served)
 
+    # delivered once, as a real delivery is: the transformer hands each to the adapter itself (a second `Incoming.receive_activity/1` applied it twice)
     for a <- [announce, text_announce] do
-      case ActivityPub.Federator.Transformer.handle_incoming(a) do
-        {:ok, activity} -> Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
-        {:error, _} -> :ok
-      end
+      ActivityPub.Federator.Transformer.handle_incoming(a)
     end
 
     # the community the ingested posts actually belong to, which is what a lock has to name: Lemmy's
@@ -218,12 +216,109 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
       assert {:ok, _} = Bonfire.Social.Flags.unflag(reporter, post)
 
-      undone =
+      undos =
         for %{data: %{"type" => "Undo", "object" => %{"id" => flag_id}} = undo} <- objects.(),
             flag_id in Enum.map(sent, & &1.data["id"]),
-            do: {flag_id, undo["actor"]}
+            do: {flag_id, undo}
 
-      assert Enum.sort(undone) == Enum.sort(Enum.map(sent, &{&1.data["id"], &1.data["actor"]}))
+      assert Enum.sort(for {flag_id, undo} <- undos, do: {flag_id, undo["actor"]}) ==
+               Enum.sort(Enum.map(sent, &{&1.data["id"], &1.data["actor"]}))
+
+      # each goes where its report went: the anonymous one, naming no group here, reaches the author's instance only through `bcc`
+      for {flag_id, undo} <- undos do
+        %{data: flag} = Enum.find(sent, &(&1.data["id"] == flag_id))
+        assert List.wrap(undo["to"]) ++ List.wrap(undo["cc"]) ++ List.wrap(undo["bcc"]) != []
+        assert List.wrap(undo["bcc"]) == List.wrap(flag["bcc"])
+      end
+
+      assert Enum.any?(undos, fn {_, undo} -> List.wrap(undo["bcc"]) != [] end),
+             "the anonymous report's Undo keeps the author's account it was sent to"
+    end
+  end
+
+  # A community ban is a `Block` by a moderator with `target` the community (Lemmy's `block_user.json`), which means "can't participate in it", what our group silence is. Without `target` a `Block` is a personal block, which is how this used to be read: as the moderator blocking the person themselves
+  describe "a ban from the community" do
+    setup %{announced_by: community, community_moderator: moderator, text_post: post_ap} do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: post_ap)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      banned_ap = "http://lemmy2.local/u/lemmy_alpha"
+
+      {:ok, banned} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(banned_ap)
+
+      ban =
+        fixture("mod_ban_user.json")
+        |> Map.merge(%{
+          "actor" => moderator,
+          "object" => banned_ap,
+          "target" => community,
+          "cc" => [community],
+          "audience" => community
+        })
+
+      assert Bonfire.Boundaries.can?(banned, :reply, post),
+             "control: they may reply before the ban"
+
+      {:ok, post: post, banned: banned, ban: ban}
+    end
+
+    test "silences the person in the group, and its Undo lifts it", %{
+      post: post,
+      banned: banned,
+      ban: ban
+    } do
+      receive_moderation(ban)
+
+      refute Bonfire.Boundaries.can?(banned, :reply, post), "banned from taking part"
+      assert Bonfire.Boundaries.can?(banned, :read, post), "but can still read"
+
+      undo =
+        fixture("mod_unban_user.json")
+        |> Map.merge(%{
+          "actor" => ban["actor"],
+          "cc" => ban["cc"],
+          "audience" => ban["audience"],
+          "object" => ban
+        })
+
+      receive_moderation(undo)
+
+      assert Bonfire.Boundaries.can?(banned, :reply, post), "the Undo lifts the ban"
+    end
+
+    # without a `target`, a `Block` is its sender's own, as from anyone, and the group is not involved. Here neither the sender nor the person is ours, so it is not ours to record at all (the transformer only takes a personal `Block` of someone local)
+    test "a Block naming no group doesn't ban from the group", %{
+      post: post,
+      banned: banned,
+      ban: ban
+    } do
+      ban
+      |> Map.drop(["target", "audience"])
+      |> Map.merge(%{"cc" => [], "id" => "#{ban["id"]}/personal"})
+      |> receive_moderation()
+
+      assert Bonfire.Boundaries.can?(banned, :reply, post), "not banned from the group"
+
+      # the control, so "not banned" above means the missing `target` and not bans being ignored: the same `Block` naming the group does ban
+      receive_moderation(ban)
+      refute Bonfire.Boundaries.can?(banned, :reply, post), "control: with a target, it bans"
+    end
+
+    test "from an actor with no authority over the group is refused", %{
+      post: post,
+      banned: banned,
+      ban: ban
+    } do
+      # served, and neither a moderator of the community nor the person banned
+      receive_moderation(Map.put(ban, "actor", "http://lemmy.local/u/lemmy_alpha"))
+
+      assert Bonfire.Boundaries.can?(banned, :reply, post),
+             "a stranger's ban must not silence anyone here"
+
+      # the control, so the refusal above means the sender's standing and not bans being ignored: the community's moderator sending the same ban does silence them
+      receive_moderation(Map.put(ban, "id", "#{ban["id"]}/by-moderator"))
+      refute Bonfire.Boundaries.can?(banned, :reply, post), "control: a moderator's ban applies"
     end
   end
 
@@ -295,11 +390,12 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
               "#{fixture("mod_lock_page.json")["id"]}/#{locked |> String.split("/") |> List.last()}"
           })
 
-        assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(lock),
-               "#{locked}: the transformer must accept a Lock before the adapter can act on it"
+        assert {:ok, _activity} = ActivityPub.Federator.Transformer.handle_incoming(lock),
+               "#{locked}: the transformer must accept a Lock, and hand it to the adapter, which applies it"
 
-        assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity),
-               "#{locked}: and the adapter must route it to a module that applies it"
+        # the transformer already handed it to the adapter, so this applied it a second time
+        # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity),
+        #        "#{locked}: and the adapter must route it to a module that applies it"
 
         refute Bonfire.Boundaries.can?(someone, :reply, post),
                "#{locked}: a Lock closes a thread to further replies, and dropping it loses a moderator's decision"
@@ -378,6 +474,111 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       assert Bonfire.Social.Likes.liked?(voter_user, post), "the relayed vote counts here"
     end
 
+    # A relayed copy of an activity we already hold goes to the adapter again (the community's relay can be what confirms it, as for our own moderator's below), so applying it must be idempotent: a moderator's `Lock` that reached us directly and then in the community's `Announce` is one lock, with one record
+    test "a Lock we already applied, relayed again by the community, leaves one record", %{
+      text_post: locked,
+      announced_by: community,
+      community_moderator: moderator
+    } do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: locked)
+
+      lock_verb_id = "10CKTHREADT0FVRTHERREP11ES"
+
+      lock_records = fn ->
+        Bonfire.Common.Repo.all(
+          from(a in Bonfire.Data.Social.Activity,
+            where: a.object_id == ^pointer_id and a.verb_id == ^lock_verb_id
+          )
+        )
+      end
+
+      lock =
+        fixture("mod_lock_page.json")
+        |> Map.merge(%{
+          "object" => locked,
+          "audience" => community,
+          "actor" => moderator,
+          "id" => "#{fixture("mod_lock_page.json")["id"]}/direct-then-relayed"
+        })
+
+      # delivered once, as a real delivery is: the transformer hands it to the adapter itself (`receive_moderation/1` would apply it a second time)
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(lock)
+      assert [_] = lock_records.(), "control: the direct Lock was applied, with its record"
+
+      relayed = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/lock/direct-then-relayed",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => lock
+      }
+
+      ActivityPub.Federator.Transformer.handle_incoming(relayed)
+
+      assert [_] = lock_records.(), "the relayed copy doesn't lock it again"
+    end
+
+    # One of OUR users who the community lists as a moderator acts on a post in it: the community applies it and announces it to its followers, us included (`send_activity_in_community`), so its echo comes back with an id we already hold, since we stored the activity when we sent it, and an actor who is local. That echo is what applies the action here, rather than applying it before the community has
+    test "the community's Announce of our own moderator's Lock locks the thread here", %{
+      text_post: locked,
+      announced_by: community,
+      community_moderator: moderator,
+      moderators_collection: collection,
+      served: served
+    } do
+      local_moderator = fake_user!()
+
+      {:ok, %{ap_id: local_moderator_ap_id} = local_actor} =
+        ActivityPub.Actor.get_cached(pointer: local_moderator)
+
+      serve(
+        Map.put(
+          served,
+          collection,
+          moderators_collection(collection, [moderator, local_moderator_ap_id])
+        )
+      )
+
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      assert {:ok, _} = Bonfire.Classify.Categories.sync_remote_moderators(mirror, collection)
+
+      assert Bonfire.Boundaries.can?(local_moderator, :mediate, mirror),
+             "control: listed by the community, so a moderator of our mirror"
+
+      {:ok, %{pointer_id: pointer_id} = ap_post} = ActivityPub.Object.get_cached(ap_id: locked)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      someone = fake_user!()
+
+      # what our moderator sends, built as `Blocks.ap_publish_activity/4` builds it, and stored as ours
+      assert {:ok, sent} =
+               ActivityPub.lock(%{
+                 actor: local_actor,
+                 object: ap_post,
+                 summary: "off topic",
+                 audience: community
+               })
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post),
+             "control: sending it applied nothing here"
+
+      relayed = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/lock/our-moderator",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => sent.data
+      }
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(relayed)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post),
+             "the community's echo of our moderator's Lock closes the thread here"
+    end
+
     # Lemmy's mod "remove" is a `Delete` of the post by the moderator, its reason in `summary` ("if summary is present, this is a mod action (Remove in Lemmy terms)"), which Lemmy itself applies as REMOVING the post from the community. Read as a plain delete, a moderator elsewhere would erase someone's post from their own profile here, which no moderator of a group has the standing to do
     test "a moderator's Delete with a reason removes the post from the group, without deleting it",
          %{
@@ -412,8 +613,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
         fixture("mod_remove_note.json")
         |> Map.merge(%{"object" => removed, "audience" => community, "actor" => moderator})
 
-      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
-      Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      assert {:ok, _activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+      # the transformer already handed it to the adapter, so this applied it a second time
+      # Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
       assert {:ok, _} = Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true),
              "a moderator's removal must not delete the post itself"
@@ -423,6 +625,51 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                current_user: reader
              ),
              "the removal takes it out of the group"
+    end
+
+    # How a follower's instance actually hears of that removal: the community relays its moderator's `Delete` as `Announce{Delete}`, as it relays votes
+    test "a moderator's Delete relayed by the community removes the post from the group, without deleting it",
+         %{
+           text_post: removed,
+           announced_by: community,
+           community_moderator: moderator
+         } do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: removed)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      reader = fake_user!()
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: mirror,
+               current_user: reader
+             ),
+             "control: the post is in the group to begin with"
+
+      remove =
+        fixture("mod_remove_note.json")
+        |> Map.merge(%{"object" => removed, "audience" => community, "actor" => moderator})
+
+      relayed = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/delete/relayed",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => remove
+      }
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(relayed)
+
+      assert {:ok, _} = Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true),
+             "a moderator's removal must not delete the post itself"
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: mirror,
+               current_user: reader
+             ),
+             "the relayed removal takes it out of the group"
     end
 
     # How a Bonfire group relays a member's post: a plain `Announce` of the post, which a follower's instance fetches as it handles the announce, with no `Create` or `Announce{Create}` before it. The post's own `audience` names the group and the group announced it, so it is published in the mirror like a post the group relayed as an activity, and carries the moderators ACL that gives the group's moderators standing over it
@@ -488,10 +735,12 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
           "id" => "#{fixture("mod_lock_page.json")["id"]}/announced-only"
         })
 
-      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(lock)
-
-      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity),
+      assert {:ok, _activity} = ActivityPub.Federator.Transformer.handle_incoming(lock),
              "the group's moderator has standing over a post the group announced"
+
+      # the transformer already handed it to the adapter, so this applied it a second time
+      # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity),
+      #        "the group's moderator has standing over a post the group announced"
 
       refute Bonfire.Boundaries.can?(someone, :reply, post), "the Lock closes the thread"
     end
@@ -566,8 +815,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
         fixture("mod_remove_note.json")
         |> Map.merge(%{"object" => post_id, "audience" => community, "actor" => moderator})
 
-      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
-      Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      assert {:ok, _activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+      # the transformer already handed it to the adapter, so this applied it a second time
+      # Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
       assert {:ok, _} = Bonfire.Common.Needles.get(id(post), skip_boundary_check: true)
 
@@ -593,8 +843,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
         |> Map.drop(["summary"])
         |> Map.merge(%{"object" => removed, "audience" => community, "actor" => moderator})
 
-      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
-      Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      assert {:ok, _activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+      # the transformer already handed it to the adapter, so this applied it a second time
+      # Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
 
       assert {:ok, _} = Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true)
 
@@ -602,6 +853,53 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                by: mirror,
                current_user: reader
              )
+    end
+
+    # Our mirror knows a group's moderators from its last sync (on fetch, and on its relayed `Add`/`Remove`). A moderator added since, whose `Add` we missed, would be refused until the group is next fetched; a refusal re-syncs from the origin and tries once more, which costs a stranger nothing but a fetch, since the origin decides who moderates
+    test "a Lock from a moderator added since our last sync applies, after re-syncing the moderators",
+         %{
+           text_post: locked,
+           announced_by: community,
+           moderators_collection: moderators_collection,
+           community_moderator: moderator,
+           served: served
+         } do
+      new_moderator = "#{community |> String.split("/c/") |> List.first()}/u/new_mod"
+
+      serve(
+        served
+        |> Map.put(new_moderator, person_actor(new_moderator))
+        |> Map.put(
+          moderators_collection,
+          moderators_collection(moderators_collection, [moderator, new_moderator])
+        )
+      )
+
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      refute Enum.any?(
+               Bonfire.Classify.Categories.moderators(mirror),
+               &(Bonfire.Common.URIs.canonical_url(&1) == new_moderator)
+             ),
+             "control: the mirror has not heard of the new moderator"
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: locked)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      someone = fake_user!()
+      assert Bonfire.Boundaries.can?(someone, :reply, post), "control: the thread starts out open"
+
+      fixture("mod_lock_page.json")
+      |> Map.merge(%{
+        "object" => locked,
+        "audience" => community,
+        "actor" => new_moderator,
+        "id" => "#{fixture("mod_lock_page.json")["id"]}/new_mod"
+      })
+      |> receive_moderation()
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post),
+             "the new moderator's Lock closes the thread once the moderators are re-synced"
     end
 
     # A `Lock` closes someone's thread, so who may send one matters as much as what it does. The
@@ -622,6 +920,42 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
       assert Bonfire.Boundaries.can?(someone, :reply, post),
              "a stranger's Lock must not close a thread on this instance"
+    end
+
+    # The same rule for a removal: a moderator's `Delete` takes a post out of the group only if its actor may moderate the group HERE (`:mediate` on the mirror, which its moderators circle, synced from the group's declared moderators, holds). Being on the group's own instance is not enough for an action that takes effect (Mayel, 12 October), unlike `Add`/`Remove` of moderators, which only trigger a re-sync from the origin
+    test "a removal from an actor with no authority over the group is refused", %{
+      text_post: removed,
+      announced_by: community
+    } do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: removed)
+      reader = fake_user!()
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, pointer_id,
+               by: mirror,
+               current_user: reader
+             ),
+             "control: the post is in the group to begin with"
+
+      # an actor the mock serves, on another host than the community: neither a moderator nor same-origin
+      fixture("mod_remove_note.json")
+      |> Map.merge(%{
+        "object" => removed,
+        "audience" => community,
+        "actor" => "http://lemmy2.local/u/lemmy_alpha"
+      })
+      |> receive_moderation()
+
+      assert {:ok, _} = Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true),
+             "a stranger's removal must not delete the post"
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, pointer_id,
+               by: mirror,
+               current_user: reader
+             ),
+             "nor take it out of the group"
     end
 
     # A moderator of one community must not be able to close threads elsewhere, so naming a group
@@ -680,7 +1014,8 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       # asserting on the RETURN, not only on the effect: a refreshed actor would re-sync the list
       # too, so without this the test cannot tell whether the moderator change was handled or merely
       # coincided with something else that re-read the collection
-      assert {:ok, %Bonfire.Classify.Category{}} =
+      # (the adapter's result is the activity's `pointer`, now that it is delivered once through the transformer)
+      assert {:ok, %{pointer: %Bonfire.Classify.Category{}}} =
                fixture("mod_add_mod.json")
                |> Map.merge(%{
                  "actor" => existing_mod,
@@ -735,18 +1070,18 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
   end
 
   # ingest a moderation activity the way a delivery would: through the transformer, then the adapter
+  # delivered once, as a real delivery is: the transformer hands the activity to the adapter itself, so calling `Incoming.receive_activity/1` after it applied everything twice
   defp receive_moderation(activity) do
-    case ActivityPub.Federator.Transformer.handle_incoming(activity) do
-      {:ok, activity} -> Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
-      other -> other
-    end
+    ActivityPub.Federator.Transformer.handle_incoming(activity)
   end
 
   # A refused moderator change must not come back as a handled one. Pairs with the positive test,
   # which asserts the opposite shape: together they show the difference is the actor's standing and
   # not something upstream quietly dropping the activity.
   defp refute_handled_as_group_change(result) do
-    refute match?({:ok, %Bonfire.Classify.Category{}}, result),
+    # the adapter's result is the activity's `pointer` now that it is delivered once through the transformer; the bare shape kept too, which `Incoming.receive_activity/1` returned
+    refute match?({:ok, %Bonfire.Classify.Category{}}, result) or
+             match?({:ok, %{pointer: %Bonfire.Classify.Category{}}}, result),
            "expected the moderator change to be refused, got: #{inspect(result)}"
 
     result

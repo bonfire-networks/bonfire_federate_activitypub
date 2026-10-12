@@ -315,7 +315,7 @@ defmodule Bonfire.Federate.ActivityPub.InternationalizedHandlesTest do
 
         {:ok, activity} = ActivityPub.create(params)
 
-        assert {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+        assert {:ok, post} = {:ok, activity.pointer}
 
         assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, post,
                  current_user: recipient

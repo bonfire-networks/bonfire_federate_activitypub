@@ -131,9 +131,10 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
     end
   end
 
+  # delivered once, as a real delivery is: the transformer hands the activity to the adapter itself, so calling `Incoming.receive_activity/1` after it applied it twice
   defp receive_add(add) do
     case ActivityPub.Federator.Transformer.handle_incoming(add) do
-      {:ok, activity} -> Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      {:ok, activity} -> {:ok, activity}
       {:error, _} -> :ok
     end
   end

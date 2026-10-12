@@ -59,6 +59,32 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       )
     end
 
+    # A request can be our own bookkeeping, such as a moderator's action on a group hosted elsewhere waiting for the group to apply it, where the real activity goes out separately and the request itself must not: `skip_federation: true`
+    test "a request made with skip_federation stays on this instance" do
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, followed} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+
+      sender = fake_user!()
+
+      assert {:ok, sent} =
+               Bonfire.Social.Requests.request(sender, Bonfire.Data.Social.Follow, followed)
+
+      assert {:ok, _} = ActivityPub.Object.get_cached(pointer: id(sent)),
+             "control: a request to someone on another instance federates"
+
+      keeper = fake_user!()
+
+      assert {:ok, kept} =
+               Bonfire.Social.Requests.request(keeper, Bonfire.Data.Social.Follow, followed,
+                 skip_federation: true
+               )
+
+      assert Bonfire.Social.Requests.requested?(keeper, Bonfire.Data.Social.Follow, followed)
+
+      refute match?({:ok, _}, ActivityPub.Object.get_cached(pointer: id(kept))),
+             "nothing was sent for it"
+    end
+
     test "outgoing follow makes requests" do
       # debug(self(), "toppid")
       follower = fake_user!()

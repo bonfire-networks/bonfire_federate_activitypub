@@ -83,6 +83,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
 
       {:ok, activity} = ActivityPub.create(params)
 
+      # the ONLY application here: these params leave `local` at its default (true), so `ActivityPub.create/1` stored it as ours and skipped the adapter
       assert {:ok, %Bonfire.Data.Social.Message{} = message} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
     end
@@ -102,7 +103,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
       assert params.object["content"] == activity.object.data["content"]
 
       assert {:ok, %Bonfire.Data.Social.Message{} = message} =
-               Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+               {:ok, activity.pointer}
                |> repo().maybe_preload(:post_content)
 
       assert message.post_content.html_body =~ params.object["content"]

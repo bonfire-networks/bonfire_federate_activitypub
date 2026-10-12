@@ -2333,6 +2333,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  # an activity about the group itself, such as a ban from it, is relayed by that group
+  defp group_actor_of(%{__struct__: Bonfire.Classify.Category, type: :group} = group),
+    do: ActivityPub.Actor.get_cached(pointer: group)
+
   defp group_actor_of(object) do
     case maybe_apply(Bonfire.Classify.Categories, :group_of_object, [object],
            fallback_return: nil

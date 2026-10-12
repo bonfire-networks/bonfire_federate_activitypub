@@ -254,7 +254,7 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
           additional: %{"cc" => [recipient_actor.ap_id]}
         })
 
-      assert {:ok, received} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+      assert {:ok, received} = {:ok, activity.pointer}
 
       assert [_ | _] = Boundaries.users_grants_on([recipient], [received], [:see, :read])
 

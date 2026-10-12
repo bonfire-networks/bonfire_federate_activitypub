@@ -202,6 +202,165 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
              ActivityPub.Object.get_existing_announce(group_ap_id(group), delete)
   end
 
+  # A ban (`Blocks.block/3` with `on_behalf_of: group`) is applied here, and federates only when the moderator ticks the box (`also_unfollow_and_notify`, as for a personal block). Then it goes out as Lemmy's ban (`block_user.json`): the MODERATOR's `Block` of the person, `to` Public, `cc` and `target` and `audience` the group, the reason in `summary`, relayed by the group to its followers. Unlike a personal block, a silence federates too (it is Lemmy's ban), and so does a ban of someone local (the group's followers elsewhere need it)
+  describe "banning someone from a group we host" do
+    setup do
+      moderator = fake_user!()
+      group = public_group(moderator)
+      person = fake_user!()
+      {:ok, %{ap_id: moderator_ap_id}} = ActivityPub.Actor.get_cached(pointer: moderator)
+      {:ok, %{ap_id: person_ap_id}} = ActivityPub.Actor.get_cached(pointer: person)
+
+      sent_by_moderator = fn type ->
+        Bonfire.Common.Repo.all(ActivityPub.Object)
+        |> Enum.filter(&(&1.data["type"] == type and &1.data["actor"] == moderator_ap_id))
+      end
+
+      {:ok,
+       moderator: moderator,
+       group: group,
+       person: person,
+       person_ap_id: person_ap_id,
+       sent: sent_by_moderator}
+    end
+
+    # a block is both halves, and still ONE `Block` (each half alone would send one)
+    for type <- [:silence, :ghost, :block] do
+      test "a #{type} with the box ticked sends the moderator's Block naming the group, which the group relays",
+           %{
+             moderator: moderator,
+             group: group,
+             person: person,
+             person_ap_id: person_ap_id,
+             sent: sent
+           } do
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.block(person, unquote(type),
+                   current_user: moderator,
+                   on_behalf_of: group,
+                   also_unfollow_and_notify: true,
+                   reason: "spam post"
+                 )
+
+        assert [%{data: block} = activity] = sent.("Block")
+        assert block["object"] == person_ap_id, "of the person, local here"
+        assert block["target"] == group_ap_id(group)
+        assert block["audience"] == group_ap_id(group)
+        assert block["summary"] == "spam post"
+        assert "https://www.w3.org/ns/activitystreams#Public" in List.wrap(block["to"])
+        assert group_ap_id(group) in List.wrap(block["cc"])
+
+        assert %{data: %{"type" => "Announce"}} =
+                 ActivityPub.Object.get_existing_announce(group_ap_id(group), activity),
+               "the group relays it to its followers"
+      end
+    end
+
+    test "with no reason given, it says a moderator banned them", %{
+      moderator: moderator,
+      group: group,
+      person: person,
+      sent: sent
+    } do
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [%{data: %{"summary" => "Banned by a moderator"}}] = sent.("Block")
+    end
+
+    test "without the box, nothing leaves the instance", %{
+      moderator: moderator,
+      group: group,
+      person: person,
+      sent: sent
+    } do
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group
+               )
+
+      assert sent.("Block") == []
+
+      # the control, so the silence above means the box and not a ban that can't federate at all: the same ban of someone else, with the box, does go out
+      other = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(other, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [_] = sent.("Block"), "control: with the box, it goes out"
+    end
+
+    test "unbanning sends the moderator's Undo of it, addressed as the ban was", %{
+      moderator: moderator,
+      group: group,
+      person: person,
+      sent: sent
+    } do
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [%{data: %{"id" => block_id}}] = sent.("Block")
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.unblock(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group
+               )
+
+      assert [%{data: undo}] =
+               Enum.filter(sent.("Undo"), &(e(&1.data, "object", "id", nil) == block_id))
+
+      assert group_ap_id(group) in List.wrap(undo["cc"])
+    end
+
+    # what the group's own boundaries say about federating still decides it: a group that doesn't federate sends no ban either
+    test "a group that doesn't federate sends nothing", %{
+      moderator: moderator,
+      group: group,
+      person: person,
+      sent: sent
+    } do
+      local_group =
+        Simulate.fake_group!(moderator, %{
+          membership: "open",
+          visibility: "nonfederated",
+          participation: "anyone"
+        })
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: local_group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert sent.("Block") == []
+
+      # the control, so the silence above means the group's boundaries and not a ban that can't federate at all: the same ban, from a group that federates, does go out
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [_] = sent.("Block"), "control: from a federating group, it goes out"
+    end
+  end
+
   # A like reaches the post's author and the group, and nobody else: followers' instances only count a vote the group relays, as Lemmy, PieFed, Mbin and NodeBB all do. Without it a post's count on their copy of the group is only their own users' votes
   describe "the group relays votes on a post published in it" do
     setup do
@@ -268,6 +427,129 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
       assert %{data: %{"type" => "Announce"}} =
                ActivityPub.Object.get_existing_announce(group_ap_id(group), activity)
+    end
+  end
+
+  # A moderator of one of our groups who is on another instance locks a post in it: their `Lock` comes to the group's inbox, is applied here, and the group passes it on, unchanged, to its followers, as Lemmy's communities do (`RawAnnouncableActivities::receive` → `AnnounceActivity::send(self, …)`). That relay is also how the moderator's own instance learns the group applied it
+  describe "the group relays what a moderator on another instance did in it" do
+    setup do
+      mock(fn
+        %{method: :get, url: @remote_actor} -> json(APSimulate.actor_json(@remote_actor))
+        %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+        _ -> %Tesla.Env{status: 404, body: ""}
+      end)
+
+      creator = fake_user!()
+      group = public_group(creator)
+      author = fake_user!()
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(author, group)
+      post = post_in_group(author, group, "<p>a member's post a remote moderator acts on</p>")
+      assert {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, remote_moderator} = Bonfire.Me.Users.by_ap_id(@remote_actor)
+
+      # someone on another instance is promoted only once they are a member, which their own Follow makes them
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Follow",
+                 "id" => "#{@remote_actor}/follows/group",
+                 "actor" => @remote_actor,
+                 "object" => group_ap_id(group)
+               })
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.add_moderator(creator, group, remote_moderator)
+
+      {:ok, group: group, post: post, ap_post: ap_post}
+    end
+
+    test "a Lock", %{group: group, post: post, ap_post: ap_post} do
+      someone = fake_user!()
+      assert Bonfire.Boundaries.can?(someone, :reply, post), "control: the thread starts out open"
+
+      lock = %{
+        "type" => "Lock",
+        "id" => "#{@remote_actor}/locks/group-post",
+        "actor" => @remote_actor,
+        "object" => ap_post.data["id"],
+        "summary" => "off topic",
+        "audience" => group_ap_id(group),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [group_ap_id(group)]
+      }
+
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(lock)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post),
+             "control: the remote moderator's Lock was applied here"
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id(group), activity),
+             "the group relays it"
+    end
+
+    # Lemmy's ban (`block_user.json`): the moderator's `Block` of the person with `target` the group
+    test "a ban", %{group: group, post: post} do
+      banned = fake_user!()
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(banned, group)
+      {:ok, %{ap_id: banned_ap_id}} = ActivityPub.Actor.get_cached(pointer: banned)
+      assert Bonfire.Boundaries.can?(banned, :reply, post), "control: they may reply before"
+
+      ban = %{
+        "type" => "Block",
+        "id" => "#{@remote_actor}/blocks/group-member",
+        "actor" => @remote_actor,
+        "object" => banned_ap_id,
+        "target" => group_ap_id(group),
+        "summary" => "spam",
+        "audience" => group_ap_id(group),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [group_ap_id(group)]
+      }
+
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(ban)
+
+      refute Bonfire.Boundaries.can?(banned, :reply, post),
+             "control: the remote moderator's ban was applied here"
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id(group), activity),
+             "the group relays it"
+    end
+
+    # the threadiverse's mod "remove" (`mod_remove_note.json`): the moderator's `Delete` of the post, a removal by its `summary`
+    test "a removal", %{group: group, post: post, ap_post: ap_post} do
+      reader = fake_user!()
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: group,
+               current_user: reader
+             ),
+             "control: the post is in the group to begin with"
+
+      remove = %{
+        "type" => "Delete",
+        "id" => "#{@remote_actor}/deletes/group-post",
+        "actor" => @remote_actor,
+        "object" => ap_post.data["id"],
+        "summary" => "spam",
+        "audience" => group_ap_id(group),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [group_ap_id(group)]
+      }
+
+      assert {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+               by: group,
+               current_user: reader
+             ),
+             "control: the remote moderator's removal was applied here"
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id(group), activity),
+             "the group relays it"
     end
   end
 
