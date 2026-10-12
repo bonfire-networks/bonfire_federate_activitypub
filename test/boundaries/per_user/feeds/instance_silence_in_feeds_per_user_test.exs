@@ -25,6 +25,57 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.SilenceFeedsPerUserTest do
   #   assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, local_user)
   # end
 
+  # `assert Blocks.block(…)` alone passes on `{:error, _}` too, since an error tuple is truthy, so these pin the SHAPE
+  test "silencing an instance reports success" do
+    local_user = fake_user!()
+    assert {:ok, instance} = Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
+
+    assert {:ok, _} = Bonfire.Boundaries.Blocks.block(instance, :silence, current_user: local_user)
+
+    assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
+             current_user: local_user
+           )
+  end
+
+  test "ghosting an instance reports success, and takes effect" do
+    local_user = fake_user!()
+    assert {:ok, instance} = Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
+
+    assert {:ok, _} = Bonfire.Boundaries.Blocks.block(instance, :ghost, current_user: local_user)
+
+    assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :ghost,
+             current_user: local_user
+           )
+  end
+
+  # a block with no type is both a ghost and a silence, which do opposite-facing jobs: success has to mean BOTH took effect, not whichever finished first
+  test "a block of an instance with no type reports success only when both halves applied" do
+    local_user = fake_user!()
+    assert {:ok, instance} = Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
+
+    case Bonfire.Boundaries.Blocks.block(instance, nil, current_user: local_user) do
+      {:ok, _} ->
+        assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :ghost,
+                 current_user: local_user
+               ),
+               "reported success, so the ghost half applied"
+
+        assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
+                 current_user: local_user
+               ),
+               "reported success, so the silence half applied"
+
+      {:error, _} ->
+        refute Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :silence,
+                 current_user: local_user
+               ) and
+                 Bonfire.Federate.ActivityPub.Instances.instance_blocked?(instance, :ghost,
+                   current_user: local_user
+                 ),
+               "reported failure, so at least one half did not apply"
+    end
+  end
+
   test "does not show in my_feed an incoming Note from a per-user silenced instance (from an actor I am not following)" do
     local_user = fake_user!(@local_actor)
 
