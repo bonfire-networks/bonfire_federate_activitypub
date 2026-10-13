@@ -2357,7 +2357,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   The threadiverse's mod "remove", which Lemmy applies as taking the post out of the community. The object is NOT deleted here (`keep_object: true`): it was removed from the group, and stays on its author's profile.
   """
-  def publish_moderator_delete(moderator, object, reason \\ nil) do
+  def publish_moderator_delete(moderator, object, reason \\ nil, opts \\ []) do
     with {:ok, %{ap_id: moderator_ap_id}} <- ActivityPub.Actor.get_cached(pointer: moderator),
          {:ok, ap_object} <- ActivityPub.Object.get_cached(pointer: object),
          {:ok, activity} <-
@@ -2366,7 +2366,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              subject: moderator_ap_id,
              # `hide`: the moderation log's verb for taking a post out of a group
              summary: Bonfire.Social.Moderations.summary(reason, :hide),
-             audience: maybe_determine_audience(object)
+             audience: maybe_determine_audience(object),
+             # its moderation record, so the group's echo of it is known as ours and finds it
+             pointer: opts[:pointer]
            ) do
       maybe_group_relays(object, activity)
       {:ok, activity}

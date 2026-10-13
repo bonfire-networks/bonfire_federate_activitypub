@@ -1069,7 +1069,335 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
     end
   end
 
-  # ingest a moderation activity the way a delivery would: through the transformer, then the adapter
+  # One of OUR users whom the community lists as a moderator acts on it: the real activity goes to the community, which applies it and announces it to its followers, us included, and that echo is what applies it here. Until then it is pending: the moderation record is written, with a request on it (`Requests`, kept on this instance), which the echo (or an `Accept`) accepts and a `Reject` refuses
+  describe "a moderator here of a community elsewhere" do
+    setup %{
+      text_post: post_ap,
+      announced_by: community,
+      community_moderator: moderator,
+      moderators_collection: collection,
+      served: served
+    } do
+      local_moderator = fake_user!()
+      {:ok, %{ap_id: local_moderator_ap_id}} = ActivityPub.Actor.get_cached(pointer: local_moderator)
+
+      serve(
+        Map.put(
+          served,
+          collection,
+          moderators_collection(collection, [moderator, local_moderator_ap_id])
+        )
+      )
+
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      assert {:ok, _} = Bonfire.Classify.Categories.sync_remote_moderators(mirror, collection)
+
+      assert Bonfire.Boundaries.can?(local_moderator, :mediate, mirror),
+             "control: listed by the community, so a moderator of our mirror"
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: post_ap)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      # what our moderator sent, of a type
+      sent = fn type ->
+        Bonfire.Common.Repo.all(ActivityPub.Object)
+        |> Enum.filter(
+          &(&1.local and &1.data["type"] == type and &1.data["actor"] == local_moderator_ap_id)
+        )
+      end
+
+      # the community's echo of one of them
+      echo = fn %{data: data} ->
+        ActivityPub.Federator.Transformer.handle_incoming(%{
+          "type" => "Announce",
+          "id" => "#{community}/activities/announce/#{System.unique_integer([:positive])}",
+          "actor" => community,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["#{community}/followers"],
+          "object" => data
+        })
+      end
+
+      # the request on a record, kept here while the community hasn't applied it
+      request = fn verb, record ->
+        Bonfire.Social.Requests.get(
+          local_moderator,
+          Bonfire.Boundaries.Verbs.get_id!(verb),
+          record,
+          skip_boundary_check: true
+        )
+      end
+
+      {:ok,
+       local_moderator: local_moderator,
+       mirror: mirror,
+       post: post,
+       sent: sent,
+       echo: echo,
+       request: request}
+    end
+
+    test "locking a post sends the Lock and waits for the community", %{
+      local_moderator: local_moderator,
+      post: post,
+      sent: sent,
+      request: request
+    } do
+      someone = fake_user!()
+
+      assert {:ok, record} = Bonfire.Boundaries.Blocks.lock(post, current_user: local_moderator)
+
+      assert [lock] = sent.("Lock"), "the real activity goes out"
+      assert lock.pointer_id == id(record), "pointing at its record"
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post),
+             "nothing applied here before the community has"
+
+      assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:lock, record),
+             "pending"
+    end
+
+    test "the community's echo of the Lock applies it", %{
+      local_moderator: local_moderator,
+      post: post,
+      sent: sent,
+      echo: echo,
+      request: request
+    } do
+      someone = fake_user!()
+      {:ok, record} = Bonfire.Boundaries.Blocks.lock(post, current_user: local_moderator)
+      [lock] = sent.("Lock")
+
+      assert {:ok, _} = echo.(lock)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post), "applied once the community did"
+      assert {:ok, %{accepted_at: %DateTime{}}} = request.(:lock, record)
+    end
+
+    test "a Reject of the Lock leaves the thread open, and the request refused", %{
+      local_moderator: local_moderator,
+      announced_by: community,
+      post: post,
+      sent: sent,
+      request: request
+    } do
+      someone = fake_user!()
+      {:ok, record} = Bonfire.Boundaries.Blocks.lock(post, current_user: local_moderator)
+      [lock] = sent.("Lock")
+
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Reject",
+                 "id" => "#{community}/activities/reject/#{System.unique_integer([:positive])}",
+                 "actor" => community,
+                 "to" => [lock.data["actor"]],
+                 "object" => lock.data
+               })
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post)
+      assert {:ok, %{accepted_at: nil, ignored_at: %DateTime{}}} = request.(:lock, record)
+    end
+
+    # the moderator may ask for it here at once as well (a checkbox in the confirmation; config says the default): a Reject then undoes it here
+    test "applied now, a Lock closes the thread at once, and a Reject reopens it", %{
+      local_moderator: local_moderator,
+      announced_by: community,
+      post: post,
+      sent: sent,
+      request: request
+    } do
+      someone = fake_user!()
+
+      {:ok, record} =
+        Bonfire.Boundaries.Blocks.lock(post, current_user: local_moderator, apply_now: true)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post), "closed at once"
+      assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:lock, record), "still pending"
+
+      [lock] = sent.("Lock")
+
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Reject",
+                 "id" => "#{community}/activities/reject/#{System.unique_integer([:positive])}",
+                 "actor" => community,
+                 "to" => [lock.data["actor"]],
+                 "object" => lock.data
+               })
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post), "reopened, as the group refused it"
+      assert {:ok, %{ignored_at: %DateTime{}}} = request.(:lock, record)
+    end
+
+    # whether our side counts someone as moderating the community there is `:mediate` on our mirror of it, which its moderators circle grants. An instance admin here, not listed by the community, locks our own copy only: the community would refuse it from them
+    test "an instance admin locking a post in the community locks our copy, and sends nothing", %{
+      post: post,
+      sent: sent
+    } do
+      admin = Bonfire.UI.Common.Testing.Helpers.fake_admin!()
+      someone = fake_user!()
+
+      assert {:ok, _} = Bonfire.Boundaries.Blocks.lock(post, current_user: admin)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post), "locked here, at once"
+
+      {:ok, %{ap_id: admin_ap_id}} = ActivityPub.Actor.get_cached(pointer: admin)
+
+      assert Bonfire.Common.Repo.all(ActivityPub.Object)
+             |> Enum.filter(&(&1.data["type"] == "Lock" and &1.data["actor"] == admin_ap_id)) ==
+               [],
+             "nothing sent to the community"
+
+      assert [] = sent.("Lock"), "nor by the community's moderator here"
+    end
+
+    test "a ban sends the community's ban, applied once the community echoes it", %{
+      local_moderator: local_moderator,
+      mirror: mirror,
+      post: post,
+      sent: sent,
+      echo: echo
+    } do
+      banned = fake_user!()
+      assert Bonfire.Boundaries.can?(banned, :reply, post), "control: they may reply before"
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(banned, :silence,
+                 current_user: local_moderator,
+                 on_behalf_of: mirror,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [ban] = sent.("Block")
+      {:ok, %{ap_id: mirror_ap_id}} = ActivityPub.Actor.get_cached(pointer: mirror)
+      assert ActivityPub.Object.get_ap_id(ban.data["target"]) == mirror_ap_id
+
+      assert Bonfire.Boundaries.can?(banned, :reply, post), "not yet"
+
+      assert {:ok, _} = echo.(ban)
+      refute Bonfire.Boundaries.can?(banned, :reply, post), "once the community did"
+    end
+
+    # a community refusing what our moderator did: nothing is applied here (or, applied at once, it is undone), and the request says it was refused
+    for apply_now <- [false, true] do
+      test "a Reject of the ban #{if apply_now, do: "lifts it, applied at once", else: "leaves them taking part"}, and refuses the request",
+           %{
+             local_moderator: local_moderator,
+             mirror: mirror,
+             announced_by: community,
+             post: post,
+             sent: sent,
+             request: request
+           } do
+        banned = fake_user!()
+
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.block(banned, :silence,
+                   current_user: local_moderator,
+                   on_behalf_of: mirror,
+                   apply_now: unquote(apply_now)
+                 )
+
+        assert Bonfire.Boundaries.can?(banned, :reply, post) == not unquote(apply_now),
+               "control: applied at once only when asked"
+
+        [ban] = sent.("Block")
+        {:ok, record} = Bonfire.Social.Moderations.record_of(ban)
+
+        assert {:ok, _} =
+                 ActivityPub.Federator.Transformer.handle_incoming(%{
+                   "type" => "Reject",
+                   "id" => "#{community}/activities/reject/#{System.unique_integer([:positive])}",
+                   "actor" => community,
+                   "to" => [ban.data["actor"]],
+                   "object" => ban.data
+                 })
+
+        assert Bonfire.Boundaries.can?(banned, :reply, post), "taking part, as the community refused it"
+        assert {:ok, %{ignored_at: %DateTime{}}} = request.(:silence, record)
+      end
+
+      test "a Reject of the removal #{if apply_now, do: "puts the post back, removed at once", else: "leaves the post in the group"}, and refuses the request",
+           %{
+             local_moderator: local_moderator,
+             mirror: mirror,
+             announced_by: community,
+             post: post,
+             sent: sent,
+             request: request
+           } do
+        reader = fake_user!()
+
+        in_group? = fn ->
+          Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+            by: mirror,
+            current_user: reader
+          )
+        end
+
+        assert in_group?.(), "control: the post is in the group to begin with"
+
+        assert {:ok, _} =
+                 Bonfire.Classify.Categories.remove_post_from_group(local_moderator, mirror, post,
+                   apply_now: unquote(apply_now)
+                 )
+
+        # (`feed_contains?/3` returns the activity it found, so compared as a boolean)
+        assert !!in_group?.() == not unquote(apply_now), "control: removed at once only when asked"
+
+        [delete] = sent.("Delete")
+        {:ok, record} = Bonfire.Social.Moderations.record_of(delete)
+
+        assert {:ok, _} =
+                 ActivityPub.Federator.Transformer.handle_incoming(%{
+                   "type" => "Reject",
+                   "id" => "#{community}/activities/reject/#{System.unique_integer([:positive])}",
+                   "actor" => community,
+                   "to" => [delete.data["actor"]],
+                   "object" => delete.data
+                 })
+
+        assert in_group?.(), "in the group, as the community refused it"
+        assert {:ok, %{ignored_at: %DateTime{}}} = request.(:hide, record)
+      end
+    end
+
+    test "a removal sends the moderator's Delete, applied once the community echoes it", %{
+      local_moderator: local_moderator,
+      mirror: mirror,
+      post: post,
+      sent: sent,
+      echo: echo
+    } do
+      reader = fake_user!()
+
+      in_group? = fn ->
+        Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+          by: mirror,
+          current_user: reader
+        )
+      end
+
+      assert in_group?.(), "control: the post is in the group"
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.remove_post_from_group(local_moderator, mirror, post)
+
+      assert [delete] = sent.("Delete")
+      assert is_binary(delete.data["summary"]), "a removal, marked by its reason"
+
+      assert in_group?.(), "not yet"
+
+      assert {:ok, _} = echo.(delete)
+      refute in_group?.(), "once the community did"
+
+      assert {:ok, _} = Bonfire.Common.Needles.get(id(post), skip_boundary_check: true),
+             "removed from the group, not deleted"
+    end
+  end
+
   # delivered once, as a real delivery is: the transformer hands the activity to the adapter itself, so calling `Incoming.receive_activity/1` after it applied everything twice
   defp receive_moderation(activity) do
     ActivityPub.Federator.Transformer.handle_incoming(activity)
