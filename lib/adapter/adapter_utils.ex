@@ -1196,8 +1196,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_by_url_ap_id_or_username(q, opts \\ [])
 
-  def get_by_url_ap_id_or_username("@" <> username, opts),
-    do: get_or_fetch_and_create_by_username(username, opts)
+  # a handle with any of the prefixes one is typed with: `@` for a person, `!`, `&` or `+` for a group, as everywhere that reads one
+  def get_by_url_ap_id_or_username(<<prefix::utf8, username::binary>>, opts)
+      when prefix in ~c"@!&+",
+      do: get_or_fetch_and_create_by_username(username, opts)
 
   def get_by_url_ap_id_or_username("http:" <> _ = url, opts),
     do: get_or_fetch_and_create_by_uri(url, opts)
