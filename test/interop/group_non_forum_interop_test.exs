@@ -52,8 +52,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupNonForumInteropTest do
 
     assert {:ok, channel} = Adapter.maybe_create_remote_actor(%{"id" => @channel})
 
-    assert %Bonfire.Classify.Category{type: :group} = channel,
-           "it declares `Group`, so it becomes one: what differs is the affordances, not the type"
+    # was `type: :group`, "it declares `Group`, so it becomes one: what differs is the affordances, not the type"; reversed 13 October (Mayel: "postRestrictedToMods" → topic), since nobody but its owner can post or join there
+    assert %Bonfire.Classify.Category{type: :topic} = channel,
+           "a channel only its owner publishes in is mirrored as a topic"
 
     assert Bonfire.Boundaries.Presets.group_dimension_slugs(channel)[:participation] ==
              "moderators",

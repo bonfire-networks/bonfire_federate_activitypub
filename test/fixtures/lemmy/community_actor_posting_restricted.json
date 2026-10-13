@@ -1,0 +1,38 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "type": "Group",
+  "id": "https://lemmy.local/c/announcements",
+  "preferredUsername": "announcements",
+  "inbox": "https://lemmy.local/c/announcements/inbox",
+  "followers": "https://lemmy.local/c/announcements/followers",
+  "publicKey": {
+    "id": "https://lemmy.local/c/announcements#main-key",
+    "owner": "https://lemmy.local/c/announcements",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy7e413IIvjPvDLODjMPQ\nXYtZu59vWfAKw9MGx5z4HN5DeH06BpWtgFb0cX7t79l9BUnhJn4lA9RZEGGrUW5K\nI9mejhnxqNz0q6NGqsIPI63/c7zfVhRl+gTLxjQiMJZAyP4NQ3eEKw7LtBcQ6hlv\nFwV76ybn/UA2guykoSuE1qtv+tX8I1Q1o79cIef5R0NB4Zq3I0A5gq6XC3Vbvig0\nl7twWahUIDiD73nQ/0dIdn28PDExaINpW3Gk/zgeyCVJdPlH3PZRdIzzrDyWm3d6\nmOQJJ/nGzcw1vrlCpyB4Fx4MidgcZb68wJGbUhHh0hu0aYXk/Tnqx5DqIBlSRaAy\n6QIDAQAB\n-----END PUBLIC KEY-----\n"
+  },
+  "name": "announcements ",
+  "summary": "<p>See !lemmyworld</p>\n",
+  "source": {
+    "content": "See !lemmyworld",
+    "mediaType": "text/markdown"
+  },
+  "sensitive": false,
+  "attributedTo": "https://lemmy.local/c/announcements/moderators",
+  "postingRestrictedToMods": true,
+  "outbox": "https://lemmy.local/c/announcements/outbox",
+  "endpoints": {
+    "sharedInbox": "https://lemmy.local/inbox"
+  },
+  "featured": "https://lemmy.local/c/announcements/featured",
+  "language": [
+    {
+      "identifier": "en",
+      "name": "English"
+    }
+  ],
+  "published": "2023-06-18T05:51:13.774084Z",
+  "updated": "2024-12-19T20:26:39.317410Z"
+}

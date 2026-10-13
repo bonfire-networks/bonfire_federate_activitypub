@@ -435,7 +435,10 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       # who may start threads: the threadiverse's `lemmy:` term, which PeerTube emits too
       posting_restricted_to_mods: data["postingRestrictedToMods"] == true,
       # whether it's listed: Lemmy 1.0 sends `false` for an Unlisted community, which "doesn't appear in community list"
-      discoverable: data["discoverable"]
+      discoverable: data["discoverable"],
+      # what kind of category it is (`Bonfire.Classify.Categories.remote_type/1`): a membership collection (Bonfire, Mobilizon, Smithereen), and FEP-9b2b's `broader`, the group a topic or subgroup is in
+      members: ActivityPub.Object.get_ap_id(data["members"]),
+      broader: ActivityPub.Object.get_ap_id(data["broader"])
     }
   end
 

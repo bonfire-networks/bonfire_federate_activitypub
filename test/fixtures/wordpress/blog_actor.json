@@ -1,0 +1,226 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://w3id.org/security/v1",
+        "https://purl.archive.org/socialweb/webfinger",
+        "https://purl.archive.org/miscellany",
+        {
+            "schema": "http://schema.org#",
+            "toot": "http://joinmastodon.org/ns#",
+            "lemmy": "https://join-lemmy.org/ns#",
+            "litepub": "http://litepub.social/ns#",
+            "gts": "https://gotosocial.org/ns#",
+            "PropertyValue": "schema:PropertyValue",
+            "value": "schema:value",
+            "featured": {
+                "@id": "toot:featured",
+                "@type": "@id"
+            },
+            "featuredTags": {
+                "@id": "toot:featuredTags",
+                "@type": "@id"
+            },
+            "moderators": {
+                "@id": "lemmy:moderators",
+                "@type": "@id"
+            },
+            "alsoKnownAs": {
+                "@id": "as:alsoKnownAs",
+                "@type": "@id"
+            },
+            "attributionDomains": {
+                "@id": "toot:attributionDomains",
+                "@type": "@id"
+            },
+            "implements": {
+                "@id": "https://w3id.org/fep/844e/implements",
+                "@type": "@id",
+                "@container": "@list"
+            },
+            "interactionPolicy": {
+                "@id": "gts:interactionPolicy",
+                "@type": "@id"
+            },
+            "canFeature": {
+                "@id": "https://w3id.org/fep/7aa9#canFeature",
+                "@type": "@id"
+            },
+            "automaticApproval": {
+                "@id": "gts:automaticApproval",
+                "@type": "@id"
+            },
+            "postingRestrictedToMods": "lemmy:postingRestrictedToMods",
+            "discoverable": "toot:discoverable",
+            "indexable": "toot:indexable",
+            "invisible": "litepub:invisible"
+        }
+    ],
+    "id": "https://wordpress.local/@wordpress.local",
+    "type": "Group",
+    "attachment": [
+        {
+            "type": "PropertyValue",
+            "name": "About",
+            "value": "<p><a href=\"https://wordpress.local/about/wordpress.local/\">wordpress.local/about/wordpress.local</a></p>"
+        },
+        {
+            "type": "Link",
+            "name": "About",
+            "href": "https://wordpress.local/about/wordpress.local/"
+        },
+        {
+            "type": "PropertyValue",
+            "name": "Powered by",
+            "value": "<p>WordPress ❤️</p>"
+        },
+        {
+            "type": "Note",
+            "name": "Powered by",
+            "content": "<p>WordPress ❤️</p>"
+        },
+        {
+            "type": "PropertyValue",
+            "name": "Tags",
+            "value": "<p>#longform #wordpress #fediblog #indieweb #fediverse #fedi22</p>"
+        },
+        {
+            "type": "Note",
+            "name": "Tags",
+            "content": "<p>#longform #wordpress #fediblog #indieweb #fediverse #fedi22</p>"
+        },
+        {
+            "type": "PropertyValue",
+            "name": "Blog",
+            "value": "<p><a rel=\"me noopener\" title=\"https://wordpress.local/\" href=\"https://wordpress.local/\">wordpress.local</a></p>"
+        },
+        {
+            "type": "Link",
+            "name": "Blog",
+            "href": "https://wordpress.local/",
+            "rel": [
+                "me",
+                "noopener"
+            ]
+        }
+    ],
+    "attributedTo": "https://wordpress.local/wp-api/activitypub/1.0/collections/moderators",
+    "name": "notizBlog",
+    "generator": {
+        "type": "Application",
+        "implements": [
+            {
+                "href": "https://datatracker.ietf.org/doc/html/rfc9421",
+                "name": "RFC-9421: HTTP Message Signatures"
+            }
+        ]
+    },
+    "icon": {
+        "type": "Image",
+        "url": "https://wordpress.local/wp-content/uploads/2019/10/cropped-notizblog-icon-1.png"
+    },
+    "image": {
+        "type": "Image",
+        "url": "https://wordpress.local/wp-content/uploads/2023/04/cropped-IMG_0814-scaled-1.jpg"
+    },
+    "published": "2007-01-15T09:22:46Z",
+    "summary": "<p>a weblog mainly about the open, portable, interoperable, small, social, synaptic, semantic, structured, distributed, (re-)decentralized, independent, microformatted and federated social web</p>\n",
+    "tag": [
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/fediblog/",
+            "name": "#FediBlog"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/microformats/",
+            "name": "#Microformats"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/openid/",
+            "name": "#OpenID"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/wordpress/",
+            "name": "#WordPress"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/mikroformate/",
+            "name": "#Mikroformate"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/hcard/",
+            "name": "#hCard"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/dataportability/",
+            "name": "#DataPortability"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/indieweb/",
+            "name": "#IndieWeb"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/google/",
+            "name": "#Google"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://wordpress.local/tag/rdfa/",
+            "name": "#RDFa"
+        }
+    ],
+    "url": "https://wordpress.local",
+    "interactionPolicy": {
+        "canFeature": {
+            "automaticApproval": [
+                "https://www.w3.org/ns/activitystreams#Public"
+            ]
+        }
+    },
+    "inbox": "https://wordpress.local/wp-api/activitypub/1.0/actors/0/inbox",
+    "outbox": "https://wordpress.local/wp-api/activitypub/1.0/actors/0/outbox",
+    "following": "https://wordpress.local/wp-api/activitypub/1.0/actors/0/following",
+    "followers": "https://wordpress.local/wp-api/activitypub/1.0/actors/0/followers",
+    "liked": "https://wordpress.local/wp-api/activitypub/1.0/actors/0/liked",
+    "streams": [],
+    "preferredUsername": "wordpress.local",
+    "endpoints": {
+        "sharedInbox": "https://wordpress.local/wp-api/activitypub/1.0/inbox",
+        "oauthAuthorizationEndpoint": "https://wordpress.local/wp-api/activitypub/1.0/oauth/authorize",
+        "oauthTokenEndpoint": "https://wordpress.local/wp-api/activitypub/1.0/oauth/token",
+        "oauthRegistrationEndpoint": "https://wordpress.local/wp-api/activitypub/1.0/oauth/clients",
+        "proxyUrl": "https://wordpress.local/wp-api/activitypub/1.0/proxy",
+        "proxyEventStream": "https://wordpress.local/wp-api/activitypub/1.0/proxy/stream",
+        "actorAutocomplete": "https://wordpress.local/wp-api/activitypub/1.0/actors/autocomplete?q={q}"
+    },
+    "publicKey": {
+        "id": "https://wordpress.local/@wordpress.local#main-key",
+        "owner": "https://wordpress.local/@wordpress.local",
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\r\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA12njJ+Y3H4b8LF4iBoPo\r\n3Z956cSyHFEg0VcKF4YHIgsIeWJSFsZ6Qr+UtzASJfR26bHMyw1WwL7GK+eI9BnM\r\nXZ0renBHdQDJhGd2Gy+JzGl6YBICQYMkZS1DEfpmtT+Es5eJDLucRfrdMiXlertw\r\nEgen/39kafSh3sHfXj3CT3uGRZCS2EA47aKPao+UjfNWZH49o/WCgSKU6gDdZkeL\r\nxpo/gxRh3RhfiYqwgrkBOHYx5x6NspkJZUSlVV72kMisTtrfcuBHFppJk1DPWVT4\r\nRGYI36xYIKiFxVNg30rNXyy+DAaTL32xBqIhmfymiBnRshJju4ODEZ8s7fe1Jqa9\r\n7wIDAQAB\r\n-----END PUBLIC KEY-----"
+    },
+    "manuallyApprovesFollowers": false,
+    "attributionDomains": [
+        "wordpress.local"
+    ],
+    "alsoKnownAs": [
+        "https://wordpress.local/?author=0",
+        "https://wordpress.local",
+        "https://wordpress.local/",
+        "https://seafoam.local/pfefferle",
+        "https://seafoam.local/users/pfefferle"
+    ],
+    "featured": "https://wordpress.local/wp-api/activitypub/1.0/actors/0/collections/featured",
+    "featuredTags": "https://wordpress.local/wp-api/activitypub/1.0/actors/0/collections/tags",
+    "discoverable": true,
+    "indexable": true,
+    "webfinger": "wordpress.local@wordpress.local",
+    "moderators": "https://wordpress.local/wp-api/activitypub/1.0/collections/moderators",
+    "postingRestrictedToMods": true
+}

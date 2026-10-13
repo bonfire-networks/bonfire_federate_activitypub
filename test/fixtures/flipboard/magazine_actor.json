@@ -1,0 +1,109 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://w3id.org/security/v1",
+        {
+            "Hashtag": "as:Hashtag",
+            "toot": "http://joinmastodon.org/ns#",
+            "discoverable": "toot:discoverable",
+            "indexable": "toot:indexable",
+            "gts": "https://gotosocial.org/ns#",
+            "quoteAuthorization": {
+                "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+                "@type": "@id"
+            },
+            "interactionPolicy": {
+                "@id": "gts:interactionPolicy",
+                "@type": "@id"
+            },
+            "canQuote": {
+                "@id": "gts:canQuote",
+                "@type": "@id"
+            },
+            "automaticApproval": {
+                "@id": "gts:automaticApproval",
+                "@type": "@id"
+            },
+            "manualApproval": {
+                "@id": "gts:manualApproval",
+                "@type": "@id"
+            },
+            "quote": {
+                "@id": "https://w3id.org/fep/044f#quote",
+                "@type": "@id"
+            },
+            "alsoKnownAs": {
+                "@id": "as:alsoKnownAs",
+                "@type": "@id"
+            },
+            "schema": "http://schema.org#",
+            "PropertyValue": "schema:PropertyValue",
+            "value": "schema:value"
+        }
+    ],
+    "id": "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020",
+    "type": "Group",
+    "following": "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020/following",
+    "followers": "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020/followers",
+    "inbox": "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020/inbox",
+    "outbox": "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020/outbox",
+    "summary": "<p>From inflation to unemployment, fiscal policy to monetary strategy - dive into the data-driven insights and expert analysis powering Europe's ever-evolving economic narrative. <a href=\"https://flipboard.local/tag/exonomy\" class=\"mention hashtag\" rel=\"tag\">#<span>Exonomy</span></a> <a href=\"https://flipboard.local/tag/business\" class=\"mention hashtag\" rel=\"tag\">#<span>Business</span></a> <a href=\"https://flipboard.local/tag/finance\" class=\"mention hashtag\" rel=\"tag\">#<span>Finance</span></a></p><p><a href=\"https://flipboard.local/@euronews/economy-tfp2i1c4z\">Economy</a> is a Flipboard Magazine created by <span class=\"h-card\" translate=\"no\"><a href=\"https://flipboard.local/@euronews\" class=\"u-url mention\">@<span>euronews</span></a></span>.</p>",
+    "url": "https://flipboard.local/@euronews/economy-tfp2i1c4z",
+    "discoverable": true,
+    "indexable": true,
+    "preferredUsername": "economy-euronews",
+    "name": "Economy",
+    "published": "2023-12-22T02:22:56Z",
+    "publicKey": {
+        "id": "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020#main-key",
+        "owner": "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020",
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArn6sXRq52ha8i0j7X/jr\nfyqkDqFqUop/u/o/TUwefA3AEqdKqZkI4/ZpY5Gw6xKROsI+hpk98BzMGMgLjgl9\nogi6PPsiZxyej8CTiXmtjXmCt02h2jQguoBXJXwHU74sJISf8hUEnW34O4w0m00x\nBApej53mLVltKsdHC+jjPqZIk8Enb8oSQE4sjtd7MNNNkqXIG4Jg+7qcP+ndrqG7\niyChhcZ0yb54ayrPQYsEKBfuuFR3GLfWZ7zOCUEiJlfmfqfpsatAAmLosqa3RvyI\n0TeIfzmR840/Wbbdcxfn3vEgPFHeuzTJ5yUgCT6iYUkEiEaUd0bhS7ZX/TLfVH5k\n1QIDAQAB\n-----END PUBLIC KEY-----\n"
+    },
+    "endpoints": {
+        "sharedInbox": "https://flipboard.local/inbox"
+    },
+    "image": {
+        "type": "Image",
+        "mediaType": "image/jpeg",
+        "url": "https://ic-cdn.flipboard.local/euronews.com/be45c3679a624cee114e047f03059c108a7528e3/_medium.jpeg"
+    },
+    "icon": {
+        "type": "Image",
+        "mediaType": "image/png",
+        "url": "https://um-cdn.flipboard.local/Q41EzNxe54Rc-CgLW8c_pA/uploads/avatar/f8aa0462e414a241618425679ccef8d2de95c191.png"
+    },
+    "attachment": [
+        {
+            "type": "PropertyValue",
+            "name": "Flipboard",
+            "value": "<a href=\"https://flipboard.local/@euronews\" target=\"_blank\" rel=\"nofollow noopener noreferrer me\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"\">flipboard.local/@euronews</span><span class=\"invisible\"> </span></a>"
+        },
+        {
+            "type": "PropertyValue",
+            "name": "Magazine",
+            "value": "<a href=\"https://flipboard.local/@euronews/economy-tfp2i1c4z\" target=\"_blank\" rel=\"nofollow noopener noreferrer me\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">flipboard.local/@euronews/econom</span><span class=\"invisible\">y-tfp2i1c4z </span></a>"
+        }
+    ],
+    "tag": [
+        {
+            "type": "Mention",
+            "href": "https://flipboard.local/users/euronews",
+            "name": "@euronews@flipboard.local"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://flipboard.local/tag/Finance",
+            "name": "#Finance"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://flipboard.local/tag/Business",
+            "name": "#Business"
+        },
+        {
+            "type": "Hashtag",
+            "href": "https://flipboard.local/tag/Exonomy",
+            "name": "#Exonomy"
+        }
+    ]
+}

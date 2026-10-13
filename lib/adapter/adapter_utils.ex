@@ -1611,21 +1611,59 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     }
     |> Enums.filter_empty(%{})
     |> Map.merge(%{
-      # declared whatever the visibility, since the URI says nothing about who is in it (serving it is what checks visibility, see `Categories.collection_items/2`). Declaring one is how a remote server tells that membership here is not following, as with Mobilizon and Smithereen, unlike the threadiverse
-      "members" => ActivityPub.Utils.collection_ap_id("members", id(group)),
       # an ARCHIVED group accepts nothing from anyone (`soft_delete/2` locks it), which this field is the only way to say. Read from the archive flag rather than from boundaries on purpose: a circle-level check cannot tell a locked group from one only its MEMBERS may post in, and marking the latter restricted would hide the compose button from people who can in fact post
       "postingRestrictedToMods" =>
         dims[:participation] == "moderators" or not is_nil(e(group, :deleted_at, nil)),
       "manuallyApprovesFollowers" => manually_approves?,
       # whether peers should list it, from whether the fediverse may `see` it here (an unlisted visibility grants read but not see), so what we declare can't drift from what we enforce. Overrides the user-level `undiscoverable` setting `do_format_actor/2` puts in, which says nothing about a group. Lemmy 1.0 reads `false` as Unlisted
-      "discoverable" => Bonfire.Boundaries.can?(:activity_pub, :see, group) == true,
+      "discoverable" => Bonfire.Boundaries.can?(:activity_pub, :see, group) == true
+    })
+    # what kind of category it is, so another Bonfire mirrors a group as a group and a topic as a topic (`Bonfire.Classify.Categories.remote_type/1` reads it)
+    |> Map.merge(category_kind_declarations(group, dims))
+  end
+
+  # A TOPIC is followed rather than joined, and belongs to a group: it names that group with FEP-9b2b's `broader` and its scheme (`inScheme`), declares the group's membership as its own only when that parent has one (its members are who may take part), and says nothing about joining (no `openness`, no `acceptsJoins`)
+  defp category_kind_declarations(%{type: :topic} = topic, _dims) do
+    # loaded as what it is (through the tree it may come as a bare pointer, without its `type`)
+    parent =
+      with parent_id when is_binary(parent_id) <-
+             topic |> repo().maybe_preload(:tree) |> e(:tree, :parent_id, nil),
+           {:ok, parent} <- Bonfire.Common.Needles.get(parent_id, skip_boundary_check: true) do
+        parent
+      else
+        _ -> nil
+      end
+
+    %{
+      "inScheme" => "https://w3id.org/fep/9b2b#Topic",
+      "broader" =>
+        with %{} <- parent,
+             {:ok, %{ap_id: parent_ap_id}} <- ActivityPub.Actor.get_cached(pointer: parent) do
+          parent_ap_id
+        else
+          _ -> nil
+        end,
+      "members" =>
+        if(e(parent, :type, nil) == :group,
+          do: ActivityPub.Utils.collection_ap_id("members", id(parent))
+        )
+    }
+    |> Enums.filter_empty(%{})
+  end
+
+  # A GROUP has members of its own, people join it (`acceptsJoins`, as Smithereen says it and reads it to offer Join), and says how (`openness`)
+  defp category_kind_declarations(group, dims) do
+    %{
+      # declared whatever the visibility, since the URI says nothing about who is in it (serving it is what checks visibility, see `Categories.collection_items/2`). Declaring one is how a remote server tells that membership here is not following, as with Mobilizon and Smithereen, unlike the threadiverse
+      "members" => ActivityPub.Utils.collection_ap_id("members", id(group)),
+      "capabilities" => %{"acceptsJoins" => true},
       "openness" =>
         case dims[:membership] do
           "on_request" -> "moderated"
           "invite_only" -> "invite_only"
           _ -> "open"
         end
-    })
+    }
   end
 
   # Any other actor declares only the follow rule, the one boundary of its own a Person states on the wire. Skipped for a remote actor, whose own instance is the authority on it and whose local boundaries here answer a different question.
