@@ -70,7 +70,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.CircleBoundariesDanceTest do
 
       # preconditions, so a fixture problem cannot masquerade as the bug
       refute Boundaries.object_public?(post)
-      assert [_ | _] = Boundaries.users_grants_on([bob_on_local], [post], [:see, :read])
+      assert [_] = Boundaries.permitted_users([bob_on_local], [:see, :read], post)
 
       # the bug: no AP object is created at all, so nothing is ever queued or delivered
       assert {:ok, _} = ActivityPub.Object.get_cached(pointer: id(post))

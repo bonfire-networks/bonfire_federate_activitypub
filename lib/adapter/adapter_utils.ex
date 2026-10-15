@@ -2422,16 +2422,13 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
            |> Enum.reject(&is_local?/1)
            |> debug("remote followers"),
          granted_followers when is_list(granted_followers) and granted_followers != [] <-
-           Bonfire.Boundaries.users_grants_on(followers, object, [:see, :read]) do
+           Bonfire.Boundaries.permitted_users(followers, [:see, :read], object) do
       {:ok,
        granted_followers
-       #  only positive grants
-       |> Enum.filter(& &1.value)
-       |> Enum.map(&Map.take(&1, [:subject_id]))
+       |> Enum.map(&uid/1)
        # Skip granted followers already in addressed recipients
-       |> Enum.reject(&(&1.subject_id in exclude_ids))
-       |> debug("post_grants (excluding already addressed)")
-       |> Enum.map(& &1.subject_id)
+       |> Enum.reject(&(&1 in exclude_ids))
+       |> debug("granted followers (excluding already addressed)")
        |> ActivityPub.Actor.list_cached()
        |> Enum.filter(
          &Bonfire.Federate.ActivityPub.federation_allowed?(&1,

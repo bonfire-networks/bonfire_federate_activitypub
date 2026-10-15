@@ -17,6 +17,7 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
   alias Bonfire.Boundaries
   alias Bonfire.Boundaries.{Acls, Circles, Grants}
   alias Bonfire.Federate.ActivityPub.Outgoing
+  alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
@@ -106,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
 
       # preconditions, so a fixture problem cannot masquerade as the behaviour under test
       refute Boundaries.object_public?(post)
-      assert [_ | _] = Boundaries.users_grants_on([karen], [post], [:see, :read])
+      assert [_] = Boundaries.permitted_users([karen], [:see, :read], post)
 
       assert {:ok, activity} = Outgoing.push_now!(post)
 
@@ -121,6 +122,53 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
     end
   end
 
+  # who `external_recipients_for_object/3` hands to delivery, asked directly rather than through the payload, so a denial can't be masked by addressing done elsewhere
+  describe "the boundary-granted recipients of a post" do
+    defp recipient_ap_ids(author, post) do
+      assert {:ok, actors} = AdapterUtils.external_recipients_for_object(author, post)
+      Enum.map(actors, & &1.ap_id)
+    end
+
+    test "include a follower the post's circle grants seeing and reading it", %{
+      alice: alice,
+      karen: karen,
+      karen_actor: karen_actor,
+      alice_actor: alice_actor
+    } do
+      follow!(karen_actor, alice_actor)
+      post = publish_with_circle_boundary!(alice, karen, "circle only")
+
+      assert karen_actor.ap_id in recipient_ap_ids(alice, post)
+    end
+
+    # a denial is a grant too, with `value: false`, and wins over the circle's grant: the same rule `can?/3` applies
+    test "leave out a follower the circle grants it to but who is denied it themselves", %{
+      alice: alice,
+      karen: karen,
+      karen_actor: karen_actor,
+      alice_actor: alice_actor
+    } do
+      follow!(karen_actor, alice_actor)
+
+      {:ok, circle} = Circles.create(alice, %{named: %{name: "friends"}})
+      {:ok, _} = Circles.add_to_circles(id(karen), circle)
+      {:ok, acl} = Acls.simple_create(alice, "friends, but not karen")
+      Grants.grant(circle.id, acl.id, [:see, :read], true, current_user: alice)
+      Grants.grant(id(karen), acl.id, [:see, :read], false, current_user: alice)
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: alice,
+          post_attrs: %{post_content: %{html_body: "friends, but not karen"}},
+          boundary: acl.id
+        )
+
+      refute Boundaries.can?(karen, :read, post), "control: the denial took"
+
+      refute karen_actor.ap_id in recipient_ap_ids(alice, post)
+    end
+  end
+
   describe "a circle grantee who does not follow the author" do
     test "is not delivered to, and the post does not federate at all", %{
       alice: alice,
@@ -128,7 +176,7 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
     } do
       post = publish_with_circle_boundary!(alice, karen, "circle only, grantee is not a follower")
 
-      assert [_ | _] = Boundaries.users_grants_on([karen], [post], [:see, :read])
+      assert [_] = Boundaries.permitted_users([karen], [:see, :read], post)
 
       # guards the chosen default: delivery stays gated on mentioned-or-following, so this post has no deliverable recipients and must behave exactly like a "mentions" post with no mentions
       assert_raise RuntimeError, fn -> Outgoing.push_now!(post) end
@@ -256,9 +304,9 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
 
       assert {:ok, received} = {:ok, activity.pointer}
 
-      assert [_ | _] = Boundaries.users_grants_on([recipient], [received], [:see, :read])
+      assert [_] = Boundaries.permitted_users([recipient], [:see, :read], received)
 
-      assert [] == Boundaries.users_grants_on([bystander], [received], [:see, :read]),
+      assert [] == Boundaries.permitted_users([bystander], [:see, :read], received),
              "a local user absent from the audience must not be granted access"
     end
   end

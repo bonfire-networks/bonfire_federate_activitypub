@@ -106,7 +106,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.CircleAudienceLiveTest do
 
       # preconditions, so a fixture problem cannot masquerade as a pass
       refute Boundaries.object_public?(post)
-      assert [_ | _] = Boundaries.users_grants_on([bob], [post], [:see, :read])
+      assert [_] = Boundaries.permitted_users([bob], [:see, :read], post)
 
       # before the fix this was `[]`: the empty audience made BoundariesMRF return :ignore, so Object.insert never wrote a row
       assert [%{}] = ap_object_rows(post),
@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.CircleAudienceLiveTest do
         )
 
       refute Boundaries.object_public?(post)
-      assert [_ | _] = Boundaries.users_grants_on([bob], [post], [:see, :read])
+      assert [_] = Boundaries.permitted_users([bob], [:see, :read], post)
 
       # unlike row 1, an AP object now exists
       assert [%{} = row] = ap_object_rows(post)
