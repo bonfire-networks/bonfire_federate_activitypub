@@ -172,6 +172,16 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
     end
   end
 
+  # deleting a remote post sends nothing, while taking it out of the group reaches the group's followers elsewhere, so a moderator who may do that is pointed to it
+  test "deleting a post from the mirrored community points its moderator to removing it from the group",
+       %{conn: conn, post: post} do
+    conn
+    |> open_post_menu(post)
+    |> click_button("[data-role=delete_object] [data-role=open_modal]", "Delete")
+    |> assert_has("[data-role=delete_remote_explanation]")
+    |> assert_has("[data-role=delete_remote_group_hint]", text: "remove it from the group")
+  end
+
   describe "removing from the group" do
     test "ticked, takes the post out here at once", %{conn: conn, post: post, group: group} do
       conn
