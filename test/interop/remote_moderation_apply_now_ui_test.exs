@@ -19,7 +19,8 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
     announces: ["announce_create_page_text.json"]
   }
 
-  @apply_now "input[name=apply_now]"
+  # the checkbox, not the hidden `"false"` sent when it's unticked, which has the same name
+  @apply_now "input[data-role=apply_now]"
 
   setup do
     account = fake_account!()
@@ -101,6 +102,29 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
 
   defp tick(session), do: check(session, @apply_now, "Apply it here now", exact: false)
 
+  # whether a moderator may take a post out of its group can be read off the POST's own boundary (its moderators get `:mediate` on what is published in the group, through the group's moderators ACL) rather than the group's, so a feed that has loaded each post's boundary answers it without a query per card. For that, both must agree, for a mirrored community's posts as for a local group's
+  describe "moderating a post, asked of the post or of its group" do
+    test "agree for a post received from a mirrored community", %{me: me, post: post, group: group} do
+      assert Boundaries.can?(me, :mediate, group), "control: a moderator of the mirror"
+
+      assert Boundaries.can?(me, :mediate, post) == Boundaries.can?(me, :mediate, group)
+
+      someone = fake_user!()
+      refute Boundaries.can?(someone, :mediate, post), "control: not anyone's"
+    end
+
+    test "agree for a post in a local group", %{me: me} do
+      group = Bonfire.Classify.Simulate.fake_group!(me)
+      author = fake_user!()
+      assert {:ok, _} = Bonfire.Classify.Categories.add_member(me, group, id(author))
+      post = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>theirs</p>")
+
+      assert Boundaries.can?(me, :mediate, group), "control: its creator moderates it"
+
+      assert Boundaries.can?(me, :mediate, post) == Boundaries.can?(me, :mediate, group)
+    end
+  end
+
   describe "locking" do
     test "ticked, closes the thread here at once, and sends the Lock", %{
       conn: conn,
@@ -130,9 +154,13 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
 
     test "in a local group, offers no box", %{conn: conn, me: me} do
       group = Bonfire.Classify.Simulate.fake_group!(me)
+      # a member, so their post is published INTO the group and carries its moderators' ACL (joining a group with the default membership may only file a request)
       author = fake_user!()
-      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(author, group)
+      assert {:ok, _} = Bonfire.Classify.Categories.add_member(me, group, id(author))
       post = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>theirs</p>")
+
+      assert Bonfire.Boundaries.can?(me, :mediate, post),
+             "control: the group's creator moderates what is published in it"
 
       conn
       |> open_lock(post)
