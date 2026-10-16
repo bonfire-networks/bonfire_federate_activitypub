@@ -72,7 +72,8 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupFollowButtonUITest do
     conn
     |> visit(Bonfire.Common.URIs.path(group))
     |> wait_async()
-    |> click_button("[data-id=follow][data-tip='Follow group'], [data-id=unfollow]", "")
+    # by id, as the sidebar now lists the joined group with a follow toggle of its own
+    |> click_button("#follow_feed_#{group.id}", "")
     |> refute_has("[data-id=flash_error]")
   end
 end

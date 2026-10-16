@@ -585,6 +585,35 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert quote_tags == []
   end
 
+  # the quote_reject event passes the request's id, so the request is looked up as the author, on a post a guest can't see
+  test "the author can reject a quote request by its id on a post guests can't see" do
+    author = fake_user!()
+
+    {:ok, original_post} =
+      Posts.publish(
+        current_user: author,
+        post_attrs: %{post_content: %{html_body: "For locals only"}},
+        boundary: "local"
+      )
+
+    refute Bonfire.Boundaries.can?(nil, :see, original_post), "control: hidden from guests"
+
+    original_url = Bonfire.Common.URIs.canonical_url(original_post, preload_if_needed: true)
+    other_user = fake_user!()
+
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: other_user,
+        post_attrs: %{post_content: %{html_body: "Quoting this! #{original_url}"}},
+        boundary: "public"
+      )
+
+    assert {:ok, request} = Quotes.requested(quote_post, original_post), "control: a request"
+
+    assert {:ok, _} = Quotes.reject(id(request), current_user: author)
+    refute Quotes.requested?(id(quote_post), original_post)
+  end
+
   test "ap_quote_fields uses stored fields even when quote tags are missing (cross-instance scenario)",
        context do
     # This simulates what happens in dance tests: the AP object has quote + quoteAuthorization
