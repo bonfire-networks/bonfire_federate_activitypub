@@ -235,4 +235,31 @@ defmodule Bonfire.Federate.ActivityPub.InteractionPolicyBoundariesTest do
       refute Boundaries.can?(fake_user!(), :quote, note), "someone else may not"
     end
   end
+
+  # a card's buttons are decided from the boundary its feed loaded (`Boundaries.boundaries_on_objects/2`), not by asking of the object, so the two must agree on what arrives with a policy as on what doesn't
+  describe "the boundary a feed loads for the card" do
+    for kind <- [:public, :private],
+        {label, policy} <- [
+          {"no policy", nil},
+          # what Mastodon sends by default
+          {"quoting approved for everyone", %{"canQuote" => %{"automaticApproval" => [@public]}}},
+          {"replies only by its author", %{"canReply" => @author_only}}
+        ] do
+      @kind kind
+      @policy policy
+
+      test "#{kind}, #{label}: agrees with asking of the object" do
+        {to, who} = audience(@kind)
+        note = receive_note(to, @policy)
+
+        loaded = Boundaries.boundaries_on_objects([id(note)], who) |> Map.get(id(note))
+        assert %{verbs: _} = loaded, "control: loaded"
+
+        for verb <- [:see, :read, :like, :boost, :reply, :quote, :request] do
+          assert Boundaries.can?(who, verb, loaded) == Boundaries.can?(who, verb, note),
+                 "#{verb}: loaded #{inspect(loaded.verbs)}"
+        end
+      end
+    end
+  end
 end

@@ -91,7 +91,10 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
   defp open_lock(conn, post) do
     conn
     |> open_post_menu(post)
-    |> click_button("[data-role=lock_discussion] [data-role=open_modal]", "Lock discussion")
+    |> click_button(
+      "[data-role=lock_or_unlock_discussion] [data-role=open_modal]",
+      "Lock or unlock discussion"
+    )
   end
 
   defp open_removal(conn, post) do
