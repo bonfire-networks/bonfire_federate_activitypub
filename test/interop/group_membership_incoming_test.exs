@@ -354,17 +354,30 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
   end
 
   describe "a moderator adding a remote person" do
-    # A remote member is made a local follower only when THEY asked, through a `Join`. A moderator adding them is not their act, so nothing is recorded as if they had subscribed
-    test "makes them a member but not a follower", %{creator: creator, group: group} do
+    # Adding someone directly is for local people only (17 October): someone on another instance joins with their own `Follow` or `Join`, which we can't send for them. So the add is refused, and nothing is recorded as if they had joined or subscribed
+    test "is refused, and makes them neither a member nor a follower", %{
+      creator: creator,
+      group: group
+    } do
       user = remote_user()
+      creator = Bonfire.Me.Fake.instance_moderator!(creator)
 
-      assert {:ok, _} = Categories.add_member(creator, group, id(user))
+      assert {:error, _} = Categories.add_member(creator, group, id(user))
 
-      assert Categories.member?(user, group), "control: the add itself worked"
+      refute Categories.member?(user, group)
 
       refute Bonfire.Social.Graph.Follows.following?(user, group),
              "only their own `Join` makes a remote member a follower"
     end
+
+    # was, before adding was limited to local people:
+    # test "makes them a member but not a follower", %{creator: creator, group: group} do
+    #   user = remote_user()
+    #   assert {:ok, _} = Categories.add_member(creator, group, id(user))
+    #   assert Categories.member?(user, group), "control: the add itself worked"
+    #   refute Bonfire.Social.Graph.Follows.following?(user, group),
+    #          "only their own `Join` makes a remote member a follower"
+    # end
   end
 
   describe "an invite-only group" do

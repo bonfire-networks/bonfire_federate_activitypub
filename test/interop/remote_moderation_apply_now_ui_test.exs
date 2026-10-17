@@ -123,7 +123,12 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
     test "agree for a post in a local group", %{me: me} do
       group = Bonfire.Classify.Simulate.fake_group!(me)
       author = fake_user!()
-      assert {:ok, _} = Bonfire.Classify.Categories.add_member(me, group, id(author))
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.add_member(me, group, id(author),
+                 skip_boundary_check: true
+               )
+
       post = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>theirs</p>")
 
       assert Boundaries.can?(me, :mediate, group), "control: its creator moderates it"
@@ -164,7 +169,12 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
 
       # a member, so their post is published INTO the group and carries its moderators' ACL (joining a group with the default membership may only file a request)
       author = fake_user!()
-      assert {:ok, _} = Bonfire.Classify.Categories.add_member(me, group, id(author))
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.add_member(me, group, id(author),
+                 skip_boundary_check: true
+               )
+
       post = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>theirs</p>")
 
       assert Bonfire.Boundaries.can?(me, :mediate, post),
