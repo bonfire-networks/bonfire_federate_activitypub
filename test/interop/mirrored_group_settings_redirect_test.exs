@@ -92,7 +92,9 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupSettingsRedirectTest do
              Bonfire.Social.Requests.get(
                requester,
                Bonfire.Boundaries.Verbs.get_id!(:join),
-               group, current_user: moderator),
+               group,
+               current_user: moderator
+             ),
            "control: expected a join request row"
 
     id(request)

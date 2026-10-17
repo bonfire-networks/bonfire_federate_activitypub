@@ -105,8 +105,9 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     do: maybe_push_delete(subject, thing, opts)
 
   defp maybe_push_delete(subject, thing, opts) do
+    # the schema, which is what each clause matches on: without `only_schemas` a group is `:group`, so it was deleted as a post rather than as an actor (no tombstone of its own, and a relay of its own deletion through itself)
     case not is_nil(thing) and
-           push_delete(Types.object_type(thing), subject, thing, opts)
+           push_delete(Types.object_type(thing, only_schemas: true), subject, thing, opts)
            |> debug("result of push_delete") do
       {:ok, del} ->
         {:ok, del}
@@ -463,6 +464,29 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         {:error, e}
     end
   end
+
+  @doc "A group we host refusing a moderation activity (a `Lock`, a ban's `Block`, a removal's `Delete`) from someone elsewhere tells them, with a `Reject` of it from the group, so their instance takes back what it applied on their side (`Bonfire.Social.Moderations.refuse_applied/2` there). Nothing for a group we only mirror, whose origin answers, nor for an activity of our own."
+  def send_reject(%{} = subject, %{local: false, data: data} = activity) do
+    with {:ok, %{local: true} = actor} <- ActivityPub.Actor.get_cached(pointer: subject),
+         {:ok, reject} <-
+           ActivityPub.reject(%{
+             actor: actor,
+             to: [data["actor"]],
+             object: data,
+             local: true
+           }) do
+      {:ok, reject}
+    else
+      {:ok, %ActivityPub.Actor{}} ->
+        nil
+
+      e ->
+        warn(e, "Could not send the Reject (the refusal itself stands)")
+        {:error, e}
+    end
+  end
+
+  def send_reject(_subject, _activity), do: nil
 
   defp accepter_actor(%ActivityPub.Actor{} = actor), do: {:ok, actor}
   defp accepter_actor(accepter), do: ActivityPub.Actor.get_cached(pointer: accepter)

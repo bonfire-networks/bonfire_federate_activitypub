@@ -189,6 +189,418 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end)
     end
 
+    # A moderator of a group here who is on another instance acts through their own instance's copy of the group: their `Lock` goes to the group, which applies it if they are one of its moderators. Someone there who isn't is refused before anything is sent, and a `Lock` made up in their name and delivered here is refused here (mocked counterparts: `threadiverse_moderation_test.exs`, describe "a moderator here of a community elsewhere", and the `Lock` refusal pair)
+    defp moderator_on_other_instance!(context, html_body) do
+      %{moderator: moderator, group: group} =
+        setup = member_post_in_followed_group!(context, html_body)
+
+      assert {:ok, remote_moderator} =
+               AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.add_moderator(
+                 moderator,
+                 group[:category],
+                 id(remote_moderator)
+               ),
+             "control: the follower on the other instance is made a moderator here"
+
+      setup
+    end
+
+    defp their_copy(post_url) do
+      {:ok, %{pointer_id: remote_post_id}} = ActivityPub.Object.get_cached(ap_id: post_url)
+      Bonfire.Common.Needles.get!(remote_post_id, skip_boundary_check: true)
+    end
+
+    test "a moderator on another instance locking a post in a group here locks it here",
+         context do
+      %{group: group, post: post, post_url: post_url} =
+        moderator_on_other_instance!(context, "a thread a moderator elsewhere closes")
+
+      refute Bonfire.Boundaries.Blocks.is_blocked?(id(post), :lock), "control: open here"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        assert Bonfire.Boundaries.can?(context[:remote][:user], :mediate, group_on_remote),
+               "control: their instance knows them as a moderator of its copy of the group"
+
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.lock(their_copy(post_url),
+                   current_user: context[:remote][:user]
+                 )
+      end)
+
+      assert Bonfire.Boundaries.Blocks.is_blocked?(id(post), :lock),
+             "their Lock reaches the group, which applies it"
+    end
+
+    # what the moderator's own instance does with it: waiting for the group, applied when the group echoes it back
+    test "a moderator on another instance locking a post in a group here closes their own copy once the group applies it",
+         context do
+      %{post: post, post_url: post_url} =
+        moderator_on_other_instance!(context, "a thread closed from elsewhere, and there")
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.lock(their_copy(post_url),
+                   current_user: context[:remote][:user]
+                 )
+      end)
+
+      assert Bonfire.Boundaries.Blocks.is_blocked?(id(post), :lock), "control: applied here"
+
+      TestInstanceRepo.apply(fn ->
+        assert Bonfire.Boundaries.Blocks.is_blocked?(id(their_copy(post_url)), :lock),
+               "the group's echo closes the moderator's own copy"
+      end)
+    end
+
+    # A group refusing a moderator's action tells them, so their instance takes back what it applied straight away (`apply_now`). The moderator is demoted here without their instance being told (out of the moderators circle directly, where `remove_moderator/4` would send a `Remove`), so it still takes them for one and sends the lock
+    test "a lock the group refuses, applied at once by a moderator on another instance, is taken back there",
+         context do
+      %{group: group, post: post, post_url: post_url} =
+        moderator_on_other_instance!(context, "a thread a demoted moderator elsewhere closes")
+
+      assert {:ok, remote_moderator} =
+               AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
+
+      {:ok, circle} = Bonfire.Classify.Categories.moderators_circle(group[:category])
+      Bonfire.Boundaries.Circles.remove_from_circles(remote_moderator, [circle])
+
+      refute Bonfire.Boundaries.can?(remote_moderator, :mediate, group[:category]),
+             "control: no longer a moderator here"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.lock(their_copy(post_url),
+                   current_user: context[:remote][:user],
+                   apply_now: true
+                 ),
+               "their instance still takes them for a moderator"
+      end)
+
+      refute Bonfire.Boundaries.Blocks.is_blocked?(id(post), :lock), "refused here"
+
+      TestInstanceRepo.apply(fn ->
+        refute Bonfire.Boundaries.Blocks.is_blocked?(id(their_copy(post_url)), :lock),
+               "the group's Reject reopens the moderator's own copy"
+      end)
+    end
+
+    test "someone on another instance who doesn't moderate a group here can't lock its posts from there",
+         context do
+      %{post: post, post_url: post_url} =
+        member_post_in_followed_group!(context, "a thread a stranger elsewhere tries to close")
+
+      TestInstanceRepo.apply(fn ->
+        assert {:error, _} =
+                 Bonfire.Boundaries.Blocks.lock(their_copy(post_url), current_user: fake_user!()),
+               "refused there, before anything is sent"
+      end)
+
+      refute Bonfire.Boundaries.Blocks.is_blocked?(id(post), :lock)
+    end
+
+    test "a Lock made up in the name of someone on another instance who doesn't moderate the group is refused here",
+         context do
+      %{group: group, post: post, post_url: post_url} =
+        moderator_on_other_instance!(context, "a thread someone forges a Lock for")
+
+      # their URLs as their own instance gives them
+      {stranger_ap_id, moderator_ap_id} =
+        TestInstanceRepo.apply(fn ->
+          {:ok, %{ap_id: stranger}} = ActivityPub.Actor.get_cached(pointer: fake_user!())
+
+          {:ok, %{ap_id: moderator}} =
+            ActivityPub.Actor.get_cached(pointer: context[:remote][:user])
+
+          {stranger, moderator}
+        end)
+
+      {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: group[:category])
+
+      lock_from = fn actor ->
+        ActivityPub.Federator.Transformer.handle_incoming(%{
+          "id" => actor <> "/lock/#{System.unique_integer([:positive])}",
+          "type" => "Lock",
+          "actor" => actor,
+          "object" => post_url,
+          "to" => [group_ap_id],
+          "audience" => group_ap_id
+        })
+      end
+
+      lock_from.(stranger_ap_id)
+
+      refute Bonfire.Boundaries.Blocks.is_blocked?(id(post), :lock),
+             "someone with no standing in the group can't close its threads"
+
+      lock_from.(moderator_ap_id)
+
+      assert Bonfire.Boundaries.Blocks.is_blocked?(id(post), :lock),
+             "control: the same Lock from one of its moderators there closes it, so the refusal above is about who sent it"
+    end
+
+    # The rest of a moderator's actions, each across instances (the group plan's inventory against `moderation-log.md`'s verbs)
+
+    # parked with the rest of undoing, which comes later (the group plan's lifting item); red 17 October: a follower's instance stays locked. `skip:` rather than `:todo`, since the dance recipe runs `--only test_instance`, which an exclude can't override
+    @tag skip: "undoing comes later: a follower's instance stays locked"
+    test "a moderator unlocking a member's post in a group reopens it on a follower's instance",
+         context do
+      %{moderator: moderator, post: post, post_url: post_url} =
+        member_post_in_followed_group!(context, "a thread closed then reopened")
+
+      remote_post_open? = fn ->
+        TestInstanceRepo.apply(fn ->
+          Bonfire.Boundaries.can?(context[:remote][:user], :reply, their_copy(post_url))
+        end)
+      end
+
+      assert {:ok, _} = Bonfire.Boundaries.Blocks.lock(post, current_user: moderator)
+      refute remote_post_open?.(), "control: the lock reached the follower's instance"
+
+      assert {:ok, _} = Bonfire.Boundaries.Blocks.unlock(post, current_user: moderator)
+      assert remote_post_open?.(), "the unlock reaches it too"
+    end
+
+    test "demoting a moderator at the group's origin removes them from a follower's mirror's moderators",
+         context do
+      %{moderator: moderator, group: group} =
+        moderator_on_other_instance!(context, "a post in a group whose moderator is demoted")
+
+      remote_is_moderator_there? = fn ->
+        TestInstanceRepo.apply(fn ->
+          assert {:ok, group_on_remote} =
+                   AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+          Bonfire.Boundaries.can?(context[:remote][:user], :mediate, group_on_remote)
+        end)
+      end
+
+      assert remote_is_moderator_there?.(), "control: promoted, and their mirror knows"
+
+      assert {:ok, remote_moderator} =
+               AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.remove_moderator(
+                 moderator,
+                 group[:category],
+                 id(remote_moderator)
+               )
+
+      refute remote_is_moderator_there?.(), "the demotion reaches the mirror"
+    end
+
+    # `silence` is the ban tested above; `ghost` keeps them from seeing the group's posts, `block` does both
+    for {type, can_see_after?, can_reply_after?} <- [
+          {:ghost, false, true},
+          {:block, false, false}
+        ] do
+      # parked: red 17 October, every incoming ban on behalf of a group is applied as `:silence` (`Blocks.receive_block_on_behalf_of/5`), since the `Block` carries no type (the group plan's "a ban as `ghost` or `block` lands on B as a `silence`")
+      @tag skip: "every incoming group ban is applied as silence"
+      test "a moderator banning someone from a group as #{type} applies on their own instance",
+           context do
+        %{moderator: moderator, group: group, post_url: post_url} =
+          member_post_in_followed_group!(context, "a post the #{unquote(type)}ed person loses")
+
+        remote_can? = fn verb ->
+          TestInstanceRepo.apply(fn ->
+            Bonfire.Boundaries.can?(context[:remote][:user], verb, their_copy(post_url))
+          end)
+        end
+
+        assert remote_can?.(:read), "control: they may read it there before the ban"
+        assert remote_can?.(:reply), "control: and reply"
+
+        assert {:ok, banned} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
+
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.block(banned, unquote(type),
+                   current_user: moderator,
+                   on_behalf_of: group[:category],
+                   also_unfollow_and_notify: true,
+                   reason: "spam"
+                 )
+
+        assert remote_can?.(:read) == unquote(can_see_after?)
+        assert remote_can?.(:reply) == unquote(can_reply_after?)
+      end
+    end
+
+    test "a moderator on another instance removing a post from a group here takes it out of the group here",
+         context do
+      %{group: group, post: post, post_url: post_url} =
+        moderator_on_other_instance!(context, "a post a moderator elsewhere removes")
+
+      assert FeedLoader.feed_contains?(:user_activities, post,
+               by: group[:category],
+               current_user: context[:local][:user]
+             ),
+             "control: in the group here"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        assert FeedLoader.feed_contains?(:user_activities, their_copy(post_url),
+                 by: group_on_remote,
+                 current_user: context[:remote][:user]
+               ),
+               "control: in their copy of the group too"
+
+        assert {:ok, _} =
+                 Bonfire.Classify.Categories.remove_post_from_group(
+                   context[:remote][:user],
+                   group_on_remote,
+                   their_copy(post_url)
+                 )
+      end)
+
+      refute FeedLoader.feed_contains?(:user_activities, post,
+               by: group[:category],
+               current_user: context[:local][:user]
+             ),
+             "their removal reaches the group, which takes it out"
+
+      assert post_held?(post_url), "the post itself stays"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        refute FeedLoader.feed_contains?(:user_activities, their_copy(post_url),
+                 by: group_on_remote,
+                 current_user: context[:remote][:user]
+               ),
+               "and the group's echo takes it out of the moderator's own copy of the group"
+      end)
+    end
+
+    test "a moderator on another instance banning someone in a group here bans them here",
+         context do
+      %{group: group, post: post, post_url: post_url} =
+        moderator_on_other_instance!(
+          context,
+          "a post someone a moderator elsewhere bans replied to"
+        )
+
+      # another member, not the post's author: `can?/3` lets anyone act on what they created without a boundary check, so the author would still pass
+      member = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.join_and_follow_group(member, group[:category])
+
+      assert Bonfire.Boundaries.can?(member, :reply, post), "control: the member may reply"
+
+      {:ok, %{ap_id: member_ap_id}} = ActivityPub.Actor.get_cached(pointer: member)
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        assert {:ok, member_there} = AdapterUtils.get_or_fetch_and_create_by_uri(member_ap_id)
+
+        assert Bonfire.Boundaries.can?(member_there, :reply, their_copy(post_url)),
+               "control: they may reply in the moderator's copy too, before the ban"
+
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.block(member_there, :silence,
+                   current_user: context[:remote][:user],
+                   on_behalf_of: group_on_remote,
+                   also_unfollow_and_notify: true,
+                   reason: "spam"
+                 )
+      end)
+
+      refute Bonfire.Boundaries.can?(member, :reply, post),
+             "their ban reaches the group, which applies it"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, member_there} = AdapterUtils.get_or_fetch_and_create_by_uri(member_ap_id)
+
+        refute Bonfire.Boundaries.can?(member_there, :reply, their_copy(post_url)),
+               "and the group's echo bans them in the moderator's own copy of the group"
+      end)
+    end
+
+    # Deleting, in each place it can start (mocked counterparts: `group_remote_posting_test.exs`, `remote_moderation_apply_now_ui_test.exs`, `delete_permissions_test.exs`). Lemmy accepts a `Delete` of a post from anyone on the post's own instance, so the author's and their admin's both count; a moderator elsewhere erases only their own copy
+
+    test "someone on another instance deleting their post in a group here deletes it here",
+         context do
+      %{remote_post_id: remote_post_id, post_url: post_url} =
+        remote_member_post_in_group!(context, "a post from elsewhere, about to be deleted")
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Social.Objects.delete(remote_post_id,
+                   current_user: context[:remote][:user]
+                 )
+      end)
+
+      refute post_held?(post_url), "the author's deletion reaches the group's instance"
+    end
+
+    test "an admin on another instance deleting a post of theirs in a group here deletes it here",
+         context do
+      %{remote_post_id: remote_post_id, post_url: post_url} =
+        remote_member_post_in_group!(context, "a post its admin will delete")
+
+      TestInstanceRepo.apply(fn ->
+        {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+        assert {:ok, _} = Bonfire.Social.Objects.delete(remote_post_id, current_user: admin)
+      end)
+
+      refute post_held?(post_url), "a deletion from the post's own instance reaches the group's"
+    end
+
+    test "a moderator on another instance deleting a member's post in a group here erases only their own copy",
+         context do
+      %{moderator: moderator, group: group, post_url: post_url} =
+        member_post_in_followed_group!(context, "a post a moderator elsewhere deletes")
+
+      assert {:ok, remote_moderator} =
+               AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.add_moderator(
+                 moderator,
+                 group[:category],
+                 id(remote_moderator)
+               ),
+             "control: the follower on the other instance is made a moderator here"
+
+      TestInstanceRepo.apply(fn ->
+        {:ok, %{pointer_id: remote_post_id}} = ActivityPub.Object.get_cached(ap_id: post_url)
+
+        assert {:ok, _} =
+                 Bonfire.Social.Objects.delete(remote_post_id,
+                   current_user: context[:remote][:user]
+                 )
+
+        refute post_held?(post_url), "erased on their own instance"
+      end)
+
+      assert post_held?(post_url), "still here, where the post lives"
+    end
+
+    test "an instance moderator deleting a member's post in a group deletes it on a follower's instance",
+         context do
+      %{post: post, post_url: post_url} =
+        member_post_in_followed_group!(context, "a post an instance moderator deletes")
+
+      instance_moderator = Bonfire.Me.Fake.instance_moderator!(fake_user!())
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: instance_moderator)
+
+      TestInstanceRepo.apply(fn ->
+        refute post_held?(post_url), "the deletion reaches the follower's instance"
+      end)
+    end
+
     # A ban the moderator chooses to federate (`also_unfollow_and_notify`) goes out as Lemmy's ban, the moderator's `Block` with `target` the group, relayed by the group, so the follower's instance applies it to its copy of the group: the banned person, there, can no longer take part in it, and lifting the ban here lifts it there
     test "a moderator banning someone from a group keeps them out of it on their own instance, and unbanning lets them back in",
          context do
@@ -250,7 +662,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       refute Bonfire.Social.Flags.flagged_object?(post), "control: nobody reported it yet"
 
-      remote_post =
+      {remote_post, reporter_ap_id} =
         TestInstanceRepo.apply(fn ->
           {:ok, %{pointer_id: remote_post_id}} = ActivityPub.Object.get_cached(ap_id: post_url)
           remote_post = Bonfire.Common.Needles.get!(remote_post_id, skip_boundary_check: true)
@@ -264,10 +676,17 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                      comment: "spam in the group"
                    )
 
-          remote_post
+          {:ok, %{ap_id: ap_id}} = ActivityPub.Actor.get_cached(pointer: context[:remote][:user])
+          {remote_post, ap_id}
         end)
 
       assert Bonfire.Social.Flags.flagged_object?(post), "the report reaches the group's instance"
+
+      # what the anonymous report below is compared against
+      assert {:ok, reporter_here} = AdapterUtils.get_or_fetch_and_create_by_uri(reporter_ap_id)
+
+      assert Bonfire.Social.Flags.flagged?(reporter_here, post),
+             "a named report is the reporter's, here too"
 
       assert FeedLoader.feed_contains?(:notifications, post, current_user: moderator),
              "and the group's moderator"
@@ -278,6 +697,140 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       refute Bonfire.Social.Flags.flagged_object?(post),
              "withdrawing it there withdraws it at the group's instance"
+    end
+
+    # The group's moderators may be on other instances, and a report has to reach them there too. Lemmy relays a report its community receives to every moderator's inbox, as the community's `Announce{Flag}` (`crates/apub/activities/src/community/report.rs:180-187`, `report_inboxes`)
+    # the reporter chooses, with the flag form's checkboxes: anonymously (`forward`) or named (`forward_to_group`); unticked, it stays here
+    for {how, opts} <- [anonymously: [forward: true], named: [forward_to_group: true]] do
+      test "a report on a post in a group here reaches the group's moderator on another instance, #{how}",
+           context do
+        %{post: post, post_url: post_url} =
+          moderator_on_other_instance!(context, "a post reported to a moderator elsewhere")
+
+        assert {:ok, _} =
+                 Bonfire.Social.Flags.flag(
+                   fake_user!(),
+                   post,
+                   [comment: "spam in the group"] ++ unquote(opts)
+                 )
+
+        assert Bonfire.Social.Flags.flagged_object?(post), "control: reported here"
+
+        TestInstanceRepo.apply(fn ->
+          remote_post = their_copy(post_url)
+
+          assert Bonfire.Social.Flags.flagged_object?(remote_post),
+                 "the report reaches the moderator's instance"
+
+          assert FeedLoader.feed_contains?(:notifications, remote_post,
+                   current_user: context[:remote][:user]
+                 ),
+                 "and the moderator, in their notifications"
+        end)
+      end
+    end
+
+    test "a report on a post in a group here, with neither box ticked, stays here", context do
+      %{post: post, post_url: post_url} =
+        moderator_on_other_instance!(context, "a post reported only here")
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(fake_user!(), post, comment: "spam in the group")
+
+      assert Bonfire.Social.Flags.flagged_object?(post), "control: reported here"
+
+      TestInstanceRepo.apply(fn ->
+        refute Bonfire.Social.Flags.flagged_object?(their_copy(post_url)),
+               "nothing sent without the reporter's say"
+      end)
+    end
+
+    # With only "Forward anonymously to remote moderators" ticked (`forward: true`), the report goes from a service actor, and names the group as well as the post's instance (`Flags.anonymous_to_group/2`), so the group's moderators get it without learning who sent it
+    test "reporting a post in a group hosted elsewhere anonymously reaches its moderators there, without the reporter's name",
+         context do
+      %{post: post, post_url: post_url, moderator: moderator} =
+        member_post_in_followed_group!(context, "a post someone elsewhere reports anonymously")
+
+      refute Bonfire.Social.Flags.flagged_object?(post), "control: nobody reported it yet"
+
+      reporter_ap_id =
+        TestInstanceRepo.apply(fn ->
+          {:ok, %{pointer_id: remote_post_id}} = ActivityPub.Object.get_cached(ap_id: post_url)
+          remote_post = Bonfire.Common.Needles.get!(remote_post_id, skip_boundary_check: true)
+
+          assert {:ok, _} =
+                   Bonfire.Social.Flags.flag(context[:remote][:user], remote_post,
+                     forward: true,
+                     comment: "anonymous spam report"
+                   )
+
+          {:ok, %{ap_id: ap_id}} = ActivityPub.Actor.get_cached(pointer: context[:remote][:user])
+          ap_id
+        end)
+
+      assert Bonfire.Social.Flags.flagged_object?(post), "the report reaches the group's instance"
+
+      assert FeedLoader.feed_contains?(:notifications, post, current_user: moderator),
+             "and the group's moderator"
+
+      assert {:ok, reporter_here} = AdapterUtils.get_or_fetch_and_create_by_uri(reporter_ap_id)
+
+      refute Bonfire.Social.Flags.flagged?(reporter_here, post),
+             "sent without the reporter's name: here, the report isn't theirs"
+    end
+
+    # whether this instance still holds a post, by its URL
+    defp post_held?(post_url) do
+      with {:ok, %{pointer_id: id}} when is_binary(id) <-
+             ActivityPub.Object.get_cached(ap_id: post_url),
+           {:ok, _} <- Bonfire.Common.Needles.get(id, skip_boundary_check: true) do
+        true
+      else
+        _ -> false
+      end
+    end
+
+    # someone on the other instance joins a group hosted here and posts in it from there, as their group-page composer does (`group_live.sface`'s smart input opts)
+    defp remote_member_post_in_group!(context, html_body) do
+      group =
+        fancy_fake_category!(context[:local][:user],
+          type: :group,
+          membership: "open",
+          visibility: "global",
+          participation: "anyone"
+        )
+
+      {remote_post_id, post_url} =
+        TestInstanceRepo.apply(fn ->
+          assert {:ok, group_on_remote} =
+                   AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+          author = context[:remote][:user]
+
+          assert {:ok, _} =
+                   Bonfire.Classify.Categories.join_and_follow_group(author, group_on_remote)
+
+          {:ok, post} =
+            Posts.publish(
+              current_user: author,
+              post_attrs: %{post_content: %{html_body: html_body}},
+              context_id: id(group_on_remote),
+              to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(group_on_remote),
+              to_boundaries:
+                List.wrap(
+                  Bonfire.Classify.Boundaries.read_default_content_visibility(group_on_remote)
+                )
+            )
+
+          {id(post),
+           post
+           |> repo().maybe_preload([:peered, created: [:peered]])
+           |> Bonfire.Common.URIs.canonical_url()}
+        end)
+
+      assert post_held?(post_url), "control: the post reached the group's instance"
+
+      %{group: group, remote_post_id: remote_post_id, post_url: post_url}
     end
 
     # A group on this instance, a member of it who is NOT the group's moderator, someone on the other instance following the group, and a post the member published in it, asserted to have reached that follower and to be in the group there: the starting point for what moderators and authors do to such a post

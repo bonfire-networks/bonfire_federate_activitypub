@@ -712,6 +712,43 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
       %{creator: creator, group: group, actor: actor, post: post, announce: announce}
     end
 
+    # someone on another instance who joined by `Join` alone (as Mobilizon does, never sending a `Follow`) is still delivered the group's relay of a deletion, since their join records them as a follower (`Categories.join_group/3`)
+    test "a member who joined from another instance by Join alone gets the group's relay of a deletion" do
+      creator = fake_user!()
+      group = public_group(creator)
+      remote_user = remote_follower()
+
+      {:ok, _} =
+        ActivityPub.Federator.Transformer.handle_incoming(%{
+          "id" => @remote_actor <> "/join/#{System.unique_integer([:positive])}",
+          "type" => "Join",
+          "actor" => @remote_actor,
+          "object" => group_ap_id(group),
+          "to" => [group_ap_id(group)]
+        })
+
+      assert Bonfire.Classify.Categories.member?(remote_user, group), "control: joined"
+
+      post = post_in_group(creator, group, "<p>soon gone</p>")
+      {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: creator)
+
+      delete = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete")
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: group)
+
+      assert %{data: %{"type" => "Announce"}} =
+               announce = ActivityPub.Object.get_existing_announce(actor.ap_id, delete),
+             "control: the group relayed the deletion"
+
+      {:ok, %{data: remote_data}} = ActivityPub.Actor.get_cached(ap_id: @remote_actor)
+      their_inboxes = [remote_data["inbox"], e(remote_data, "endpoints", "sharedInbox", nil)]
+
+      inboxes = APPublisher.prepare_publish_params(actor, announce) |> Enum.map(& &1.inbox)
+
+      assert Enum.any?(inboxes, &(&1 in their_inboxes)),
+             "the member's instance is among the relay's recipients"
+    end
+
     test "publishing a group relay yields both shapes for the same inbox" do
       %{actor: actor, announce: announce} = announce_of_group_post()
 

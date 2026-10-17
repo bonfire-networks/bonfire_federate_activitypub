@@ -296,6 +296,25 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
              "accepted here, but their own instance is never told, so it still shows them waiting"
     end
 
+    # Pressing Join sends both a `Follow` and a `Join` (the threadiverse reads the first as joining, Mobilizon and Bonfire the second), and a group that reviews joins reads each as a request to join, so the two must make ONE request, whichever arrives first, or its moderators see the same person asking twice
+    for order <- [["Follow", "Join"], ["Join", "Follow"]] do
+      test "a #{Enum.join(order, " then a ")} from the same person make one join request", %{
+        group: group,
+        group_ap_id: group_ap_id
+      } do
+        for type <- unquote(order) do
+          assert {:ok, _} = Transformer.handle_incoming(membership_activity(type, group_ap_id))
+        end
+
+        assert [_] =
+                 Bonfire.Social.Requests.all_by_object(
+                   group,
+                   Bonfire.Boundaries.Verbs.get_id!(:join),
+                   skip_boundary_check: true
+                 )
+      end
+    end
+
     # ignoring is how a moderator declines, and nothing is sent for it
     test "ignoring an incoming Join sends nothing back", %{
       creator: creator,

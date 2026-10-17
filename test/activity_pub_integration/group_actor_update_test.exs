@@ -63,6 +63,25 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
     assert object["openness"] == "moderated"
   end
 
+  test "renaming a group federates an Update carrying the new name" do
+    creator = fake_user!()
+
+    group =
+      Simulate.fake_group!(creator, %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+
+    assert {:ok, _} = Categories.update(creator, group, %{profile: %{name: "Renamed group"}})
+
+    assert %{data: %{"object" => object}} = actor_update_activity(group),
+           "a renamed group that tells nobody keeps its old name on every remote mirror"
+
+    assert object["name"] == "Renamed group"
+  end
+
   # Archiving changes what the group declares (`postingRestrictedToMods` becomes true, since it now accepts nothing), and a declaration nobody is told about does no work: existing followers keep offering their users a compose button for a group that has closed.
   @tag skip:
          "2026-09-08: `soft_delete/2` deliberately does NOT push an actor Update. Delivering one for an already-archived group crashes a LINKED process in the delivery path, taking the caller's DB connection with it, so archiving itself failed — it broke every archive test across `bonfire_ui_groups`, sidebar pins and this extension in CI. A linked exit cannot be rescued at the call site, so the push was removed until the delivery crash is understood (archived rows are excluded from the default fetch, so delivery re-loading the group is the likely cause). The DECLARATION is correct either way and is covered by `group_actor_declarations_test.exs`; only telling existing followers is missing."
@@ -159,5 +178,43 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
     assert Map.take(after_update, [:membership, :visibility]) ==
              Map.take(before, [:membership, :visibility]),
            "the Update changed only who may post, so the rest must come through as it was"
+  end
+
+  # a rename reaches a mirror through `Categories.update_remote_actor/2`, the same `update/4` a local rename goes through, so it is what would echo the origin's rename back as ours
+  test "an incoming Update renames a mirrored group, and federates nothing back" do
+    assert {:ok, mirror} =
+             Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(
+               APSimulate.actor_json(@remote_group, "tests", %{"type" => "Group"})
+             )
+
+    renamed =
+      APSimulate.actor_json(@remote_group, "tests", %{
+        "type" => "Group",
+        "name" => "Renamed at the origin"
+      })
+
+    mock(fn
+      %{method: :get, url: @remote_group} -> json(renamed)
+      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+    end)
+
+    assert {:ok, _} =
+             Transformer.handle_incoming(%{
+               "type" => "Update",
+               "actor" => @remote_group,
+               "object" => renamed
+             })
+
+    assert {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
+
+    mirror = Bonfire.Common.Repo.maybe_preload(mirror, :profile)
+
+    assert mirror.profile.name == "Renamed at the origin",
+           "control: the rename reached the mirror, so update/4 ran for it. Its profile: #{inspect(mirror.profile)}"
+
+    # the incoming Update is stored too, so only one WE made counts
+    refute match?(%{local: true}, actor_update_activity(mirror)),
+           "the mirror announced its origin's rename as its own"
   end
 end

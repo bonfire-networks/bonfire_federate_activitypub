@@ -492,7 +492,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_character(%struct{id: pointer_id} = object, opts)
       when is_binary(pointer_id) and struct not in [Actor, Object] do
-    if opts[:skip] != :id do
+    if not skipped?(:id, opts) do
       get_character_by_id(pointer_id, opts)
     else
       case object do
@@ -526,8 +526,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   defp skip?(type, opts) do
-    if opts[:skip] == type, do: {:error, :not_found}
+    if skipped?(type, opts), do: {:error, :not_found}
   end
+
+  # every lookup that hands on to another appends its own `skip:` (`opts ++ [skip: :id]`), so there can be several, and `opts[:skip]` reads only the first: a character whose lookups each return a bare pointer (an archived group, which `Needles.get/2` can't follow) then went from username to id and back to id forever
+  defp skipped?(type, opts), do: type in Keyword.get_values(opts, :skip)
 
   def get_character_by_username(username, opts \\ [])
 

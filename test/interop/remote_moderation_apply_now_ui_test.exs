@@ -105,6 +105,22 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
 
   defp tick(session), do: check(session, @apply_now, "Apply it here now", exact: false)
 
+  # Delete and "Remove from group" do different things: removing takes the post out of the group at its origin (the moderator's `Delete` with a `summary`). Deleting a post that came from ANOTHER instance erases only our copy, as its confirmation says for a remote object ("only the copy here is deleted"; a local object's delete goes out to other instances), so it must send nothing: a plain `Delete` of someone else's remote post is refused by Lemmy, and isn't ours to send
+  describe "deleting someone's post in a mirrored community" do
+    test "erases our copy and sends nothing", %{me: me, my_ap_id: my_ap_id, post: post} do
+      refute Bonfire.Social.Objects.object_creator(Bonfire.Social.Objects.preload_creator(post))
+             |> id() == id(me),
+             "control: someone else's post"
+
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: me)
+
+      assert {:error, _} = Bonfire.Posts.read(id(post), current_user: me),
+             "gone here"
+
+      assert sent("Delete", my_ap_id) == [], "nothing sent to the community"
+    end
+  end
+
   # whether a moderator may take a post out of its group can be read off the POST's own boundary (its moderators get `:mediate` on what is published in the group, through the group's moderators ACL) rather than the group's, so a feed that has loaded each post's boundary answers it without a query per card. For that, both must agree, for a mirrored community's posts as for a local group's
   describe "moderating a post, asked of the post or of its group" do
     test "agree for a post received from a mirrored community", %{

@@ -74,13 +74,86 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseFlagUITest do
     assert List.wrap(to) == [@community]
   end
 
-  # the control: the same form, for a post in a LOCAL group, whose moderators see reports here
+  # A group here whose moderators include someone on another instance: they see reports only if sent to them, so the form offers the same two choices it offers for a group elsewhere, and the named report goes to them
+  test "a post in a local group with a moderator on another instance can be reported to them",
+       %{conn: conn, post: remote_post, me: me} do
+    # open, so its members' posts are published into it (a group that reviews joins would only file their join as a request)
+    group =
+      Bonfire.Classify.Simulate.fake_group!(me, %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+
+    # the Lemmy person who wrote the fixture's post, made one of this group's moderators
+    remote_moderator =
+      Bonfire.Social.Objects.object_creator(Bonfire.Social.Objects.preload_creator(remote_post))
+
+    refute Bonfire.Social.is_local?(remote_moderator), "control: someone on another instance"
+
+    {:ok, _} =
+      Bonfire.Classify.Categories.join_group(remote_moderator, group, skip_boundary_check: true)
+
+    {:ok, _} = Bonfire.Classify.Categories.add_moderator(me, group, id(remote_moderator))
+
+    author = fake_user!()
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(author, group)
+    post_by_other = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>theirs</p>")
+
+    {:ok, %{ap_id: moderator_ap_id}} = ActivityPub.Actor.get_cached(pointer: remote_moderator)
+
+    assert {:ok, _, %{id: group_id}} =
+             Bonfire.Classify.Categories.group_of_object(post_by_other)
+
+    assert group_id == id(group), "control: the post is in the group"
+
+    assert %{to: [^moderator_ap_id]} = Bonfire.Social.Flags.report_destination(post_by_other),
+           "control: the report can go to the group's moderator elsewhere"
+
+    conn
+    |> visit("/post/#{id(post_by_other)}")
+    |> wait_async()
+    |> assert_has("[data-object_id='#{id(post_by_other)}']")
+    |> within("[data-object_id='#{id(post_by_other)}']", fn session ->
+      click_button(session, "[data-role=open_modal]", "Flag this")
+    end)
+    |> assert_has("input[name=forward]")
+    |> assert_has(@group_checkbox)
+    |> fill_in("Add a comment for the flag", with: "spam")
+    |> check("my name for the group's moderators", exact: false)
+    |> click_button("button[data-role=submit_flag]", "Flag this")
+    |> assert_has("[role=alert]", text: "flagged!")
+
+    {:ok, %{ap_id: reporter}} = ActivityPub.Actor.get_cached(pointer: me)
+
+    assert [%{data: %{"to" => to}}] =
+             Bonfire.Common.Repo.all(ActivityPub.Object)
+             |> Enum.filter(&(&1.data["type"] == "Flag" and &1.data["actor"] == reporter))
+
+    assert List.wrap(to) == [moderator_ap_id], "sent to the group's moderator elsewhere"
+  end
+
+  # the control: the same form, for a post in a LOCAL group whose moderators are all here, who see reports on its moderation page
   test "a post in a local group offers no such checkbox", %{conn: conn, me: me} do
-    group = Bonfire.Classify.Simulate.fake_group!(me)
+    # open, so the post is really in the group (a group that reviews joins would leave the author's join a request, and their post outside it, so the missing checkbox would prove nothing)
+    group =
+      Bonfire.Classify.Simulate.fake_group!(me, %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+
     # someone else's post, since nobody flags their own
     author = fake_user!()
     assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(author, group)
     post_by_other = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>theirs</p>")
+
+    assert {:ok, _, %{id: group_id}} =
+             Bonfire.Classify.Categories.group_of_object(post_by_other)
+
+    assert group_id == id(group), "control: the post is in the group"
 
     conn
     |> visit("/post/#{id(post_by_other)}")

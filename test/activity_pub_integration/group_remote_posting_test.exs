@@ -107,4 +107,44 @@ defmodule Bonfire.Federate.ActivityPub.GroupRemotePostingTest do
     refute List.wrap(data["to"]) == [] and List.wrap(data["cc"]) == [@community],
            "this is the exact shape the production report produced: the community in `cc`, nothing in `to`, no `Public` anywhere"
   end
+
+  # Deleting a post of ours that's in a community elsewhere has to reach the community, which then relays it to its followers. Lemmy accepts a plain `Delete` of a post from anyone on the post's own instance who isn't banned from the community (`verify_delete_post_or_comment`, `verify_domains_match(actor, object_id)`), so the author's and our admin's both count, as long as the community is addressed
+  describe "deleting a post of ours in a mirrored community" do
+    test "by its author sends their Delete to the community" do
+      group = mirrored_community()
+      author = fake_user!()
+      post = post_in_group_as_composer_would(author, group, "<p>soon gone</p>")
+      {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: author)
+
+      assert %{data: delete} = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
+             "a Delete was sent"
+
+      {:ok, %{ap_id: author_ap_id}} = ActivityPub.Actor.get_cached(pointer: author)
+      assert delete["actor"] == author_ap_id
+
+      assert @community in (List.wrap(delete["to"]) ++ List.wrap(delete["cc"])),
+             "addressed to the community, so it reaches its inbox"
+    end
+
+    test "by an admin here sends a Delete to the community, from our instance" do
+      group = mirrored_community()
+      author = fake_user!()
+      post = post_in_group_as_composer_would(author, group, "<p>soon gone</p>")
+      {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: admin)
+
+      assert %{data: delete} = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
+             "a Delete was sent"
+
+      assert URI.parse(delete["actor"]).host == URI.parse(ap_id).host,
+             "from someone on the post's own instance, which is what Lemmy checks"
+
+      assert @community in (List.wrap(delete["to"]) ++ List.wrap(delete["cc"])),
+             "addressed to the community, so it reaches its inbox"
+    end
+  end
 end

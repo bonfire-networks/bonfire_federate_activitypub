@@ -258,47 +258,206 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "the Announce{Add} did not reach the follower, or did not re-sync its mirror.\nmirror's moderators: #{inspect(mirrored_moderators)}"
     end
 
-    # the moderator's decision at the origin is the only thing that can settle a pending join here, so it has to be sent back. Not expected to work yet: only `open_network` federates, and on the peer no stored `Join` is found to accept
-    # # for moderated groups
-    # @tag :todo
-    # test "joining a remote group that reviews joins waits, and its moderator accepting makes you a member here too",
-    #      context do
-    #   remote =
-    #     remote_group!(context, %{
-    #       membership: "on_request",
-    #       visibility: "global",
-    #       participation: "group_members",
-    #       default_content_visibility: "public"
-    #     })
+    # the moderator's decision at the origin is the only thing that can settle a pending join here, so it has to be sent back. (Was parked, its note then: "only `open_network` federates, and on the peer no stored `Join` is found to accept"; restored 17 October to see where it stands)
+    @tag :test_instance
+    test "joining a remote group that reviews joins waits, and its moderator accepting makes you a member here too",
+         context do
+      remote =
+        remote_group!(context, %{
+          membership: "on_request",
+          visibility: "global",
+          participation: "group_members",
+          default_content_visibility: "public"
+        })
 
-    #   local = context[:local][:user]
-    #   local_url = Bonfire.Me.Characters.character_url(local)
-    #   creator = context[:remote][:user]
+      local = context[:local][:user]
+      local_url = Bonfire.Me.Characters.character_url(local)
+      creator = context[:remote][:user]
 
-    #   assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
-    #   assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
 
-    #   refute Bonfire.Classify.Categories.member?(local, mirror), "the group has not decided yet"
-    #   assert Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
+      # by id, as the Join button does (`Bonfire.UI.Groups.LiveHandler`), which loads the group fresh
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, id(mirror))
 
-    #   TestInstanceRepo.apply(fn ->
-    #     joiner = on_peer(local_url)
+      refute Bonfire.Classify.Categories.member?(local, mirror), "the group has not decided yet"
+      assert Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
 
-    #     assert [request] =
-    #              Bonfire.Social.Requests.all_by_object(remote[:group], join_verb(),
-    #                skip_boundary_check: true
-    #              ),
-    #            "the Join did not arrive as a join request at the group's origin"
+      TestInstanceRepo.apply(fn ->
+        joiner = on_peer(local_url)
 
-    #     assert {:ok, _} = Bonfire.Classify.Categories.accept_join_request(creator, request)
-    #     assert Bonfire.Classify.Categories.member?(joiner, remote[:group])
-    #   end)
+        assert [request] =
+                 Bonfire.Social.Requests.all_by_object(remote[:group], join_verb(),
+                   skip_boundary_check: true
+                 ),
+               "the Join did not arrive as a join request at the group's origin"
 
-    #   assert Bonfire.Classify.Categories.member?(local, mirror),
-    #          "accepted at the origin, but no Accept of the Join came back, so the joiner's own instance still shows them waiting"
+        assert {:ok, _} = Bonfire.Classify.Categories.accept_join_request(creator, request)
+        assert Bonfire.Classify.Categories.member?(joiner, remote[:group])
+      end)
 
-    #   refute Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
-    # end
+      assert Bonfire.Classify.Categories.member?(local, mirror),
+             "accepted at the origin, but no Accept of the Join came back, so the joiner's own instance still shows them waiting"
+
+      refute Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
+    end
+
+    # whichever side refuses (our mirror, or the origin on receiving the Join), neither may end up with a member or a request the group never asked for. The test above is the control: the same steps for a group that reviews joins do make a request at the origin
+    @tag :test_instance
+    test "asking to join a remote invite-only group makes no member and no request on either side",
+         context do
+      remote =
+        remote_group!(context, %{
+          membership: "invite_only",
+          visibility: "global",
+          participation: "group_members",
+          default_content_visibility: "public"
+        })
+
+      local = context[:local][:user]
+      local_url = Bonfire.Me.Characters.character_url(local)
+
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+
+      assert Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)[:membership] ==
+               "invite_only",
+             "control: the mirror knows it is invite-only"
+
+      # by id, as the Join button does. Its answer isn't asserted: what matters is what each side holds after
+      Bonfire.Classify.Categories.join_and_follow_group(local, id(mirror))
+
+      refute Bonfire.Classify.Categories.member?(local, mirror)
+      refute Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
+
+      TestInstanceRepo.apply(fn ->
+        joiner = on_peer(local_url)
+
+        refute Bonfire.Classify.Categories.member?(joiner, remote[:group]),
+               "an invite-only group took in someone nobody invited"
+
+        assert [] ==
+                 Bonfire.Social.Requests.all_by_object(remote[:group], join_verb(),
+                   skip_boundary_check: true
+                 ),
+               "an invite-only group got a join request it has no way to answer"
+      end)
+    end
+
+    # renaming sends an actor `Update` to the group's followers, so their mirror changes without waiting for a re-fetch
+    @tag :test_instance
+    test "renaming a group at its origin renames a follower's mirror", context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      local = context[:local][:user]
+
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
+      assert Follows.following?(local, mirror), "control: only a follower is told"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Classify.Categories.update(context[:remote][:user], remote[:group], %{
+                   profile: %{name: "Renamed at the origin"}
+                 })
+      end)
+
+      assert {:ok, mirror} =
+               Bonfire.Classify.Categories.get(id(mirror), skip_boundary_check: true)
+
+      mirror = repo().maybe_preload(mirror, :profile)
+
+      assert mirror.profile.name == "Renamed at the origin",
+             "the Update never reached the follower, so its mirror keeps the old name"
+    end
+
+    # a peer that doesn't follow the group is told nothing, so its mirror learns of the change on its next fetch, which re-syncs the moderators from the served collection (as Lemmy does). Promotion reaching a FOLLOWER is the test above
+    @tag :test_instance
+    test "a moderator removed at the group's origin is gone from a peer's mirror once it re-fetches the group",
+         context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      creator = context[:remote][:user]
+
+      {demoted, demoted_url} =
+        TestInstanceRepo.apply(fn ->
+          demoted = fake_user!()
+
+          assert {:ok, _} =
+                   Bonfire.Classify.Categories.add_moderator(creator, remote[:group], id(demoted))
+
+          {demoted, Bonfire.Me.Characters.character_url(demoted)}
+        end)
+
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+
+      mirrored_moderators = fn ->
+        Bonfire.Classify.Categories.moderators(mirror)
+        |> repo().maybe_preload(character: [:peered])
+        |> Enum.map(&Bonfire.Common.URIs.canonical_url/1)
+      end
+
+      assert demoted_url in mirrored_moderators.(),
+             "control: the mirror took them as a moderator from its first fetch"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Classify.Categories.remove_moderator(
+                   creator,
+                   remote[:group],
+                   id(demoted)
+                 )
+      end)
+
+      # our next fetch of it, by the AP id we hold it under
+      {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: mirror)
+      assert {:ok, _} = ActivityPub.Actor.update_actor(group_ap_id, nil, true)
+
+      refute demoted_url in mirrored_moderators.(),
+             "the re-fetch kept a moderator the origin removed, so they can still act for the group from here.\nmirror's moderators: #{inspect(mirrored_moderators.())}"
+    end
+
+    # deleting is the irreversible act, so the group's actor is served as a `Tombstone` from then on, which is what tells a peer re-fetching it that it is gone
+    @tag :test_instance
+    test "a group deleted at its origin is served as a Tombstone to a peer", context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      assert {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(username: remote[:username])
+
+      assert {:ok, %{"type" => "Group"}} =
+               ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(actor.ap_id,
+                 return_tombstones: true
+               ),
+             "control: before deletion the peer is served the group"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Classify.Categories.hard_delete(remote[:group],
+                   current_user: context[:remote][:user]
+                 )
+      end)
+
+      assert {:ok, %{"type" => "Tombstone"}} =
+               ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(actor.ap_id,
+                 return_tombstones: true
+               )
+    end
 
     @tag :test_instance
     test "can lookup group actors from AP API with username, AP ID and with friendly URL",
