@@ -318,6 +318,41 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
     end
   end
 
+  # The group is fetched for the Join with `{:any, [:see, :read, :request]}` (`Categories.group_from_ap_object/2`): someone without all three still reaches it to ask, where a plain list would need them all. An `unlisted` group, as it federates (the `activity_pub` circle may read it, which serving its actor needs: a `preview` or members-only group's isn't found, `{:error, :is_local}`) while not being listed for them
+  describe "an unlisted group that reviews joins" do
+    setup %{creator: creator, group: group} do
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "on_request",
+                 visibility: "unlisted",
+                 participation: "group_members",
+                 default_content_visibility: "members:private"
+               })
+
+      :ok
+    end
+
+    test "files an incoming Join from someone who may read and ask but not see it", %{
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      user = remote_user()
+      assert Bonfire.Boundaries.can?(user, :request, group), "control: they may ask"
+      assert Bonfire.Boundaries.can?(user, :read, group), "control: and read it"
+      refute Bonfire.Boundaries.can?(user, :see, group), "control: but it isn't listed for them"
+
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Join", group_ap_id))
+
+      assert Bonfire.Social.Requests.requested?(
+               user,
+               Bonfire.Boundaries.Verbs.get_id!(:join),
+               group
+             )
+
+      refute Categories.member?(user, group), "waiting for a decision"
+    end
+  end
+
   describe "a moderator adding a remote person" do
     # A remote member is made a local follower only when THEY asked, through a `Join`. A moderator adding them is not their act, so nothing is recorded as if they had subscribed
     test "makes them a member but not a follower", %{creator: creator, group: group} do

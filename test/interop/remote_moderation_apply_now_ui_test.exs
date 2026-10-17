@@ -107,7 +107,11 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
 
   # whether a moderator may take a post out of its group can be read off the POST's own boundary (its moderators get `:mediate` on what is published in the group, through the group's moderators ACL) rather than the group's, so a feed that has loaded each post's boundary answers it without a query per card. For that, both must agree, for a mirrored community's posts as for a local group's
   describe "moderating a post, asked of the post or of its group" do
-    test "agree for a post received from a mirrored community", %{me: me, post: post, group: group} do
+    test "agree for a post received from a mirrored community", %{
+      me: me,
+      post: post,
+      group: group
+    } do
       assert Boundaries.can?(me, :mediate, group), "control: a moderator of the mirror"
 
       assert Boundaries.can?(me, :mediate, post) == Boundaries.can?(me, :mediate, group)
@@ -157,6 +161,7 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
 
     test "in a local group, offers no box", %{conn: conn, me: me} do
       group = Bonfire.Classify.Simulate.fake_group!(me)
+
       # a member, so their post is published INTO the group and carries its moderators' ACL (joining a group with the default membership may only file a request)
       author = fake_user!()
       assert {:ok, _} = Bonfire.Classify.Categories.add_member(me, group, id(author))

@@ -1079,7 +1079,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       served: served
     } do
       local_moderator = fake_user!()
-      {:ok, %{ap_id: local_moderator_ap_id}} = ActivityPub.Actor.get_cached(pointer: local_moderator)
+
+      {:ok, %{ap_id: local_moderator_ap_id}} =
+        ActivityPub.Actor.get_cached(pointer: local_moderator)
 
       serve(
         Map.put(
@@ -1214,7 +1216,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
         Bonfire.Boundaries.Blocks.lock(post, current_user: local_moderator, apply_now: true)
 
       refute Bonfire.Boundaries.can?(someone, :reply, post), "closed at once"
-      assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:lock, record), "still pending"
+
+      assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:lock, record),
+             "still pending"
 
       [lock] = sent.("Lock")
 
@@ -1315,7 +1319,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                    "object" => ban.data
                  })
 
-        assert Bonfire.Boundaries.can?(banned, :reply, post), "taking part, as the community refused it"
+        assert Bonfire.Boundaries.can?(banned, :reply, post),
+               "taking part, as the community refused it"
+
         assert {:ok, %{ignored_at: %DateTime{}}} = request.(:silence, record)
       end
 
@@ -1345,7 +1351,8 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                  )
 
         # (`feed_contains?/3` returns the activity it found, so compared as a boolean)
-        assert !!in_group?.() == not unquote(apply_now), "control: removed at once only when asked"
+        assert !!in_group?.() == not unquote(apply_now),
+               "control: removed at once only when asked"
 
         [delete] = sent.("Delete")
         {:ok, record} = Bonfire.Social.Moderations.record_of(delete)
