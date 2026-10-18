@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorDeleteTest do
   @moduledoc """
   Deleting a group tells the instances that hold it.
 
-  Groups are ARCHIVED rather than deleted in the product (`Categories.soft_delete/2`, reversible by `unarchive/2`), and archiving stays local on purpose: a federated `Delete` cannot be taken back, so announcing one for a reversible act would strand every remote mirror as a tombstone that `unarchive/2` could never undo. `Categories.hard_delete/2` is the irreversible path, named to pair with `soft_delete/2` so neither can be reached for by accident, and it is the one that federates.
+  Groups are ARCHIVED rather than deleted in the product (`Categories.soft_delete/2`, reversible by `unarchive/2`). Both federate as a `Delete` of the group, which is what Lemmy calls deleting a community, and Lemmy takes one back with an `Undo` of it, so a reversible archive and an irreversible `Categories.hard_delete/2` look the same on the wire; a peer archives its mirror for either, and its admin can clean up after.
 
   The machinery is shared with users and already handles non-user actors: `Outgoing.push_delete/4` has a clause for "Topics, Groups, and other non-user actors", and `ActivityPub.delete/3` matches any supported actor type, tombstoning local actors via `Actor.delete/2` so the actor endpoint serves a `Tombstone` afterwards rather than the actor. What is missing is a group deletion that reaches it.
   """
@@ -51,16 +51,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorDeleteTest do
            "the post was written by a person, not by the group, and deleting the group they posted in must not delete what they wrote"
   end
 
-  # The other half of the same act, and the reason archiving must not federate one: this is irreversible for everyone who receives it.
-  test "archiving a group federates nothing" do
+  # Archiving is what Lemmy calls deleting a community: a `Delete` of the group from the moderator who did it, undone by an `Undo` of it (`unarchive/2`), so the same wire as deleting, sent by whoever archived it
+  test "archiving a group federates a Delete of it, from whoever archived it" do
     creator = fake_user!()
     group = federated_group!(creator)
 
     assert {:ok, %{ap_id: ap_id}} = ActivityPub.Actor.get_cached(pointer: group)
+    assert {:ok, %{ap_id: creator_ap_id}} = ActivityPub.Actor.get_cached(pointer: creator)
 
     assert {:ok, _} = Categories.soft_delete(group, creator)
 
-    refute ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
-           "archiving is reversible by `unarchive/2`, and a federated Delete is not, so announcing one would strand every mirror as a tombstone we could never undo"
+    assert %{data: %{"type" => "Delete", "actor" => ^creator_ap_id}} =
+             ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
+           "an archive nobody is told about leaves every remote instance offering a community that accepts nothing"
   end
 end
