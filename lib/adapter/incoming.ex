@@ -484,11 +484,22 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   def receive_object(creator, object) do
     info("AP - Create an object without an activity")
-    receive_activity(%{data: %{"type" => "Create", "actor" => creator}}, object)
+
+    # with no creator given (eg. re-ingesting a cached object not yet linked to a local one) the author is the object's own `attributedTo`, else the service character would be credited
+    receive_activity(
+      %{
+        data: %{
+          "type" => "Create",
+          "actor" => creator || ActivityPub.Object.actor_id_from_data(object)
+        }
+      },
+      object
+    )
   end
 
   # for activities that create new objects we need to take into account the date, and save canonical url/update pointer
   # This should not be done if the object is local, i. e. local actor as the object of a follow
+  # Creates the local object only if none exists yet for the AP id, else returns the existing one. Two jobs can ingest the same object at once (eg. a Note's `Create` from its author's inbox delivery, and a relay's `Announce` of it, which resolves the Note before the first job has linked it): both would pass the exists? check before either commits, and each create a Post. So the check and the creation run under a lock on the AP id, and the job that waited finds the Post the other created.
   defp handle_activity_with(
          {:ok, module},
          character,
@@ -502,6 +513,15 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     ap_activity_id = e(activity, :data, "id", nil)
     ap_id = ap_obj_id || ap_activity_id
 
+    lock_id = if(ap_id, do: {__MODULE__, :ingest, ap_id})
+
+    Utils.with_lock(lock_id, fn ->
+      create_unless_exists(ap_id, module, character, activity, object)
+    end)
+  end
+
+  # the exists? check and the creation, which `handle_activity_with/4` runs under the AP id's lock
+  defp create_unless_exists(ap_id, module, character, activity, object) do
     if ap_id && Bonfire.Common.Needles.exists?(ap_id) do
       warn(ap_id, "Already exists locally")
       Bonfire.Common.Needles.get(ap_id, skip_boundary_check: true)

@@ -368,6 +368,22 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
       end
     end
 
+    # A batch's mirrors are repaired one after another, so one whose repair raises must not lose the rest of its batch. Seen on bonfire.cafe (18 October, 2507 still untyped after the migration ran): repairing a mirror syncs its moderators, and creating one of them (`jan_beta@makertube.net`) collided with a character already holding that username under another URI, so its transaction rolled back and the raise ended the run. That collision isn't reproduced here (see the group plan); this stands in an entry whose repair raises for certain
+    test "the data migration goes on past a mirror whose repair raises", %{
+      mirror: mirror,
+      untyped: untyped
+    } do
+      untyped.([])
+
+      assert {:ok, %{type: nil}} = Categories.get(id(mirror), skip_boundary_check: true),
+             "control: the old shape"
+
+      Bonfire.Classify.UntypedMirrors.DataMigration.migrate([:not_a_row, %{id: id(mirror)}])
+
+      assert {:ok, %{type: :group}} = Categories.get(id(mirror), skip_boundary_check: true),
+             "the mirror after one whose repair raised was never repaired"
+    end
+
     test "a mirror that already has a type is left as it is", %{mirror: mirror} do
       assert {:ok, %{type: :group}} = Categories.get(id(mirror), skip_boundary_check: true)
 

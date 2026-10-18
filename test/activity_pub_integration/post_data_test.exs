@@ -495,6 +495,101 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       assert reply.replied.reply_to_id == post.id
     end
 
+    test "a cached Note not yet linked to a Post is created as authored by its attributedTo, not the service character" do
+      {:ok, author} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(@remote_actor)
+
+      {:ok, actor} = ActivityPub.Actor.get_cached(ap_id: @remote_actor)
+
+      note_id = @remote_instance <> "/pub/" <> Needle.UID.generate()
+
+      # stored the way an inbox job stores it before the adapter has created and linked the Post, which is what a concurrent job (eg. a relay's `Announce` of the same Note) sees when it resolves the Note
+      {:ok, _} =
+        ActivityPub.Object.insert(
+          %{
+            "type" => "Create",
+            "actor" => actor.ap_id,
+            "to" => [ActivityPub.Config.public_uri()],
+            "object" => %{
+              "id" => note_id,
+              "type" => "Note",
+              "content" => "content",
+              "attributedTo" => actor.ap_id,
+              "to" => [ActivityPub.Config.public_uri()],
+              "published" => "2015-02-10T15:00:00Z"
+            }
+          },
+          false
+        )
+
+      {:ok, note} = ActivityPub.Object.get_cached(ap_id: note_id)
+      assert %{is_object: true, local: false, pointer_id: nil} = note
+
+      assert {:ok, post} = Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(note)
+
+      assert repo().maybe_preload(post, :created).created.creator_id == author.id
+    end
+
+    test "a Note ingested by two jobs at once (eg. its Create and a relay's Announce of it) creates one Post" do
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+
+      create_id = @remote_instance <> "/pub/" <> Needle.UID.generate()
+      note_id = @remote_instance <> "/pub/" <> Needle.UID.generate()
+
+      {:ok, _} =
+        ActivityPub.Object.insert(
+          %{
+            "id" => create_id,
+            "type" => "Create",
+            "actor" => actor.ap_id,
+            "to" => [ActivityPub.Config.public_uri()],
+            "object" => %{
+              "id" => note_id,
+              "type" => "Note",
+              "content" => "content",
+              "attributedTo" => actor.ap_id,
+              "to" => [ActivityPub.Config.public_uri()],
+              "published" => "2015-02-10T15:00:00Z"
+            }
+          },
+          false
+        )
+
+      {:ok, create} = ActivityPub.Object.get_cached(ap_id: create_id)
+      {:ok, note} = ActivityPub.Object.get_cached(ap_id: note_id)
+
+      # hold each job at the "does this Note already exist locally?" check until the other reaches it too (or a timeout passes), so both check before either has created the Post, as happened on prod
+      test_pid = self()
+
+      Repatch.patch(Bonfire.Common.Needles, :exists?, [mode: :shared], fn filters, opts ->
+        if filters == note_id do
+          send(test_pid, {:at_exists_check, self()})
+
+          receive do
+            :go -> :ok
+          after
+            2_000 -> :ok
+          end
+        end
+
+        Repatch.real(Bonfire.Common.Needles, :exists?, [filters, opts])
+      end)
+
+      # the inbox job handling the Create
+      create_job = Task.async(fn -> Bonfire.Federate.ActivityPub.Incoming.receive_activity(create) end)
+
+      # the relay's Announce job resolving the same Note
+      announce_job =
+        Task.async(fn -> Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(note) end)
+
+      for pid <- await_exists_checks(2, 2_000), do: send(pid, :go)
+
+      assert {:ok, %{id: created_id}} = Task.await(create_job, 30_000)
+      assert {:ok, %{id: resolved_id}} = Task.await(announce_job, 30_000)
+
+      assert resolved_id == created_id
+    end
+
     test "creates a private reply for an incoming public note" do
       {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
@@ -621,6 +716,18 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       assert String.starts_with?(mention["name"], "@"),
              "Expected mention name to start with @, got: #{inspect(mention["name"])}"
+    end
+  end
+
+  # the pids of up to `count` processes that reached the patched exists? check within `timeout`
+  defp await_exists_checks(count, timeout, pids \\ [])
+  defp await_exists_checks(count, _timeout, pids) when length(pids) == count, do: pids
+
+  defp await_exists_checks(count, timeout, pids) do
+    receive do
+      {:at_exists_check, pid} -> await_exists_checks(count, timeout, [pid | pids])
+    after
+      timeout -> pids
     end
   end
 end
