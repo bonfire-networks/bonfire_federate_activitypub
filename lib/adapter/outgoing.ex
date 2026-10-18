@@ -107,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp maybe_push_delete(subject, thing, opts) do
     # the schema, which is what each clause matches on: without `only_schemas` a group is `:group`, so it was deleted as a post rather than as an actor (no tombstone of its own, and a relay of its own deletion through itself)
     case not is_nil(thing) and
-           push_delete(Types.object_type(thing, only_schemas: true), subject, thing, opts)
+           push_delete(Types.object_type_schema(thing), subject, thing, opts)
            |> debug("result of push_delete") do
       {:ok, del} ->
         {:ok, del}
@@ -163,7 +163,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
         ActivityPub.Federator.publish(existing_activity)
       else
         _ ->
-          object_type = Types.object_type(local_object) || struct_type
+          object_type = Types.object_type_schema(local_object) || struct_type
           prepare_and_queue(subject, :create, local_object, object_type, opts)
       end
     end
@@ -172,7 +172,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   defp maybe_prepare_and_queue(subject, verb, local_object, opts) do
     object_type =
       case local_object do
-        %{__struct__: struct_type} -> Types.object_type(local_object) || struct_type
+        %{__struct__: struct_type} -> Types.object_type_schema(local_object) || struct_type
         _ -> nil
       end
 
@@ -383,6 +383,23 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     else
       e ->
         preparation_error("Could not find the AP object to delete", "Delete", e)
+        :ignore
+    end
+  end
+
+  @doc """
+  Tells other instances that a deleted local actor is back (eg. an unarchived group): turns its tombstone back into the actor, sends an `Undo` of its `Delete` from `subject` (whoever restored it, as Lemmy expects a moderator to), then an actor `Update`, for software that doesn't read an `Undo` of a deletion.
+  """
+  def push_undelete(subject, character) do
+    with %ActivityPub.Actor{} = actor <- AdapterUtils.character_to_actor(character),
+         {:ok, actor} <- ActivityPub.Actor.undo_tombstone(actor),
+         {:ok, subject_actor} <- ActivityPub.Actor.get_cached(pointer: subject),
+         {:ok, undo} <- ActivityPub.undelete(%{actor: subject_actor, object: actor}) do
+      push_actor_update(character)
+      {:ok, undo}
+    else
+      e ->
+        preparation_error("Could not federate the restoring of an actor", "Undo", e)
         :ignore
     end
   end

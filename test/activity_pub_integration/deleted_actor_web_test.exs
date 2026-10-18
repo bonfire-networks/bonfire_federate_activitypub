@@ -34,8 +34,6 @@ defmodule Bonfire.Federate.ActivityPub.DeletedActorWebTest do
   end
 
   # archiving is Lemmy's community delete: served as a tombstone until restored, which is also what lets a peer verify the `Delete` it is sent (it goes ahead only once the origin stops serving the group)
-  @tag skip:
-         "2026-10-18: archiving marks `Category`'s own (deprecated) `deleted_at` rather than the pointer's, so the adapter still finds the group through its live pointer and serves it ahead of its tombstone. Waits for archiving to mark the pointer (group plan, Phase 2, archiving)"
   test "an archived group is served as a Tombstone by username and by id, and as the group again once unarchived" do
     creator = fake_user!()
     group = federated_group!(creator)

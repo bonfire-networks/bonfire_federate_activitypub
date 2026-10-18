@@ -375,6 +375,44 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "the Update never reached the follower, so its mirror keeps the old name"
     end
 
+    # archiving is Lemmy's community delete: a `Delete` of the group, taken back by an `Undo` of it. The follower's mirror is archived (not deleted, so the `Undo` can bring it back) and restored with it
+    @tag :test_instance
+    test "archiving a group at its origin archives a follower's mirror, and unarchiving restores it",
+         context do
+      remote =
+        remote_group!(context, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+      local = context[:local][:user]
+      creator = context[:remote][:user]
+
+      assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
+      assert Follows.following?(local, mirror), "control: only a follower is told"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} = Bonfire.Classify.Categories.soft_delete(remote[:group], creator)
+      end)
+
+      refute repo().get(Bonfire.Classify.Category, id(mirror)),
+             "the Delete never reached the follower, so its mirror stays open for posts the origin closed"
+
+      assert {:ok, %{profile: %{name: _}}} = Bonfire.Classify.Categories.get_archived(id(mirror)),
+             "the mirror was deleted rather than archived, so the origin's restore can't bring it back"
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} = Bonfire.Classify.Categories.unarchive(id(remote[:group]), creator)
+      end)
+
+      assert {:ok, %{type: :group}} =
+               Bonfire.Classify.Categories.get(id(mirror), skip_boundary_check: true),
+             "restored at its origin, but the Undo of the Delete never restored the follower's mirror"
+    end
+
     # a peer that doesn't follow the group is told nothing, so its mirror learns of the change on its next fetch, which re-syncs the moderators from the served collection (as Lemmy does). Promotion reaching a FOLLOWER is the test above
     @tag :test_instance
     test "a moderator removed at the group's origin is gone from a peer's mirror once it re-fetches the group",

@@ -442,6 +442,21 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     }
   end
 
+  @doc """
+  Restores our copy of a remote actor that its origin deleted and then restored (`Undo{Delete}`, once the origin serves it again). Found by its `Peered` URI, a mixin that survives the deletion, and handed to its character module's `restore_remote/1` (eg. a mirrored group, archived when its origin deleted it).
+  """
+  def undelete_remote_actor(ap_id) when is_binary(ap_id) do
+    with %{id: id} <-
+           Bonfire.Common.Repo.get_by(Bonfire.Data.ActivityPub.Peered, canonical_uri: ap_id),
+         {:ok, pointer} <-
+           Bonfire.Common.Needles.one(id, skip_boundary_check: true, deleted: true),
+         module when not is_nil(module) <- AdapterUtils.character_module(pointer) do
+      maybe_apply(module, :restore_remote, [id], fallback_return: {:ok, nil})
+    else
+      _ -> {:ok, nil}
+    end
+  end
+
   def update_remote_actor(%{pointer_id: pointer_id} = actor) when is_binary(pointer_id) do
     AdapterUtils.get_character_by_id(pointer_id)
     |> debug("character pre-update")

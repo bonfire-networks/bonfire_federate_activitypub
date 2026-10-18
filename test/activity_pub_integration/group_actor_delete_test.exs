@@ -51,6 +51,37 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorDeleteTest do
            "the post was written by a person, not by the group, and deleting the group they posted in must not delete what they wrote"
   end
 
+  # Lemmy restores a deleted community on an `Undo` of its `Delete` (`undo_delete.rs`), the only thing that clears its `deleted` flag; software that doesn't read an `Undo` of an actor's deletion learns the group is back from the actor `Update` that follows
+  test "unarchiving a group federates an Undo of its archive's Delete, then an Update of its actor" do
+    creator = fake_user!()
+    group = federated_group!(creator)
+
+    assert {:ok, %{ap_id: ap_id}} = ActivityPub.Actor.get_cached(pointer: group)
+    assert {:ok, %{ap_id: creator_ap_id}} = ActivityPub.Actor.get_cached(pointer: creator)
+
+    assert {:ok, _} = Categories.soft_delete(group, creator)
+
+    assert %{data: %{"id" => delete_id}} =
+             ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
+           "control: archiving federated a Delete, for the Undo to take back"
+
+    assert {:ok, _} = Categories.unarchive(id(group), creator)
+
+    assert %{
+             data: %{
+               "type" => "Undo",
+               "actor" => ^creator_ap_id,
+               "object" => %{"id" => ^delete_id}
+             }
+           } =
+             ActivityPub.Object.get_activity_for_object_ap_id(delete_id, "Undo"),
+           "a restored group nobody is told about stays deleted on Lemmy, where only an Undo of the Delete clears it"
+
+    assert %{data: %{"object" => %{"type" => "Group"}}} =
+             ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Update"),
+           "and an Update of the actor, as it is again, for software that doesn't read an Undo of a deletion"
+  end
+
   # Archiving is what Lemmy calls deleting a community: a `Delete` of the group from the moderator who did it, undone by an `Undo` of it (`unarchive/2`), so the same wire as deleting, sent by whoever archived it
   test "archiving a group federates a Delete of it, from whoever archived it" do
     creator = fake_user!()

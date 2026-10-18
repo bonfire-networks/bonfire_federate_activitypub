@@ -63,26 +63,33 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                AdapterUtils.get_by_url_ap_id_or_username(remote.topic_url)
     end
 
-    # archiving a group closes it to posting (it declares `postingRestrictedToMods`, as a channel does), but it still has its members, so it stays a group.
-    # Seen here on our next fetch of it rather than through its `Update`: archiving doesn't send one (disabled, since delivering it crashed the archive, parked in `group_actor_update_test.exs`).
-    # Parked: re-fetching the archived group fails too (`Actor.update_actor/4` → "Cannot update a locally-unknown actor"), so archived groups don't federate at all yet. The rule itself (members of its own keep it a group though nobody may post) is covered by `interop/group_or_topic_test.exs` "a group, when nobody may post but it has members of its own (an archived group)"
-    @tag :todo
-    @tag skip:
-           "archived groups don't federate: no actor Update on archive, and the archived actor can't be re-fetched"
-    test "an archived group there is still a group here", %{remote: remote} do
+    # archiving a group serves it as a tombstone (Lemmy's community delete), so a peer that doesn't follow it learns of the archive on its next fetch rather than by the `Delete`, and of the restore the same way, finding the group again, still a group.
+    # The group-or-topic rule for an archived group is moot now (it is a tombstone); `interop/group_or_topic_test.exs` "a group, when nobody may post but it has members of its own (an archived group)" still covers the rule for other software's actors
+    test "an archived group there is a tombstone when fetched here, and a group again once restored",
+         %{remote: remote} do
       assert {:ok, %{type: :group} = mirror} =
                AdapterUtils.get_by_url_ap_id_or_username(remote.group_url)
+
+      # the AP id we hold it under, which any re-fetch uses
+      {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: mirror)
 
       TestInstanceRepo.apply(fn ->
         assert {:ok, _} = Categories.soft_delete(remote.group, remote.creator)
       end)
 
-      # our next fetch of it, as any re-fetch would, by the AP id we hold it under
-      {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: mirror)
-      assert {:ok, actor} = ActivityPub.Actor.update_actor(group_ap_id, nil, true)
+      assert {:ok, %{"type" => "Tombstone"}} =
+               ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(group_ap_id,
+                 return_tombstones: true
+               ),
+             "the archived group is still served as itself, so a peer keeps offering a group that accepts nothing"
 
-      assert actor.data["postingRestrictedToMods"] == true,
-             "control: the archive reached us, closing it to posting"
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} = Categories.unarchive(id(remote.group), remote.creator)
+      end)
+
+      assert {:ok, %{data: %{"type" => "Group"}}} =
+               ActivityPub.Actor.update_actor(group_ap_id, nil, true),
+             "restored at its origin, but still a tombstone to a peer"
 
       assert {:ok, %{type: :group}} = Categories.get(id(mirror), skip_boundary_check: true)
     end

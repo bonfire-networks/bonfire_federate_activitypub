@@ -1617,8 +1617,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enums.filter_empty(%{})
     |> Map.merge(%{
       # an ARCHIVED group accepts nothing from anyone (`soft_delete/2` locks it), which this field is the only way to say. Read from the archive flag rather than from boundaries on purpose: a circle-level check cannot tell a locked group from one only its MEMBERS may post in, and marking the latter restricted would hide the compose button from people who can in fact post
-      "postingRestrictedToMods" =>
-        dims[:participation] == "moderators" or not is_nil(e(group, :deleted_at, nil)),
+      "postingRestrictedToMods" => dims[:participation] == "moderators",
+      # or not is_nil(e(group, :deleted_at, nil)),
+      # ^ commented out 2026-10-18: archiving now marks the group's pointer deleted, so an archived group has no row to read this from and is served as its tombstone rather than as an actor declaring anything
       "manuallyApprovesFollowers" => manually_approves?,
       # whether peers should list it, from whether the fediverse may `see` it here (an unlisted visibility grants read but not see), so what we declare can't drift from what we enforce. Overrides the user-level `undiscoverable` setting `do_format_actor/2` puts in, which says nothing about a group. Lemmy 1.0 reads `false` as Unlisted
       "discoverable" => Bonfire.Boundaries.can?(:activity_pub, :see, group) == true
