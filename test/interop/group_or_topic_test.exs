@@ -26,6 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
   @flipboard "https://flipboard.local/magazines/6_IpBYSbRV-7tt-Yfrp6tA:m:89340020"
   @hubzilla "https://hubzilla.local/channel/berlin"
   @friendica "https://friendica.local/profile/helpers"
+  @bonfire_parent "https://bonfire.local/pub/actors/parent"
 
   setup do
     read = fn dir, name ->
@@ -121,72 +122,412 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
       refute Map.has_key?(topic_actor, "openness"), "nobody joins a topic"
     end
+
+    # a topic converted to a group keeps its parent here, so it is a subgroup, which names that parent as a topic does, with members of its own
+    test "a subgroup names its parent group, and declares members of its own" do
+      creator = fake_user!()
+
+      group =
+        Bonfire.Classify.Simulate.fake_group!(creator, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone"
+        })
+
+      topic = Bonfire.Classify.Simulate.fake_category!(creator, group, %{type: :topic})
+      assert {:ok, subgroup} = Categories.convert(topic, :group, current_user: creator)
+
+      group_actor = Categories.format_actor(group).data
+      subgroup_actor = Categories.format_actor(subgroup).data
+
+      assert subgroup_actor["broader"] == group_actor["id"], "names its parent group"
+
+      assert subgroup_actor["members"] ==
+               ActivityPub.Utils.collection_ap_id("members", id(subgroup)),
+             "its members are its own"
+
+      refute Map.has_key?(subgroup_actor, "inScheme"), "a group, not a topic"
+    end
   end
 
-  # what another Bonfire sends, as the test above has ours send it. A subgroup and a topic both name their `broader` group, so the parent is fetched and their `members` compared: the parent's (or none) is a topic, its own a subgroup
+  # what another Bonfire sends, as the test above has ours send it. A subgroup and a topic both name their `broader` group, so the parent is fetched and their `members` compared: the parent's (or none) is a topic, its own a subgroup. Either one is filed under the parent's mirror, as it is under the parent at home
   describe "a Bonfire category from another instance is mirrored as" do
-    for {label, extra, type} <- [
+    for {label, extra, type, under_parent?} <- [
           {"a topic, when it names a broader group and declares that group's members",
            %{
-             "broader" => "https://bonfire.local/pub/actors/parent",
+             "broader" => @bonfire_parent,
              "members" => "https://bonfire.local/pub/collections/members/parent"
-           }, :topic},
+           }, :topic, true},
           {"a topic, when it names a broader group and declares no members",
-           %{"broader" => "https://bonfire.local/pub/actors/parent"}, :topic},
+           %{"broader" => @bonfire_parent}, :topic, true},
           {"a group, when it names a broader group but has members of its own (a subgroup)",
            %{
-             "broader" => "https://bonfire.local/pub/actors/parent",
+             "broader" => @bonfire_parent,
              "members" => "https://bonfire.local/pub/collections/members/sub",
              "capabilities" => %{"acceptsJoins" => true}
-           }, :group},
+           }, :group, true},
           {"a group, when nobody may post but it has members of its own (an archived group)",
            %{
              "postingRestrictedToMods" => true,
              "members" => "https://bonfire.local/pub/collections/members/archived",
              "capabilities" => %{"acceptsJoins" => true}
-           }, :group}
+           }, :group, false}
         ] do
       test label, %{served: served} do
-        bonfire_actor = fn id, extra ->
-          served[@lemmy]
-          |> Map.drop(["postingRestrictedToMods"])
-          |> Map.merge(%{
-            "id" => id,
-            "preferredUsername" => "cat#{System.unique_integer([:positive])}",
-            "inbox" => "#{id}/inbox",
-            "outbox" => "#{id}/outbox",
-            "followers" => "#{id}/followers",
-            "attributedTo" => "#{id}/moderators"
-          })
-          |> Map.merge(extra)
-          |> put_in(["publicKey", "id"], "#{id}#main-key")
-          |> put_in(["publicKey", "owner"], id)
-        end
-
-        parent_id = "https://bonfire.local/pub/actors/parent"
-
-        parent =
-          bonfire_actor.(parent_id, %{
-            "members" => "https://bonfire.local/pub/collections/members/parent",
-            "capabilities" => %{"acceptsJoins" => true}
-          })
-
         id = "https://bonfire.local/pub/actors/#{System.unique_integer([:positive])}"
-        actor = bonfire_actor.(id, unquote(Macro.escape(extra)))
-
-        mock(fn
-          %{method: :get, url: ^id} -> json(actor)
-          %{method: :get, url: ^parent_id} -> json(parent)
-          %{method: :get} -> %Tesla.Env{status: 404, body: ""}
-          %{method: :post} -> %Tesla.Env{status: 202, body: ""}
-        end)
+        actor = bonfire_actor(served, id, unquote(Macro.escape(extra)))
+        serve_with_parent(served, id, actor)
 
         assert {:ok, %Bonfire.Classify.Category{} = mirror} =
                  Adapter.maybe_create_remote_actor(%{"id" => id})
 
         assert mirror.type == unquote(type)
+
+        if unquote(under_parent?) do
+          assert parent_id_of(mirror) == id(parent_mirror!()),
+                 "filed under its parent group's mirror"
+        else
+          assert parent_id_of(mirror) == nil, "control: a top-level group has no parent"
+        end
       end
     end
+
+    # a mirror made from an actor that didn't name its parent (eg. before we sent `broader`) is filed under it once an `Update` does
+    test "a topic is filed under its parent group's mirror once an Update names it", %{
+      served: served
+    } do
+      id = "https://bonfire.local/pub/actors/#{System.unique_integer([:positive])}"
+      before = bonfire_actor(served, id, %{"postingRestrictedToMods" => true})
+      serve_with_parent(served, id, before)
+
+      assert {:ok, %{type: :topic} = mirror} = Adapter.maybe_create_remote_actor(%{"id" => id})
+      assert parent_id_of(mirror) == nil, "control: no parent named yet"
+
+      updated = Map.put(before, "broader", @bonfire_parent)
+      serve_with_parent(served, id, updated)
+
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Update",
+                 "id" => "#{id}/activities/update/broader",
+                 "actor" => id,
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "object" => updated
+               })
+
+      assert {:ok, reloaded} = Categories.get(id(mirror), skip_boundary_check: true)
+      assert reloaded.type == :topic
+      assert parent_id_of(reloaded) == id(parent_mirror!()), "filed under its parent group's mirror"
+    end
+  end
+
+  # a parent may name a parent in turn, and a chain may be a cycle (FEP-9b2b: "limit how far you follow them"), so the chain is followed as deep as incoming threads may be (`federation_incoming_max_recursion`) and a cycle isn't followed round
+  describe "a chain of broader groups" do
+    setup %{served: served} do
+      [group, subgroup, topic] =
+        for name <- ~w(group subgroup topic),
+            do: "https://bonfire.local/pub/actors/#{name}#{System.unique_integer([:positive])}"
+
+      serve(%{
+        group =>
+          bonfire_actor(served, group, %{
+            "members" => "#{group}/members",
+            "capabilities" => %{"acceptsJoins" => true}
+          }),
+        subgroup =>
+          bonfire_actor(served, subgroup, %{
+            "broader" => group,
+            "members" => "#{subgroup}/members",
+            "capabilities" => %{"acceptsJoins" => true}
+          }),
+        topic => bonfire_actor(served, topic, %{"broader" => subgroup})
+      })
+
+      {:ok, group: group, subgroup: subgroup, topic: topic}
+    end
+
+    test "is followed: a topic in a subgroup in a group is filed at every level", ctx do
+      assert {:ok, %{type: :topic} = topic} =
+               Adapter.maybe_create_remote_actor(%{"id" => ctx.topic})
+
+      assert {:ok, %{type: :group} = subgroup} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.subgroup)
+
+      assert {:ok, %{type: :group} = group} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.group)
+
+      assert parent_id_of(topic) == id(subgroup), "the topic in its subgroup"
+      assert parent_id_of(subgroup) == id(group), "the subgroup in its group"
+      assert parent_id_of(group) == nil, "control: the group is top-level"
+    end
+
+    test "is followed no deeper than incoming threads may be", ctx do
+      previous = ActivityPub.Config.get([:instance, :federation_incoming_max_recursion])
+      ActivityPub.Config.put([:instance, :federation_incoming_max_recursion], 0)
+
+      on_exit(fn ->
+        ActivityPub.Config.put([:instance, :federation_incoming_max_recursion], previous)
+      end)
+
+      assert {:ok, %{type: :topic} = topic} =
+               Adapter.maybe_create_remote_actor(%{"id" => ctx.topic})
+
+      assert parent_id_of(topic) == nil, "no parent followed at a limit of 0"
+    end
+
+    # the parent is made before the child's transaction opens (`AdapterUtils.create_remote_actor/1` → `Categories.remote_parent/2`), so a parent the database refuses can't abort the child's: here a NUL byte, which Postgres refuses in `text` and `jsonb` alike
+    test "whose parent can't be made still mirrors the child, at the top level", %{served: served} do
+      [parent, topic] =
+        for name <- ~w(parent topic),
+            do: "https://bonfire.local/pub/actors/#{name}#{System.unique_integer([:positive])}"
+
+      serve(%{
+        parent =>
+          bonfire_actor(served, parent, %{
+            "preferredUsername" => "broken\u0000parent",
+            "members" => "#{parent}/members",
+            "capabilities" => %{"acceptsJoins" => true}
+          }),
+        topic => bonfire_actor(served, topic, %{"broader" => parent})
+      })
+
+      assert {:ok, %{type: :topic} = mirror} = Adapter.maybe_create_remote_actor(%{"id" => topic})
+
+      assert {:error, :not_found} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(parent),
+             "control: the parent really couldn't be made"
+
+      assert parent_id_of(mirror) == nil, "filed nowhere until its parent can be made"
+    end
+
+    test "that is a cycle is mirrored once each, and not followed round", %{served: served} do
+      [a, b] =
+        for name <- ~w(a b),
+            do: "https://bonfire.local/pub/actors/#{name}#{System.unique_integer([:positive])}"
+
+      serve(%{
+        a =>
+          bonfire_actor(served, a, %{
+            "broader" => b,
+            "members" => "#{a}/members",
+            "capabilities" => %{"acceptsJoins" => true}
+          }),
+        b =>
+          bonfire_actor(served, b, %{
+            "broader" => a,
+            "members" => "#{b}/members",
+            "capabilities" => %{"acceptsJoins" => true}
+          })
+      })
+
+      assert {:ok, %{type: :group} = a_mirror} = Adapter.maybe_create_remote_actor(%{"id" => a})
+
+      assert {:ok, b_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(b)
+
+      assert parent_id_of(a_mirror) == id(b_mirror), "the first one in the group it names"
+      assert parent_id_of(b_mirror) == nil, "the other not filed back under the first"
+    end
+  end
+
+  # A group lists its topics and subgroups in a `narrower` collection, so the children nobody here has met yet are mirrored and filed under its mirror. Fetched as the AP library fetches replies (the collection, then each entry, by jobs, which tests run inline), as many as it fetches of any collection (`federation_incoming_max_items`), as FEP-9b2b asks of consumers. Each one is filed under the group it names itself, so one listed that names another group is mirrored, as any actor we fetch is, but not filed here
+  describe "a group's narrower collection" do
+    setup %{served: served} do
+      group = "https://bonfire.local/pub/actors/group#{System.unique_integer([:positive])}"
+      narrower = "#{group}/narrower"
+
+      [topic, subgroup, stranger] =
+        for name <- ~w(topic subgroup stranger),
+            do: "https://bonfire.local/pub/actors/#{name}#{System.unique_integer([:positive])}"
+
+      actors = %{
+        group =>
+          bonfire_actor(served, group, %{
+            "members" => "#{group}/members",
+            "capabilities" => %{"acceptsJoins" => true},
+            "narrower" => narrower
+          }),
+        topic => bonfire_actor(served, topic, %{"broader" => group}),
+        subgroup =>
+          bonfire_actor(served, subgroup, %{
+            "broader" => group,
+            "members" => "#{subgroup}/members",
+            "capabilities" => %{"acceptsJoins" => true}
+          }),
+        # listed, but in no group of this one's
+        stranger => bonfire_actor(served, stranger, %{"postingRestrictedToMods" => true})
+      }
+
+      {:ok,
+       actors: actors,
+       group: group,
+       narrower: narrower,
+       topic: topic,
+       subgroup: subgroup,
+       stranger: stranger}
+    end
+
+    defp serve_narrower(ctx, items) do
+      serve(
+        Map.put(ctx.actors, ctx.narrower, %{
+          "@context" => "https://www.w3.org/ns/activitystreams",
+          "id" => ctx.narrower,
+          "type" => "Collection",
+          "totalItems" => length(items),
+          "items" => items
+        })
+      )
+    end
+
+    test "mirrors the children listed, under the group's mirror, and doesn't file an actor in another group there",
+         ctx do
+      serve_narrower(ctx, [ctx.topic, ctx.subgroup, ctx.stranger])
+
+      assert {:ok, %{type: :group} = group} =
+               Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+
+      assert {:ok, _} = Categories.sync_remote_children(group)
+      # the fetches are jobs, which tests run when asked
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, %{type: :topic} = topic} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic)
+
+      assert {:ok, %{type: :group} = subgroup} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.subgroup)
+
+      assert parent_id_of(topic) == id(group)
+      assert parent_id_of(subgroup) == id(group)
+
+      # mirrored or not, as any actor we fetch may be
+      case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.stranger) do
+        {:ok, stranger} ->
+          refute parent_id_of(stranger) == id(group),
+                 "an actor that doesn't name this group as its parent isn't filed under it"
+
+        _ ->
+          :ok
+      end
+    end
+
+    # the AP library's limit on any collection it fetches, which counts the collection itself: at 2, the collection and its first entry
+    test "mirrors no more than the AP library fetches of a collection", ctx do
+      previous = ActivityPub.Config.get([:instance, :federation_incoming_max_items])
+      ActivityPub.Config.put([:instance, :federation_incoming_max_items], 2)
+
+      on_exit(fn ->
+        ActivityPub.Config.put([:instance, :federation_incoming_max_items], previous)
+      end)
+
+      serve_narrower(ctx, [ctx.topic, ctx.subgroup])
+
+      assert {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+      assert {:ok, _} = Categories.sync_remote_children(group)
+      # the fetches are jobs, which tests run when asked
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      mirrored =
+        for ap_id <- [ctx.topic, ctx.subgroup],
+            match?(
+              {:ok, _},
+              Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ap_id)
+            ),
+            do: ap_id
+
+      assert mirrored == [ctx.topic], "only the first of the list"
+    end
+
+    # making the mirror is one of the triggers (`update_remote_actor/2`, after the transaction that makes it, so the jobs see it), and once per `children_sync_interval`
+    test "is synced once the mirror is made, and not again soon after", ctx do
+      serve_narrower(ctx, [ctx.topic])
+
+      assert {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, topic} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic),
+             "the listed topic is mirrored without being asked for"
+
+      assert parent_id_of(topic) == id(group)
+
+      assert :skip == Categories.maybe_sync_remote_children(group), "not again within the interval"
+    end
+
+    test "isn't synced for a local group", %{served: _served} do
+      group = Bonfire.Classify.Simulate.fake_group!(fake_user!())
+      assert :skip == Categories.maybe_sync_remote_children(group)
+    end
+
+    test "leaves the mirror as it is when the collection can't be read", ctx do
+      # the collection isn't served: a 404
+      serve(ctx.actors)
+
+      assert {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+      assert {:ok, _} = Categories.sync_remote_children(group)
+      # the fetches are jobs, which tests run when asked
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:error, :not_found} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic)
+    end
+  end
+
+  # an actor as another Bonfire serves one, built on the Lemmy capture
+  defp bonfire_actor(served, id, extra) do
+    served[@lemmy]
+    |> Map.drop(["postingRestrictedToMods"])
+    |> Map.merge(%{
+      "id" => id,
+      "preferredUsername" => "cat#{System.unique_integer([:positive])}",
+      "inbox" => "#{id}/inbox",
+      "outbox" => "#{id}/outbox",
+      "followers" => "#{id}/followers",
+      "attributedTo" => "#{id}/moderators"
+    })
+    |> Map.merge(extra)
+    |> put_in(["publicKey", "id"], "#{id}#main-key")
+    |> put_in(["publicKey", "owner"], id)
+  end
+
+  # serves `actor` at `id`, and the group it may name as its parent at `@bonfire_parent`
+  defp serve_with_parent(served, id, actor) do
+    parent =
+      bonfire_actor(served, @bonfire_parent, %{
+        "members" => "https://bonfire.local/pub/collections/members/parent",
+        "capabilities" => %{"acceptsJoins" => true}
+      })
+
+    mock(fn
+      %{method: :get, url: ^id} -> json(actor)
+      %{method: :get, url: @bonfire_parent} -> json(parent)
+      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+    end)
+  end
+
+  # serves each actor at its id
+  defp serve(actors) do
+    mock(fn
+      %{method: :get, url: url} ->
+        case actors[url] do
+          nil -> %Tesla.Env{status: 404, body: ""}
+          actor -> json(actor)
+        end
+
+      %{method: :post} ->
+        %Tesla.Env{status: 202, body: ""}
+    end)
+  end
+
+  defp parent_mirror! do
+    assert {:ok, parent} =
+             Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(@bonfire_parent)
+
+    parent
+  end
+
+  defp parent_id_of(category) do
+    category |> Repo.preload(:tree, force: true) |> e(:tree, :parent_id, nil)
   end
 
   # Smithereen's (and our) `capabilities.acceptsJoins` says people join it, which the fork reads into `openness` when nothing more specific says (`Transformer.fix_openness/1`)

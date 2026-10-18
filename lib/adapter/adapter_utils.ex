@@ -1630,25 +1630,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   # A TOPIC is followed rather than joined, and belongs to a group: it names that group with FEP-9b2b's `broader` and its scheme (`inScheme`), declares the group's membership as its own only when that parent has one (its members are who may take part), and says nothing about joining (no `openness`, no `acceptsJoins`)
   defp category_kind_declarations(%{type: :topic} = topic, _dims) do
-    # loaded as what it is (through the tree it may come as a bare pointer, without its `type`)
-    parent =
-      with parent_id when is_binary(parent_id) <-
-             topic |> repo().maybe_preload(:tree) |> e(:tree, :parent_id, nil),
-           {:ok, parent} <- Bonfire.Common.Needles.get(parent_id, skip_boundary_check: true) do
-        parent
-      else
-        _ -> nil
-      end
+    parent = category_parent(topic)
 
     %{
       "inScheme" => "https://w3id.org/fep/9b2b#Topic",
-      "broader" =>
-        with %{} <- parent,
-             {:ok, %{ap_id: parent_ap_id}} <- ActivityPub.Actor.get_cached(pointer: parent) do
-          parent_ap_id
-        else
-          _ -> nil
-        end,
+      "broader" => broader(parent),
       "members" =>
         if(e(parent, :type, nil) == :group,
           do: ActivityPub.Utils.collection_ap_id("members", id(parent))
@@ -1657,9 +1643,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> Enums.filter_empty(%{})
   end
 
-  # A GROUP has members of its own, people join it (`acceptsJoins`, as Smithereen says it and reads it to offer Join), and says how (`openness`)
+  # A GROUP has members of its own, people join it (`acceptsJoins`, as Smithereen says it and reads it to offer Join), and says how (`openness`). It lists the topics and subgroups in it (`narrower`). A subgroup also names the group it is in, as a topic does
   defp category_kind_declarations(group, dims) do
     %{
+      # declared whatever it holds, since a URL that appeared with the first topic would need an actor `Update` to announce. Serving it lists only the children the fediverse may see (`Categories.collection_items/2`)
+      "narrower" => ActivityPub.Utils.collection_ap_id("narrower", id(group)),
       # declared whatever the visibility, since the URI says nothing about who is in it (serving it is what checks visibility, see `Categories.collection_items/2`). Declaring one is how a remote server tells that membership here is not following, as with Mobilizon and Smithereen, unlike the threadiverse
       "members" => ActivityPub.Utils.collection_ap_id("members", id(group)),
       "capabilities" => %{"acceptsJoins" => true},
@@ -1668,8 +1656,32 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           "on_request" -> "moderated"
           "invite_only" -> "invite_only"
           _ -> "open"
-        end
+        end,
+      "broader" => broader(category_parent(group))
     }
+    |> Enums.filter_empty(%{})
+  end
+
+  # the category a topic or subgroup is in, loaded as what it is (through the tree it may come as a bare pointer, without its `type`)
+  defp category_parent(category) do
+    with parent_id when is_binary(parent_id) <-
+           category |> repo().maybe_preload(:tree) |> e(:tree, :parent_id, nil),
+         true <- parent_id != id(category),
+         {:ok, parent} <- Bonfire.Common.Needles.get(parent_id, skip_boundary_check: true) do
+      parent
+    else
+      _ -> nil
+    end
+  end
+
+  # FEP-9b2b's `broader`: the parent's actor
+  defp broader(nil), do: nil
+
+  defp broader(parent) do
+    case ActivityPub.Actor.get_cached(pointer: parent) do
+      {:ok, %{ap_id: parent_ap_id}} -> parent_ap_id
+      _ -> nil
+    end
   end
 
   # Any other actor declares only the follow rule, the one boundary of its own a Person states on the wire. Skipped for a remote actor, whose own instance is the authority on it and whose local boundaries here answer a different question.
@@ -1946,7 +1958,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     name = actor.data["name"]
     name = if empty?(name), do: username, else: name
 
+    declarations = Adapter.remote_declarations(actor.data)
+
     with {:error, :not_found} <- get_character_by_username(username),
+         # the group it names as its parent (a topic or subgroup's `broader`), resolved BEFORE the transaction below, so a parent we don't hold yet is made (or fails) in its own, rather than aborting this one and leaving the child unmirrored
+         # only a category module has one, so not `maybe_apply/4`, which warns of a missing function on every person we mirror
+         remote_parent <-
+           if(function_exported?(character_module, :remote_parent, 2),
+             do: character_module.remote_parent(declarations, actor.data["id"])
+           ),
          {:ok, user_etc} <-
            repo().transact_with(fn ->
              with {:ok, peer} <-
@@ -1978,7 +1998,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
                           # what the actor declares about ITSELF, which the flattened profile params
                           # above don't carry. Same shape as the update path in `Adapter`, so a
                           # character module reads one thing however the actor reached us
-                          remote_declarations: Adapter.remote_declarations(actor.data),
+                          remote_declarations: declarations,
+                          remote_parent: remote_parent,
                           # FIXME: don't query again (Instances.get_or_create already has)
                           custom_circles: [
                             silence_my_instance:
@@ -2010,6 +2031,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         type: :actor
       )
       |> debug("saved peered")
+
+      # and onto the struct, which was loaded before it and so carries `character.peered` as nil, read as local by the `update_remote_actor` below and by `Characters.mark_as/2` (whose `maybe_preload` keeps a loaded nil)
+      user_etc = repo().preload(user_etc, [character: [:peered]], force: true)
 
       maybe_add_aliases(user_etc, e(actor, :data, "alsoKnownAs", nil))
 

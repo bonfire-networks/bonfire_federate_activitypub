@@ -44,23 +44,51 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       {:ok, remote: remote}
     end
 
-    test "a group there is a group here, and a topic in it a topic", %{remote: remote} do
-      assert {:ok, %Bonfire.Classify.Category{type: :group}} =
+    test "a group there is a group here, and a topic in it a topic, in the group", %{
+      remote: remote
+    } do
+      assert {:ok, %Bonfire.Classify.Category{type: :group} = group_mirror} =
                AdapterUtils.get_by_url_ap_id_or_username(remote.group_url)
 
-      assert {:ok, %Bonfire.Classify.Category{type: :topic}} =
+      assert {:ok, %Bonfire.Classify.Category{type: :topic} = topic_mirror} =
                AdapterUtils.get_by_url_ap_id_or_username(remote.topic_url)
+
+      assert parent_id_of(topic_mirror) == id(group_mirror), "in its group, as it is there"
+      assert parent_id_of(group_mirror) == nil, "control: the group is top-level"
+    end
+
+    # the group lists its topics (`narrower`), so mirroring the group alone brings its topics, which nobody here has met yet
+    test "mirroring a group brings the topics it lists, underneath it", %{remote: remote} do
+      assert {:ok, %Bonfire.Classify.Category{type: :group} = group_mirror} =
+               AdapterUtils.get_by_url_ap_id_or_username(remote.group_url)
+
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, topic_ap_id} =
+               TestInstanceRepo.apply(fn ->
+                 with {:ok, %{ap_id: ap_id}} <- ActivityPub.Actor.get_cached(pointer: remote.topic),
+                      do: {:ok, ap_id}
+               end)
+
+      assert {:ok, %Bonfire.Classify.Category{type: :topic} = topic_mirror} =
+               AdapterUtils.get_character_by_ap_id(topic_ap_id),
+             "the topic is mirrored without being fetched itself"
+
+      assert parent_id_of(topic_mirror) == id(group_mirror), "in its group"
     end
 
     # a topic converted to a group on its own instance keeps its parent there, so it is a subgroup, which names its parent as a topic does but has members of its own
-    test "a subgroup there is a group here", %{remote: remote} do
+    test "a subgroup there is a group here, in its parent group", %{remote: remote} do
       TestInstanceRepo.apply(fn ->
         assert {:ok, %{type: :group}} =
                  Categories.convert(remote.topic, :group, current_user: remote.creator)
       end)
 
-      assert {:ok, %Bonfire.Classify.Category{type: :group}} =
+      assert {:ok, %Bonfire.Classify.Category{type: :group} = subgroup_mirror} =
                AdapterUtils.get_by_url_ap_id_or_username(remote.topic_url)
+
+      assert {:ok, group_mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote.group_url)
+      assert parent_id_of(subgroup_mirror) == id(group_mirror), "in its parent group"
     end
 
     # archiving a group serves it as a tombstone (Lemmy's community delete), so a peer that doesn't follow it learns of the archive on its next fetch rather than by the `Delete`, and of the restore the same way, finding the group again, still a group.
@@ -116,6 +144,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Bonfire.Social.Graph.Follows.following?(follower, mirror),
                "the follow carries over"
       end
+    end
+
+    defp parent_id_of(category) do
+      category |> Bonfire.Common.Repo.preload(:tree, force: true) |> e(:tree, :parent_id, nil)
     end
   end
 end
