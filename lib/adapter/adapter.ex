@@ -71,6 +71,26 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def collection_total(%Object{} = collection, opts \\ []),
     do: collection_via_module(collection, :collection_total, opts)
 
+  # whether to serve who is in a collection or only how many. The members and the followers of a group are its roster, and the group says whether it lists it. Anything else is listed
+  def items_listed?(%Object{data: %{"id" => collection_id}}, "members") do
+    case ActivityPub.Utils.parse_collection_ap_id(collection_id) do
+      {:ok, "members", group_id} -> roster_listed?(group_id)
+      _ -> true
+    end
+  end
+
+  # only a `Group` actor can be a group, so a person's followers (the common case) cost no lookup
+  def items_listed?(%Actor{data: %{"type" => "Group"}} = actor, "followers"),
+    do: roster_listed?(AdapterUtils.character_id_from_actor(actor))
+
+  def items_listed?(_actor_or_collection, _kind), do: true
+
+  defp roster_listed?(group_or_id),
+    do:
+      maybe_apply(Bonfire.Classify.Categories, :roster_listed?, [group_or_id],
+        fallback_return: true
+      ) != false
+
   defp shape_members(pointer_ids, :pointer_ids), do: pointer_ids
 
   defp shape_members(pointer_ids, :pointers),
@@ -432,6 +452,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       attributed_to: data["attributedTo"],
       # who may JOIN: `open` / `moderated` / `invite_only`
       openness: data["openness"],
+      # whether following needs approval: `false` says anyone may follow, which for an invite-only group (nothing to join) is what makes it public
+      manually_approves_followers: data["manuallyApprovesFollowers"],
       # who may start threads: the threadiverse's `lemmy:` term, which PeerTube emits too
       posting_restricted_to_mods: data["postingRestrictedToMods"] == true,
       # whether it's listed: Lemmy 1.0 sends `false` for an Unlisted community, which "doesn't appear in community list"

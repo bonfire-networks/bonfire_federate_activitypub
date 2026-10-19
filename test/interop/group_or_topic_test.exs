@@ -27,6 +27,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
   @hubzilla "https://hubzilla.local/channel/berlin"
   @friendica "https://friendica.local/profile/helpers"
   @bonfire_parent "https://bonfire.local/pub/actors/parent"
+  @announcement_channel "https://bonfire.local/pub/group/announcements"
+  @private_channel "https://bonfire.local/pub/group/private-channel"
 
   setup do
     read = fn dir, name ->
@@ -51,7 +53,40 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
       @wordpress => read.("wordpress", "blog_actor.json"),
       @flipboard => read.("flipboard", "magazine_actor.json"),
       @hubzilla => read.("hubzilla", "forum_actor.json"),
-      @friendica => read.("friendica", "forum_actor.json")
+      @friendica => read.("friendica", "forum_actor.json"),
+      # what a Bonfire announcement channel declares: public, followable by anyone, nothing to join, and only its moderators post
+      @announcement_channel =>
+        read.("lemmy", "community_actor.json")
+        |> Map.merge(%{
+          "id" => @announcement_channel,
+          "preferredUsername" => "announcements",
+          "inbox" => "#{@announcement_channel}/inbox",
+          "outbox" => "#{@announcement_channel}/outbox",
+          "followers" => "#{@announcement_channel}/followers",
+          "members" => "#{@announcement_channel}/members",
+          "openness" => "invite_only",
+          "manuallyApprovesFollowers" => false,
+          "postingRestrictedToMods" => true,
+          "discoverable" => true
+        })
+        |> put_in(["publicKey", "id"], "#{@announcement_channel}#main-key")
+        |> put_in(["publicKey", "owner"], @announcement_channel),
+      # invite-only too, but following needs approval: nothing says anyone may follow it
+      @private_channel =>
+        read.("lemmy", "community_actor.json")
+        |> Map.merge(%{
+          "id" => @private_channel,
+          "preferredUsername" => "private-channel",
+          "inbox" => "#{@private_channel}/inbox",
+          "outbox" => "#{@private_channel}/outbox",
+          "followers" => "#{@private_channel}/followers",
+          "members" => "#{@private_channel}/members",
+          "openness" => "invite_only",
+          "manuallyApprovesFollowers" => true,
+          "postingRestrictedToMods" => true
+        })
+        |> put_in(["publicKey", "id"], "#{@private_channel}#main-key")
+        |> put_in(["publicKey", "owner"], @private_channel)
     }
 
     mock(fn
@@ -89,6 +124,37 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
         assert Bonfire.Boundaries.can?(fake_user!(), :read, mirror),
                "whichever it is, people here can open it"
       end
+    end
+  end
+
+  # Who may follow or join a group is its origin's rule, and an invite-only group is hidden here unless it says anyone may follow it (`manuallyApprovesFollowers: false`, as our announcement channel does): then people here can open and follow it, and nobody joins
+  describe "an invite-only channel is mirrored as" do
+    test "a hidden group when following it needs approval" do
+      assert {:ok, %Bonfire.Classify.Category{} = mirror} =
+               Adapter.maybe_create_remote_actor(%{"id" => @private_channel})
+
+      dims = Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)
+      assert dims[:membership] == "invite_only"
+
+      assert dims[:visibility] != "global",
+             "an invite-only group that does not say anyone may follow it is not public here"
+    end
+
+    test "a group people here can see and follow, and not join" do
+      assert {:ok, %Bonfire.Classify.Category{} = mirror} =
+               Adapter.maybe_create_remote_actor(%{"id" => @announcement_channel})
+
+      dims = Bonfire.Boundaries.Presets.group_dimension_slugs(mirror)
+      assert dims[:membership] == "invite_only"
+      assert dims[:participation] == "moderators"
+
+      assert dims[:visibility] == "global",
+             "it is public where it lives, so it is not a hidden group here"
+
+      user = fake_user!()
+      assert Bonfire.Boundaries.can?(user, :read, mirror)
+      assert {:ok, _} = Bonfire.Social.Graph.Follows.follow(user, mirror)
+      refute Categories.member?(user, mirror), "following is not joining"
     end
   end
 
@@ -472,6 +538,154 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
     end
   end
 
+  # A handle is hashed with its underscores dropped and look-alikes folded (`Character.hash/1`), so `jan_beta` and `janbeta` on one instance are two accounts to PeerTube and one to us. Seen on bonfire.cafe: the second, a moderator of mirrors being repaired, RAISED out of `create_remote_actor/1` (the unique index refuses the insert, and the failed insert aborts the transaction around it) and ended the repair of every mirror listing it
+  describe "a moderator whose handle folds to one already taken" do
+    # the group's moderators list (`moderators`) is NOT served here: each test serves it when it needs it, since a collection already fetched may be cached and so would not change
+    setup %{served: served} do
+      [group, taken, folded, other] =
+        for name <- ~w(group janbeta jan_beta other),
+            do: "https://bonfire.local/pub/actors/#{name}#{System.unique_integer([:positive])}"
+
+      moderators = "#{group}/moderators"
+
+      actors = %{
+        group =>
+          bonfire_actor(served, group, %{
+            "members" => "#{group}/members",
+            "capabilities" => %{"acceptsJoins" => true},
+            "attributedTo" => moderators
+          }),
+        taken => person_actor(taken, "janbeta"),
+        folded => person_actor(folded, "jan_beta"),
+        other => person_actor(other, "other_mod")
+      }
+
+      serve(actors)
+
+      # the account whose handle is held first, as on cafe
+      assert {:ok, taken_mirror} = Adapter.maybe_create_remote_actor(%{"id" => taken})
+
+      {:ok,
+       actors: actors,
+       group: group,
+       moderators: moderators,
+       taken: taken,
+       taken_mirror: taken_mirror,
+       folded: folded,
+       other: other}
+    end
+
+    defp serve_moderators(ctx, items) do
+      serve(
+        Map.put(ctx.actors, ctx.moderators, %{
+          "@context" => "https://www.w3.org/ns/activitystreams",
+          "id" => ctx.moderators,
+          "type" => "Collection",
+          "totalItems" => length(items),
+          "items" => items
+        })
+      )
+    end
+
+    test "is skipped, and a new group is mirrored with its other moderators", ctx do
+      serve_moderators(ctx, [ctx.taken, ctx.folded, ctx.other])
+
+      assert {:ok, %{type: :group} = mirror} =
+               Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+
+      assert {:error, _} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.folded),
+             "control: the folded one wasn't mirrored (its handle is taken)"
+
+      assert {:ok, other_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.other)
+
+      moderator_ids = Categories.moderators(mirror) |> Enum.map(&id/1)
+      assert id(other_mirror) in moderator_ids, "its other moderators are still added"
+      assert id(ctx.taken_mirror) in moderator_ids
+    end
+
+    # the path the cafe repair takes: a mirror already there, whose moderators are read again, outside any transaction of the group's own
+    test "is skipped on an Update of a group already mirrored", ctx do
+      # first mirrored while its moderators list is down (a 404), as an origin sometimes is
+      assert {:ok, %{type: :group} = mirror} =
+               Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+
+      assert {:error, _} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.other),
+             "control: no moderator was mirrored yet, so the list is read by the Update"
+
+      # an `Update` is re-fetched from its origin rather than trusted, and an actor re-fetched unchanged doesn't reach the adapter, so it is served changed
+      updated = Map.put(ctx.actors[ctx.group], "summary", "<p>changed since</p>")
+
+      serve_moderators(
+        %{ctx | actors: Map.put(ctx.actors, ctx.group, updated)},
+        [ctx.taken, ctx.folded, ctx.other]
+      )
+
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Update",
+                 "id" => "#{ctx.group}/activities/update/moderators",
+                 "actor" => ctx.group,
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "object" => updated
+               })
+
+      assert {:ok, other_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.other)
+
+      assert id(other_mirror) in (Categories.moderators(mirror) |> Enum.map(&id/1))
+
+      assert {:error, _} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.folded)
+    end
+
+    # what stopped bonfire.cafe's repair: the mirror stays untyped while a moderator in its list can't be made
+    test "doesn't leave an untyped mirror untyped when the data migration repairs it", ctx do
+      assert {:ok, %{type: :group} = mirror} =
+               Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+
+      # back to the old shape, as in "a mirror made before 23 August"
+      Repo.update_all(
+        from(c in Bonfire.Classify.Category, where: c.id == ^id(mirror)),
+        set: [type: nil]
+      )
+
+      Repo.delete_all(
+        from(c in Bonfire.Data.AccessControl.Controlled, where: c.id == ^id(mirror))
+      )
+
+      assert {:ok, %{type: nil}} = Categories.get(id(mirror), skip_boundary_check: true),
+             "control: the old shape"
+
+      serve_moderators(ctx, [ctx.taken, ctx.folded, ctx.other])
+
+      Bonfire.Classify.UntypedMirrors.DataMigration.migrate([%{id: id(mirror)}])
+
+      assert {:ok, %{type: :group}} = Categories.get(id(mirror), skip_boundary_check: true),
+             "the repair stopped at the moderator whose handle is taken"
+
+      assert {:ok, other_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.other)
+
+      assert id(other_mirror) in (Categories.moderators(mirror) |> Enum.map(&id/1))
+    end
+  end
+
+  defp person_actor(id, username) do
+    Bonfire.Federate.ActivityPub.Simulate.actor_json("https://mocked.local/users/karen")
+    |> Map.merge(%{
+      "id" => id,
+      "type" => "Person",
+      "preferredUsername" => username,
+      "inbox" => "#{id}/inbox",
+      "outbox" => "#{id}/outbox"
+    })
+    |> put_in(["publicKey", "id"], "#{id}#main-key")
+    |> put_in(["publicKey", "owner"], id)
+  end
+
   # an actor as another Bonfire serves one, built on the Lemmy capture
   defp bonfire_actor(served, id, extra) do
     served[@lemmy]
@@ -709,7 +923,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
       end
     end
 
-    # A batch's mirrors are repaired one after another, so one whose repair raises must not lose the rest of its batch. Seen on bonfire.cafe (18 October, 2507 still untyped after the migration ran): repairing a mirror syncs its moderators, and creating one of them (`jan_beta@makertube.net`) collided with a character already holding that username under another URI, so its transaction rolled back and the raise ended the run. That collision isn't reproduced here (see the group plan); this stands in an entry whose repair raises for certain
+    # A batch's mirrors are repaired one after another, so one whose repair raises must not lose the rest of its batch. Seen on bonfire.cafe (18 October, 2507 still untyped after the migration ran): repairing a mirror syncs its moderators, and creating one of them (`jan_beta@makertube.net`) collided with `janbeta@makertube.net`, whose hash it shares (underscores are dropped), so its transaction rolled back and the raise ended the run. That collision is covered by "a moderator whose handle folds to one already taken"; this stands in an entry whose repair raises for certain
     test "the data migration goes on past a mirror whose repair raises", %{
       mirror: mirror,
       untyped: untyped

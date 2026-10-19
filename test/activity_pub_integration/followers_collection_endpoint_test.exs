@@ -112,6 +112,59 @@ defmodule Bonfire.Federate.ActivityPub.FollowersCollectionEndpointTest do
     end
   end
 
+  # A group's followers are its roster, with the same rule as its members (`Categories.roster_audience/1`): listed where anyone can join and the group is public, and only counted where joining needs approval or an invite. Delivery to followers uses our own database, so nothing else depends on the list. A person's own followers stay listed (`T4-a`)
+  describe "a group's followers" do
+    for {membership, listed?} <- [{"open", true}, {"on_request", false}, {"invite_only", false}] do
+      test "are #{if listed?, do: "listed", else: "counted and not listed"}, in a #{membership} group",
+           %{actor: person_actor} do
+        creator = fake_user!()
+        group = Bonfire.Classify.Simulate.fake_group!(creator)
+
+        # public and federated, or the group is not served at all
+        assert :ok =
+                 Bonfire.Classify.Boundaries.replace(group, creator, %{
+                   membership: unquote(membership),
+                   visibility: "global",
+                   participation: "anyone",
+                   default_content_visibility: "public"
+                 })
+
+        for _ <- 1..2 do
+          {:ok, _} = Follows.follow(fake_user!(), group, skip_boundary_check: true)
+        end
+
+        {:ok, group_actor} = ActivityPub.Federator.Adapter.get_actor_by_id(group.id)
+
+        # the URL the group's actor declares, by id, as a group has no `/actors/<username>` path
+        group_followers_url = fn page ->
+          "#{group_actor.ap_id}/followers" <> if(page, do: "?page=#{page}", else: "")
+        end
+
+        # the creator follows their group on creation
+        assert get_collection(group_followers_url.(nil))["totalItems"] == 3
+
+        if unquote(listed?) do
+          top = get_collection(group_followers_url.(nil))
+
+          assert top["totalItems"] == 3
+          assert length(top["first"]["orderedItems"]) == 3, "Got: #{inspect(top)}"
+        else
+          for page <- [nil, 1, 2] do
+            served = get_collection(group_followers_url.(page))
+
+            assert served["totalItems"] == 3, "page #{inspect(page)}: Got: #{inspect(served)}"
+            refute Map.has_key?(served, "first"), "page #{inspect(page)}: Got: #{inspect(served)}"
+            refute Map.has_key?(served, "next"), "page #{inspect(page)}: Got: #{inspect(served)}"
+            assert (served["orderedItems"] || []) == [], "page #{inspect(page)}"
+          end
+        end
+
+        # the control: the same endpoint still lists a person's followers
+        assert [_ | _] = get_collection(followers_url(person_actor))["first"]["orderedItems"]
+      end
+    end
+  end
+
   describe "T4-a: envelope with mixed local + remote followers" do
     test "top level + pages", %{actor: actor, expected_uris: expected_uris} do
       top = get_collection(followers_url(actor))

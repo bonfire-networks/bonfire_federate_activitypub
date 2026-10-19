@@ -399,6 +399,107 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
     # end
   end
 
+  # The `announcement_channel` preset, read from the config rather than restated: people follow it and cannot join it, and only its moderators post. What a follower writes to it is a message to the moderators, not a post in the channel
+  describe "an announcement channel" do
+    @public "https://www.w3.org/ns/activitystreams#Public"
+
+    setup %{creator: creator, group: group} do
+      preset = Bonfire.Boundaries.Presets.group_preset_meta("announcement_channel")
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(
+                 group,
+                 creator,
+                 Map.take(preset, [
+                   :membership,
+                   :visibility,
+                   :participation,
+                   :default_content_visibility
+                 ])
+               )
+
+      :ok
+    end
+
+    defp note_to(group_ap_id, text) do
+      note_id = "#{@remote_actor}/notes/#{System.unique_integer([:positive])}"
+
+      %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => "Create",
+        "id" => "#{note_id}/create",
+        "actor" => @remote_actor,
+        "to" => [group_ap_id, @public],
+        "object" => %{
+          "id" => note_id,
+          "type" => "Note",
+          "attributedTo" => @remote_actor,
+          "content" => "<p>#{text}</p>",
+          "to" => [group_ap_id, @public],
+          "tag" => [%{"type" => "Mention", "href" => group_ap_id, "name" => "@channel"}]
+        }
+      }
+    end
+
+    test "a Follow is accepted, and makes them a follower and not a member", %{
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Follow", group_ap_id))
+
+      user = remote_user()
+
+      assert Bonfire.Social.Graph.Follows.following?(user, group)
+      refute Categories.member?(user, group)
+      assert [_] = accepts_of("Follow", group_ap_id)
+    end
+
+    test "a Join is discarded", %{group: group, group_ap_id: group_ap_id} do
+      Transformer.handle_incoming(membership_activity("Join", group_ap_id))
+
+      refute Categories.member?(remote_user(), group)
+      assert accepts_of("Join", group_ap_id) == []
+    end
+
+    test "a post a follower writes to it is not published by the group", %{
+      creator: creator,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Follow", group_ap_id))
+
+      # the group's Announce of the post, found through the post's own AP object as the other incoming post tests do (nil when the post was not stored at all)
+      announce_of = fn create ->
+        with {:ok, ap_object} <- ActivityPub.Object.get_cached(ap_id: create["object"]["id"]) do
+          ActivityPub.Object.get_existing_announce(group_ap_id, ap_object)
+        else
+          _ -> nil
+        end
+      end
+
+      message = note_to(group_ap_id, "a question for the moderators")
+      assert {:ok, _} = Transformer.handle_incoming(message)
+
+      refute announce_of.(message),
+             "the group announced a post by someone who may not post in it"
+
+      # the control: in a group that takes posts from anyone, the same kind of post IS announced, so the refusal above is the channel's rule and not a test that cannot see an announce
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "open",
+                 visibility: "global",
+                 participation: "anyone",
+                 default_content_visibility: "public"
+               })
+
+      open = note_to(group_ap_id, "a post to an open group")
+      assert {:ok, _} = Transformer.handle_incoming(open)
+
+      assert %{data: %{"type" => "Announce"}} = announce_of.(open),
+             "control: an open group announces it"
+    end
+  end
+
   describe "an invite-only group" do
     setup %{creator: creator, group: group} do
       assert :ok =

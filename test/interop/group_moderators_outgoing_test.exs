@@ -80,6 +80,21 @@ defmodule Bonfire.Federate.ActivityPub.GroupModeratorsOutgoingTest do
            )
   end
 
+  # removing a member who moderates is the demotion too, so the group's followers hear of it as of any other
+  test "removing a member who is a moderator sends the Remove", %{
+    creator: creator,
+    person: person
+  } do
+    group = federated_group(creator)
+    {:ok, _} = Categories.add_moderator(creator, group, id(person))
+    assert stored("Remove", ap_id(creator)) == [], "control: nothing demoted yet"
+
+    assert {:ok, _} = Categories.remove_member(creator, group, id(person))
+
+    assert [remove] = stored("Remove", ap_id(creator))
+    assert remove.data["object"] == ap_id(person)
+  end
+
   # Someone local can be promoted directly, and is made a member with it (the first test's `person` never joined). Someone on another instance can't be made a member by us, which takes their own `Follow` or `Join`, so they are promoted only once they are one
   test "someone on another instance can be made a moderator only once they are a member",
        %{creator: creator} do

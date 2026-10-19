@@ -205,6 +205,13 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
             opts
           )
 
+      :ghost == check_block_type and is_local? and block_activity?(activity) ->
+        debug(
+          "a Block (or its Undo) keeps the person it blocks as its recipient: they are ghosted by the time it is made, and telling their server is what it is for"
+        )
+
+        {:ok, activity}
+
       :ghost == check_block_type and is_local? ->
         debug("filter ghosted recipients of outgoing local activities")
 
@@ -224,6 +231,12 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       true ->
         error("no filter cond matched")
     end
+  end
+
+  defp block_activity?(activity) do
+    type = ed(activity, "type", nil)
+
+    type == "Block" or (type == "Undo" and ed(activity, "object", "type", nil) == "Block")
   end
 
   defp activity_blocked?(block_types, local_character_ids, activity, rejects, opts) do

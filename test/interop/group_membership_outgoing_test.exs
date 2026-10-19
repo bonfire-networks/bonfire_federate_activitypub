@@ -248,6 +248,97 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
     end
   end
 
+  @remote_person "https://lemmy.local/u/joiner"
+
+  describe "removing a remote member of a group here" do
+    setup do
+      mock(fn
+        %{method: :get, url: @remote_person} ->
+          json(APSimulate.actor_json(@remote_person, "joiner"))
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+
+        %{method: :get} ->
+          %Tesla.Env{status: 404, body: ""}
+      end)
+
+      creator = fake_user!()
+      group = Bonfire.Classify.Simulate.fake_group!(creator)
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "open",
+                 visibility: "global",
+                 participation: "anyone",
+                 default_content_visibility: "public"
+               })
+
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: group)
+
+      %{creator: creator, group: group, group_ap_id: actor.ap_id}
+    end
+
+    defp from_remote(type, group_ap_id) do
+      %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => type,
+        "id" => "#{@remote_person}/#{String.downcase(type)}/#{System.unique_integer([:positive])}",
+        "actor" => @remote_person,
+        "object" => group_ap_id,
+        "to" => [group_ap_id]
+      }
+    end
+
+    # the `Reject`s the group sent for what the remote person sent, by the type of what is rejected
+    defp rejects_of(group_ap_id) do
+      ActivityPub.Object
+      |> repo().all()
+      |> Enum.filter(fn %{local: local, data: data} ->
+        local and data["type"] == "Reject" and data["actor"] == group_ap_id and
+          is_map(data["object"]) and data["object"]["actor"] == @remote_person
+      end)
+      |> Enum.map(& &1.data["object"]["type"])
+      |> Enum.sort()
+    end
+
+    test "rejects their Follow and their Join, so their server stops treating them as one", %{
+      creator: creator,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(from_remote("Follow", group_ap_id))
+      assert {:ok, _} = Transformer.handle_incoming(from_remote("Join", group_ap_id))
+
+      {:ok, user} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(@remote_person)
+
+      assert Categories.member?(user, group), "control: a member"
+      assert rejects_of(group_ap_id) == [], "control: nothing rejected yet"
+
+      assert {:ok, %{member: false}} = Categories.remove_member(creator, group, id(user))
+
+      assert rejects_of(group_ap_id) == ["Follow", "Join"]
+      refute Categories.member?(user, group)
+      refute Bonfire.Social.Graph.Follows.following?(user, group)
+    end
+
+    test "sends nothing for a local member", %{creator: creator, group: group, group_ap_id: group_ap_id} do
+      member = fake_user!()
+      {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
+      assert Categories.member?(member, group), "control: a member"
+
+      assert {:ok, _} = Categories.remove_member(creator, group, id(member))
+
+      refute Categories.member?(member, group)
+
+      assert ActivityPub.Object
+             |> repo().all()
+             |> Enum.filter(&(&1.local and &1.data["type"] == "Reject" and &1.data["actor"] == group_ap_id)) ==
+               []
+    end
+  end
+
   describe "joining a remote group that answers joins itself" do
     # Smithereen declares only `members`; Mobilizon and Bonfire declare `openness` too
     for {software, declares} <- [

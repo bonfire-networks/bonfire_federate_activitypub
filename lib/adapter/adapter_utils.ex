@@ -1549,7 +1549,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   defp maybe_apply_or(type, fun, args, fallback_fn \\ nil)
 
   defp maybe_apply_or(type, fun, args, fallback_fn) when is_atom(type) and not is_nil(type) do
-    with {:error, e} <-
+    # a changeset error is the function's own answer (eg. the username is taken), not "no such function": running the generic one after it would do the same insert again on the transaction the first had just rolled back, which raised `transaction rolling back` out of `create_remote_actor/1`
+    with {:error, e} when not is_struct(e, Ecto.Changeset) <-
            Bonfire.Common.ContextModule.maybe_apply(
              type,
              fun,
@@ -1961,6 +1962,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     declarations = Adapter.remote_declarations(actor.data)
 
     with {:error, :not_found} <- get_character_by_username(username),
+         # a handle that folds to one already held (`Character.hash/1` drops underscores and folds look-alikes, so `jan_beta` and `janbeta` on one instance are one to us) is asked about first, not left to the insert: when this runs inside another transaction (a new group creating its moderators), the failed insert dooms THAT one too, and the group is lost with it. Answered as an error, which `sync_remote_moderators/3` skips
+         true <-
+           Characters.username_available?(username) ||
+             warn({:error, :username_taken}, "the handle of #{username} folds to one already held"),
          # the group it names as its parent (a topic or subgroup's `broader`), resolved BEFORE the transaction below, so a parent we don't hold yet is made (or fails) in its own, rather than aborting this one and leaving the child unmirrored
          # only a category module has one, so not `maybe_apply/4`, which warns of a missing function on every person we mirror
          remote_parent <-

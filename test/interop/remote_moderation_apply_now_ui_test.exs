@@ -252,12 +252,11 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
       {:ok, author: author}
     end
 
-    defp open_ban(conn, group, author) do
+    defp open_ban(conn, group, author, type \\ "Silence") do
       conn
       |> visit("/group/#{group.character.username}/settings/moderation")
       |> wait_async()
-      |> click_button("[data-role=open_modal]", "Silence #{author.profile.name}")
-      |> assert_has("[data-role=group_block]")
+      |> click_button("[data-role=open_modal]", "#{type} #{author.profile.name}")
     end
 
     defp silenced_in_group?(author, group) do
@@ -267,6 +266,7 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
     test "ticked, keeps them out here at once", %{conn: conn, group: group, author: author} do
       conn
       |> open_ban(group, author)
+      |> assert_has("[data-role=group_block]")
       |> within("[data-role=group_block]", &tick/1)
       |> click_button("[data-role=block_from_group]", "Silence in the group")
 
@@ -281,11 +281,26 @@ defmodule Bonfire.Federate.ActivityPub.RemoteModerationApplyNowUITest do
     } do
       conn
       |> open_ban(group, author)
+      |> assert_has("[data-role=group_block]")
       |> within("[data-role=group_block]", &assert_has(&1, @apply_now))
       |> click_button("[data-role=block_from_group]", "Silence in the group")
 
       assert [_] = sent("Block", my_ap_id)
       refute silenced_in_group?(author, group), "nothing applied here yet"
+    end
+
+    # A ghost has no ban the community understands: it would read the `Block` we send as a silence (the group plan's "Group bans and removals", ⑦). So the group's ghost is not offered to a moderator of a community on another instance, for now, and nothing is sent. Their own ghost is still there
+    test "the group's ghost is not offered, and nothing is sent", %{
+      conn: conn,
+      group: group,
+      author: author,
+      my_ap_id: my_ap_id
+    } do
+      conn
+      |> open_ban(group, author, "Ghost")
+      |> refute_has("[data-role=group_block]")
+
+      assert sent("Block", my_ap_id) == []
     end
   end
 end

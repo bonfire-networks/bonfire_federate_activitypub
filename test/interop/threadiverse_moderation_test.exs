@@ -440,6 +440,74 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
              "the relayed Lock closes the thread"
     end
 
+    # Reopening is the same decision in reverse, and Lemmy sends it as `Undo{Lock}`: the `Lock` it takes back is embedded whole as the `Undo`'s `object`. So what the receiver is handed is that activity, and the thread to reopen has to be found from it
+    defp lock_then_undo(%{text_post: locked, announced_by: community, community_moderator: mod}) do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: locked)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      someone = fake_user!()
+
+      lock =
+        fixture("mod_lock_page.json")
+        |> Map.merge(%{
+          "object" => locked,
+          "audience" => community,
+          "actor" => mod,
+          "id" => "#{fixture("mod_lock_page.json")["id"]}/to-undo"
+        })
+
+      assert {:ok, _} = receive_moderation(lock)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post),
+             "control: the Lock closed the thread, or reopening it proves nothing"
+
+      undo = %{
+        "type" => "Undo",
+        "id" => "#{lock["id"]}/undo",
+        "actor" => mod,
+        "to" => lock["to"],
+        "cc" => lock["cc"],
+        "object" => lock
+      }
+
+      %{post: post, someone: someone, undo: undo, community: community}
+    end
+
+    test "an Undo of a Lock reopens the thread", context do
+      %{post: post, someone: someone, undo: undo} = lock_then_undo(context)
+
+      assert {:ok, _} = receive_moderation(undo)
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post), "reopened"
+    end
+
+    # how a follower's instance gets it: wrapped in the COMMUNITY's `Announce`, as the `Lock` was
+    test "an Undo of a Lock relayed by the community reopens the thread", context do
+      %{post: post, someone: someone, undo: undo, community: community} = lock_then_undo(context)
+
+      relayed = %{
+        "type" => "Announce",
+        "id" => "#{community}/activities/announce/undo-lock/relayed",
+        "actor" => community,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => ["#{community}/followers"],
+        "object" => undo
+      }
+
+      assert {:ok, _} = receive_moderation(relayed)
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post), "reopened"
+    end
+
+    test "an Undo of a Lock from an actor with no authority over the group is refused", context do
+      %{post: post, someone: someone, undo: undo} = lock_then_undo(context)
+
+      # an actor the mock DOES serve, on another host than the community, so the refusal is about standing and not a failed fetch
+      receive_moderation(Map.put(undo, "actor", "http://lemmy2.local/u/lemmy_alpha"))
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post),
+             "a stranger's Undo must not reopen a thread a moderator closed"
+    end
+
     # A community relays its members' votes the same way (`Announce{Like}`), which is how a follower's instance counts votes cast elsewhere. An upvote is a `Like`; a downvote is a `Dislike`, which we have no concept for yet
     test "a vote relayed by the community counts here", %{
       text_post: voted,
@@ -1139,6 +1207,24 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
        sent: sent,
        echo: echo,
        request: request}
+    end
+
+    # who belongs to a community is for its own instance to say: our mirror of it holds what it told us, so removing someone from the mirror would only be undone by the next sync
+    test "removing a member is refused, changing nothing", %{
+      local_moderator: local_moderator,
+      mirror: mirror,
+      sent: sent
+    } do
+      member = fake_user!()
+      {:ok, circle} = Bonfire.Classify.Categories.members_circle(mirror)
+      {:ok, _} = Bonfire.Boundaries.Circles.add_to_circles(member, circle)
+      assert Bonfire.Classify.Categories.member?(member, mirror), "control: a member of the mirror"
+
+      assert {:error, :hosted_elsewhere} =
+               Bonfire.Classify.Categories.remove_member(local_moderator, mirror, id(member))
+
+      assert Bonfire.Classify.Categories.member?(member, mirror)
+      assert sent.("Reject") == []
     end
 
     test "locking a post sends the Lock and waits for the community", %{

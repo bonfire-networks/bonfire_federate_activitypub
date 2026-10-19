@@ -224,8 +224,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
        sent: sent_by_moderator}
     end
 
-    # a block is both halves, and still ONE `Block` (each half alone would send one)
-    for type <- [:silence, :ghost, :block] do
+    # a block is both halves, and still ONE `Block` (a silence alone sends one; a ghost alone sends none, below)
+    for type <- [:silence, :block] do
       test "a #{type} with the box ticked sends the moderator's Block naming the group, which the group relays",
            %{
              moderator: moderator,
@@ -254,6 +254,64 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
                  ActivityPub.Object.get_existing_announce(group_ap_id(group), activity),
                "the group relays it to its followers"
       end
+    end
+
+    # A peer can only act on a `Block` as a ban from taking part (Lemmy, PieFed and Mbin read it so, with no type, and the microblog software not at all): a ghost keeps someone from SEEING the group, which a peer holding a public copy can't enforce, and would apply as a silence, the half the moderator didn't choose. So a ghost stays on this instance
+    test "a ghost with the box ticked sends no Block, and still ghosts them from the group", %{
+      moderator: moderator,
+      group: group,
+      person: person,
+      sent: sent
+    } do
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :ghost,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true,
+                 reason: "spam post"
+               )
+
+      assert Bonfire.Boundaries.Blocks.is_blocked?(person, :ghost, current_user: group),
+             "the ghost itself happened, so nothing sent below is the ghost failing rather than staying home"
+
+      assert sent.("Block") == []
+
+      # the control, so the empty list means a ghost and not a ban that can't federate at all: a silence of someone else, with the box, does go out
+      other = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(other, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [_] = sent.("Block"), "control: a silence with the box goes out"
+    end
+
+    test "unghosting a ghost-only ban sends no Undo", %{
+      moderator: moderator,
+      group: group,
+      person: person,
+      sent: sent
+    } do
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :ghost,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.unblock(person, :ghost,
+                 current_user: moderator,
+                 on_behalf_of: group
+               )
+
+      refute Bonfire.Boundaries.Blocks.is_blocked?(person, :ghost, current_user: group),
+             "control: the ghost is lifted"
+
+      assert sent.("Undo") == []
     end
 
     test "with no reason given, it says a moderator banned them", %{
@@ -553,6 +611,38 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
     end
   end
 
+  # Reopening a thread is sent as the `Lock`'s own `Undo`, addressed as the `Lock` was and naming the group it is in, which a receiver checks a moderator's standing against. The group then passes it on to its followers, as it does the `Lock`
+  test "unlocking a post in the group sends an Undo of the Lock, naming the group, which the group announces" do
+    creator = fake_user!()
+    group = public_group(creator)
+    post = post_in_group(creator, group, "<p>a thread the moderator closes and reopens</p>")
+    {:ok, %{ap_id: creator_ap_id}} = ActivityPub.Actor.get_cached(pointer: creator)
+
+    sent_by_creator = fn type ->
+      ActivityPub.Object
+      |> repo().all()
+      |> Enum.filter(&(&1.data["type"] == type and &1.data["actor"] == creator_ap_id))
+    end
+
+    assert {:ok, _} = Bonfire.Boundaries.Blocks.lock(post, current_user: creator)
+    assert [lock] = sent_by_creator.("Lock"), "control: the Lock went out"
+    assert lock.data["audience"] == group_ap_id(group), "control: and names the group"
+
+    assert {:ok, _} = Bonfire.Boundaries.Blocks.unlock(post, current_user: creator)
+
+    assert [undo] = sent_by_creator.("Undo")
+    assert undo.data["object"]["type"] == "Lock"
+    assert undo.data["to"] == lock.data["to"]
+    assert undo.data["cc"] == lock.data["cc"]
+
+    assert undo.data["audience"] == group_ap_id(group),
+           "named as the Lock was, or a receiver cannot tell which group's moderators to check"
+
+    assert %{data: %{"type" => "Announce"}} =
+             ActivityPub.Object.get_existing_announce(group_ap_id(group), undo),
+           "the group passes it on to its followers"
+  end
+
   # removing a post from the group takes the group's boost back, which other servers' copies of the group only learn of from the group's `Undo{Announce}`
   test "removing a post from the group federates the group's Undo of its Announce" do
     creator = fake_user!()
@@ -670,6 +760,185 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
     refute Map.has_key?(outbox, "last"),
            "with everything inline there is nothing further back to link to, and a `last` pointing at the page you are holding says nothing"
+  end
+
+  # A group's ban is addressed to Public and to the group, and `Block` is not an addressed-only type, so besides the group it also went to the moderator's own remote followers. Mastodon, Pleroma and Akkoma read a `Block` that reaches their inbox, whatever its `target`, as the moderator blocking the person, so a banned person who follows the moderator from one of them lost that follow as a side effect. The group's relay is what tells the threadiverse
+  describe "a group ban's delivery" do
+    setup do
+      mock(fn
+        %{method: :get, url: @remote_actor} ->
+          json(APSimulate.actor_json(@remote_actor))
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+
+        %{method: :get} ->
+          %Tesla.Env{status: 404, body: ""}
+      end)
+
+      moderator = fake_user!()
+      group = public_group(moderator)
+      person = fake_user!()
+      {:ok, _} = Follows.follow(remote_follower(), moderator, skip_boundary_check: true)
+
+      {:ok, moderator_actor} = ActivityPub.Actor.get_cached(pointer: moderator)
+      {:ok, %{data: remote_data}} = ActivityPub.Actor.get_cached(ap_id: @remote_actor)
+
+      {:ok,
+       moderator: moderator,
+       group: group,
+       person: person,
+       moderator_actor: moderator_actor,
+       their_inboxes:
+         Enum.reject(
+           [remote_data["inbox"], e(remote_data, "endpoints", "sharedInbox", nil)],
+           &is_nil/1
+         )}
+    end
+
+    defp inboxes(actor, activity),
+      do: APPublisher.prepare_publish_params(actor, activity) |> Enum.map(& &1.inbox)
+
+    defp sent_by(moderator_actor, type) do
+      Bonfire.Common.Repo.all(ActivityPub.Object)
+      |> Enum.filter(&(&1.data["type"] == type and &1.data["actor"] == moderator_actor.ap_id))
+    end
+
+    test "control: a public post by the moderator does reach their remote follower", %{
+      moderator: moderator,
+      moderator_actor: moderator_actor,
+      their_inboxes: their_inboxes
+    } do
+      assert {:ok, post} =
+               Bonfire.Posts.publish(
+                 current_user: moderator,
+                 post_attrs: %{post_content: %{html_body: "<p>a post for my followers</p>"}},
+                 boundary: "public"
+               )
+
+      {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+      create = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Create")
+
+      assert Enum.any?(inboxes(moderator_actor, create), &(&1 in their_inboxes)),
+             "so the ban below not reaching them is the ban, not the fixture"
+    end
+
+    test "a ban goes to the group's side and not to the moderator's remote followers", %{
+      moderator: moderator,
+      moderator_actor: moderator_actor,
+      group: group,
+      person: person,
+      their_inboxes: their_inboxes
+    } do
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [ban] = sent_by(moderator_actor, "Block")
+      assert ban.data["target"] == group_ap_id(group), "control: it is the group's ban"
+
+      refute Enum.any?(inboxes(moderator_actor, ban), &(&1 in their_inboxes))
+    end
+
+    # The moderator's `Block` reaches the banned person's own instance only through the group's relay to its followers, and a block ghosts them, so the publisher skips them there. The group's own `Block` goes to them directly instead, for a block only: a ghost reads on the other side as the group blocking them, which a silence is not
+    test "a block also sends the group's own Block straight to the banned person's instance", %{
+      moderator: moderator,
+      group: group,
+      their_inboxes: their_inboxes
+    } do
+      banned = remote_follower()
+      {:ok, group_actor} = ActivityPub.Actor.get_cached(pointer: group)
+      {:ok, %{ap_id: banned_ap_id}} = ActivityPub.Actor.get_cached(pointer: banned)
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(banned, :block,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [own] = sent_by(group_actor, "Block")
+      assert own.data["object"] == banned_ap_id
+      assert banned_ap_id in List.wrap(own.data["to"]), "got #{inspect(own.data)}"
+      refute Map.has_key?(own.data, "target"), "the group's own block, not a ban naming a group"
+
+      assert Enum.any?(inboxes(group_actor, own), &(&1 in their_inboxes)),
+             "delivered to their instance"
+    end
+
+    test "a silence sends only the moderator's Block", %{
+      moderator: moderator,
+      moderator_actor: moderator_actor,
+      group: group
+    } do
+      banned = remote_follower()
+      {:ok, group_actor} = ActivityPub.Actor.get_cached(pointer: group)
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(banned, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert [_] = sent_by(moderator_actor, "Block"), "control: the moderator's ban went out"
+      assert sent_by(group_actor, "Block") == []
+    end
+
+    test "unbanning a block sends the group's Undo too", %{
+      moderator: moderator,
+      group: group,
+      their_inboxes: their_inboxes
+    } do
+      banned = remote_follower()
+      {:ok, group_actor} = ActivityPub.Actor.get_cached(pointer: group)
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(banned, :block,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.unblock(banned, :block,
+                 current_user: moderator,
+                 on_behalf_of: group
+               )
+
+      assert [undo] = sent_by(group_actor, "Undo")
+
+      assert Enum.any?(inboxes(group_actor, undo), &(&1 in their_inboxes)),
+             "delivered to their instance"
+    end
+
+    test "unbanning goes the same way", %{
+      moderator: moderator,
+      moderator_actor: moderator_actor,
+      group: group,
+      person: person,
+      their_inboxes: their_inboxes
+    } do
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group,
+                 also_unfollow_and_notify: true
+               )
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.unblock(person, :silence,
+                 current_user: moderator,
+                 on_behalf_of: group
+               )
+
+      assert [undo] = sent_by(moderator_actor, "Undo")
+
+      refute Enum.any?(inboxes(moderator_actor, undo), &(&1 in their_inboxes))
+    end
   end
 
   # The fan-out rather than the shaping: `prepare_publish_params/2` is where one activity becomes one payload per inbox, so it is where a second shape has to appear. It resolves recipients through the adapter, so it needs a group actor backed by a local pointer and a remote follower to have an inbox at all, which is why this lives here rather than in the AP lib's own tests.

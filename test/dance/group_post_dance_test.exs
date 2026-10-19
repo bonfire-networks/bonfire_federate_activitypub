@@ -97,6 +97,73 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end)
     end
 
+    # The `announcement_channel` preset, read from the config: people follow it and only its moderators post. A follower on another instance gets the moderator's post, and what they reply to it comes back to the channel's instance
+    test "an announcement channel's post reaches a follower on the other instance, and their reply comes back",
+         context do
+      moderator = context[:local][:user]
+      preset = Bonfire.Boundaries.Presets.group_preset_meta("announcement_channel")
+
+      group =
+        fancy_fake_category!(
+          moderator,
+          [type: :group] ++ Map.to_list(Map.take(preset, [:membership, :visibility, :participation]))
+        )
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        assert {:ok, _} = Follows.follow(context[:remote][:user], group_on_remote)
+      end)
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: moderator,
+          post_attrs: %{post_content: %{html_body: "an announcement from the channel"}},
+          boundary: "public",
+          publish_in: id(group[:category])
+        )
+
+      post_url =
+        post
+        |> repo().maybe_preload([:peered, created: [:peered]])
+        |> Bonfire.Common.URIs.canonical_url()
+
+      reply_url =
+        TestInstanceRepo.apply(fn ->
+          assert {:ok, group_on_remote} =
+                   AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+          assert FeedLoader.feed_contains?(
+                   :user_activities,
+                   "an announcement from the channel",
+                   by: group_on_remote,
+                   current_user: context[:remote][:user]
+                 ),
+                 "the follower got the moderator's post"
+
+          assert {:ok, reply} =
+                   Posts.publish(
+                     current_user: context[:remote][:user],
+                     post_attrs: %{
+                       post_content: %{html_body: "a reply from a follower"},
+                       reply_to_id: id(their_copy(post_url))
+                     },
+                     boundary: "public"
+                   )
+
+          reply
+          |> repo().maybe_preload([:peered, created: [:peered]])
+          |> Bonfire.Common.URIs.canonical_url()
+        end)
+
+      assert {:ok, %{pointer_id: reply_id}} = ActivityPub.Object.get_cached(ap_id: reply_url),
+             "the reply never reached the channel's instance"
+
+      assert {:ok, reply} = Posts.read(reply_id, skip_boundary_check: true)
+      assert e(reply, :post_content, :html_body, nil) =~ "a reply from a follower"
+    end
+
     # The removal reaches the other instance twice, as the group's `Undo{Announce}` and as the moderator's `Delete` carrying a `summary` (the shape Lemmy acts on), and the two together must take the post out of the group there while leaving the post itself: a group's moderator removes from the group, and has no standing to erase someone's post
     test "a moderator removing a member's post from a group takes it out of the group on a follower's instance, without deleting it",
          context do
@@ -346,8 +413,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     # The rest of a moderator's actions, each across instances (the group plan's inventory against `moderation-log.md`'s verbs)
 
-    # parked with the rest of undoing, which comes later (the group plan's lifting item); red 17 October: a follower's instance stays locked. `skip:` rather than `:todo`, since the dance recipe runs `--only test_instance`, which an exclude can't override
-    @tag skip: "undoing comes later: a follower's instance stays locked"
+    # The `Undo` embeds the `Lock` it takes back, so the follower's instance reopens the thread that `Lock` names (`Blocks.ap_receive_locked_object/1`), not the embedded activity
     test "a moderator unlocking a member's post in a group reopens it on a follower's instance",
          context do
       %{moderator: moderator, post: post, post_url: post_url} =
@@ -395,16 +461,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       refute remote_is_moderator_there?.(), "the demotion reaches the mirror"
     end
 
-    # `silence` is the ban tested above; `ghost` keeps them from seeing the group's posts, `block` does both
-    for {type, can_see_after?, can_reply_after?} <- [
-          {:ghost, false, true},
-          {:block, false, false}
-        ] do
-      # parked: red 17 October, every incoming ban on behalf of a group is applied as `:silence` (`Blocks.receive_block_on_behalf_of/5`), since the `Block` carries no type (the group plan's "a ban as `ghost` or `block` lands on B as a `silence`")
-      @tag skip: "every incoming group ban is applied as silence"
-      test "a moderator banning someone from a group as #{type} applies on their own instance",
+    # `silence` is the ban tested above. A ghost alone sends nothing to the other instance. A block also sends the group's own `Block` to the person's instance, which acts on it as the group blocking them: they can neither read nor reply there. On the group's own instance both keep the person from reading
+    for {type, can_read_on_peer?, can_reply_on_peer?} <- [{:ghost, true, true}, {:block, false, false}] do
+      test "a #{type} ban from a group #{if can_reply_on_peer?, do: "leaves them as they were on the other instance", else: "is a block on the other instance"}, and keeps them from reading here",
            context do
-        %{moderator: moderator, group: group, post_url: post_url} =
+        %{moderator: moderator, group: group, post: post, post_url: post_url} =
           member_post_in_followed_group!(context, "a post the #{unquote(type)}ed person loses")
 
         remote_can? = fn verb ->
@@ -419,6 +480,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert {:ok, banned} =
                  AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
 
+        assert Bonfire.Boundaries.can?(banned, :read, post),
+               "control: they may read it here before the ban"
+
         assert {:ok, _} =
                  Bonfire.Boundaries.Blocks.block(banned, unquote(type),
                    current_user: moderator,
@@ -427,8 +491,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                    reason: "spam"
                  )
 
-        assert remote_can?.(:read) == unquote(can_see_after?)
-        assert remote_can?.(:reply) == unquote(can_reply_after?)
+        refute Bonfire.Boundaries.can?(banned, :read, post),
+               "the ban holds on the group's own instance"
+
+        assert remote_can?.(:read) == unquote(can_read_on_peer?)
+        assert remote_can?.(:reply) == unquote(can_reply_on_peer?)
       end
     end
 
