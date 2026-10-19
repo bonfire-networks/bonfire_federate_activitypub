@@ -1965,7 +1965,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
          # a handle that folds to one already held (`Character.hash/1` drops underscores and folds look-alikes, so `jan_beta` and `janbeta` on one instance are one to us) is asked about first, not left to the insert: when this runs inside another transaction (a new group creating its moderators), the failed insert dooms THAT one too, and the group is lost with it. Answered as an error, which `sync_remote_moderators/3` skips
          true <-
            Characters.username_available?(username) ||
-             warn({:error, :username_taken}, "the handle of #{username} folds to one already held"),
+             warn(
+               {:error, :username_taken},
+               "the handle of #{username} folds to one already held"
+             ),
          # the group it names as its parent (a topic or subgroup's `broader`), resolved BEFORE the transaction below, so a parent we don't hold yet is made (or fails) in its own, rather than aborting this one and leaving the child unmirrored
          # only a category module has one, so not `maybe_apply/4`, which warns of a missing function on every person we mirror
          remote_parent <-

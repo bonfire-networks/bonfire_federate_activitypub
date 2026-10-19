@@ -106,7 +106,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group =
         fancy_fake_category!(
           moderator,
-          [type: :group] ++ Map.to_list(Map.take(preset, [:membership, :visibility, :participation]))
+          [type: :group] ++
+            Map.to_list(Map.take(preset, [:membership, :visibility, :participation]))
         )
 
       TestInstanceRepo.apply(fn ->
@@ -462,7 +463,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     end
 
     # `silence` is the ban tested above. A ghost alone sends nothing to the other instance. A block also sends the group's own `Block` to the person's instance, which acts on it as the group blocking them: they can neither read nor reply there. On the group's own instance both keep the person from reading
-    for {type, can_read_on_peer?, can_reply_on_peer?} <- [{:ghost, true, true}, {:block, false, false}] do
+    for {type, can_read_on_peer?, can_reply_on_peer?} <- [
+          {:ghost, true, true},
+          {:block, false, false}
+        ] do
       test "a #{type} ban from a group #{if can_reply_on_peer?, do: "leaves them as they were on the other instance", else: "is a block on the other instance"}, and keeps them from reading here",
            context do
         %{moderator: moderator, group: group, post: post, post_url: post_url} =

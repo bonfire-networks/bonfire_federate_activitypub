@@ -283,7 +283,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
       %{
         "@context" => "https://www.w3.org/ns/activitystreams",
         "type" => type,
-        "id" => "#{@remote_person}/#{String.downcase(type)}/#{System.unique_integer([:positive])}",
+        "id" =>
+          "#{@remote_person}/#{String.downcase(type)}/#{System.unique_integer([:positive])}",
         "actor" => @remote_person,
         "object" => group_ap_id,
         "to" => [group_ap_id]
@@ -323,7 +324,11 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
       refute Bonfire.Social.Graph.Follows.following?(user, group)
     end
 
-    test "sends nothing for a local member", %{creator: creator, group: group, group_ap_id: group_ap_id} do
+    test "sends nothing for a local member", %{
+      creator: creator,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
       member = fake_user!()
       {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
       assert Categories.member?(member, group), "control: a member"
@@ -334,7 +339,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
 
       assert ActivityPub.Object
              |> repo().all()
-             |> Enum.filter(&(&1.local and &1.data["type"] == "Reject" and &1.data["actor"] == group_ap_id)) ==
+             |> Enum.filter(
+               &(&1.local and &1.data["type"] == "Reject" and &1.data["actor"] == group_ap_id)
+             ) ==
                []
     end
   end

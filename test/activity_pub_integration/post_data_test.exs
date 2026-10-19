@@ -576,7 +576,8 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       end)
 
       # the inbox job handling the Create
-      create_job = Task.async(fn -> Bonfire.Federate.ActivityPub.Incoming.receive_activity(create) end)
+      create_job =
+        Task.async(fn -> Bonfire.Federate.ActivityPub.Incoming.receive_activity(create) end)
 
       # the relay's Announce job resolving the same Note
       announce_job =

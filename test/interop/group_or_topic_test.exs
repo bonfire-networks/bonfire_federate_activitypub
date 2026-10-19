@@ -283,7 +283,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
       assert {:ok, reloaded} = Categories.get(id(mirror), skip_boundary_check: true)
       assert reloaded.type == :topic
-      assert parent_id_of(reloaded) == id(parent_mirror!()), "filed under its parent group's mirror"
+
+      assert parent_id_of(reloaded) == id(parent_mirror!()),
+             "filed under its parent group's mirror"
     end
   end
 
@@ -516,7 +518,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
       assert parent_id_of(topic) == id(group)
 
-      assert :skip == Categories.maybe_sync_remote_children(group), "not again within the interval"
+      assert :skip == Categories.maybe_sync_remote_children(group),
+             "not again within the interval"
     end
 
     test "isn't synced for a local group", %{served: _served} do

@@ -1218,7 +1218,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       member = fake_user!()
       {:ok, circle} = Bonfire.Classify.Categories.members_circle(mirror)
       {:ok, _} = Bonfire.Boundaries.Circles.add_to_circles(member, circle)
-      assert Bonfire.Classify.Categories.member?(member, mirror), "control: a member of the mirror"
+
+      assert Bonfire.Classify.Categories.member?(member, mirror),
+             "control: a member of the mirror"
 
       assert {:error, :hosted_elsewhere} =
                Bonfire.Classify.Categories.remove_member(local_moderator, mirror, id(member))

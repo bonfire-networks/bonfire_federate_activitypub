@@ -72,8 +72,8 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupFollowButtonUITest do
     conn
     |> visit(Bonfire.Common.URIs.path(group))
     |> wait_async()
-    # by id, as the sidebar now lists the joined group with a follow toggle of its own
-    |> click_button("#follow_feed_#{group.id}", "")
+    # the hero's Follow button in its pending state (the same one the test above looks for): the control the page offers for the request that joining sent
+    |> click_button("[data-id=unfollow][aria-label='Cancel follow request']", "")
     |> refute_has("[data-id=flash_error]")
   end
 end
