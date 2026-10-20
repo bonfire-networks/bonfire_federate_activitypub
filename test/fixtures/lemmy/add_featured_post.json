@@ -1,0 +1,10 @@
+{
+  "id": "https://lemmy.local/activities/add/3c7cb2d4-1c62-4c4d-8a8e-0f8c3a6c9b11",
+  "actor": "https://lemmy.local/u/MinutePhrase",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "object": "https://lemmy.local/post/51786515",
+  "target": "https://lemmy.local/c/technology/featured",
+  "cc": ["https://lemmy.local/c/technology"],
+  "type": "Add",
+  "audience": "https://lemmy.local/c/technology"
+}

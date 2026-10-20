@@ -74,4 +74,71 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PinsTest do
       refute Pins.pinned?(local_on_remote, activity.object)
     end)
   end
+
+  # A moderator's `Add` to the group's `featured`, cc'd to the group, which announces it to its followers (as a Lemmy community relays its mods' features). The follower's instance pins the post into its mirror of the group, not onto the moderator; the `Remove` takes it off again
+  @tag :test_instance
+  if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
+    test "a group pin/unpin reaches a follower's instance, pinned into its mirror of the group",
+         context do
+      moderator = context[:local][:user]
+      remote_user = context[:remote][:user]
+      body = "pinned to the top of the group"
+
+      group =
+        Bonfire.Classify.Simulate.fancy_fake_category!(moderator,
+          type: :group,
+          membership: "open",
+          visibility: "global",
+          participation: "anyone"
+        )
+
+      moderator_ap_id = Bonfire.Me.Characters.character_url(moderator)
+
+      TestInstanceRepo.apply(fn ->
+        Logger.metadata(action: info("remote follows the group"))
+        assert {:ok, group_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+        assert {:ok, _} = Follows.follow(remote_user, group_on_remote)
+      end)
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: moderator,
+          post_attrs: %{post_content: %{html_body: body}},
+          boundary: "public",
+          publish_in: id(group[:category])
+        )
+
+      Logger.metadata(action: info("the moderator pins the post to the top of the group"))
+      assert {:ok, _} = Pins.pin(moderator, post, id(group[:category]))
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, group_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+        assert {:ok, moderator_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(moderator_ap_id)
+
+        assert activity =
+                 Bonfire.Social.FeedLoader.feed_contains?(:user_activities, body,
+                   by: group_on_remote,
+                   current_user: remote_user
+                 )
+
+        assert Pins.pinned?(id(group_on_remote), activity.object)
+        refute Pins.pinned?(id(moderator_on_remote), activity.object)
+      end)
+
+      Logger.metadata(action: info("the moderator unpins it"))
+      Pins.unpin(moderator, post, id(group[:category]))
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, group_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        activity =
+          Bonfire.Social.FeedLoader.feed_contains?(:user_activities, body,
+            by: group_on_remote,
+            current_user: remote_user
+          )
+
+        refute Pins.pinned?(id(group_on_remote), activity.object)
+      end)
+    end
+  end
 end
