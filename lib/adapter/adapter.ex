@@ -114,8 +114,13 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   # cheap registry lookup (no fetching): does any FederationModule handle this query? Used by the
   # lib to infer routing (e.g. store-backed collections are those no adapter handles).
-  def adapter_handles?(query),
-    do: match?({:ok, _}, Bonfire.Federate.ActivityPub.FederationModules.federation_module(query))
+  def adapter_handles?(query) do
+    # the registry holds the declared modules, enabled or not: one that is disabled handles nothing
+    case Bonfire.Federate.ActivityPub.FederationModules.federation_module(query) do
+      {:ok, module} -> Bonfire.Common.Extend.module_enabled?(module)
+      _ -> false
+    end
+  end
 
   defp collection_via_module(%{data: %{"id" => id}} = collection, fun, opts) do
     with {:ok, type, _uuid} <- ActivityPub.Utils.parse_collection_ap_id(id),
@@ -162,6 +167,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def activity_exists?(type, actor_ap_id, object) do
     with {:ok, module} <-
            Bonfire.Federate.ActivityPub.FederationModules.federation_module(type),
+         # the registry holds the declared modules, enabled or not: a disabled one answers nothing
+         true <- Bonfire.Common.Extend.module_enabled?(module),
          {:ok, subject} <- AdapterUtils.get_character_by_ap_id(actor_ap_id),
          {:ok, pointable} <- AdapterUtils.return_pointable(object, skip_boundary_check: true) do
       # ask the owning module first, so anything that is not edge-shaped can still answer for itself; otherwise fall back to trying as an Edge, which covers the interactions that are (boost, like, flag, follow). `Edges.exists?/4` takes the context module, which is exactly what the registry hands back, so neither path needs a per-type mapping here

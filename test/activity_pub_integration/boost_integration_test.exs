@@ -134,6 +134,48 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
              )
     end
 
+    # ActivityPub asks the adapter whether this actor already has a live boost of this object, to discard a duplicate Announce (`Transformer.duplicate_announce?/2`). The module answering is `Bonfire.Social.Boosts`, and extensions and modules are toggled at runtime: while it is disabled it answers nothing, so the duplicate is not discarded.
+    #
+    # Only the module is disabled here, not its extension: the answer goes through `Bonfire.Social.Edges`, which is in the same extension, and would be disabled with it, so that would not show the check on the module
+    test "a received boost is a live interaction, unless the module answering for it is disabled" do
+      user = fake_user!()
+      attrs = %{post_content: %{html_body: "content"}}
+      {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      {:ok, actor} =
+        ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
+
+      {:ok, ap_boost} = ActivityPub.announce(%{actor: actor, object: ap_activity.object})
+
+      assert {:ok, %Boost{}} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_boost)
+
+      exists? = fn ->
+        ActivityPub.Federator.Adapter.activity_exists?(
+          "Announce",
+          actor.ap_id,
+          ap_activity.object.data["id"]
+        )
+      end
+
+      key = [:bonfire_social, Bonfire.Social.Boosts, :modularity]
+
+      # the positive first: the boost just received is found
+      assert exists?.()
+
+      Bonfire.Common.Extend.clear_modularity_cache(Bonfire.Social.Boosts)
+      Process.put(key, :disabled)
+
+      try do
+        refute exists?.()
+      after
+        Process.delete(key)
+        Bonfire.Common.Extend.clear_modularity_cache(Bonfire.Social.Boosts)
+      end
+
+      assert exists?.()
+    end
+
     test "boost receiving works, but doesn't notify me if I disabled federation" do
       user = fake_user!()
 

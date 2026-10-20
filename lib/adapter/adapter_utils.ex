@@ -2236,7 +2236,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def character_module(type) when is_atom(type) or is_binary(type) do
     with {:ok, module} <-
-           Bonfire.Federate.ActivityPub.FederationModules.federation_module(type) do
+           Bonfire.Federate.ActivityPub.FederationModules.federation_module(type),
+         # the registry holds the declared modules, enabled or not
+         {:module_enabled, true} <-
+           {:module_enabled, Bonfire.Common.Extend.module_enabled?(module)} do
       module
     else
       e ->
