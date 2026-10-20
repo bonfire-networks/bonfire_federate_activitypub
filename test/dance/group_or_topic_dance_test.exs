@@ -66,7 +66,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       assert {:ok, topic_ap_id} =
                TestInstanceRepo.apply(fn ->
-                 with {:ok, %{ap_id: ap_id}} <- ActivityPub.Actor.get_cached(pointer: remote.topic),
+                 with {:ok, %{ap_id: ap_id}} <-
+                        ActivityPub.Actor.get_cached(pointer: remote.topic),
                       do: {:ok, ap_id}
                end)
 

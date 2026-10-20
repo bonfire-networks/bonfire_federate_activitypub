@@ -228,6 +228,19 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
       assert is_nil(AdapterUtils.character_module("NoSuchType"))
     end
 
+    # extensions are enabled and disabled at runtime, and the registry holds what the modules declare, enabled or not
+    test "returns nil while the extension of the actor module is disabled, and the module again once it is enabled" do
+      assert AdapterUtils.character_module("Person") == Bonfire.Me.Users
+
+      assert is_nil(
+               Bonfire.Common.Testing.with_extension_disabled(:bonfire_me, fn ->
+                 AdapterUtils.character_module("Person")
+               end)
+             )
+
+      assert AdapterUtils.character_module("Person") == Bonfire.Me.Users
+    end
+
     # Parked: list-valued `type` belongs to the places-as-actors work (Service + Place), not to the
     # group/Service scope. Raises FunctionClauseError today — there is no list clause.
     @tag :todo
