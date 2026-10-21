@@ -8,7 +8,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegation do
 
       AP_DELEGATED_ACTORS="events:lauti.org;alice:https://social.org/actors/alice,https://alice.org"
 
-  A signer entry is either a bare instance hostname which admits any actor on that instance, or a full actor URI which admits only that actor. A URI like `https://alice.org` is the second kind: it is an instance actor's own id, not a wildcard for its host.
+  A signer entry is either a bare instance hostname which admits any actor on that instance, or a full actor URI which admits only that actor. A URI like `https://alice.org` is the second kind: it is an instance actor's own id, not a wildcard for its host. Trailing slashes are ignored on both sides, so `lauti.org/`, `https://alice.org/` and a signer id that ends in `/` mean what they would without it.
 
   The lib asks for this via the optional `maybe_delegated_user/2` adapter callback, so nothing in `activity_pub` knows how the decision is made, a future version could express it as a per-user circle/boundary instead, with no change on the lib side.
   """
@@ -22,16 +22,24 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegation do
   Whether `signer` (a remote actor, or its AP ID) may post as the local actor named `username`.
   """
   def delegated?(username, signer) when is_binary(username) do
-    with signer_ap_id when is_binary(signer_ap_id) <- Utils.ap_id(signer) do
+    with signer_ap_id when is_binary(signer_ap_id) <- Utils.ap_id(signer),
+         signer_ap_id when signer_ap_id != "" <- trim_slashes(signer_ap_id) do
       username
       |> allowed_signers()
+      |> Enum.map(&trim_slashes/1)
+      |> Enum.reject(&(&1 == ""))
       |> Enum.any?(&matches?(&1, signer_ap_id))
     else
-      _ -> false
+      _ -> 
+        warn("Delegation could not be checked for #{username} and #{inspect signer}")
+        false
     end
   end
 
-  def delegated?(_username, _signer), do: false
+  def delegated?(username, _signer) do
+    warn(username, "Delegation could not be checked")
+    false
+  end
 
   @doc """
   The configured signer entries for a local actor's username (empty when none).
@@ -78,6 +86,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegation do
     |> Enum.reject(&(&1 == ""))
   end
 
+  # A trailing slash does not change which actor or instance is meant, so neither the entry nor the signer is held to one (`delegated?/2` trims both). One that is nothing but slashes names nobody, and is dropped there.
+  defp trim_slashes(uri), do: String.trim_trailing(uri, "/")
+
   defp matches?(entry, signer_ap_id) do
     entry == signer_ap_id or instance_matches?(entry, signer_ap_id)
   end
@@ -89,7 +100,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegation do
          when is_binary(signer_host) and signer_host != "" <- URI.parse(signer_ap_id) do
       String.downcase(signer_host) == host and signer_port == default_port(scheme)
     else
-      _ -> false
+      _ -> 
+        warn(entry, "Could not check matches")
+        false
     end
   end
 

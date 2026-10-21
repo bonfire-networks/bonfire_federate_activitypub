@@ -109,6 +109,50 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegationTest do
       refute ActorDelegation.delegated?("bonfire", @other_remote_actor)
     end
 
+    test "an exact actor URI matches with or without a trailing slash, on either side" do
+      System.put_env(@env, "bonfire:#{@remote_actor}/")
+      assert ActorDelegation.delegated?("bonfire", @remote_actor)
+      assert ActorDelegation.delegated?("bonfire", @remote_actor <> "/")
+      refute ActorDelegation.delegated?("bonfire", @other_remote_actor)
+
+      System.put_env(@env, "bonfire:#{@remote_actor}")
+      assert ActorDelegation.delegated?("bonfire", @remote_actor <> "/")
+      assert ActorDelegation.delegated?("bonfire", @remote_actor <> "//")
+    end
+
+    test "an origin URL with a trailing slash is still an actor id, not a wildcard for its host" do
+      System.put_env(@env, "bonfire:#{@remote_instance}/")
+
+      assert ActorDelegation.delegated?("bonfire", @remote_instance)
+      assert ActorDelegation.delegated?("bonfire", @remote_instance <> "/")
+
+      refute ActorDelegation.delegated?("bonfire", @remote_actor)
+      refute ActorDelegation.delegated?("bonfire", @other_remote_actor)
+    end
+
+    test "a bare hostname with a trailing slash still admits any actor on that host" do
+      System.put_env(@env, "bonfire:#{@remote_host}/")
+
+      assert ActorDelegation.delegated?("bonfire", @remote_actor)
+      assert ActorDelegation.delegated?("bonfire", @other_remote_actor)
+      assert ActorDelegation.delegated?("bonfire", @remote_instance)
+    end
+
+    test "a host with a path is not a bare hostname, trailing slash or not" do
+      System.put_env(@env, "bonfire:#{@remote_host}/users/")
+
+      refute ActorDelegation.delegated?("bonfire", @remote_actor)
+      refute ActorDelegation.delegated?("bonfire", @remote_instance)
+    end
+
+    test "an entry that is only slashes admits nothing, not even an empty signer" do
+      System.put_env(@env, "bonfire:/")
+
+      refute ActorDelegation.delegated?("bonfire", "")
+      refute ActorDelegation.delegated?("bonfire", "/")
+      refute ActorDelegation.delegated?("bonfire", @remote_actor)
+    end
+
     test "a signer allowlisted for one actor is not allowlisted for another" do
       System.put_env(@env, "bonfire:#{@remote_host}")
       refute ActorDelegation.delegated?("someone_else", @remote_actor)

@@ -516,12 +516,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
           location: e(data["location"], "name", nil),
           icon_id:
             AdapterUtils.maybe_create_icon_object(
-              AdapterUtils.maybe_fix_image_object(data["icon"]),
+              Bonfire.Files.Media.extract_ap_icon_url(data["icon"]),
               character
             ),
           image_id:
             AdapterUtils.maybe_create_banner_object(
-              AdapterUtils.maybe_fix_image_object(data["image"]),
+              Bonfire.Files.Media.extract_ap_icon_url(data["image"]),
               character
             )
         },
@@ -698,10 +698,16 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
           error(e, "Delegation is allowed, but could not resolve the local user to publish as")
           nil
       end
+    else
+      warn("Not delegted: #{username} cannot be published as by #{inspect signer}")
+      nil
     end
   end
 
-  def maybe_delegated_user(_local_actor, _signer), do: nil
+  def maybe_delegated_user(local_actor, _signer) do
+    warn(local_actor, "Delegation could not be checked")
+    nil
+  end
 
   def get_locale, do: Bonfire.Common.Localise.get_locale_id()
 

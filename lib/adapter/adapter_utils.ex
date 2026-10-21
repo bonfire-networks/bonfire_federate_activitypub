@@ -2051,14 +2051,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # do this after the transaction, in case of timeouts downloading the images
       icon_id =
         maybe_create_icon_object(
-          maybe_fix_image_object(actor.data["icon"]),
+          Bonfire.Files.Media.extract_ap_icon_url(actor.data["icon"]),
           user_etc
         )
 
       # |> debug
       banner_id =
         maybe_create_image_object(
-          maybe_fix_image_object(actor.data["image"]),
+          Bonfire.Files.Media.extract_ap_icon_url(actor.data["image"]),
           user_etc
         )
 
@@ -2607,18 +2607,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_author(author) when is_binary(author), do: author
 
-  def maybe_fix_image_object(url) when is_binary(url), do: url
-  def maybe_fix_image_object(%{"url" => url}), do: url
-  def maybe_fix_image_object(_), do: nil
-
-  # def maybe_create_image_object(nil), do: nil
-
-  # def maybe_create_image_object(url) do
-  #   %{
-  #     "type" => "Image",
-  #     "url" => url
-  #   }
-  # end
 
   def maybe_create_banner_object(nil, _actor), do: nil
 

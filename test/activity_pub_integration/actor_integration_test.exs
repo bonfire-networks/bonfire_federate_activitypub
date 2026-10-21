@@ -13,6 +13,11 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
   # `jo` sends neither property
   @remote_actor_unindexable @remote_instance <> "/users/kip"
   @remote_actor_no_privacy_props @remote_instance <> "/users/jo"
+  # `linky` sends its `icon` as an Image whose `url` is a Link object (as 9.dev.bonfire.cafe does)
+  # and its `image` as a bare Link
+  @remote_actor_link_images @remote_instance <> "/users/linky"
+  @link_icon_href @remote_instance <> "/assets/linky_icon.png"
+  @link_image_href @remote_instance <> "/assets/linky_banner.jpg"
   @webfinger @remote_instance <>
                "/.well-known/webfinger?resource=acct:" <> @actor_name
   @webfinger @remote_instance <>
@@ -32,6 +37,17 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
       %{method: :get, url: @remote_actor_no_privacy_props} ->
         json(Simulate.actor_json(@remote_actor_no_privacy_props))
+
+      %{method: :get, url: @remote_actor_link_images} ->
+        json(
+          Simulate.actor_json(@remote_actor_link_images, "linky", %{
+            "icon" => %{
+              "type" => "Image",
+              "url" => %{"type" => "Link", "href" => @link_icon_href, "mediaType" => "image/png"}
+            },
+            "image" => %{"type" => "Link", "href" => @link_image_href, "mediaType" => "image/jpeg"}
+          })
+        )
 
       %{method: :get, url: @webfinger} ->
         json(Simulate.webfingered())
@@ -197,6 +213,18 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     # debug(user)
     assert user.profile.icon_id
     assert user.profile.image_id
+  end
+
+  test "remote actor with Link-object icon and image gets an avatar and banner" do
+    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor_link_images)
+    assert {:ok, user} = Bonfire.Me.Users.by_username(actor.username)
+
+    user = Bonfire.Common.Repo.preload(user, profile: [:icon, :image])
+
+    assert user.profile.icon_id
+    assert user.profile.image_id
+    assert user.profile.icon.path == @link_icon_href
+    assert user.profile.image.path == @link_image_href
   end
 
   # `by_username/1` doesn't preload settings and `Settings.get` reads them off the struct, so
