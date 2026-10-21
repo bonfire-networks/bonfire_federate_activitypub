@@ -76,7 +76,6 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PinsTest do
   end
 
   # A moderator's `Add` to the group's `featured`, cc'd to the group, which announces it to its followers (as a Lemmy community relays its mods' features). The follower's instance pins the post into its mirror of the group, not onto the moderator; the `Remove` takes it off again
-  @tag :test_instance
   if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     test "a group pin/unpin reaches a follower's instance, pinned into its mirror of the group",
          context do
