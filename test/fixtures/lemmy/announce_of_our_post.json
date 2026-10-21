@@ -1,0 +1,104 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "actor": "https://lemmy.local/c/test5677754",
+  "cc": [
+    "https://lemmy.local/c/test5677754/followers"
+  ],
+  "id": "https://lemmy.local/activities/announce/create/3a51879c-179a-496b-baf5-b9f4f2bd1b07",
+  "object": {
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
+      {
+        "@language": "en",
+        "Hashtag": "as:Hashtag",
+        "KeyPackage": "https://purl.archive.org/socialweb/mls#KeyPackage",
+        "ValueFlows": "https://w3id.org/valueflows#",
+        "_misskey_quote": "https://misskey-hub.net/ns/#_misskey_quote",
+        "commentsEnabled": "pt:commentsEnabled",
+        "mlsSignature": "https://purl.archive.org/socialweb/mls#Signature",
+        "mlsSignerKeyId": "https://purl.archive.org/socialweb/mls#SignerKeyId",
+        "om2": "http://www.ontology-of-units-of-measure.org/resource/om-2/",
+        "pt": "https://joinpeertube.org/ns#",
+        "quote": {
+          "@id": "https://w3id.org/fep/044f#quote",
+          "@type": "@id"
+        },
+        "quoteAuthorization": {
+          "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+          "@type": "@id"
+        },
+        "sensitive": "as:sensitive"
+      }
+    ],
+    "actor": "https://bonfire.local/pub/person/01M5CWC4RVW8CVMHXR49PF69W3",
+    "audience": "https://lemmy.local/c/test5677754",
+    "cc": [
+      "https://bonfire.local/pub/person/01M41W9HSGSXGMAQV6CC1GDWTY",
+      "https://lemmy.local/c/test5677754"
+    ],
+    "context": "https://7.dev.bonfire.cafe/pub/objects/01M41WAGYMWY46DYVD2TDWX6C4",
+    "id": "https://bonfire.local/pub/objects/8882e950-53ba-45e4-8004-d8dacff19e6a",
+    "object": {
+      "attributedTo": "https://bonfire.local/pub/person/01M5CWC4RVW8CVMHXR49PF69W3",
+      "audience": "https://lemmy.local/c/test5677754",
+      "cc": [
+        "https://bonfire.local/pub/person/01M41W9HSGSXGMAQV6CC1GDWTY",
+        "https://lemmy.local/c/test5677754"
+      ],
+      "commentsEnabled": true,
+      "content": "<p>Bonfire reply probe 52259</p>",
+      "context": "https://7.dev.bonfire.cafe/pub/objects/01M41WAGYMWY46DYVD2TDWX6C4",
+      "id": "https://bonfire.local/pub/objects/01M5CWC761D5GY80X9K9HNMWYK",
+      "inReplyTo": "https://7.dev.bonfire.cafe/pub/objects/01M41WAGYMWY46DYVD2TDWX6C4",
+      "indexable": false,
+      "interactionPolicy": {
+        "canAnnounce": {
+          "automaticApproval": [
+            "https://www.w3.org/ns/activitystreams#Public"
+          ]
+        },
+        "canLike": {
+          "automaticApproval": [
+            "https://www.w3.org/ns/activitystreams#Public"
+          ]
+        },
+        "canQuote": {
+          "automaticApproval": [
+            "https://bonfire.local/pub/person/01M5CWC4RVW8CVMHXR49PF69W3"
+          ],
+          "manualApproval": [
+            "https://www.w3.org/ns/activitystreams#Public"
+          ]
+        },
+        "canReply": {
+          "automaticApproval": [
+            "https://www.w3.org/ns/activitystreams#Public"
+          ]
+        }
+      },
+      "published": "2026-10-20T14:45:18.145Z",
+      "sensitive": false,
+      "source": {
+        "content": "<p>Bonfire reply probe 52259</p>",
+        "mediaType": "text/markdown"
+      },
+      "tag": [],
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "type": "Note"
+    },
+    "published": "2026-10-20T14:45:18.145Z",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Create"
+  },
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Announce"
+}

@@ -28,7 +28,6 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupLiveTest do
   # a test that waits on a human waiting on a remote needs to show what is arriving WHILE it waits. Captured logs are printed only on failure and only at the end, which is how the 2026-09-04 run could not say whether a follow attempt reached us at all
   @moduletag capture_log: false
 
-  alias Bonfire.Classify.Simulate
   alias Bonfire.Federate.ActivityPub.Testing.Interop
 
   @opt_in_env "LIVE_TEST_HOSTED_GROUP"
@@ -183,19 +182,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupLiveTest do
     end
   end
 
-  defp hosted_group(creator) do
-    group = Simulate.fancy_fake_category!(creator, type: :group)
-
-    assert :ok =
-             Bonfire.Classify.Boundaries.replace(group[:category], creator, %{
-               membership: "open",
-               visibility: "global",
-               participation: "anyone",
-               default_content_visibility: "public"
-             })
-
-    group
-  end
+  defp hosted_group(creator), do: Interop.Groups.hosted_group(creator)
 
   # everything the observer forwarded while we published, narrowed to announces BY THE GROUP: the same publish also delivers the author's own Create, which is not what this is about
   defp delivered_announces(group_ap_id) do

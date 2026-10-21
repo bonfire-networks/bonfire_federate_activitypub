@@ -1,0 +1,36 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "attributedTo": "https://mbin.local/m/foo_test/moderators",
+  "discoverable": true,
+  "endpoints": {
+    "sharedInbox": "https://mbin.local/f/inbox"
+  },
+  "featured": "https://mbin.local/m/foo_test/pinned",
+  "followers": "https://mbin.local/m/foo_test/followers",
+  "id": "https://mbin.local/m/foo_test",
+  "inbox": "https://mbin.local/m/foo_test/inbox",
+  "indexable": true,
+  "name": "FOO - test magazine in Kbin for experimentation",
+  "outbox": "https://mbin.local/m/foo_test/outbox",
+  "postingRestrictedToMods": false,
+  "preferredUsername": "foo_test",
+  "publicKey": {
+    "id": "https://mbin.local/m/foo_test#main-key",
+    "owner": "https://mbin.local/m/foo_test",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\r\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA2ET/ASWXuganS1UFuSVQ\r\nj6vEbQslAQVRLzN9fmyXBSpaoKTSSsSL9jVTkCLGvq47/Ho+lWhMgOrtafCoO1iq\r\ni6Hr8uDUSbOAJquzE5ZywB7shtkOVP1ScIdUbYPiLOQZj01IUH9M1e0xob/P274u\r\nu6Q5ireQ8N2r4OKZhvZfos3XSLkbKc8k+3nHYYsPw7lXFKyMlsNIPcohXmXi+sBH\r\ndCp3ypB2qI6+d9NrQM9WkQnS5aRtJX8Q60BqzUaFd/X1Kj254wvNHPKLxnd0Ai39\r\n6Zk8meoKGtDmMcEcbHzaa8DWd6k/UsDh+6eX+epRAakXTohiHmxupJ5KR/rY1u/r\r\nKvHTRYgn9/z66Pk9vrmKfPF/8mLDvtVbPPyzIRbULFzp68bvuUSwfNJxUeyFIzVy\r\nEJcIac0/bqBEKrjpn8QRbpwH+CZ+BICFZAUJnBBRPTbwvlSdhyW7ZqxPk28VUQOh\r\naaNhK4Voj6JsHMNT4sTITz+BKDFu11Qt3uE8jBMmmWvV8WVo7+fXwPrm0xd9vdWs\r\nf7dJBkspr4YcC+kvbDdDBQEnyb7pjcdKmR55sPFZy0EJ+Kpos9G9EZR9X1sPKIZ6\r\nnnkWAgZOnRoqz+5/zIfzJUfH662LdWkqnG0qH85sqkr8bFkeXQ2ILKiH48dyY9+E\r\nZ0RYWW3wbitStcFsmWnRbVECAwEAAQ==\r\n-----END PUBLIC KEY-----"
+  },
+  "published": "2023-06-22T21:54:49+00:00",
+  "sensitive": false,
+  "source": {
+    "content": "A magazine where you can post test content for Fediverse experimentation content.\r\n\r\nExpect little to no moderation, although I might purge spam or NSFW material.\r\n\r\n### Rules\r\n\r\nClean up your clutter. Maybe skip the NSFW stuff.",
+    "mediaType": "text/markdown"
+  },
+  "summary": "<p>A magazine where you can post test content for Fediverse experimentation content.</p>\n<p>Expect little to no moderation, although I might purge spam or NSFW material.</p>\n<h3>Rules</h3>\n<p>Clean up your clutter. Maybe skip the NSFW stuff.</p>\n",
+  "type": "Group",
+  "updated": "2023-07-08T17:33:28+00:00",
+  "url": "https://mbin.local/m/foo_test"
+}

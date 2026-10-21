@@ -102,7 +102,7 @@ defmodule Bonfire.Federate.ActivityPub.FediGroupsInteropTest do
 
   # Ingest the Announce and return the LOCAL post it produced.
   #
-  # Deliberately asserts on resulting state rather than on the return value: boost-edge creation reports `{:error, "You already boosted this."}` when fetching the announced object created the edge first, which is benign (see `peertube_announced_video_linked_test.exs`, which tolerates the same thing at a later point in the pipeline). Treating that as failure would test our plumbing instead of the interop behaviour we care about.
+  # Deliberately asserts on resulting state rather than on the return value: boost-edge creation reports `{:error, :already_boosted}` when fetching the announced object created the edge first, which is benign (see `peertube_announced_video_linked_test.exs`, which tolerates the same thing at a later point in the pipeline). Treating that as failure would test our plumbing instead of the interop behaviour we care about.
   defp receive_announce!(announce) do
     case ActivityPub.Federator.Transformer.handle_incoming(announce) do
       # the transformer already handed it to the adapter (a second `Incoming.receive_activity/1` applied it twice), whose result is the activity's `pointer`

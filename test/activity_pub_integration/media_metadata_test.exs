@@ -127,6 +127,260 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
     end
   end
 
+  # Which image is the post's primary one decides, on the receiving Bonfire, whether an incoming `Page` is filed as a Post (no primary image) or as Media (`Media.ap_receive_activity/3`). Only an image whose metadata says `primary_image: true`, the cover the author ticked, goes in `image`; every other image goes in `attachment`.
+  describe "the cover versus the other images" do
+    defp upload_image(user, file, metadata \\ %{}) do
+      assert {:ok, media} =
+               Files.upload(Bonfire.Files.ImageUploader, user, file, %{metadata: metadata})
+
+      media
+    end
+
+    defp publish_with(user, medias, opts \\ []) do
+      assert {:ok, post} =
+               Posts.publish(
+                 [
+                   current_user: user,
+                   boundary: "public",
+                   post_attrs: %{
+                     post_content: %{name: opts[:title], html_body: "look at this"},
+                     uploaded_media: medias
+                   }
+                 ] ++ if(opts[:group], do: [publish_in: uid(opts[:group])], else: [])
+               )
+
+      published_object(post)
+    end
+
+    test "without media the object has neither `image` nor `attachment`" do
+      data = publish_with(fake_user!(), [])
+
+      refute Map.has_key?(data, "image")
+      refute Map.has_key?(data, "attachment")
+    end
+
+    test "one image that is not the cover is an attachment, and there is no `image`" do
+      user = fake_user!()
+      data = publish_with(user, [upload_image(user, Files.Simulation.image_file())])
+
+      refute Map.has_key?(data, "image")
+      assert [%{"type" => "Image"}] = List.wrap(data["attachment"])
+    end
+
+    test "two images that are not the cover are both attachments, and there is no `image`" do
+      user = fake_user!()
+
+      data =
+        publish_with(user, [
+          upload_image(user, Files.Simulation.image_file()),
+          upload_image(user, Files.Simulation.image_with_exif_file())
+        ])
+
+      refute Map.has_key?(data, "image")
+      assert [%{"type" => "Image"}, %{"type" => "Image"}] = List.wrap(data["attachment"])
+    end
+
+    test "one image flagged as the cover is the `image`, and not an attachment too" do
+      user = fake_user!()
+
+      data =
+        publish_with(user, [
+          upload_image(user, Files.Simulation.image_file(), %{"primary_image" => true})
+        ])
+
+      assert %{"type" => "Image"} = data["image"]
+      refute Map.has_key?(data, "attachment")
+    end
+
+    test "a cover plus another image: the cover is `image`, only the other is an attachment" do
+      user = fake_user!()
+
+      data =
+        publish_with(user, [
+          upload_image(user, Files.Simulation.image_file(), %{"primary_image" => true}),
+          upload_image(user, Files.Simulation.image_with_exif_file())
+        ])
+
+      assert %{"url" => cover_url} = data["image"]
+      assert [%{"url" => other_url}] = List.wrap(data["attachment"])
+      assert cover_url != other_url, "the cover is not repeated in the attachments"
+    end
+
+    test "the cover flag may be the string \"true\"" do
+      user = fake_user!()
+
+      data =
+        publish_with(user, [
+          upload_image(user, Files.Simulation.image_file(), %{"primary_image" => "true"})
+        ])
+
+      assert %{"type" => "Image"} = data["image"]
+    end
+
+    # the same checks on the object a titled post in a group produces, which is a `Page`
+    test "a titled post in a group is a Page with `image` only when a cover is flagged" do
+      user = fake_user!()
+      group = Bonfire.Classify.Simulate.fake_group!(user)
+
+      without_cover =
+        publish_with(user, [upload_image(user, Files.Simulation.image_file())],
+          title: "A thread",
+          group: group
+        )
+
+      with_cover =
+        publish_with(
+          user,
+          [upload_image(user, Files.Simulation.image_file(), %{"primary_image" => true})],
+          title: "A thread",
+          group: group
+        )
+
+      assert without_cover["type"] == "Page"
+      refute Map.has_key?(without_cover, "image")
+      assert [%{"type" => "Image"}] = List.wrap(without_cover["attachment"])
+
+      assert with_cover["type"] == "Page"
+      assert %{"type" => "Image"} = with_cover["image"]
+    end
+  end
+
+  # What Bonfire files an incoming titled `Page` as: Media when it has a primary image (`image.url`), a Post when it has none, whatever else it carries (`Media.ap_receive_activity/3`). A `Link` attachment is looked at first: with no `content` the Page is the link (Media), with `content` it is a post about the link (Post), which is Lemmy's shape. The objects come from what we publish ourselves, re-addressed to a remote author, so the cases follow what `ap_prepare_object_note/7` and `Files.ap_merge_media/2` really emit.
+  describe "an incoming titled Page with media" do
+    @public "https://www.w3.org/ns/activitystreams#Public"
+
+    defp as_remote_create(object, suffix) do
+      id = "https://mocked.local/objects/#{suffix}-#{System.unique_integer([:positive])}"
+
+      %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => "Create",
+        "id" => id <> "/activity",
+        "actor" => @remote_actor,
+        "to" => [@public],
+        "object" =>
+          object
+          |> Map.drop(["audience", "context", "cc", "inReplyTo"])
+          |> Map.merge(%{
+            "id" => id,
+            "attributedTo" => @remote_actor,
+            "to" => [@public],
+            "cc" => []
+          })
+      }
+    end
+
+    defp receive_incoming(create) do
+      {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(create)
+
+      assert {:ok, received} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+               # `prune: true` because what comes back is a Post or a Media, which don't share associations
+               |> repo().maybe_preload([:post_content, :media], prune: true)
+
+      received
+    end
+
+    defp titled_page(user, medias) do
+      group = Bonfire.Classify.Simulate.fake_group!(user)
+      data = publish_with(user, medias, title: "A thread title", group: group)
+      assert data["type"] == "Page", "control: this is the Page we send into a group"
+      data
+    end
+
+    test "with a title and text and no media is a Post" do
+      user = fake_user!()
+
+      received = titled_page(user, []) |> as_remote_create("page") |> receive_incoming()
+
+      assert %Bonfire.Data.Social.Post{} = received
+      assert e(received, :post_content, :name, nil) == "A thread title"
+    end
+
+    test "with a primary image is Media" do
+      user = fake_user!()
+
+      page =
+        titled_page(user, [
+          upload_image(user, Files.Simulation.image_file(), %{"primary_image" => true})
+        ])
+
+      assert %Bonfire.Files.Media{} = page |> as_remote_create("cover") |> receive_incoming()
+    end
+
+    test "with a primary image and another image is Media" do
+      user = fake_user!()
+
+      page =
+        titled_page(user, [
+          upload_image(user, Files.Simulation.image_file(), %{"primary_image" => true}),
+          upload_image(user, Files.Simulation.image_with_exif_file())
+        ])
+
+      assert %Bonfire.Files.Media{} = page |> as_remote_create("cover-plus") |> receive_incoming()
+    end
+
+    test "with images but no primary image is a Post, and keeps them attached" do
+      user = fake_user!()
+
+      page =
+        titled_page(user, [
+          upload_image(user, Files.Simulation.image_file()),
+          upload_image(user, Files.Simulation.image_with_exif_file())
+        ])
+
+      refute Map.has_key?(page, "image"), "control: no primary image"
+
+      received = page |> as_remote_create("attachments") |> receive_incoming()
+
+      assert %Bonfire.Data.Social.Post{} = received
+      assert length(List.wrap(received.media)) == 2
+    end
+
+    # Lemmy sends a post's link (or image URL) as a `Link` attachment, and its thumbnail as `image`
+    test "with a Link attachment and no text is Media, with text it is a Post" do
+      link = %{"type" => "Link", "href" => "https://example.com/an-article", "mediaType" => "text/html"}
+
+      page = fn content ->
+        %{
+          "type" => "Page",
+          "name" => "A link post",
+          "content" => content,
+          "attachment" => [link],
+          "image" => %{"type" => "Image", "url" => "https://example.com/thumb.png"}
+        }
+      end
+
+      assert %Bonfire.Files.Media{} = page.(nil) |> as_remote_create("link-bare") |> receive_incoming()
+
+      assert %Bonfire.Data.Social.Post{} =
+               page.("<p>and what I think of it</p>")
+               |> as_remote_create("link-text")
+               |> receive_incoming()
+    end
+
+    test "control: a Note with a title and a primary image is a Post" do
+      user = fake_user!()
+
+      assert {:ok, post} =
+               Posts.publish(
+                 current_user: user,
+                 boundary: "public",
+                 post_attrs: %{
+                   post_content: %{name: "A title, no group", html_body: "look at this"},
+                   uploaded_media: [
+                     upload_image(user, Files.Simulation.image_file(), %{"primary_image" => true})
+                   ]
+                 }
+               )
+
+      note = published_object(post)
+      assert note["type"] == "Note"
+
+      assert %Bonfire.Data.Social.Post{} = note |> as_remote_create("note") |> receive_incoming()
+    end
+  end
+
   describe "alt text federates incoming" do
     test "an image attachment's `name` is stored as the media's alt text" do
       alt = "A cat asleep on a keyboard"

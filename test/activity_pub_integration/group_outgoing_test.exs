@@ -105,6 +105,188 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
     assert Outgoing.ap_activity!(post).data["audience"] == group_ap_id(group)
   end
 
+  # Mbin files a `Note` as a microblog post whatever its `name`, and only a `Page` (or `Article`, `Video`) as a thread, so a titled post that starts a thread in a group has to go out as a `Page`. It is decided once, when the object is built: every recipient, the group's relay in both shapes and the object endpoint all carry the same type. A titled post on someone's own timeline, a reply and an untitled post are still a `Note`.
+  describe "a titled post that starts a thread in a group is a Page" do
+    setup do
+      mock(fn
+        %{method: :get, url: @remote_actor} ->
+          json(APSimulate.actor_json(@remote_actor))
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+
+        %{method: :get} ->
+          %Tesla.Env{status: 404, body: ""}
+      end)
+
+      creator = fake_user!()
+      group = public_group(creator)
+      {:ok, _} = Follows.follow(remote_follower(), group, skip_boundary_check: true)
+
+      %{creator: creator, group: group}
+    end
+
+    defp titled_post(author, opts) do
+      post_attrs =
+        %{post_content: %{name: opts[:title], html_body: opts[:body] || "<p>the body</p>"}}
+        |> then(&if opts[:reply_to], do: Map.put(&1, :reply_to_id, uid(opts[:reply_to])), else: &1)
+
+      assert {:ok, post} =
+               Bonfire.Posts.publish(
+                 [current_user: author, post_attrs: post_attrs, boundary: "public"] ++
+                   if(opts[:group], do: [publish_in: uid(opts[:group])], else: [])
+               )
+
+      post
+    end
+
+    defp served_type(post) do
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: post)
+      data["type"]
+    end
+
+    # both shapes of the group's relay, as delivered to a follower on another instance
+    defp relay_payloads(group, post) do
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: group)
+      {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+      announce = ActivityPub.Object.get_existing_announce(actor.ap_id, ap_post)
+      assert %{data: %{"type" => "Announce"}} = announce
+
+      APPublisher.prepare_publish_params(actor, announce) |> Enum.map(&Jason.decode!(&1.json))
+    end
+
+    test "in the 1b12 relay shape, where the Create is embedded", %{creator: creator, group: group} do
+      post = titled_post(creator, title: "A thread title", group: group)
+
+      payload =
+        relay_payloads(group, post)
+        |> Enum.find(&(e(&1, "object", "type", nil) == "Create")) ||
+          flunk("no relay in the 1b12 shape")
+
+      assert payload["object"]["object"]["type"] == "Page"
+      assert payload["object"]["object"]["name"] == "A thread title"
+    end
+
+    test "in the bare-object relay shape, which microblog software re-fetches by id", %{
+      creator: creator,
+      group: group
+    } do
+      post = titled_post(creator, title: "A thread title", group: group)
+
+      payload =
+        relay_payloads(group, post)
+        |> Enum.find(&(e(&1, "object", "type", nil) != "Create")) ||
+          flunk("no relay in the object shape")
+
+      assert payload["object"]["type"] == "Page"
+    end
+
+    test "and as the object endpoint serves it", %{creator: creator, group: group} do
+      post = titled_post(creator, title: "A thread title", group: group)
+
+      assert served_type(post) == "Page"
+    end
+
+    test "a titled post on the author's own timeline is a Note", %{creator: creator} do
+      post = titled_post(creator, title: "A title, no group")
+
+      assert served_type(post) == "Note"
+    end
+
+    test "a reply in a group is a Note, titled or not", %{creator: creator, group: group} do
+      thread = titled_post(creator, title: "A thread title", group: group)
+
+      assert served_type(titled_post(creator, title: "A reply title", reply_to: thread)) == "Note"
+      assert served_type(titled_post(creator, title: nil, reply_to: thread)) == "Note"
+    end
+
+    test "an untitled post that starts a thread in a group is a Note", %{
+      creator: creator,
+      group: group
+    } do
+      post = titled_post(creator, title: nil, group: group)
+
+      assert served_type(post) == "Note"
+    end
+  end
+
+  # The same rule for a group hosted elsewhere, read where it matters: in what is delivered to that group's own inbox.
+  describe "a titled post that starts a thread in a group hosted elsewhere is a Page" do
+    import Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures, only: [fixture: 2, served_for: 1]
+
+    @lemmy %{
+      name: "Lemmy",
+      dir: "lemmy",
+      id: "https://lemmy.local/c/technology",
+      actor: "community_actor.json",
+      announces: []
+    }
+
+    setup do
+      served = Map.new(served_for([@lemmy]))
+
+      mock(fn
+        %{method: :get, url: url} ->
+          case served[url] do
+            nil -> %Tesla.Env{status: 404, body: ""}
+            body -> json(body)
+          end
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+      end)
+
+      assert {:ok, group} =
+               Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{
+                 "id" => @lemmy.id
+               })
+
+      user = fake_user!()
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(user, group)
+
+      %{user: user, group: group}
+    end
+
+    defp delivered_to_group_inbox(user, post) do
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: user)
+      group = fixture("lemmy", "community_actor.json")
+      group_inboxes = [group["inbox"], e(group, "endpoints", "sharedInbox", nil)]
+
+      APPublisher.prepare_publish_params(actor, Outgoing.ap_activity!(post))
+      |> Enum.filter(&(&1.inbox in group_inboxes))
+      |> Enum.map(&Jason.decode!(&1.json))
+    end
+
+    test "the Create delivered to the group's inbox carries a Page", %{user: user, group: group} do
+      assert {:ok, post} =
+               Bonfire.Posts.publish(
+                 current_user: user,
+                 post_attrs: %{post_content: %{name: "A thread title", html_body: "<p>body</p>"}},
+                 boundary: "public",
+                 publish_in: uid(group)
+               )
+
+      assert [payload | _] = delivered_to_group_inbox(user, post),
+             "control: something is delivered to the group's inbox"
+
+      assert payload["object"]["type"] == "Page"
+      assert payload["object"]["audience"] == @lemmy.id
+    end
+
+    test "an untitled post to the same group stays a Note", %{user: user, group: group} do
+      assert {:ok, post} =
+               Bonfire.Posts.publish(
+                 current_user: user,
+                 post_attrs: %{post_content: %{html_body: "<p>body</p>"}},
+                 boundary: "public",
+                 publish_in: uid(group)
+               )
+
+      assert [payload | _] = delivered_to_group_inbox(user, post)
+      assert payload["object"]["type"] == "Note"
+    end
+  end
+
   test "the group announces a post published in it" do
     creator = fake_user!()
     group = public_group(creator)
@@ -181,6 +363,29 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
     assert %{data: %{"type" => "Announce"}} =
              ActivityPub.Object.get_existing_announce(group_ap_id(group), delete),
            "the group's followers keep a deleted post unless the group relays its deletion"
+  end
+
+  # The relayed `Announce{Delete}` is understood by Lemmy and the threadiverse, but Mastodon (and GoToSocial, Akkoma, Misskey) ignore it, so a follower there keeps the group's boost of a post that no longer exists. Found against `@mayel@mastodon.social` on 20 October (`group_account_live_test.exs`). Taking the boost back is what removes it for them, and it needs nobody's key but the group's.
+  test "the group takes its boost back when its author deletes a post published in it" do
+    creator = fake_user!()
+    group = public_group(creator)
+    post = post_in_group(creator, group, "<p>soon gone, and not boosted any more</p>")
+
+    assert {:ok, ap_post} = ActivityPub.Object.get_cached(pointer: post)
+
+    assert %{data: announce} =
+             ActivityPub.Object.get_existing_announce(group_ap_id(group), ap_post),
+           "control: the group announced it, so there is an Announce to undo"
+
+    assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: creator)
+
+    assert ActivityPub.Object
+           |> repo().all()
+           |> Enum.any?(
+             &(&1.data["type"] == "Undo" and &1.data["actor"] == group_ap_id(group) and
+                 ActivityPub.Object.get_ap_id(&1.data["object"]) == announce["id"])
+           ),
+           "the post was deleted but the group never took its boost back, so servers that ignore a relayed `Announce{Delete}` keep showing it"
   end
 
   # a moderator may delete a member's post (the moderate role includes `:delete`), and that delete takes the same path as an author's
@@ -1038,6 +1243,30 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
       assert Enum.any?(shapes, &(&1 in ["Note", "Page", "Article", "Question"])),
              "and the object shape, which the Pleroma/Misskey/GoToSocial family require"
+    end
+
+    # Mastodon deletes a status only on a `Delete` from the account that wrote it, and a server that follows the GROUP and not the author knows the post only through the group's `Announce`. The author's `Delete` goes to the author's followers and the people it mentions, so without this that server keeps the deleted post, on the author's profile, for good. Found against `@mayel@mastodon.social` on 20 October (`group_account_live_test.exs`).
+    test "the author's own Delete reaches the group's remote followers, who only know the post through the group" do
+      creator = fake_user!()
+      group = public_group(creator)
+      {:ok, _} = Follows.follow(remote_follower(), group, skip_boundary_check: true)
+
+      post = post_in_group(creator, group, "<p>soon gone, from every follower's server</p>")
+      assert {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: creator)
+
+      assert %{} = delete = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
+             "control: the deletion federated a Delete"
+
+      {:ok, author_actor} = ActivityPub.Actor.get_cached(pointer: creator)
+      {:ok, %{data: remote_data}} = ActivityPub.Actor.get_cached(ap_id: @remote_actor)
+      their_inboxes = [remote_data["inbox"], e(remote_data, "endpoints", "sharedInbox", nil)]
+
+      deliveries = APPublisher.prepare_publish_params(author_actor, delete)
+
+      assert Enum.any?(deliveries, &(&1.inbox in their_inboxes)),
+             "the author's Delete went only to #{inspect(Enum.map(deliveries, & &1.inbox))}, so the group's remote follower never hears the post is gone"
     end
 
     test "publishing a person's boost yields one" do

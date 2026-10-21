@@ -1,0 +1,58 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "actor": "https://mbin.local/u/mayel",
+  "audience": "https://mbin.local/m/foo_test",
+  "cc": [
+    "https://mbin.local/u/mayel/followers"
+  ],
+  "id": "https://mbin.local/f/object/01a15918-f9ff-7d40-b716-b452ffe978fb",
+  "object": {
+    "attachment": [
+      {
+        "href": "https://radicaldata.org/about/",
+        "type": "Link"
+      }
+    ],
+    "attributedTo": "https://mbin.local/u/mayel",
+    "audience": "https://mbin.local/m/foo_test",
+    "cc": [
+      "https://mbin.local/u/mayel/followers"
+    ],
+    "commentsEnabled": true,
+    "content": "<p>A collective claiming data as a tool of resistance and a million liberations.</p>\n",
+    "contentMap": {
+      "en": "<p>A collective claiming data as a tool of resistance and a million liberations.</p>\n"
+    },
+    "id": "https://mbin.local/m/foo_test/t/4476994",
+    "inReplyTo": null,
+    "mediaType": "text/html",
+    "name": "Radical Data - A collective creating an alternative future for data.",
+    "published": "2026-10-20T11:36:10+00:00",
+    "sensitive": false,
+    "source": "https://radicaldata.org/about/",
+    "stickied": false,
+    "summary": "Radical Data - A collective creating an alternative future... #foo_test",
+    "tag": [
+      {
+        "href": "https://mbin.local/tag/foo_test",
+        "name": "#foo_test",
+        "type": "Hashtag"
+      }
+    ],
+    "to": [
+      "https://mbin.local/m/foo_test",
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Page"
+  },
+  "published": "2026-10-20T11:36:10+00:00",
+  "to": [
+    "https://mbin.local/m/foo_test",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Create"
+}

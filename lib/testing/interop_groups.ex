@@ -143,6 +143,35 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
 
     defp software_slug(other), do: to_string(other)
 
+    @doc """
+    A group on this instance that anyone may join and read, created by `creator`, for a remote to follow in the live tests. Returns the same map as `Bonfire.Classify.Simulate.fancy_fake_category!/2`: `:category`, `:username`, `:canonical_url` and `:friendly_url`.
+    """
+    def hosted_group(creator) do
+      group =
+        maybe_apply(Bonfire.Classify.Simulate, :fancy_fake_category!, [creator, [type: :group]],
+          fallback_return: nil
+        ) || raise "could not create a group to host"
+
+      :ok =
+        maybe_apply(
+          Bonfire.Classify.Boundaries,
+          :replace,
+          [
+            group[:category],
+            creator,
+            %{
+              membership: "open",
+              visibility: "global",
+              participation: "anyone",
+              default_content_visibility: "public"
+            }
+          ],
+          fallback_return: nil
+        )
+
+      group
+    end
+
     defp fetch_moderators(actor, opts) do
       case e(actor, :data, "attributedTo", nil) do
         url when is_binary(url) ->

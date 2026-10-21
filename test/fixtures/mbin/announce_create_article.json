@@ -1,0 +1,95 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "actor": "https://mbin.local/m/foo_test",
+  "audience": "https://mbin.local/m/foo_test",
+  "cc": [
+    "https://mbin.local/m/foo_test/followers",
+    "https://www.w3.org/ns/activitystreams#Public",
+    "https://mbin.local/m/foo_test/followers"
+  ],
+  "id": "https://mbin.local/f/object/01a1592a-b696-7698-9e53-62535a948719",
+  "object": {
+    "actor": "https://friendica.local/profile/mayel",
+    "audience": "https://mbin.local/m/foo_test",
+    "cc": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://mbin.local/m/foo_test/followers"
+    ],
+    "id": "https://friendica.local/objects/84b6ef2b-796a-d756-9b99-70b193614624/Create",
+    "instrument": {
+      "id": "https://friendica.local/friendica",
+      "name": "Friendica 'Blutwurz' 2026.05-1595",
+      "type": "Application",
+      "url": "https://friendica.local"
+    },
+    "object": {
+      "attachment": [],
+      "attributedTo": "https://friendica.local/profile/mayel",
+      "audience": "https://mbin.local/m/foo_test",
+      "cc": [
+        "https://www.w3.org/ns/activitystreams#Public",
+        "https://mbin.local/m/foo_test/followers"
+      ],
+      "content": "test to group",
+      "contentMap": {
+        "gl": "<bdi>!<a href=\"https://mbin.local/m/foo_test\" class=\"userinfo mention\" title=\"foo_test\">foo_test</a></bdi> test to group"
+      },
+      "conversation": "https://friendica.local/objects/84b6ef2b-796a-d756-9b99-70b193614624#context",
+      "diaspora:guid": "84b6ef2b-796a-d756-9b99-70b193614624",
+      "id": "https://friendica.local/objects/84b6ef2b-796a-d756-9b99-70b193614624",
+      "inReplyTo": null,
+      "interactionPolicy": {
+        "canQuote": {
+          "automaticApproval": [
+            "https://www.w3.org/ns/activitystreams#Public"
+          ]
+        }
+      },
+      "name": "test",
+      "published": "2026-10-20T11:55:07Z",
+      "replies": {
+        "id": "https://friendica.local/objects/84b6ef2b-796a-d756-9b99-70b193614624/replies",
+        "totalItems": 0,
+        "type": "Collection"
+      },
+      "sensitive": false,
+      "source": {
+        "content": "![url=https://mbin.local/m/foo_test]FOO - test magazine in Kbin for experimentation[/url] test to group",
+        "mediaType": "text/bbcode"
+      },
+      "tag": [
+        {
+          "href": "https://mbin.local/m/foo_test",
+          "name": "@foo_test@mbin.local",
+          "type": "Mention"
+        }
+      ],
+      "to": [
+        "https://mbin.local/m/foo_test"
+      ],
+      "type": "Article",
+      "url": "https://friendica.local/display/84b6ef2b-796a-d756-9b99-70b193614624"
+    },
+    "published": "2026-10-20T11:55:07Z",
+    "signature": {
+      "created": "2026-10-20T11:55:32Z",
+      "creator": "https://friendica.local/profile/mayel#main-key",
+      "nonce": "a8fca3446abbe7f0d88a030233ba26fb2711f95526508f56dda595d2a2bad451",
+      "signatureValue": "qGNGBilojYFZxWTWZYwGSawEazfVlzRwHA++yxDUm998KPHIG6dA63nEBT7Ee+bJ71eCIi0x8I9fFRz3JnUU2d9NhgPtquG+L0OxZQ6O1HCQcxCIdLedZKbBPkK+fErR42VQOfqDKJ2eGorpbbWJe1DXG080OYFbzIDIovS3x1R5zu0QFc1D3LKHyWvD5TwmnCFKplzH9WO0CGcanlZuQyY8MCDB+UBzs22NO1iq6/3obDfFMtAcZ8HwSZNRNfhcWJmtzp2UgBHp4WfFZQ9WiVFHJsufR/TdzdINazL+1y9av2/odDUyDF4nxxW2VFwpts8aH+otxVha0mDRvyvte1ZvRiFDIisrycbJfftkxOHCUYbvHOMuetx0Y6HeHx/GAvP9nmnjNu2pptabFOTW1j5P944100v/V/gy52BIdnsU84Wi2LHw1+Kg+v6p1w2vihBFL9s2f0ThicpaE+WcY7cKdJGvUBp7d54At2CTu9EkleUKn6O/tBPwxIUXG0xO5/y17N8Fe1xU7zAflLe0Y0NGVck+I+U/0oS6YFbYKfh29sO0KT1j2UXqEjMEnDzGtw8pFoC1yu+whzVM75siflc4ErkJPvtGT4eUH9kjk77LTGnqn7UEbSGj28AaDD0zE8Z1bzm3/yE48Dy3kbUfSHtkYyAXsyDX6vfGKXJqvqY=",
+      "type": "RsaSignature2017"
+    },
+    "to": [
+      "https://mbin.local/m/foo_test"
+    ],
+    "type": "Create"
+  },
+  "published": "2026-10-20T11:55:33+00:00",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Announce"
+}

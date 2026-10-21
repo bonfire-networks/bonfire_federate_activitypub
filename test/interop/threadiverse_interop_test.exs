@@ -74,6 +74,15 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       actor: "magazine_actor.json",
       announces: [],
       titled: nil
+    },
+    # Mbin announces only a REMOTE author's post, and not to the author's own instance (`AnnounceHandler` drops every inbox on the post's host), so this one is a Friendica member's `Article` posted into a magazine and announced to a third instance, captured on 2026-10-20 from `fedia.io/m/foo_test`. A local member's post is not announced at all but delivered as the author's own `Create` (`mbin_local_author_test` below).
+    %{
+      name: "Mbin (a remote author's post)",
+      dir: "mbin",
+      id: "https://mbin.local/m/foo_test",
+      actor: "magazine_actor_foo_test.json",
+      announces: ["announce_create_article.json"],
+      titled: "announce_create_article.json"
     }
   ]
 

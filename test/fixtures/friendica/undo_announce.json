@@ -1,0 +1,95 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "Hashtag": "as:Hashtag",
+      "PropertyValue": "schema:PropertyValue",
+      "automaticApproval": {
+        "@id": "gts:automaticApproval",
+        "@type": "@id"
+      },
+      "canQuote": {
+        "@id": "gts:canQuote",
+        "@type": "@id"
+      },
+      "conversation": "ostatus:conversation",
+      "dfrn": "http://purl.org/macgirvin/dfrn/1.0/",
+      "diaspora": "https://diasporafoundation.org/ns/",
+      "directMessage": "litepub:directMessage",
+      "discoverable": "toot:discoverable",
+      "featured": {
+        "@id": "toot:featured",
+        "@type": "@id"
+      },
+      "gts": "https://gotosocial.org/ns#",
+      "interactionPolicy": {
+        "@id": "gts:interactionPolicy",
+        "@type": "@id"
+      },
+      "litepub": "http://litepub.social/ns#",
+      "manualApproval": {
+        "@id": "gts:manualApproval",
+        "@type": "@id"
+      },
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "ostatus": "http://ostatus.org#",
+      "quote": "https://w3id.org/fep/044f#quote",
+      "quoteAuthorization": {
+        "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+        "@type": "@id"
+      },
+      "quoteUri": "http://fedibird.com/ns#quoteUri",
+      "quoteUrl": "as:quoteUrl",
+      "schema": "http://schema.org#",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "value": "schema:value",
+      "vcard": "http://www.w3.org/2006/vcard/ns#"
+    }
+  ],
+  "actor": "https://friendica.local/profile/testgroup3",
+  "audience": "https://friendica.local/profile/testgroup3",
+  "cc": [],
+  "id": "https://friendica.local/objects/84b6ef2b-786a-d759-794b-28d971447618/Undo",
+  "instrument": {
+    "id": "https://friendica.local/friendica",
+    "name": "Friendica 'Blutwurz' 2026.05-1595",
+    "type": "Application",
+    "url": "https://friendica.local"
+  },
+  "object": {
+    "actor": "https://friendica.local/profile/testgroup3",
+    "audience": "https://friendica.local/profile/testgroup3",
+    "cc": [],
+    "id": "https://friendica.local/objects/84b6ef2b-786a-d759-794b-28d971447618",
+    "instrument": {
+      "id": "https://friendica.local/friendica",
+      "name": "Friendica 'Blutwurz' 2026.05-1595",
+      "type": "Application",
+      "url": "https://friendica.local"
+    },
+    "object": "https://friendica.local/objects/84b6ef2b-216a-d759-77cf-694326040285",
+    "published": "2026-10-20T12:07:21Z",
+    "to": [
+      "https://friendica.local/profile/mayel",
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://friendica.local/followers/testgroup3"
+    ],
+    "type": "Announce"
+  },
+  "published": "2026-10-20T12:07:21Z",
+  "signature": {
+    "created": "2026-10-20T12:13:54Z",
+    "creator": "https://friendica.local/profile/testgroup3#main-key",
+    "nonce": "bab481bfac736f259d4755de5a3ac30035bd928bade11b12d3152146baeb0b66",
+    "signatureValue": "Vt6iIDSDjUru5vZcAv2P7BAxBD5jHi6emggTgUJ2xNy2It0UQIWMUF9+u3omESZGmH70+khcDE4Svw2MV8201XqyJiOUzYbKkLYAqJMfvXBdX3aweq4pSiNQVKgkrGyCY986w1AcnhrKDNyX+/fEmhHXM3R1LybtNjP5r3vhUbeJSKl3adb9qqJ8a5TuTUwpKvrZfdHAjlfqNw2OdxyLxXFSbcHqEkDPuwqLR1BKcNZhnPT9/Q/cGKGbvxucx8NWhS7DFu40RCYfkvwnzRem/1sWA9EAUuVrhFHB4D+wMkQSDdRl4QWrgn13PKkrEfn5bcviO8Ko26vqtGAWsUdF1SA3+VComzE+FLfpQJdqrjxfeVwFo4caJkOLzyOufWKawT87HdhgJ1ZK8/PRdWoWWpIyz7yerRJJ7A9OwnN44k2KiCzCKZgy+5hZcVCJM7gUPh3H/44trcSNH91lkLXDtjUwwOeFrv4cZWf+/k+1uK1HZm1spQZ6GU3P0UtQLk7m2TnnVrpXgMrk/c+eOn1srAyI54qojbpcq+4GbhRUtLQW2EL69tEs3+EOdxInDs2nhGk1UUBLz2mSIrZEg8pl64xHj5TnKRiM1x/6o4YDCaG6975cLflfOz9PVf3n+x9q/SnJbHYg91OpKV04DVdMNVVlfWdyojaHJjnbPAvyUDM=",
+    "type": "RsaSignature2017"
+  },
+  "to": [
+    "https://friendica.local/profile/mayel",
+    "https://www.w3.org/ns/activitystreams#Public",
+    "https://friendica.local/followers/testgroup3"
+  ],
+  "type": "Undo"
+}

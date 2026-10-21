@@ -965,5 +965,176 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       %{moderator: moderator, member: member, group: group, post: post, post_url: post_url}
     end
+
+    # A titled post that starts a thread in a group goes out as a `Page` (so Mbin files it as a thread), and what the follower's Bonfire files it as depends on its primary image: none is a Post, a flagged cover makes it Media. A titled post outside a group stays a `Note` and arrives as a Post.
+    describe "a titled post across instances" do
+      defp titled_post_in(user, group, medias, opts) do
+        {:ok, post} =
+          Posts.publish(
+            [
+              current_user: user,
+              post_attrs: %{
+                post_content: %{name: "A thread title", html_body: "the body of the thread"},
+                uploaded_media: medias
+              },
+              boundary: "public"
+            ] ++ if(opts[:in_group], do: [publish_in: id(group[:category])], else: [])
+          )
+
+        post
+      end
+
+      defp upload_image(user, file, metadata \\ %{}) do
+        assert {:ok, media} =
+                 Bonfire.Files.upload(Bonfire.Files.ImageUploader, user, file, %{
+                   metadata: metadata
+                 })
+
+        media
+      end
+
+      defp sent_type(post) do
+        assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: post)
+        data["type"]
+      end
+
+      # what the follower's instance filed the post as, and how many media it kept attached
+      defp filed_on_remote(context, group, post) do
+        post_url =
+          post
+          |> repo().maybe_preload([:peered, created: [:peered]])
+          |> Bonfire.Common.URIs.canonical_url()
+
+        TestInstanceRepo.apply(fn ->
+          assert {:ok, %{pointer_id: remote_id}} = ActivityPub.Object.get_cached(ap_id: post_url),
+                 "the post reached the follower's instance"
+
+          received =
+            Bonfire.Common.Needles.get!(remote_id, skip_boundary_check: true)
+            |> repo().maybe_preload([:post_content, :media], prune: true)
+
+          %{
+            kind: received.__struct__,
+            title: e(received, :post_content, :name, nil),
+            media: length(List.wrap(e(received, :media, []))),
+            in_group?:
+              FeedLoader.feed_contains?(:user_activities, remote_id,
+                by:
+                  elem(AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url]), 1),
+                current_user: context[:remote][:user]
+              )
+          }
+        end)
+      end
+
+      defp group_with_remote_follower(context) do
+        user = context[:local][:user]
+
+        group =
+          fancy_fake_category!(user,
+            type: :group,
+            membership: "open",
+            visibility: "global",
+            participation: "anyone"
+          )
+
+        TestInstanceRepo.apply(fn ->
+          assert {:ok, group_on_remote} =
+                   AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+          assert {:ok, _} = Follows.follow(context[:remote][:user], group_on_remote)
+        end)
+
+        group
+      end
+
+      test "with no image is sent as a Page and filed as a Post, with its title", context do
+        user = context[:local][:user]
+        group = group_with_remote_follower(context)
+
+        post = titled_post_in(user, group, [], in_group: true)
+
+        assert sent_type(post) == "Page"
+        assert %{kind: Bonfire.Data.Social.Post, title: "A thread title", in_group?: group_activity} =
+                 filed_on_remote(context, group, post)
+
+        assert group_activity
+      end
+
+      test "with an image that is not the cover is sent as a Page and filed as a Post that keeps the image",
+           context do
+        user = context[:local][:user]
+        group = group_with_remote_follower(context)
+
+        post =
+          titled_post_in(
+            user,
+            group,
+            [upload_image(user, Bonfire.Files.Simulation.image_file())],
+            in_group: true
+          )
+
+        assert sent_type(post) == "Page"
+
+        assert %{kind: Bonfire.Data.Social.Post, media: 1} =
+                 filed_on_remote(context, group, post)
+      end
+
+      test "with two images that are not the cover is a Post that keeps both", context do
+        user = context[:local][:user]
+        group = group_with_remote_follower(context)
+
+        post =
+          titled_post_in(
+            user,
+            group,
+            [
+              upload_image(user, Bonfire.Files.Simulation.image_file()),
+              upload_image(user, Bonfire.Files.Simulation.image_with_exif_file())
+            ],
+            in_group: true
+          )
+
+        assert sent_type(post) == "Page"
+
+        assert %{kind: Bonfire.Data.Social.Post, media: 2} =
+                 filed_on_remote(context, group, post)
+      end
+
+      test "with an image flagged as the cover is sent as a Page and filed as Media", context do
+        user = context[:local][:user]
+        group = group_with_remote_follower(context)
+
+        post =
+          titled_post_in(
+            user,
+            group,
+            [upload_image(user, Bonfire.Files.Simulation.image_file(), %{"primary_image" => true})],
+            in_group: true
+          )
+
+        assert sent_type(post) == "Page"
+        assert %{kind: Bonfire.Files.Media} = filed_on_remote(context, group, post)
+      end
+
+      test "outside a group is sent as a Note and filed as a Post", context do
+        user = context[:local][:user]
+        group = group_with_remote_follower(context)
+
+        # the follower follows the AUTHOR here, since a post outside a group reaches them through that follow and not the group's
+        TestInstanceRepo.apply(fn ->
+          assert {:ok, author_on_remote} =
+                   AdapterUtils.get_or_fetch_and_create_by_uri(context[:local][:canonical_url])
+
+          assert {:ok, _} = Follows.follow(context[:remote][:user], author_on_remote)
+        end)
+
+        post = titled_post_in(user, group, [], in_group: false)
+
+        assert sent_type(post) == "Note"
+        assert %{kind: Bonfire.Data.Social.Post, title: "A thread title"} =
+                 filed_on_remote(context, group, post)
+      end
+    end
   end
 end

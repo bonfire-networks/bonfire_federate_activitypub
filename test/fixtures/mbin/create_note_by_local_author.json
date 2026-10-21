@@ -1,0 +1,59 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "actor": "https://mbin.local/u/mayel",
+  "audience": "https://mbin.local/m/foo_test",
+  "cc": [
+    "https://mbin.local/m/foo_test",
+    "https://mbin.local/u/mayel/followers"
+  ],
+  "id": "https://mbin.local/f/object/01a15923-b2f1-7781-922b-970d96757183",
+  "object": {
+    "attributedTo": "https://mbin.local/u/mayel",
+    "audience": "https://mbin.local/m/foo_test",
+    "cc": [
+      "https://mbin.local/m/foo_test",
+      "https://mbin.local/u/mayel/followers"
+    ],
+    "content": "<p><a href=\"https://bonfire.local/pub/person/01M5CHQ172THVK9PGKQYZC8YQP\">@Olson_Okuneva_and_Rohan</a> test</p>\n",
+    "contentMap": {
+      "en": "<p><a href=\"https://bonfire.local/pub/person/01M5CHQ172THVK9PGKQYZC8YQP\">@Olson_Okuneva_and_Rohan</a> test</p>\n"
+    },
+    "id": "https://mbin.local/m/foo_test/p/6638377/-/reply/5214039",
+    "inReplyTo": "https://bonfire.local/pub/objects/01M5CHQ5TBY6F7ZPPYVVS5T2RA",
+    "mediaType": "text/html",
+    "published": "2026-10-20T11:47:54+00:00",
+    "sensitive": false,
+    "source": {
+      "content": "@Olson_Okuneva_and_Rohan@bonfire.local test",
+      "mediaType": "text/markdown"
+    },
+    "tag": [
+      {
+        "href": "https://mbin.local/tag/foo_test",
+        "name": "#foo_test",
+        "type": "Hashtag"
+      },
+      {
+        "href": "https://bonfire.local/pub/person/01M5CHQ172THVK9PGKQYZC8YQP",
+        "name": "@Olson_Okuneva_and_Rohan@bonfire.local",
+        "type": "Mention"
+      }
+    ],
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://bonfire.local/pub/person/01M5CHQ172THVK9PGKQYZC8YQP"
+    ],
+    "type": "Note",
+    "url": "https://mbin.local/m/foo_test/p/6638377/-/reply/5214039"
+  },
+  "published": "2026-10-20T11:47:54+00:00",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public",
+    "https://bonfire.local/pub/person/01M5CHQ172THVK9PGKQYZC8YQP"
+  ],
+  "type": "Create"
+}

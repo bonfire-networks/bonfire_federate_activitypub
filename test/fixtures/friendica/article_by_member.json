@@ -1,0 +1,97 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "Hashtag": "as:Hashtag",
+      "PropertyValue": "schema:PropertyValue",
+      "automaticApproval": {
+        "@id": "gts:automaticApproval",
+        "@type": "@id"
+      },
+      "canQuote": {
+        "@id": "gts:canQuote",
+        "@type": "@id"
+      },
+      "conversation": "ostatus:conversation",
+      "dfrn": "http://purl.org/macgirvin/dfrn/1.0/",
+      "diaspora": "https://diasporafoundation.org/ns/",
+      "directMessage": "litepub:directMessage",
+      "discoverable": "toot:discoverable",
+      "featured": {
+        "@id": "toot:featured",
+        "@type": "@id"
+      },
+      "gts": "https://gotosocial.org/ns#",
+      "interactionPolicy": {
+        "@id": "gts:interactionPolicy",
+        "@type": "@id"
+      },
+      "litepub": "http://litepub.social/ns#",
+      "manualApproval": {
+        "@id": "gts:manualApproval",
+        "@type": "@id"
+      },
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "ostatus": "http://ostatus.org#",
+      "quote": "https://w3id.org/fep/044f#quote",
+      "quoteAuthorization": {
+        "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+        "@type": "@id"
+      },
+      "quoteUri": "http://fedibird.com/ns#quoteUri",
+      "quoteUrl": "as:quoteUrl",
+      "schema": "http://schema.org#",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "value": "schema:value",
+      "vcard": "http://www.w3.org/2006/vcard/ns#"
+    }
+  ],
+  "attachment": [],
+  "attributedTo": "https://friendica.local/profile/mayel",
+  "audience": "https://friendica.local/profile/testgroup3",
+  "cc": [
+    "https://friendica.local/followers/testgroup3"
+  ],
+  "content": "test post",
+  "contentMap": {
+    "gl": "<bdi>!<a href=\"https://friendica.local/profile/testgroup3\" class=\"userinfo mention\" title=\"testgroup3\">testgroup3</a></bdi> test post"
+  },
+  "conversation": "https://friendica.local/objects/84b6ef2b-216a-d759-77cf-694326040285#context",
+  "diaspora:guid": "84b6ef2b-216a-d759-77cf-694326040285",
+  "id": "https://friendica.local/objects/84b6ef2b-216a-d759-77cf-694326040285",
+  "inReplyTo": null,
+  "interactionPolicy": {
+    "canQuote": {
+      "automaticApproval": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ]
+    }
+  },
+  "name": "a title",
+  "published": "2026-10-20T12:07:19Z",
+  "replies": {
+    "id": "https://friendica.local/objects/84b6ef2b-216a-d759-77cf-694326040285/replies",
+    "totalItems": 0,
+    "type": "Collection"
+  },
+  "sensitive": false,
+  "source": {
+    "content": "![url=https://friendica.local/profile/testgroup3]test-group[/url] test post",
+    "mediaType": "text/bbcode"
+  },
+  "tag": [
+    {
+      "href": "https://friendica.local/profile/testgroup3",
+      "name": "@testgroup3@friendica.local",
+      "type": "Mention"
+    }
+  ],
+  "to": [
+    "https://friendica.local/profile/testgroup3",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Article",
+  "url": "https://friendica.local/display/84b6ef2b-216a-d759-77cf-694326040285"
+}

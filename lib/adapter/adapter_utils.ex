@@ -2383,6 +2383,24 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  @doc """
+  The AP ids of the remote followers of the group an object is in, who may see it. `[]` when the object is in no group, or in one hosted elsewhere (that instance relays to its own followers).
+
+  A server that follows the group and not the author knows a post only through the group's `Announce`. Mastodon deletes a status only on a `Delete` from the account that wrote it, so the author's `Delete` has to be delivered to those servers as well, as a recipient that is not shown (`bcc`).
+  """
+  def group_followers_ap_ids(object) do
+    with {:ok, _object, %{} = group} <-
+           maybe_apply(Bonfire.Classify.Categories, :group_of_object, [object],
+             fallback_return: nil
+           ),
+         {:ok, %{local: true}} <- ActivityPub.Actor.get_cached(pointer: group),
+         {:ok, actors} <- external_recipients_for_object(group, object) do
+      Enum.map(actors, & &1.ap_id)
+    else
+      _ -> []
+    end
+  end
+
   # judged the way `ActivityPub.announce/2` judges what it announces, so "public" means the same on both sides
   defp object_ap_public?(object) do
     case ActivityPub.Object.get_cached(pointer: object) do

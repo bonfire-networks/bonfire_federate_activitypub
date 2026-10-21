@@ -21,6 +21,36 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
   @group_env "LIVE_TEST_GROUP"
 
+  # How long to wait for what a remote sends back. Lemmy has been seen to answer a `Follow` 14 minutes late, and then everything queued for our host together, so `LIVE_TEST_ACCEPT_WAIT` (seconds) replaces the defaults below when a run should outwait that.
+  defp reply_wait(default),
+    do: String.to_integer(System.get_env("LIVE_TEST_ACCEPT_WAIT") || "#{default}")
+
+  # Polls the wire capture of the group's host for an `Announce` of a `Delete` that names `post_ap_id`.
+  defp await_captured_relay_of_delete(group_ap_id, post_ap_id, seconds) do
+    dir = Path.join([Interop.fixtures_path(), "captured", URI.parse(group_ap_id).host])
+    deadline = System.monotonic_time(:second) + seconds
+
+    Stream.repeatedly(fn ->
+      found? =
+        dir
+        |> Path.join("Announce-*.json")
+        |> Path.wildcard()
+        |> Enum.any?(fn file ->
+          with {:ok, body} <- File.read(file),
+               {:ok, %{"document" => %{"object" => %{"type" => "Delete"} = delete}}} <-
+                 Jason.decode(body) do
+            Jason.encode!(delete) =~ post_ap_id
+          else
+            _ -> false
+          end
+        end)
+
+      if not found?, do: Process.sleep(5_000)
+      found?
+    end)
+    |> Enum.find(&(&1 or System.monotonic_time(:second) > deadline))
+  end
+
   setup do
     Process.put(:federating, true)
     :ok
@@ -108,8 +138,99 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       # generous: this is usually FIRST contact with the remote, which has to fetch and parse our
       # actor before it can accept, and a large instance queues that work. The 90s default is not
       # enough against lemmy.world even from a host it has no backoff against
-      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: 300),
+      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: reply_wait(300)),
              "no Accept received from #{group.ap_id} — the remote could not parse/verify our Follow or our actor"
+    end
+
+    # Whether a group's `Accept` is slow or missing: several new followers follow at once and each `Accept` is looked for every 10 seconds, up to `LIVE_TEST_ACCEPT_WAIT` seconds (default 900), printing when each arrived. A fresh user is a new actor the group must fetch first, which can take a while on a busy instance; the other tests give up after 3 to 5 minutes.
+    @tag timeout: :timer.minutes(25)
+    test "every new follower is Accepted, and when" do
+      handle = group_handle!()
+      {:ok, actor} = Interop.fetch(handle)
+      count = String.to_integer(System.get_env("LIVE_TEST_FOLLOWERS") || "3")
+      wait = String.to_integer(System.get_env("LIVE_TEST_ACCEPT_WAIT") || "900")
+
+      started = DateTime.utc_now()
+      started_at = System.monotonic_time(:second)
+
+      follows =
+        for _ <- 1..count do
+          me = fake_user!()
+          assert {:ok, request} = Interop.follow(handle, as: me)
+          {me, Interop.outgoing_json(request)["id"] || flunk("no Follow id")}
+        end
+
+      pending_before = length(follows)
+
+      arrivals =
+        Enum.reduce_while(1..div(wait, 10), %{}, fn _tick, arrived ->
+          Process.sleep(10_000)
+
+          arrived =
+            Enum.reduce(follows, arrived, fn {_me, follow_id}, acc ->
+              if Map.has_key?(acc, follow_id) do
+                acc
+              else
+                if Interop.await_incoming(
+                     [type: "Accept", from: actor.ap_id, about: follow_id],
+                     seconds: 0,
+                     since: started
+                   ),
+                   do: Map.put(acc, follow_id, System.monotonic_time(:second) - started_at),
+                   else: acc
+              end
+            end)
+
+          if map_size(arrived) == pending_before, do: {:halt, arrived}, else: {:cont, arrived}
+        end)
+
+      IO.puts(
+        "\n── Accepts from #{handle}: #{map_size(arrivals)} of #{pending_before}, seconds after the Follows: #{inspect(Map.values(arrivals) |> Enum.sort())} ──\n"
+      )
+
+      assert map_size(arrivals) == pending_before,
+             "only #{map_size(arrivals)} of #{pending_before} followers were Accepted in #{wait}s"
+    end
+
+    # Captures the group's own fan-out for software whose outbox never shows it (Mbin's is a literal `{}`, Friendica's holds no relays, Smithereen's `Add{Note}` is only ever delivered), where a delivery is the only way to see it. Someone has to post in the group while this waits, so it needs a group that is active or a person who posts once it says "following". `LIVE_TEST_GROUP` takes the actor URL (Mbin does not resolve a magazine by handle), `LIVE_TEST_RELAY_TYPE` is the activity to wait for ("Announce" by default, "Add" for Smithereen), and `AP_CAPTURE_JSON` keeps the wire bytes. Unfollows at the end, so the group stops delivering to this instance.
+    @tag timeout: :timer.minutes(70)
+    test "once following, the group's own relay reaches us" do
+      relay_type = System.get_env("LIVE_TEST_RELAY_TYPE") || "Announce"
+      handle = group_handle!()
+      me = fake_user!()
+
+      {:ok, actor} = Interop.fetch(handle)
+
+      {:ok, pointer} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(actor,
+          skip_boundary_check: true
+        )
+
+      {:ok, group} = Bonfire.Classify.Categories.get(id(pointer), skip_boundary_check: true)
+
+      assert {:ok, _} = Interop.follow(handle, as: me)
+
+      assert Interop.await_incoming([type: "Accept", from: actor.ap_id], seconds: reply_wait(300)),
+             "no Accept received from #{actor.ap_id}, so no #{relay_type} can follow"
+
+      IO.puts("\n── following #{actor.ap_id}: post in it now, waiting up to 60 minutes ──\n")
+
+      relay = Interop.await_incoming([type: relay_type, from: actor.ap_id], seconds: 3600)
+
+      # best effort: if the poster deletes it now, how the group relays the deletion is captured too, without failing when nobody does
+      if relay do
+        IO.puts("\n── #{relay_type} seen: delete that post now, waiting up to 10 minutes ──\n")
+
+        Interop.await_incoming([type: relay_type, from: actor.ap_id],
+          seconds: 600,
+          since: DateTime.utc_now()
+        )
+      end
+
+      Bonfire.Classify.Categories.unfollow_group(me, group)
+
+      assert relay,
+             "#{handle} sent no #{relay_type} in 60 minutes. Did anyone post in it? Pick a busier group"
     end
   end
 
@@ -169,6 +290,45 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
   end
 
   describe "posting into a remote group" do
+    # A titled thread starter goes out as a `Page`, which Mbin files as a thread (a `Note` becomes a microblog post there) and Lemmy takes as its own post type. The remote's answer is read from its own API while this waits (`LIVE_TEST_WAIT` seconds, default 90), then the post is deleted and the group unfollowed.
+    @tag timeout: :timer.minutes(40)
+    test "a titled post goes out as a Page and is filed as a thread" do
+      handle = group_handle!()
+      me = fake_user!()
+      {:ok, actor} = Interop.fetch(handle)
+
+      refute Groups.posting_restricted?(handle),
+             "#{handle} only accepts posts from its moderators — set #{@group_env} to an open group"
+
+      {:ok, pointer} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(actor,
+          skip_boundary_check: true
+        )
+
+      {:ok, group} = Bonfire.Classify.Categories.get(id(pointer), skip_boundary_check: true)
+
+      Interop.follow(handle, as: me)
+
+      assert Interop.await_incoming([type: "Accept", from: actor.ap_id], seconds: reply_wait(180)),
+             "never became a follower, so the post may not be accepted"
+
+      title = "Bonfire interop thread #{System.unique_integer([:positive])}"
+
+      assert {:ok, post} =
+               Interop.post_to(handle, "<p>the body of the thread</p>", title: title, as: me)
+
+      json = Interop.outgoing_json(post) || flunk("no outgoing JSON for the post")
+
+      IO.puts("\n── posted #{json["id"]} titled \"#{title}\", type #{json["type"]}: check #{handle} now ──\n")
+
+      Process.sleep(String.to_integer(System.get_env("LIVE_TEST_WAIT") || "90") * 1000)
+
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: me)
+      Bonfire.Classify.Categories.unfollow_group(me, group)
+
+      assert json["type"] == "Page", "a titled thread starter in a group is a Page"
+    end
+
     # EXPECTED TO FAIL until the plan's phase 3 (outgoing `audience` + group in to/cc): we currently emit no reference to the group at all, so there is nothing for the remote to attribute.
     # Kept as the acceptance test for that phase.
     test "a post addressed to the group comes back announced by the group" do
@@ -189,7 +349,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       Interop.follow(handle, as: lurker)
 
       # and WAIT for the Accept before posting. The group announces a new post to its followers at the moment it accepts the post, so posting before we are a follower means the announce is sent to everyone except us and the assertion below fails while everything actually worked, which is exactly what happened on 2026-09-04, when the post appeared on lemmy.world and nothing came back
-      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: 180),
+      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: reply_wait(180)),
              "never became a follower, so no announce can reach us"
 
       assert {:ok, post} =
@@ -205,9 +365,20 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
       assert Interop.await_incoming([type: "Announce", from: group.ap_id, about: post_ap_id],
                # generous on purpose: a large instance queues outgoing federation, and we are a brand new unknown host it has no delivery history with
-               seconds: 300
+               seconds: reply_wait(300)
              ),
              "the group never announced our post back. Check the community in a browser before believing this: on 2026-09-04 the post WAS there and the announce simply never reached us"
+
+      # then the author deletes it: how the group relays a deletion is its own shape, and the `Delete` we send is checked by whether the remote acts on it, since a group only announces a removal it accepted
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: me)
+
+      # the relay of a deletion is applied to the post it names and is not stored as a row of its own, so `await_incoming/2` cannot see it; the wire capture can
+      if System.get_env("AP_CAPTURE_JSON") in [nil, ""] do
+        IO.puts("\n── AP_CAPTURE_JSON is not set: the group's relay of the deletion is not checked ──\n")
+      else
+        assert await_captured_relay_of_delete(group.ap_id, post_ap_id, reply_wait(300)),
+               "the group never announced the deletion of our post (looked in the wire capture)"
+      end
     end
 
     # Splits the problem in half. A top-level post is rejected by Lemmy because their `Note` IS their comment type and requires `inReplyTo`, so a thread-starter has to be a `Page`, but a REPLY is a `Note` with an `inReplyTo`, which is exactly what we already emit. So replies may already work where posts cannot, and that is worth knowing before building per-receiver type transformation.
@@ -249,7 +420,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       assert Interop.await_incoming([type: "Announce", from: group.ap_id, about: reply_ap_id],
                # generous on purpose: a large instance queues outgoing federation, and we are a brand
                # new unknown host it has no delivery history with
-               seconds: 300
+               seconds: reply_wait(300)
              ),
              "the group never announced our reply back. Read the delivery captures for the status and body: a 400 here means our `Note` is wrong in some way beyond the thread-starter type"
     end
