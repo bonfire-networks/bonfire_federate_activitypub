@@ -60,7 +60,8 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
 
     # T1: the account can find and follow the group, which proves the server fetched our actor with a signed request
     {:ok, account} =
-      MastodonApi.resolve_account(api, group_url) |> ok_or_flunk("#{name} could not look up #{group_url}")
+      MastodonApi.resolve_account(api, group_url)
+      |> ok_or_flunk("#{name} could not look up #{group_url}")
 
     IO.puts("#{name} sees the group as #{account["acct"]}, `group: #{inspect(account["group"])}`")
 
@@ -92,16 +93,27 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
       [entry] = entries
 
       if entry["reblog"] do
-        IO.puts("boost by #{inspect(get_in(entry, ["account", "acct"]))} of #{get_in(entry, ["reblog", "uri"])}")
+        IO.puts(
+          "boost by #{inspect(get_in(entry, ["account", "acct"]))} of #{get_in(entry, ["reblog", "uri"])}"
+        )
 
         assert get_in(entry, ["account", "acct"]) =~ account["acct"] |> String.split("@") |> hd(),
                "the boost is not by the group's account: #{inspect(get_in(entry, ["account", "acct"]))}"
       else
-        IO.puts("#{name} shows the post as #{inspect(get_in(entry, ["account", "acct"]))}'s, filed in group #{inspect(get_in(entry, ["group", "acct"]))}, with no boost")
+        IO.puts(
+          "#{name} shows the post as #{inspect(get_in(entry, ["account", "acct"]))}'s, filed in group #{inspect(get_in(entry, ["group", "acct"]))}, with no boost"
+        )
       end
 
       # T3: a titled post, and how the server shows its title and body
-      titled = publish(creator, group, "<p>The body of the thread #{unique()}</p>", "A live interop thread")
+      titled =
+        publish(
+          creator,
+          group,
+          "<p>The body of the thread #{unique()}</p>",
+          "A live interop thread"
+        )
+
       titled_ap_id = Interop.outgoing_json(titled)["id"] || flunk("no AP id for the titled post")
 
       titled_entries = await(fn -> entries_showing(api, titled_ap_id, group_url) end, wait)
@@ -150,8 +162,11 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
                "the reply arrived but is not in the group's feed"
       after
         case MastodonApi.delete_status(api, reply["id"]) do
-          {:ok, _} -> IO.puts("cleanup: #{name} reply deleted")
-          other -> IO.puts("cleanup FAILED: could not delete the reply on #{name}: #{inspect(other)}")
+          {:ok, _} ->
+            IO.puts("cleanup: #{name} reply deleted")
+
+          other ->
+            IO.puts("cleanup FAILED: could not delete the reply on #{name}: #{inspect(other)}")
         end
       end
 
@@ -193,7 +208,10 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
       end
 
       if following?(api, account["id"]),
-        do: IO.puts("cleanup FAILED: #{name} still shows the account as following #{group_url}, unfollow it by hand")
+        do:
+          IO.puts(
+            "cleanup FAILED: #{name} still shows the account as following #{group_url}, unfollow it by hand"
+          )
     end
   end
 

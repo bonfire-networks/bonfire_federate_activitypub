@@ -699,7 +699,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
           nil
       end
     else
-      warn("Not delegted: #{username} cannot be published as by #{inspect signer}")
+      warn("Not delegted: #{username} cannot be published as by #{inspect(signer)}")
       nil
     end
   end

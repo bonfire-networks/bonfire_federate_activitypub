@@ -1019,8 +1019,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
             media: length(List.wrap(e(received, :media, []))),
             in_group?:
               FeedLoader.feed_contains?(:user_activities, remote_id,
-                by:
-                  elem(AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url]), 1),
+                by: elem(AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url]), 1),
                 current_user: context[:remote][:user]
               )
           }
@@ -1055,7 +1054,12 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         post = titled_post_in(user, group, [], in_group: true)
 
         assert sent_type(post) == "Page"
-        assert %{kind: Bonfire.Data.Social.Post, title: "A thread title", in_group?: group_activity} =
+
+        assert %{
+                 kind: Bonfire.Data.Social.Post,
+                 title: "A thread title",
+                 in_group?: group_activity
+               } =
                  filed_on_remote(context, group, post)
 
         assert group_activity
@@ -1109,7 +1113,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
           titled_post_in(
             user,
             group,
-            [upload_image(user, Bonfire.Files.Simulation.image_file(), %{"primary_image" => true})],
+            [
+              upload_image(user, Bonfire.Files.Simulation.image_file(), %{"primary_image" => true})
+            ],
             in_group: true
           )
 
@@ -1132,6 +1138,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         post = titled_post_in(user, group, [], in_group: false)
 
         assert sent_type(post) == "Note"
+
         assert %{kind: Bonfire.Data.Social.Post, title: "A thread title"} =
                  filed_on_remote(context, group, post)
       end

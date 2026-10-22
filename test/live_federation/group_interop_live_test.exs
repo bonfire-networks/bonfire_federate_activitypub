@@ -138,7 +138,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       # generous: this is usually FIRST contact with the remote, which has to fetch and parse our
       # actor before it can accept, and a large instance queues that work. The 90s default is not
       # enough against lemmy.world even from a host it has no backoff against
-      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: reply_wait(300)),
+      assert Interop.await_incoming([type: "Accept", from: group.ap_id],
+               seconds: reply_wait(300)
+             ),
              "no Accept received from #{group.ap_id} — the remote could not parse/verify our Follow or our actor"
     end
 
@@ -210,7 +212,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
       assert {:ok, _} = Interop.follow(handle, as: me)
 
-      assert Interop.await_incoming([type: "Accept", from: actor.ap_id], seconds: reply_wait(300)),
+      assert Interop.await_incoming([type: "Accept", from: actor.ap_id],
+               seconds: reply_wait(300)
+             ),
              "no Accept received from #{actor.ap_id}, so no #{relay_type} can follow"
 
       IO.puts("\n── following #{actor.ap_id}: post in it now, waiting up to 60 minutes ──\n")
@@ -309,7 +313,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
       Interop.follow(handle, as: me)
 
-      assert Interop.await_incoming([type: "Accept", from: actor.ap_id], seconds: reply_wait(180)),
+      assert Interop.await_incoming([type: "Accept", from: actor.ap_id],
+               seconds: reply_wait(180)
+             ),
              "never became a follower, so the post may not be accepted"
 
       title = "Bonfire interop thread #{System.unique_integer([:positive])}"
@@ -319,7 +325,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
       json = Interop.outgoing_json(post) || flunk("no outgoing JSON for the post")
 
-      IO.puts("\n── posted #{json["id"]} titled \"#{title}\", type #{json["type"]}: check #{handle} now ──\n")
+      IO.puts(
+        "\n── posted #{json["id"]} titled \"#{title}\", type #{json["type"]}: check #{handle} now ──\n"
+      )
 
       Process.sleep(String.to_integer(System.get_env("LIVE_TEST_WAIT") || "90") * 1000)
 
@@ -349,7 +357,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       Interop.follow(handle, as: lurker)
 
       # and WAIT for the Accept before posting. The group announces a new post to its followers at the moment it accepts the post, so posting before we are a follower means the announce is sent to everyone except us and the assertion below fails while everything actually worked, which is exactly what happened on 2026-09-04, when the post appeared on lemmy.world and nothing came back
-      assert Interop.await_incoming([type: "Accept", from: group.ap_id], seconds: reply_wait(180)),
+      assert Interop.await_incoming([type: "Accept", from: group.ap_id],
+               seconds: reply_wait(180)
+             ),
              "never became a follower, so no announce can reach us"
 
       assert {:ok, post} =
@@ -374,7 +384,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
       # the relay of a deletion is applied to the post it names and is not stored as a row of its own, so `await_incoming/2` cannot see it; the wire capture can
       if System.get_env("AP_CAPTURE_JSON") in [nil, ""] do
-        IO.puts("\n── AP_CAPTURE_JSON is not set: the group's relay of the deletion is not checked ──\n")
+        IO.puts(
+          "\n── AP_CAPTURE_JSON is not set: the group's relay of the deletion is not checked ──\n"
+        )
       else
         assert await_captured_relay_of_delete(group.ap_id, post_ap_id, reply_wait(300)),
                "the group never announced the deletion of our post (looked in the wire capture)"

@@ -75,7 +75,9 @@ defmodule Bonfire.Federate.ActivityPub.LemmyFeaturedPinsTest do
     receive_announce(featured_fixture("add_featured_post.json"))
 
     assert Pins.pinned?(id(group), post)
-    refute Pins.pinned?(id(moderator), post), "pinned onto the moderator rather than the community"
+
+    refute Pins.pinned?(id(moderator), post),
+           "pinned onto the moderator rather than the community"
   end
 
   # a community relaying, or itself sending, a change to its own featured: the group branch, not the one for a sender's own profile

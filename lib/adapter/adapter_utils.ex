@@ -2607,7 +2607,6 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def get_author(author) when is_binary(author), do: author
 
-
   def maybe_create_banner_object(nil, _actor), do: nil
 
   def maybe_create_banner_object(url, actor) do

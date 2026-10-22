@@ -83,7 +83,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupAnnouncesOurPostTest do
     user: user,
     group: group
   } do
-    post = publish_in(user, group, %{post_content: %{html_body: "<p>a post for the community</p>"}})
+    post =
+      publish_in(user, group, %{post_content: %{html_body: "<p>a post for the community</p>"}})
 
     assert {:ok, _} = receive_announce(announce_of(post))
   end

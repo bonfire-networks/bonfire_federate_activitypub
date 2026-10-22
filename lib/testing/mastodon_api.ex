@@ -81,7 +81,8 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     def account_statuses(%__MODULE__{} = client, account_id, opts \\ []),
       do: get(client, "/api/v1/accounts/#{account_id}/statuses", limit: opts[:limit] || 40)
 
-    def status(%__MODULE__{} = client, status_id), do: get(client, "/api/v1/statuses/#{status_id}")
+    def status(%__MODULE__{} = client, status_id),
+      do: get(client, "/api/v1/statuses/#{status_id}")
 
     def status_context(%__MODULE__{} = client, status_id),
       do: get(client, "/api/v1/statuses/#{status_id}/context")

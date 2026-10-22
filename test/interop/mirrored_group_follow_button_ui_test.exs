@@ -22,6 +22,8 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupFollowButtonUITest do
 
   # the ROUND Follow in the group's hero, told apart from any other follow toggle by its tooltip
   @round_not_following "[data-id=follow][data-tip='Follow group']"
+  # once you have joined, the hero keeps the Follow toggle in its "More group actions" menu, in words rather than as the round icon, so a pending request reads "Requested …" there
+  @pending_follow "[data-role=group-hero-follow] [data-id=unfollow]"
 
   setup do
     served = Map.new(served_for([@pics]))
@@ -59,7 +61,7 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupFollowButtonUITest do
     |> visit(Bonfire.Common.URIs.path(group))
     |> wait_async()
     |> refute_has(@round_not_following)
-    |> assert_has_or_open_browser("[data-id=unfollow][aria-label='Cancel follow request']")
+    |> assert_has_or_open_browser(@pending_follow, text: "Requested")
   end
 
   test "clicking the round Follow of a mirrored group you joined gives no error", %{
@@ -72,8 +74,8 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupFollowButtonUITest do
     conn
     |> visit(Bonfire.Common.URIs.path(group))
     |> wait_async()
-    # the hero's Follow button in its pending state (the same one the test above looks for): the control the page offers for the request that joining sent
-    |> click_button("[data-id=unfollow][aria-label='Cancel follow request']", "")
+    # the hero's Follow control in its pending state (the same one the test above looks for): the control the page offers for the request that joining sent
+    |> click_button(@pending_follow, "")
     |> refute_has("[data-id=flash_error]")
   end
 end

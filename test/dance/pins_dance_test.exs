@@ -95,7 +95,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PinsTest do
 
       TestInstanceRepo.apply(fn ->
         Logger.metadata(action: info("remote follows the group"))
-        assert {:ok, group_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
         assert {:ok, _} = Follows.follow(remote_user, group_on_remote)
       end)
 
@@ -111,8 +114,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PinsTest do
       assert {:ok, _} = Pins.pin(moderator, post, id(group[:category]))
 
       TestInstanceRepo.apply(fn ->
-        assert {:ok, group_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
-        assert {:ok, moderator_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(moderator_ap_id)
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+        assert {:ok, moderator_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(moderator_ap_id)
 
         assert activity =
                  Bonfire.Social.FeedLoader.feed_contains?(:user_activities, body,
@@ -128,7 +134,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PinsTest do
       Pins.unpin(moderator, post, id(group[:category]))
 
       TestInstanceRepo.apply(fn ->
-        assert {:ok, group_on_remote} = AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+        assert {:ok, group_on_remote} =
+                 AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
 
         activity =
           Bonfire.Social.FeedLoader.feed_contains?(:user_activities, body,

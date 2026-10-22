@@ -21,7 +21,10 @@ defmodule Bonfire.Federate.ActivityPub.MastodonApiClientTest do
       method: env.method,
       url: env.url,
       query: query,
-      auth: Enum.find_value(env.headers, fn {k, v} -> if String.downcase(k) == "authorization", do: v end),
+      auth:
+        Enum.find_value(env.headers, fn {k, v} ->
+          if String.downcase(k) == "authorization", do: v
+        end),
       body: env.body
     }
   end
@@ -53,17 +56,23 @@ defmodule Bonfire.Federate.ActivityPub.MastodonApiClientTest do
       json(%{
         "accounts" => [
           %{"id" => "1", "acct" => "other@elsewhere"},
-          %{"id" => "42", "acct" => "group@bonfire.example", "url" => "https://bonfire.example/group"}
+          %{
+            "id" => "42",
+            "acct" => "group@bonfire.example",
+            "url" => "https://bonfire.example/group"
+          }
         ]
       })
     end)
 
-    assert {:ok, %{"id" => "42"}} = MastodonApi.resolve_account(client(), "@group@bonfire.example")
+    assert {:ok, %{"id" => "42"}} =
+             MastodonApi.resolve_account(client(), "@group@bonfire.example")
 
     assert_received {:seen, seen}
     assert seen.url =~ "/api/v2/search"
     assert seen.query["q"] == "@group@bonfire.example"
     assert seen.query["resolve"] == "true"
+
     # Mitra reads `type=accounts` as "profiles already in the database only" and skips resolving, so an unknown actor URL comes back empty
     refute Map.has_key?(seen.query, "type")
     assert seen.auth == "Bearer secret-token"
@@ -74,7 +83,11 @@ defmodule Bonfire.Federate.ActivityPub.MastodonApiClientTest do
     @group "https://bonfire.example/pub/group/g1"
 
     test "a boost of the post is" do
-      assert MastodonApi.shows_post?(%{"uri" => "x", "reblog" => %{"uri" => @post}}, @post, @group)
+      assert MastodonApi.shows_post?(
+               %{"uri" => "x", "reblog" => %{"uri" => @post}},
+               @post,
+               @group
+             )
     end
 
     test "the post itself, filed in the group, is (a server that does not boost a group's relayed post)" do
@@ -95,17 +108,26 @@ defmodule Bonfire.Federate.ActivityPub.MastodonApiClientTest do
 
     test "another post in the group, or a boost of another post, is not" do
       refute MastodonApi.shows_post?(
-               %{"uri" => "https://bonfire.example/pub/objects/other", "group" => %{"actor_id" => @group}},
+               %{
+                 "uri" => "https://bonfire.example/pub/objects/other",
+                 "group" => %{"actor_id" => @group}
+               },
                @post,
                @group
              )
 
-      refute MastodonApi.shows_post?(%{"uri" => "x", "reblog" => %{"uri" => "other"}}, @post, @group)
+      refute MastodonApi.shows_post?(
+               %{"uri" => "x", "reblog" => %{"uri" => "other"}},
+               @post,
+               @group
+             )
     end
   end
 
   test "an account that does not resolve is an error, not the first unrelated result" do
-    mock(fn %{method: :get} -> json(%{"accounts" => [%{"id" => "1", "acct" => "other@elsewhere"}]}) end)
+    mock(fn %{method: :get} ->
+      json(%{"accounts" => [%{"id" => "1", "acct" => "other@elsewhere"}]})
+    end)
 
     assert {:error, :not_found} = MastodonApi.resolve_account(client(), "@group@bonfire.example")
   end
@@ -178,7 +200,9 @@ defmodule Bonfire.Federate.ActivityPub.MastodonApiClientTest do
   end
 
   test "a refusal comes back as the status and the body, so a failing run says why" do
-    mock(fn %{method: :post} -> %Tesla.Env{status: 422, body: ~s({"error":"Validation failed"})} end)
+    mock(fn %{method: :post} ->
+      %Tesla.Env{status: 422, body: ~s({"error":"Validation failed"})}
+    end)
 
     assert {:error, {422, %{"error" => "Validation failed"}}} = MastodonApi.follow(client(), "42")
   end

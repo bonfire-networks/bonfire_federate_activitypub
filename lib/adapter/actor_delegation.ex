@@ -30,8 +30,8 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegation do
       |> Enum.reject(&(&1 == ""))
       |> Enum.any?(&matches?(&1, signer_ap_id))
     else
-      _ -> 
-        warn("Delegation could not be checked for #{username} and #{inspect signer}")
+      _ ->
+        warn("Delegation could not be checked for #{username} and #{inspect(signer)}")
         false
     end
   end
@@ -100,7 +100,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegation do
          when is_binary(signer_host) and signer_host != "" <- URI.parse(signer_ap_id) do
       String.downcase(signer_host) == host and signer_port == default_port(scheme)
     else
-      _ -> 
+      _ ->
         warn(entry, "Could not check matches")
         false
     end

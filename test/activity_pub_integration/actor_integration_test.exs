@@ -45,7 +45,11 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
               "type" => "Image",
               "url" => %{"type" => "Link", "href" => @link_icon_href, "mediaType" => "image/png"}
             },
-            "image" => %{"type" => "Link", "href" => @link_image_href, "mediaType" => "image/jpeg"}
+            "image" => %{
+              "type" => "Link",
+              "href" => @link_image_href,
+              "mediaType" => "image/jpeg"
+            }
           })
         )
 

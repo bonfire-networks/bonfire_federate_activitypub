@@ -129,7 +129,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
     defp titled_post(author, opts) do
       post_attrs =
         %{post_content: %{name: opts[:title], html_body: opts[:body] || "<p>the body</p>"}}
-        |> then(&if opts[:reply_to], do: Map.put(&1, :reply_to_id, uid(opts[:reply_to])), else: &1)
+        |> then(
+          &if opts[:reply_to], do: Map.put(&1, :reply_to_id, uid(opts[:reply_to])), else: &1
+        )
 
       assert {:ok, post} =
                Bonfire.Posts.publish(
@@ -155,7 +157,10 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
       APPublisher.prepare_publish_params(actor, announce) |> Enum.map(&Jason.decode!(&1.json))
     end
 
-    test "in the 1b12 relay shape, where the Create is embedded", %{creator: creator, group: group} do
+    test "in the 1b12 relay shape, where the Create is embedded", %{
+      creator: creator,
+      group: group
+    } do
       post = titled_post(creator, title: "A thread title", group: group)
 
       payload =
@@ -212,7 +217,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
   # The same rule for a group hosted elsewhere, read where it matters: in what is delivered to that group's own inbox.
   describe "a titled post that starts a thread in a group hosted elsewhere is a Page" do
-    import Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures, only: [fixture: 2, served_for: 1]
+    import Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures,
+      only: [fixture: 2, served_for: 1]
 
     @lemmy %{
       name: "Lemmy",

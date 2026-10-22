@@ -339,7 +339,11 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
 
     # Lemmy sends a post's link (or image URL) as a `Link` attachment, and its thumbnail as `image`
     test "with a Link attachment and no text is Media, with text it is a Post" do
-      link = %{"type" => "Link", "href" => "https://example.com/an-article", "mediaType" => "text/html"}
+      link = %{
+        "type" => "Link",
+        "href" => "https://example.com/an-article",
+        "mediaType" => "text/html"
+      }
 
       page = fn content ->
         %{
@@ -351,7 +355,8 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
         }
       end
 
-      assert %Bonfire.Files.Media{} = page.(nil) |> as_remote_create("link-bare") |> receive_incoming()
+      assert %Bonfire.Files.Media{} =
+               page.(nil) |> as_remote_create("link-bare") |> receive_incoming()
 
       assert %Bonfire.Data.Social.Post{} =
                page.("<p>and what I think of it</p>")

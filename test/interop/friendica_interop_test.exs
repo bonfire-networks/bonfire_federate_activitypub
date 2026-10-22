@@ -69,9 +69,14 @@ defmodule Bonfire.Federate.ActivityPub.FriendicaInteropTest do
       author_id = article["attributedTo"]
 
       mock(fn
-        %{method: :get, url: @group} -> json(fixture("group_actor.json"))
-        %{method: :get, url: ^article_id} -> json(article)
-        %{method: :get, url: ^author_id} -> json(author_actor(author_id))
+        %{method: :get, url: @group} ->
+          json(fixture("group_actor.json"))
+
+        %{method: :get, url: ^article_id} ->
+          json(article)
+
+        %{method: :get, url: ^author_id} ->
+          json(author_actor(author_id))
 
         %{method: :post} ->
           %Tesla.Env{status: 202, body: ""}
