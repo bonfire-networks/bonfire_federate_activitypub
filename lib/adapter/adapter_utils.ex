@@ -2665,8 +2665,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     debug(url)
 
     with {:ok, %{id: id}} <-
-           Bonfire.Files.upload(adapter || Bonfire.Files.ImageUploader, actor, url, %{},
-             skip_fetching_remote: true
+           Bonfire.Files.save_url_as_media(
+             actor,
+             url,
+             %{},
+             adapter || Bonfire.Files.ImageUploader
            ) do
       id
     else
