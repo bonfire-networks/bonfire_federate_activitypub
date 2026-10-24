@@ -2268,6 +2268,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   Options:
 
     * `:cc` — extra AP ids to append to `cc` (e.g. FEP-044f quote authorisation)
+    * `:verb` — what is being published. For an edit (`:edit`, `:update`) the remote followers of the group the object is in are added to `bcc`, so the edit reaches them directly as well as through the group's `Announce` of it (see `maybe_put_group_followers_bcc/2`). Every publisher that builds its recipients here gets that by passing its verb.
   """
   def determine_recipients(subject, object, is_public?, opts \\ []) do
     mentioned_characters =
@@ -2314,6 +2315,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       mentioned_characters: mentioned_characters,
       audience: audience
     }
+    |> then(fn recipients ->
+      if opts[:verb] in [:edit, :update, :delete],
+        do: maybe_put_group_followers_bcc(recipients, object),
+        else: recipients
+    end)
     |> debug("determined recipients")
   end
 
@@ -2366,29 +2372,88 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   @doc """
-  Has the group an object is in relay an activity about it to the group's followers, if it is a group we host.
+  Where an activity about `object` would be announced: the group we host that it is in, and whether the object is public, as `announce_by_group/2` needs them. `nil` when the object is in no group we host.
 
-  A group's followers hear of what happens in it through the group, not through whoever acted: a moderator closing a thread, an author editing or deleting their post. Lemmy announces every activity in a community it hosts this way (`send_activity_in_community`). Not for a `Create`, which the group's auto-boost already announces, and never for a group we only mirror, which would be announcing on its origin's behalf.
+  A group announces an activity when it wraps it in its own `Announce` and sends that to its followers. They hear of what happens in it through the group, not through whoever acted: a moderator closing a thread, an author editing or deleting their post. Lemmy announces every activity in a community it hosts this way (`send_activity_in_community`). Not for a `Create`, which the group's auto-boost already announces, and never for a group we only mirror, which would be announcing on its origin's behalf.
 
-  Each publisher calls this once its activity exists, rather than the AP library inferring it from `audience`.
+  Found apart from announcing so a caller can look BEFORE the activity is applied, which can take the object away (a deletion) and with it the way to find its group, and announce only once the activity has been accepted. `Outgoing` and `Incoming` do this for whichever type of object, from `group_announce_target_of_activity/1`, or from this function when the object is about to go.
   """
-  def maybe_group_relays(object, activity) do
-    with {:ok, %{local: true} = group_actor} <- group_actor_of(object),
-         {:error, e} <-
+  def group_announce_target(object) do
+    with {:ok, %{local: true} = group_actor} <- group_actor_of(object) do
+      # a vote is addressed to the post's author and the group rather than Public, so the announce's own check would refuse it: announced when the POST is public, as the threadiverse relays votes
+      %{group: group_actor, public?: object_ap_public?(object)}
+    else
+      _ -> nil
+    end
+  end
+
+  # The activities a group announces to its followers when they are about something in it, as Lemmy's communities do for every announcable activity (`send_activity_in_community`): an edit or a deletion of a post, a vote, a lock, a ban from the group, and the `Undo` of the last three. Not a `Create`, which the group's auto-boost announces.
+  @announced_by_group ["Update", "Delete", "Like", "Lock", "Block"]
+  @announced_by_group_when_undone ["Like", "Lock", "Block"]
+
+  @doc """
+  Where the group an `activity` is about would announce it, or `nil` when it is not one a group announces, or it is about nothing in a group we host.
+
+  Read from the AP activity alone, so the same answer comes whichever way it went: what the activity names as its `target` (a ban names the group), else its `object` (a post; for an `Undo`, the activity it undoes and so what that one is about). Works for any type of object, so no type's module has to know about it.
+
+  Called BEFORE the activity is applied by whatever receives it: a deletion takes the object, and with it the way to find its group.
+  """
+  def group_announce_target_of_activity(%{data: %{} = data}) do
+    with {about, subject} when not is_nil(subject) <- announce_subject(data),
+         pointer_id when is_binary(pointer_id) <-
+           subject |> ActivityPub.Object.get_ap_id() |> get_pointer_id_by_ap_id(),
+         {:ok, %{} = thing} <- Bonfire.Common.Needles.get(pointer_id, skip_boundary_check: true),
+         # only a ban names the group as what it is about; anything else about the group itself (its own deletion) is not announced through it
+         true <- about == :target or not group?(thing) do
+      group_announce_target(thing)
+    else
+      _ -> nil
+    end
+  end
+
+  def group_announce_target_of_activity(_), do: nil
+
+  defp group?(%{__struct__: Bonfire.Classify.Category, type: :group}), do: true
+  defp group?(_), do: false
+
+  defp announce_subject(%{"type" => type} = data) when type in @announced_by_group,
+    do: named_by(data)
+
+  defp announce_subject(%{"type" => "Undo", "object" => undone}) do
+    undone_data =
+      case undone do
+        %{} = data -> data
+        ap_id -> e(ActivityPub.Object.get_cached!(ap_id: ap_id), :data, nil)
+      end
+
+    if e(undone_data, "type", nil) in @announced_by_group_when_undone,
+      do: named_by(undone_data)
+  end
+
+  defp announce_subject(_), do: nil
+
+  defp named_by(%{"target" => target}) when not is_nil(target), do: {:target, target}
+  defp named_by(%{"object" => object}), do: {:object, object}
+  defp named_by(_), do: nil
+
+  @doc "The group found by `group_announce_target/1` announces `activity` to its followers. Nothing for `nil`."
+  def announce_by_group(nil, _activity), do: nil
+
+  def announce_by_group(%{group: group_actor, public?: public?}, activity) do
+    with {:error, e} <-
            ActivityPub.announce(%{actor: group_actor, object: activity},
-             # a vote is addressed to the post's author and the group rather than Public, so the announce's own check would refuse it: relayed when the POST is public, as the threadiverse relays votes
-             skip_public_check: object_ap_public?(object)
+             skip_public_check: public?
            ) do
-      warn(e, "the group could not relay the activity to its followers")
+      warn(e, "the group could not announce the activity to its followers")
     end
   end
 
   @doc """
-  The AP ids of the remote followers of the group an object is in, who may see it. `[]` when the object is in no group, or in one hosted elsewhere (that instance relays to its own followers).
+  The AP ids of the remote followers of the group an object is in, who may see it. `[]` when the object is in no group, or in one hosted elsewhere (that instance announces to its own followers).
 
   A server that follows the group and not the author knows a post only through the group's `Announce`. Mastodon deletes a status only on a `Delete` from the account that wrote it, so the author's `Delete` has to be delivered to those servers as well, as a recipient that is not shown (`bcc`).
   """
-  def group_followers_ap_ids(object) do
+  def maybe_object_group_followers_ap_ids(object) do
     with {:ok, _object, %{} = group} <-
            maybe_apply(Bonfire.Classify.Categories, :group_of_object, [object],
              fallback_return: nil
@@ -2399,6 +2464,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     else
       _ -> []
     end
+  end
+
+  # Adds the remote followers of the group `object` is in to the `bcc` of `recipients` (as `maybe_object_group_followers_ap_ids/1` lists them), so an activity about the object reaches them directly as well as through the group's own `Announce` of it. Unchanged when the object is in no group, or in one hosted elsewhere.
+  # For an activity a server only accepts from the account that wrote the object, which a copy relayed by the group is not (ours is normalised, and unsigned): Mastodon applies an `Update` and a `Delete` only that way. Not shown as a recipient (`bcc`).
+  defp maybe_put_group_followers_bcc(recipients, object) do
+    followers = maybe_object_group_followers_ap_ids(object)
+
+    Map.update(recipients, :bcc, followers, &Enum.uniq(List.wrap(&1) ++ followers))
   end
 
   # judged the way `ActivityPub.announce/2` judges what it announces, so "public" means the same on both sides
@@ -2427,7 +2500,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
              # its moderation record, so the group's echo of it is known as ours and finds it
              pointer: opts[:pointer]
            ) do
-      maybe_group_relays(object, activity)
+      # the object is kept, so the group is still found from the activity alone
+      activity
+      |> group_announce_target_of_activity()
+      |> announce_by_group(activity)
+
       {:ok, activity}
     end
   end
@@ -2568,6 +2645,51 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       log("AP - get_object_ap_id!/1 - #{e}")
       nil
     end
+  end
+
+  @doc """
+  Finds the id of the Bonfire object that an ActivityPub object stands for, from the AP object struct or its URI, even if the AP object has been pruned from the cache. Returns `nil` when there is none.
+
+  Tries, in order:
+  - the `pointer` field
+  - the `pointer_id` field
+  - the `id` of a struct that is not itself an AP object (a Bonfire one)
+  - `data["id"]`, through the `Peered` lookup of its URI
+  - a bare URI, through the same lookup
+
+  ## Examples
+
+      iex> pointer_id_from_ap_object("https://remote.example/objects/123")
+      "01FXYZ123ABC"
+
+      iex> pointer_id_from_ap_object(%{pointer_id: "01FXYZ123ABC"})
+      "01FXYZ123ABC"
+
+      iex> pointer_id_from_ap_object(%{data: %{"id" => "https://remote.example/objects/123"}})
+      "01FXYZ123ABC"
+
+      iex> pointer_id_from_ap_object(%{})
+      nil
+  """
+  def pointer_id_from_ap_object(%{pointer: %{id: pointer_id}}) when is_binary(pointer_id),
+    do: pointer_id
+
+  def pointer_id_from_ap_object(%{pointer_id: pointer_id}) when is_binary(pointer_id),
+    do: pointer_id
+
+  def pointer_id_from_ap_object(%struct{id: id})
+      when struct not in [ActivityPub.Actor, ActivityPub.Object],
+      do: id
+
+  def pointer_id_from_ap_object(%{data: %{"id" => uri}}) when is_binary(uri),
+    do: uri |> Bonfire.Federate.ActivityPub.Peered.get_by_uri() ~> id()
+
+  def pointer_id_from_ap_object(uri) when is_binary(uri),
+    do: uri |> Bonfire.Federate.ActivityPub.Peered.get() ~> id()
+
+  def pointer_id_from_ap_object(o) do
+    error(o, "Unrecognized AP object format for extracting pointer_id")
+    nil
   end
 
   def get_pointer_id_by_ap_id(ap_id) do

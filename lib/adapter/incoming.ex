@@ -642,6 +642,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
        when is_atom(module) and not is_nil(module) do
     info(activity, "AP - handle_activity_with module: #{module}")
 
+    # looked up before the module handles the activity: a deletion takes the object away, and with it the way to find its group. Not for an activity of ours that the group elsewhere echoes back (`local`), which only confirms what we sent
+    announce_target =
+      if e(activity, :local, nil) != true,
+        do: AdapterUtils.group_announce_target_of_activity(activity)
+
     with {:ok, %struct{id: pointable_object_id} = pointable_object} <-
            Utils.maybe_apply(
              module,
@@ -674,7 +679,17 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
       {:ok, pointable_object}
     end
+    |> announce_if_accepted(announce_target, activity)
   end
+
+  # A group we host announces what happens in it (`AdapterUtils.group_announce_target_of_activity/1` says which activities and for what), whatever the object's type, so each type's module does not have to remember to. Only once the module accepted the activity: a stranger's `Update` or `Delete`, or a moderator the group refuses, is turned down and must not be announced as the group's. What "accepted" returns differs by module (a struct, a count, a status), so any `{:ok, _}` that is not a skip counts.
+  defp announce_if_accepted({:ok, accepted} = result, announce_target, activity)
+       when accepted not in [:skip, :skipped, :none, :ignore] do
+    AdapterUtils.announce_by_group(announce_target, activity)
+    result
+  end
+
+  defp announce_if_accepted(result, _announce_target, _activity), do: result
 
   # Which local groups an activity was addressed to is a property of the DELIVERY rather than of whatever the object turns out to be locally, so it is derived once here and handed to every handler, the same reasoning as `maybe_apply_comments_enabled/4` below. 
   # Only handlers that accept a 4th argument get it: `Utils.maybe_apply/4` picks the function by the arity of the args it is given, so passing four to a `/3` handler would find nothing and fall through to `no_federation_module_match/2` rather than degrading.

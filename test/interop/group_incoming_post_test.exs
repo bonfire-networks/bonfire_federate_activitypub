@@ -115,6 +115,62 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingPostTest do
     assert announce["type"] == "Announce"
   end
 
+  # The followers of our group got the post through the group's `Announce` of the `Create`, so they only see an edit if the group announces it too. The group does that for every activity about something in it, whichever way it arrived and whatever type of object: `Outgoing` for a local member's edit, `Incoming` for a remote member's `Update` (both from `AdapterUtils.group_announce_target_of_activity/1`). Found missing on 23 October.
+  test "and the group announces an edit of it that its author sends", %{
+    group_ap_id: group_ap_id,
+    incoming: incoming
+  } do
+    assert {:ok, _} = Transformer.handle_incoming(incoming)
+
+    update = %{
+      "@context" => "https://www.w3.org/ns/activitystreams",
+      "id" => "#{@post}/update/1",
+      "type" => "Update",
+      "actor" => @author,
+      "to" => incoming["to"],
+      "cc" => incoming["cc"],
+      "audience" => group_ap_id,
+      "object" => Map.put(incoming["object"], "content", "<p>an edit by its author</p>")
+    }
+
+    assert {:ok, update_activity} = Transformer.handle_incoming(update)
+
+    announce = ActivityPub.Object.get_existing_announce(group_ap_id, update_activity)
+
+    assert announce,
+           "the group relayed the post when it was made but not the edit, so its followers keep the old text"
+
+    assert announce.data["type"] == "Announce"
+  end
+
+  # Taking back the boost (the group's `Undo{Announce}`) is what Mastodon acts on, but Lemmy and the servers that read the group the way it does ignore an `Undo{Announce}` and act on an `Announce{Delete}`, so without this the followers of our group on those servers keep a post its author deleted. Found missing on 23 October.
+  test "and the group announces its author deleting it", %{
+    group_ap_id: group_ap_id,
+    incoming: incoming
+  } do
+    assert {:ok, _} = Transformer.handle_incoming(incoming)
+
+    delete = %{
+      "@context" => "https://www.w3.org/ns/activitystreams",
+      "id" => "#{@post}/delete/1",
+      "type" => "Delete",
+      "actor" => @author,
+      "to" => incoming["to"],
+      "cc" => incoming["cc"],
+      "audience" => group_ap_id,
+      "object" => %{"id" => @post, "type" => "Tombstone"}
+    }
+
+    assert {:ok, delete_activity} = Transformer.handle_incoming(delete)
+
+    announce = ActivityPub.Object.get_existing_announce(group_ap_id, delete_activity)
+
+    assert announce,
+           "the group took back its announcement of the post but did not announce the deletion, so a follower that ignores an `Undo{Announce}` keeps the post"
+
+    assert announce.data["type"] == "Announce"
+  end
+
   # The case that carries most of a group's traffic: of the 40 most recent statuses mastodon.social held for a Lemmy community, 34 were boosts of COMMENTS and 6 of posts. It also arrives differently (a `Note` with `inReplyTo`, where a thread starter is a `Page`) and it can reach the group by two routes at once, the `audience` it names and the thread it replies into, so it is worth asserting separately rather than assuming the post case covers it.
   describe "a comment from a remote instance, on a post in our group" do
     setup %{creator: creator, group: group, group_ap_id: group_ap_id} do

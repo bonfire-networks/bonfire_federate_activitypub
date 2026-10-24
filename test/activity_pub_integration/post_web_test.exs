@@ -8,6 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
 
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
+  # someone else on the same instance, who did not write the post and has no right to edit it
+  @stranger_actor @remote_instance <> "/users/kip"
 
   setup_all do
     mock_global(fn
@@ -15,6 +17,12 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         json(Simulate.actor_json(@remote_actor))
 
       %{method: :get, url: @remote_actor <> "/followers"} ->
+        json(%{})
+
+      %{method: :get, url: @stranger_actor} ->
+        json(Simulate.actor_json(@stranger_actor))
+
+      %{method: :get, url: @stranger_actor <> "/followers"} ->
         json(%{})
 
       # %{method: :get, url: "https://mocked.local/users/karen"} ->
@@ -678,6 +686,112 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
 
       assert updated_content =~ "Updated content after pruning",
              "Post should be updated in Bonfire even when AP object was pruned"
+    end
+  end
+
+  # A remote post received and stored the way a follower's instance gets it. Returns what the tests below compare against.
+  defp receive_remote_post do
+    remote_post_data =
+      "../fixtures/mastodon-post-activity.json"
+      |> Path.expand(__DIR__)
+      |> File.read!()
+      |> Jason.decode!()
+
+    {:ok, ap_activity} =
+      ActivityPub.Federator.Transformer.handle_incoming(remote_post_data, fetch_collection: false)
+
+    assert {:ok, post} =
+             Bonfire.Federate.ActivityPub.Incoming.receive_activity(ap_activity)
+             |> repo().maybe_preload(:post_content)
+
+    %{
+      post_id: post.id,
+      object_id: ap_activity.object.data["id"],
+      author: ap_activity.data["actor"],
+      original: e(post, :post_content, :html_body, nil)
+    }
+  end
+
+  defp update_of(object_id, actor, content) do
+    %{
+      "@context" => "https://www.w3.org/ns/activitystreams",
+      "id" => "#{object_id}/update-by-#{Needle.UID.generate()}",
+      "type" => "Update",
+      "actor" => actor,
+      "object" => %{
+        "id" => object_id,
+        "type" => "Note",
+        "content" => content,
+        "attributedTo" => actor
+      }
+    }
+  end
+
+  defp html_body_of(post_id) do
+    repo().get(Bonfire.Data.Social.Post, post_id)
+    |> repo().maybe_preload(:post_content)
+    |> e(:post_content, :html_body, nil)
+  end
+
+  defp prune_ap_object(object_id) do
+    {:ok, ap_object} = ActivityPub.Object.get_cached(ap_id: object_id)
+    {:ok, _} = repo().delete(ap_object)
+    ActivityPub.Object.invalidate_cache(ap_object)
+    assert {:error, :not_found} = ActivityPub.Object.get_cached(ap_id: object_id)
+  end
+
+  describe "an incoming Update of a post from someone other than its author" do
+    test "is refused while the post is in the AP db" do
+      %{post_id: post_id, object_id: object_id, original: original} = receive_remote_post()
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @stranger_actor)
+
+      assert {:error, :unauthorized} =
+               ActivityPub.Federator.Transformer.handle_incoming(
+                 update_of(object_id, @stranger_actor, "Hijacked by a stranger")
+               )
+
+      assert html_body_of(post_id) == original
+    end
+
+    test "does not change the post when the object has been pruned from the AP db" do
+      %{post_id: post_id, object_id: object_id, author: author, original: original} =
+        receive_remote_post()
+
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @stranger_actor)
+      prune_ap_object(object_id)
+
+      ActivityPub.Federator.Transformer.handle_incoming(
+        update_of(object_id, @stranger_actor, "Hijacked by a stranger")
+      )
+
+      assert html_body_of(post_id) == original
+
+      # control: the same path does apply the author's own Update, so the refusal above means something
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(
+                 update_of(object_id, author, "Edited by its author")
+               )
+
+      assert html_body_of(post_id) =~ "Edited by its author"
+    end
+
+    test "does not change the post when the sender is not yet known to the AP db" do
+      %{post_id: post_id, object_id: object_id, author: author, original: original} =
+        receive_remote_post()
+
+      ActivityPub.Federator.Transformer.handle_incoming(
+        update_of(object_id, @stranger_actor, "Hijacked by a stranger")
+      )
+
+      assert html_body_of(post_id) == original
+
+      # control: the author's own Update still applies
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(
+                 update_of(object_id, author, "Edited by its author")
+               )
+
+      assert html_body_of(post_id) =~ "Edited by its author"
     end
   end
 end

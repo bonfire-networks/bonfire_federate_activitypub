@@ -1275,6 +1275,33 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
              "the author's Delete went only to #{inspect(Enum.map(deliveries, & &1.inbox))}, so the group's remote follower never hears the post is gone"
     end
 
+    # The same rule for an edit: Mastodon applies an `Update` only from the account that wrote the post (or relayed with a signature it can check), and the group's `Announce` of an `Update` carries our normalised copy. Found against `@mayel@mastodon.social` on 23 October (`group_account_live_test.exs`): the group's `Announce` of the edit was accepted and the new text never showed.
+    test "the author's own Update reaches the group's remote followers, who only know the post through the group" do
+      creator = fake_user!()
+      group = public_group(creator)
+      {:ok, _} = Follows.follow(remote_follower(), group, skip_boundary_check: true)
+
+      post = post_in_group(creator, group, "<p>before the edit</p>")
+      assert {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+      assert {:ok, _} =
+               Bonfire.Social.PostContents.edit(creator, id(post), %{
+                 html_body: "<p>after the edit</p>"
+               })
+
+      assert %{} = update = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Update"),
+             "control: the edit federated an Update"
+
+      {:ok, author_actor} = ActivityPub.Actor.get_cached(pointer: creator)
+      {:ok, %{data: remote_data}} = ActivityPub.Actor.get_cached(ap_id: @remote_actor)
+      their_inboxes = [remote_data["inbox"], e(remote_data, "endpoints", "sharedInbox", nil)]
+
+      deliveries = APPublisher.prepare_publish_params(author_actor, update)
+
+      assert Enum.any?(deliveries, &(&1.inbox in their_inboxes)),
+             "the author's Update went only to #{inspect(Enum.map(deliveries, & &1.inbox))}, so the group's remote follower never sees the edit"
+    end
+
     test "publishing a person's boost yields one" do
       %{post: post} = announce_of_group_post()
 
@@ -1289,6 +1316,77 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
       assert length(APPublisher.prepare_publish_params(booster_actor, boost)) == 1,
              "one actor repeating an object is not a group relaying an activity"
+    end
+  end
+
+  # What we can and cannot do for an edit in a group hosted elsewhere: the `Update` is addressed to the group, whose instance relays it, but its followers are not ours to list (Lemmy publishes only a count, NodeBB no followers collection), so nothing reaches them directly. Whether a follower applies the relayed edit depends on their software (a Mastodon one does not).
+  describe "an edit of a post in a group hosted elsewhere" do
+    import Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures,
+      only: [fixture: 2, served_for: 1]
+
+    @elsewhere %{
+      name: "Lemmy",
+      dir: "lemmy",
+      id: "https://lemmy.local/c/technology",
+      actor: "community_actor.json",
+      announces: []
+    }
+
+    setup do
+      served = Map.new(served_for([@elsewhere]))
+
+      mock(fn
+        %{method: :get, url: url} ->
+          case served[url] do
+            nil -> %Tesla.Env{status: 404, body: ""}
+            body -> json(body)
+          end
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+      end)
+
+      assert {:ok, group} =
+               Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{
+                 "id" => @elsewhere.id
+               })
+
+      user = fake_user!()
+      assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(user, group)
+
+      %{user: user, group: group}
+    end
+
+    test "goes to that group's inbox and to nobody else", %{user: user, group: group} do
+      assert {:ok, post} =
+               Bonfire.Posts.publish(
+                 current_user: user,
+                 post_attrs: %{post_content: %{html_body: "<p>before the edit</p>"}},
+                 boundary: "public",
+                 publish_in: uid(group)
+               )
+
+      assert {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+      assert {:ok, _} =
+               Bonfire.Social.PostContents.edit(user, id(post), %{
+                 html_body: "<p>after the edit</p>"
+               })
+
+      assert %{} = update = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Update"),
+             "control: the edit federated an Update"
+
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: user)
+      community = fixture("lemmy", "community_actor.json")
+      group_inboxes = [community["inbox"], e(community, "endpoints", "sharedInbox", nil)]
+
+      inboxes = APPublisher.prepare_publish_params(actor, update) |> Enum.map(& &1.inbox)
+
+      assert Enum.any?(inboxes, &(&1 in group_inboxes)),
+             "the group's own instance has to get the edit to relay it, and got only #{inspect(inboxes)}"
+
+      assert Enum.all?(inboxes, &(&1 in group_inboxes)),
+             "a remote group's followers are not ours to list, so nothing may go anywhere but the group; went to #{inspect(inboxes)}"
     end
   end
 

@@ -97,51 +97,12 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
          Bonfire.Data.Social.Follow,
          Bonfire.Label
        ]),
-       do: prepare_and_queue(subject, :delete, thing, type, opts),
+       do: prepare_and_queue(subject, :delete, thing, type, opts) |> group_announces(),
        else: maybe_push_delete(subject, thing, opts)
   end
 
   defp maybe_prepare_and_queue(subject, :delete, thing, opts),
     do: maybe_push_delete(subject, thing, opts)
-
-  defp maybe_push_delete(subject, thing, opts) do
-    # the schema, which is what each clause matches on: without `only_schemas` a group is `:group`, so it was deleted as a post rather than as an actor (no tombstone of its own, and a relay of its own deletion through itself)
-    case not is_nil(thing) and
-           push_delete(Types.object_type_schema(thing), subject, thing, opts)
-           |> debug("result of push_delete") do
-      {:ok, del} ->
-        {:ok, del}
-
-      # temp workaround
-      [ok: del] ->
-        {:ok, del}
-
-      # a push that failed (e.g. a recipient inbox returned an HTTP error) comes back
-      # list-wrapped like the `[ok: del]` case — handle it so a failed delivery degrades
-      # to a logged error instead of crashing the (linked) federation task
-      [error: reason] ->
-        error(reason, "Failed to delete")
-
-      [] ->
-        debug("No delete activity was pushed")
-        :ignore
-
-      false ->
-        debug("No thing to delete")
-        :ignore
-
-      :ignore ->
-        debug("Ignored delete outgoing federation")
-        :ignore
-
-      {:ignore, reason} ->
-        debug(reason, "Ignored delete outgoing federation")
-        :ignore
-
-      {:error, reason} ->
-        error(reason, "Failed to delete")
-    end
-  end
 
   defp maybe_prepare_and_queue(subject, :create, %{__struct__: struct_type} = local_object, opts) do
     if c2s_activity = opts[:from_c2s_activity] do
@@ -177,7 +138,71 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
       end
 
     prepare_and_queue(subject, verb, local_object, object_type, opts)
+    |> group_announces()
   end
+
+  defp maybe_push_delete(subject, thing, opts) do
+    # the schema, which is what each clause matches on: without `only_schemas` a group is `:group`, so it was deleted as a post rather than as an actor (no tombstone of its own, and a relay of its own deletion through itself)
+    schema = if not is_nil(thing), do: Types.object_type_schema(thing)
+
+    # Looked up BEFORE the deletion, which takes the object and with it the way to find its group. An actor (a group itself included) is not announced by a group: it is not something that was posted in one.
+    announce_target =
+      if not is_nil(schema) and schema not in @types_characters,
+        do: AdapterUtils.group_announce_target(thing)
+
+    case not is_nil(thing) and
+           push_delete(schema, subject, thing, opts)
+           |> debug("result of push_delete") do
+      {:ok, del} ->
+        {:ok, del}
+
+      # temp workaround
+      [ok: del] ->
+        {:ok, del}
+
+      # a push that failed (e.g. a recipient inbox returned an HTTP error) comes back
+      # list-wrapped like the `[ok: del]` case — handle it so a failed delivery degrades
+      # to a logged error instead of crashing the (linked) federation task
+      [error: reason] ->
+        error(reason, "Failed to delete")
+
+      [] ->
+        debug("No delete activity was pushed")
+        :ignore
+
+      false ->
+        debug("No thing to delete")
+        :ignore
+
+      :ignore ->
+        debug("Ignored delete outgoing federation")
+        :ignore
+
+      {:ignore, reason} ->
+        debug(reason, "Ignored delete outgoing federation")
+        :ignore
+
+      {:error, reason} ->
+        error(reason, "Failed to delete")
+    end
+    |> group_announces(announce_target)
+  end
+
+  # What happens in a group we host is announced by the group to its followers, who only know about it through the group's announcement of it: an edit, a vote and its undoing, a lock and its undoing, a ban from the group, a deletion. Done here, once the publisher of whatever type built the activity, so no type's module has to remember to (`AdapterUtils.group_announce_target_of_activity/1` says which activities and for what). A `Create` is announced by the group's auto-boost.
+  defp group_announces({:ok, activity} = result) do
+    group_announces(result, AdapterUtils.group_announce_target_of_activity(activity))
+  end
+
+  defp group_announces(result), do: result
+
+  # With the target already found: a deletion removes the object, so it is looked up beforehand
+  defp group_announces({:ok, activity} = result, announce_target) do
+    AdapterUtils.announce_by_group(announce_target, activity)
+
+    result
+  end
+
+  defp group_announces(result, _announce_target), do: result
 
   defp prepare_and_queue(subject, verb, local_object, object_type, opts)
        when not is_nil(object_type) do
@@ -366,20 +391,15 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
            (opts[:ap_object] ||
               ActivityPub.Object.get_cached!(pointer: id))
            |> debug("delete_object") do
-      with {:ok, activity} = deleted <-
-             ActivityPub.delete(
-               object,
-               true,
-               opts ++
-                 [
-                   subject: AdapterUtils.the_ap_id(subject),
-                   bcc: AdapterUtils.ids_or_object_ids(opts[:ap_bcc])
-                 ]
-             ) do
-        # the group's followers got the post through the group, so they hear of its deletion through it too
-        AdapterUtils.maybe_group_relays(thing, activity)
-        deleted
-      end
+      ActivityPub.delete(
+        object,
+        true,
+        opts ++
+          [
+            subject: AdapterUtils.the_ap_id(subject),
+            bcc: AdapterUtils.ids_or_object_ids(opts[:ap_bcc])
+          ]
+      )
     else
       e ->
         preparation_error("Could not find the AP object to delete", "Delete", e)

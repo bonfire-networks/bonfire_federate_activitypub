@@ -257,6 +257,32 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end)
     end
 
+    # A like is addressed to the post's author and to the group, not to the liker's own followers, so a server that follows the group and nobody on this one only hears of it from the group's `Announce`. Taking the like back is announced the same way (`Undo{Like}`).
+    test "a like on a member's post in a group reaches a follower's instance through the group, and taking it back does too",
+         context do
+      %{moderator: voter, post: post, post_url: post_url} =
+        member_post_in_followed_group!(context, "a member's post that gets a like")
+
+      voter_url = Bonfire.Common.URIs.canonical_url(voter)
+
+      voter_liked_there? = fn ->
+        TestInstanceRepo.apply(fn ->
+          {:ok, voter_there} = AdapterUtils.get_or_fetch_and_create_by_uri(voter_url)
+          Bonfire.Social.Likes.liked?(voter_there, their_copy(post_url))
+        end)
+      end
+
+      refute voter_liked_there?.(), "control: no like there yet"
+
+      assert {:ok, _} = Bonfire.Social.Likes.like(voter, post)
+
+      assert voter_liked_there?.(), "the like reaches the follower's instance through the group"
+
+      assert {:ok, _} = Bonfire.Social.Likes.unlike(voter, post)
+
+      refute voter_liked_there?.(), "and so does taking it back"
+    end
+
     # A moderator of a group here who is on another instance acts through their own instance's copy of the group: their `Lock` goes to the group, which applies it if they are one of its moderators. Someone there who isn't is refused before anything is sent, and a `Lock` made up in their name and delivered here is refused here (mocked counterparts: `threadiverse_moderation_test.exs`, describe "a moderator here of a community elsewhere", and the `Lock` refusal pair)
     defp moderator_on_other_instance!(context, html_body) do
       %{moderator: moderator, group: group} =
@@ -627,6 +653,51 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end)
 
       refute post_held?(post_url), "a deletion from the post's own instance reaches the group's"
+    end
+
+    # The group's followers on a THIRD instance are who needs these two, and a dance has two instances, so this can only look at what the group's instance does with the activity it received over the wire: it announces it (mocked counterparts, which can read the outgoing side too: `group_incoming_post_test.exs`)
+    test "an edit by someone on another instance of their post in a group here is announced by the group",
+         context do
+      %{group: group, post_url: post_url, remote_post_id: remote_post_id} =
+        remote_member_post_in_group!(context, "a post from elsewhere, about to be edited")
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Social.PostContents.edit(context[:remote][:user], remote_post_id, %{
+                   html_body: "the same post from elsewhere after its edit"
+                 })
+      end)
+
+      assert %{} = update = ActivityPub.Object.get_activity_for_object_ap_id(post_url, "Update"),
+             "control: the author's edit reached the group's instance"
+
+      {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: group[:category])
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id, update),
+             "the group announces the edit, so its followers on other instances get it"
+    end
+
+    test "a deletion by someone on another instance of their post in a group here is announced by the group",
+         context do
+      %{group: group, post_url: post_url, remote_post_id: remote_post_id} =
+        remote_member_post_in_group!(context, "a post from elsewhere, about to be deleted again")
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Social.Objects.delete(remote_post_id,
+                   current_user: context[:remote][:user]
+                 )
+      end)
+
+      assert %{} = delete = ActivityPub.Object.get_activity_for_object_ap_id(post_url, "Delete"),
+             "control: the author's deletion reached the group's instance"
+
+      {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: group[:category])
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(group_ap_id, delete),
+             "the group announces the deletion, so followers that ignore an `Undo{Announce}` drop the post"
     end
 
     test "a moderator on another instance deleting a member's post in a group here erases only their own copy",

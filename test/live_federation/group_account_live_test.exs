@@ -105,6 +105,23 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
         )
       end
 
+      # T2b: the author edits that post, and the group's followers get the new text through the group's announced `Update`. The untitled probe, since a server that shows a `Page` as a title and a link never shows its body
+      edited_text = "edited by its author #{unique()}"
+
+      assert {:ok, _} =
+               Bonfire.Social.PostContents.edit(creator, id(post), %{
+                 html_body: "<p>Bonfire group relay probe, #{edited_text}</p>"
+               })
+
+      edit_shown? = await(fn -> shows_text?(api, post_ap_id, group_url, edited_text) end, wait)
+
+      IO.puts(
+        "after the edit, #{name} #{if edit_shown?, do: "shows the new text", else: "STILL SHOWS the old text"}"
+      )
+
+      assert edit_shown?,
+             "#{name} still shows the old text of the post after #{wait}s, so the edit did not arrive or was not applied; the timeline held: #{timeline_dump(api)}"
+
       # T3: a titled post, and how the server shows its title and body
       titled =
         publish(
@@ -236,6 +253,17 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
     case MastodonApi.home_timeline(api, limit: 40) do
       {:ok, statuses} -> Enum.filter(statuses, &MastodonApi.shows_post?(&1, ap_id, group_url))
       _ -> nil
+    end
+  end
+
+  # whether the home timeline shows the post with this AP id with this text in it; false on a failed read so `await/2` tries again
+  defp shows_text?(api, ap_id, group_url, text) do
+    case entries_showing(api, ap_id, group_url) do
+      entries when is_list(entries) ->
+        Enum.any?(entries, &((shown_post(&1)["content"] || "") =~ text))
+
+      _ ->
+        false
     end
   end
 
