@@ -13,6 +13,10 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
   @creation_verbs ["Create"]
 
+  # Our own activities that took effect when we made them, so a group relaying them back to us changes nothing here (see the `receive_activity/1` clause that reads this)
+  # TODO: a moderated group may want our post held until the group accepts and relays it (`apply_now: false` for a `Create`, as for our moderation there); a relayed-back `Create` that is waiting then has to be applied, as moderation is through `Moderations.confirm_applied/2`, while one already applied still must not
+  @applied_when_made ["Create", "Update"]
+
   # Engagement-ping activity types (e.g. PeerTube `View`) that Bonfire does not model. We skip these cleanly instead of letting them fall through to the fallback store, which tried to persist them and crashed with a DB error that the Oban worker then retried 3×. See #1802.
   # Compile-time config so it can be used directly in the guard below (override in config).
   @skip_activity_types Application.compile_env(
@@ -33,6 +37,17 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     # short-circuit before any actor/object fetch or store
     debug(activity, "AP - '#{type}' activity is not modelled by Bonfire, skipping cleanly")
     {:ok, :skip}
+  end
+
+  # One of ours, relayed back by a group hosted elsewhere (FEP-1b12), that took effect when we made it: applying it again would publish it again, which the group would announce again, and so on. Our moderation of a group hosted elsewhere is not in the list: unless it was applied at once (`apply_now`), it waits for the group, and the relayed copy is what applies it (`Moderations.confirm_applied/2`).
+  def receive_activity(%{local: true, relayed_by: relayed_by, data: %{"type" => type}} = activity)
+      when is_binary(relayed_by) and type in @applied_when_made do
+    debug(
+      activity.data["id"],
+      "AP - one of ours relayed back by #{relayed_by}, already applied here"
+    )
+
+    {:ok, :already_applied}
   end
 
   def receive_activity(

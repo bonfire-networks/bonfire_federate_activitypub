@@ -666,16 +666,42 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                  Bonfire.Social.PostContents.edit(context[:remote][:user], remote_post_id, %{
                    html_body: "the same post from elsewhere after its edit"
                  })
+
+        assert updates_of(post_url) == 1,
+               "the author's instance publishes the edit once: the group's relay of it coming back is not applied, and so not published, again"
       end)
 
       assert %{} = update = ActivityPub.Object.get_activity_for_object_ap_id(post_url, "Update"),
              "control: the author's edit reached the group's instance"
+
+      assert updates_of(post_url) == 1, "and reached it once"
 
       {:ok, %{ap_id: group_ap_id}} = ActivityPub.Actor.get_cached(pointer: group[:category])
 
       assert %{data: %{"type" => "Announce"}} =
                ActivityPub.Object.get_existing_announce(group_ap_id, update),
              "the group announces the edit, so its followers on other instances get it"
+    end
+
+    # FEP-8b32 with FEP-1b12: the author's instance signs the edit, delivers it over its HTTP signature, and the group checks the author's proof before relaying it as it arrived, so it still verifies for whoever gets the group's Announce. What a follower of the group then sees needs a third instance, which a dance does not have (the author's instance gets its own edit back, and has nothing to verify about its own activity); the relayed bytes are checked in the library's `relayed_received_document_test.exs`.
+    test "a member's signed edit is checked by its proof when the group relays it", context do
+      %{post_url: post_url, remote_post_id: remote_post_id} =
+        remote_member_post_in_group!(
+          context,
+          "a post from elsewhere, about to be edited and signed"
+        )
+
+      TestInstanceRepo.apply(fn ->
+        assert {:ok, _} =
+                 Bonfire.Social.PostContents.edit(context[:remote][:user], remote_post_id, %{
+                   html_body: "the same post after its signed edit"
+                 })
+      end)
+
+      assert %{} = update = ActivityPub.Object.get_activity_for_object_ap_id(post_url, "Update")
+
+      assert update.authenticated == :integrity_proof,
+             "delivered over its HTTP signature, the edit is marked as vouched for by its proof only once the group checked that proof to relay it unchanged"
     end
 
     test "a deletion by someone on another instance of their post in a group here is announced by the group",
@@ -922,6 +948,19 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     end
 
     # whether this instance still holds a post, by its URL
+    # how many `Update`s of this object the current instance holds
+    defp updates_of(object_ap_id) do
+      import Ecto.Query
+
+      from(o in ActivityPub.Object,
+        where:
+          fragment("?->>'type'", o.data) == "Update" and
+            fragment("coalesce(?->'object'->>'id', ?->>'object')", o.data, o.data) ==
+              ^object_ap_id
+      )
+      |> repo().aggregate(:count)
+    end
+
     defp post_held?(post_url) do
       with {:ok, %{pointer_id: id}} when is_binary(id) <-
              ActivityPub.Object.get_cached(ap_id: post_url),

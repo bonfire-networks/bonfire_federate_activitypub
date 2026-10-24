@@ -614,6 +614,70 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     refute Quotes.requested?(id(quote_post), original_post)
   end
 
+  # The quoted author revokes an authorization we already hold: checking it again fetches it from their server, which now serves a `Tombstone`. Before a fetch stored what it fetched, the copy we held came back instead, and the revoked quote still verified.
+  test "a quote authorization we hold, revoked at its origin, no longer verifies", context do
+    n = System.unique_integer([:positive])
+    quoted_id = "#{@remote_actor}/statuses/quoted-#{n}"
+    auth_url = "#{@remote_actor}/quote_authorizations/#{n}"
+
+    mock(fn
+      %{method: :get, url: @remote_actor} ->
+        json(Simulate.actor_json(@remote_actor))
+
+      %{method: :get, url: ^auth_url} ->
+        json(%{"id" => auth_url, "type" => "Tombstone", "formerType" => "QuoteAuthorization"})
+
+      %{method: :get} ->
+        %Tesla.Env{status: 404, body: ""}
+    end)
+
+    # the remote post being quoted
+    assert {:ok, %{pointer: quoted}} =
+             ActivityPub.Federator.Transformer.handle_incoming(%{
+               "type" => "Create",
+               "id" => quoted_id <> "/activity",
+               "actor" => @remote_actor,
+               "to" => context.to,
+               "object" => %{
+                 "id" => quoted_id,
+                 "type" => "Note",
+                 "attributedTo" => @remote_actor,
+                 "content" => "a remote post, about to be quoted",
+                 "to" => context.to
+               }
+             })
+
+    # our user's quote of it, carrying the authorization Karen gave
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: context.user,
+        post_attrs: %{post_content: %{html_body: "quoting it"}},
+        boundary: "public"
+      )
+
+    {:ok, %{data: quote_data} = quote_ap} = ActivityPub.Object.get_cached(pointer: quote_post)
+
+    ActivityPub.Object.do_update_existing(quote_ap, %{
+      data: quote_data |> Map.put("quote", quoted_id) |> Map.put("quoteAuthorization", auth_url)
+    })
+
+    # the authorization as we got it before it was revoked: a valid one
+    assert {:ok, _} =
+             ActivityPub.Object.insert(
+               %{
+                 "id" => auth_url,
+                 "type" => "QuoteAuthorization",
+                 "attributedTo" => @remote_actor,
+                 "interactingObject" => quote_data["id"],
+                 "interactionTarget" => quoted_id
+               },
+               false
+             )
+
+    assert {:not_authorized, _reason} = Quotes.verify_quote_authorization(quote_post, quoted),
+           "the authorization was revoked at its origin, but the copy we held still made the quote look authorized"
+  end
+
   test "ap_quote_fields uses stored fields even when quote tags are missing (cross-instance scenario)",
        context do
     # This simulates what happens in dance tests: the AP object has quote + quoteAuthorization
