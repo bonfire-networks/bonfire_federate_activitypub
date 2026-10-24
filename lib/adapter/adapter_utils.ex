@@ -103,6 +103,29 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   def mirrored_group(_, _), do: nil
 
+  @doc """
+  The ids of the local users whose followers get a reply to the post `post_id` forwarded to them: the creators of the post and of its ancestors, and whoever boosted or quoted the post. Each once, in no particular order.
+
+  One query, of each context's own: the thread's (`Threads.query_creator_ids_in_reply_path/1`), the boosts' and the quotes', with who is local as a join (no `Peered` row).
+  """
+  def local_actor_ids_to_forward_to(post_id) do
+    import Ecto.Query
+
+    candidates =
+      Bonfire.Social.Threads.query_creator_ids_in_reply_path(post_id)
+      # `union` (not `union_all`) leaves each id once
+      |> union(^Bonfire.Social.Boosts.query_booster_ids(post_id))
+      |> union(^Bonfire.Social.Quotes.query_quoter_ids(post_id))
+
+    from(candidate in subquery(candidates),
+      left_join: peered in Peered,
+      on: peered.id == candidate.creator_id,
+      where: is_nil(peered.id) and not is_nil(candidate.creator_id),
+      select: candidate.creator_id
+    )
+    |> repo().all()
+  end
+
   def local_group_audiences(activity_data, object_data \\ %{}) do
     case addressed_local_categories(activity_data, object_data) do
       [] -> List.wrap(group_of_thread(object_data["inReplyTo"]))

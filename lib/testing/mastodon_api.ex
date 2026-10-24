@@ -51,6 +51,10 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
       |> Enum.any?(&(is_binary(&1) and String.downcase(&1) == wanted))
     end
 
+    @doc "The token's own account (its `acct`, `url`, `id`), for a test that needs to say who it is acting as."
+    def verify_credentials(%__MODULE__{} = client),
+      do: get(client, "/api/v1/accounts/verify_credentials")
+
     def follow(%__MODULE__{} = client, account_id),
       do: post(client, "/api/v1/accounts/#{account_id}/follow")
 

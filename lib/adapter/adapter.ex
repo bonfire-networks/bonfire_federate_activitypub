@@ -269,6 +269,30 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     |> Enum.reject(&is_nil/1)
   end
 
+  @doc """
+  Whose followers get `received`, a remote reply to `post` (or an edit or a deletion of one), forwarded to them (ActivityPub 7.1.2, see `ActivityPub.Federator.Forwarder`): the local authors of the post and of its ancestors, and the local boosters and quoters of the post (`AdapterUtils.local_actor_ids_to_forward_to/1`).
+
+  `:relayed_by_group` when a group we host relays `received` already, by the group relay's own rule: a `Create` the group is addressed in, or whose thread is in it, which its auto-boost announces (`AdapterUtils.local_group_audiences/2`, as the incoming post is placed by); anything else the group announces (`AdapterUtils.group_announce_target_of_activity/1`).
+  """
+  def forward_to_followers_of_actors(%{pointer_id: post_id}, received) when is_binary(post_id) do
+    if relayed_by_local_group?(received) do
+      :relayed_by_group
+    else
+      post_id
+      |> AdapterUtils.local_actor_ids_to_forward_to()
+      |> ActivityPub.Actor.list_cached()
+    end
+  end
+
+  # an object we hold only as AP data, which no post of ours is in
+  def forward_to_followers_of_actors(_post, _received), do: []
+
+  defp relayed_by_local_group?(%{"type" => "Create", "object" => %{} = object} = received),
+    do: AdapterUtils.local_group_audiences(received, object) != []
+
+  defp relayed_by_local_group?(received),
+    do: not is_nil(AdapterUtils.group_announce_target_of_activity(%{data: received}))
+
   # NOTE: for anything already addressed at publish time (see `AdapterUtils.determine_recipients/4`, which puts boundary-granted recipients in `bto`/`bcc`), those recipients arrive here in `addressed_pointer_ids` and are excluded at the SQL level by `get_followers`, so the expensive `bonfire_boundaries_summary` grants query is skipped by the `followers != []` guard rather than being re-run.
   def external_followers_for_activity(actor, activity_data, addressed_pointer_ids \\ []) do
     with ap_object when is_binary(ap_object) <-
