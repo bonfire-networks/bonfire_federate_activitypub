@@ -202,15 +202,17 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
         Interop.await_incoming([type: "Create", audience: group.ap_id], seconds: 300)
     """
     def await_incoming(filters, opts \\ []) do
-      deadline = System.monotonic_time(:second) + (opts[:seconds] || 90)
-
       # only rows that arrive from NOW on can satisfy this. Live tests run with `db_sandbox: false`,
       # so everything a previous run ingested is still in the table, and without this an await is
       # satisfied by a stale row: on 2026-09-04 the "remote Accepts our Follow" assertion passed in
       # three consecutive runs on an Accept received hours earlier, while nothing at all was arriving,
       # which hid the reason the announce assertions were failing.
       since = opts[:since] || DateTime.utc_now()
-      do_await(filters, deadline, opts[:every] || 3_000, since)
+
+      await(fn -> incoming(filters, since) end,
+        seconds: opts[:seconds] || 90,
+        every: opts[:every] || 3_000
+      )
     end
 
     @doc """
@@ -219,46 +221,61 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     Storing the AP object and creating the Bonfire object are not the same step: the inbox stores and queues, and the local object appears when that job runs. So a live test that checks for a pointer the moment the activity lands is asking a question the server has not been given time to answer, and will report a bug that is not there.
     """
     def await_pointer(ap_id, opts \\ []) do
-      deadline = System.monotonic_time(:second) + (opts[:seconds] || 60)
-      do_await_pointer(ap_id, deadline, opts[:every] || 2_000)
+      await(
+        fn ->
+          case Object.get_cached(ap_id: ap_id) do
+            {:ok, %{pointer_id: pointer_id}} when is_binary(pointer_id) -> pointer_id
+            _ -> nil
+          end
+        end,
+        seconds: opts[:seconds] || 60,
+        every: opts[:every] || 2_000
+      )
     end
 
-    defp do_await_pointer(ap_id, deadline, every) do
-      case Object.get_cached(ap_id: ap_id) do
-        {:ok, %{pointer_id: pointer_id}} when is_binary(pointer_id) ->
-          pointer_id
+    @doc """
+    Calls `fun` until it gives something other than `nil`, `false` or `[]`, and gives that; or `nil` once `seconds:` (default 60) have passed. `every:` is the ms between calls (default 5000).
+
+        Interop.await(fn -> reply_in_context?(api, status_id, reply_ap_id) end, seconds: 600)
+    """
+    def await(fun, opts \\ []) do
+      deadline = System.monotonic_time(:second) + (opts[:seconds] || 60)
+      do_await(fun, deadline, opts[:every] || 5_000)
+    end
+
+    defp do_await(fun, deadline, every) do
+      case fun.() do
+        result when result not in [nil, false, []] ->
+          result
 
         _ ->
           if System.monotonic_time(:second) >= deadline do
             nil
           else
             Process.sleep(every)
-            do_await_pointer(ap_id, deadline, every)
+            do_await(fun, deadline, every)
           end
       end
     end
 
-    defp do_await(filters, deadline, every, since) do
-      found =
-        from(o in Object,
-          where: o.local == false and o.inserted_at >= ^since,
-          order_by: [desc: o.id],
-          limit: 100
-        )
-        |> repo().all()
-        |> Enum.find(&matches?(&1.data, filters))
+    @doc """
+    The newest activity WE made since `since` that matches the filters (the same ones as `await_incoming/2`), or nil: what our instance sends, as it was made, eg. to check a `Follow` references its object by id.
 
-      cond do
-        found ->
-          found
+        Interop.outgoing([type: "Follow", about: actor.ap_id], since)
+    """
+    def outgoing(filters, since), do: activities(true, filters, since)
 
-        System.monotonic_time(:second) >= deadline ->
-          nil
+    # the newest ingested incoming activity since `since` that matches the filters
+    defp incoming(filters, since), do: activities(false, filters, since)
 
-        true ->
-          Process.sleep(every)
-          do_await(filters, deadline, every, since)
-      end
+    defp activities(local?, filters, since) do
+      from(o in Object,
+        where: o.local == ^local? and o.inserted_at >= ^since,
+        order_by: [desc: o.id],
+        limit: 100
+      )
+      |> repo().all()
+      |> Enum.find(&matches?(&1.data, filters))
     end
 
     defp matches?(data, filters) do

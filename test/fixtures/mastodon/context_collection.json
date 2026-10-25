@@ -1,0 +1,15 @@
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "id": "https://mastodon.local/contexts/1-117490029541161010",
+  "type": "Collection",
+  "attributedTo": "https://mastodon.local/users/Gargron",
+  "first": {
+    "type": "CollectionPage",
+    "partOf": "https://mastodon.local/contexts/1-117490029541161010",
+    "items": [
+      "https://mastodon.local/users/Gargron/statuses/117490029541161010",
+      "https://freude.local/users/alvar/statuses/117490043911759987",
+      "https://hoyle.local/users/tony/statuses/117490077250188126"
+    ]
+  }
+}

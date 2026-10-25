@@ -2715,6 +2715,71 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     nil
   end
 
+  @doc """
+  A placeholder for a remote object we know of by its URL but couldn't fetch, so the replies to it can be threaded under its id rather than each start a thread of their own: a plain pointer (of the generic `APActivity` type, the real one not being known), soft-deleted like a deleted reply so nothing lists it, and found by its URL through `Peered`. The object takes its place under the same id when it arrives (`Incoming`).
+
+  `Peered` is what tells it from a deleted object, which loses its `Peered` (`Bonfire.Social.Objects.delete/2`). Nothing is made for a local URL: we hold all of ours.
+  """
+  def get_or_create_placeholder(url, opener_id \\ nil)
+
+  def get_or_create_placeholder(url, opener_id) when is_binary(url) do
+    cond do
+      String.starts_with?(url, Bonfire.Common.URIs.base_url()) -> nil
+      id = placeholder_id(url) -> {:ok, id}
+      true -> create_placeholder(url, opener_id)
+    end
+  end
+
+  def get_or_create_placeholder(_, _), do: nil
+
+  @doc "The local id of the post that opens the thread an incoming object's `context` names, if we hold it: as the context's collection gave it when it was fetched for this object (`ActivityPub.Federator.Fetcher.context_opener/1`), or the context itself when it is a post, as with Lemmy."
+  def thread_opener_id(%{"context" => context}) when is_binary(context) do
+    with ap_id when is_binary(ap_id) <-
+           ActivityPub.Federator.Fetcher.context_opener(context) || context,
+         {:ok, %{pointer_id: pointer_id}} when is_binary(pointer_id) <-
+           Object.get_cached(ap_id: ap_id) do
+      pointer_id
+    else
+      _ -> nil
+    end
+  end
+
+  def thread_opener_id(_), do: nil
+
+  @doc "The id of the placeholder for `url` (see `get_or_create_placeholder/1`), if there is one."
+  def placeholder_id(url) when is_binary(url) do
+    import Ecto.Query
+
+    from(p in Pointer,
+      join: peered in assoc(p, :peered),
+      where: peered.canonical_uri == ^url and not is_nil(p.deleted_at),
+      select: p.id
+    )
+    |> repo().one()
+  end
+
+  def placeholder_id(_), do: nil
+
+  defp create_placeholder(url, opener_id) do
+    import Ecto.Query
+    id = Needle.UID.generate(Pointer)
+
+    with {:ok, _} <- Pointer.create(id, Bonfire.Data.Social.APActivity) |> repo().insert(),
+         {1, _} <-
+           from(p in Pointer, where: p.id == ^id)
+           |> repo().update_all(set: [deleted_at: DateTime.utc_now()]),
+         {:ok, _} <- Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(id, url) do
+      # replies to it received at once each make one, and the first to record the URL is the one
+      id = placeholder_id(url) || id
+      Utils.maybe_apply(Bonfire.Social.Threads, :place_placeholder, [id, opener_id])
+      {:ok, id}
+    else
+      e ->
+        error(e, "Could not make a placeholder for #{url}")
+        nil
+    end
+  end
+
   def get_pointer_id_by_ap_id(ap_id) do
     case ActivityPub.Object.get_cached(ap_id: ap_id) do
       {:ok, object} ->

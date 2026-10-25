@@ -18,6 +18,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
   alias Bonfire.Federate.ActivityPub.Testing.Interop
   alias Bonfire.Federate.ActivityPub.Testing.Interop.Groups
+  alias Bonfire.Federate.ActivityPub.Testing.Scenarios
 
   @group_env "LIVE_TEST_GROUP"
 
@@ -122,26 +123,13 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
   describe "joining" do
     # REGRESSION GUARD: a Follow round-trip only completes if the remote can fetch and PARSE our actor.
     # This is what caught our `updated` field being serialised without a timezone (AS2 Core §2.3 requires RFC3339 with `Z`), which made Lemmy reject the whole actor with HTTP 400 and silently blocked every interaction with Lemmy instances.
-    test "the remote Accepts our Follow (proving it can fetch and parse our actor)" do
-      handle = group_handle!()
-      me = fake_user!()
-
-      assert {:ok, request} = Interop.follow(handle, as: me)
-      {:ok, group} = Interop.fetch(handle)
-
-      # deterministic half, independent of the remote: `object` must stay a bare id. Implementations type a Follow's object as a link, so embedding the actor (which `prepare_outgoing_object/1` used to do by normalising the id back into cached JSON) makes them reject it outright.
-      follow_json = Interop.outgoing_json(request) || %{}
-
-      assert is_binary(follow_json["object"]),
-             "our Follow embeds the target actor instead of referencing its id: #{inspect(follow_json["object"])}"
-
-      # generous: this is usually FIRST contact with the remote, which has to fetch and parse our
-      # actor before it can accept, and a large instance queues that work. The 90s default is not
-      # enough against lemmy.world even from a host it has no backoff against
-      assert Interop.await_incoming([type: "Accept", from: group.ap_id],
-               seconds: reply_wait(300)
-             ),
-             "no Accept received from #{group.ap_id} — the remote could not parse/verify our Follow or our actor"
+    # `object` must stay a bare id: implementations type a Follow's object as a link, so embedding the actor (which `prepare_outgoing_object/1` used to do) makes them reject it outright. The wait is generous: this is usually FIRST contact with the remote, which has to fetch and parse our actor before it can accept, and the 90s default is not enough against lemmy.world
+    test "the remote Accepts our Follow (proving it can fetch and parse our actor)", context do
+      Scenarios.follow_accepted(
+        Map.put(context, :local, %{user: fake_user!()}),
+        group_handle!(),
+        wait: reply_wait(300)
+      )
     end
 
     # Whether a group's `Accept` is slow or missing: several new followers follow at once and each `Accept` is looked for every 10 seconds, up to `LIVE_TEST_ACCEPT_WAIT` seconds (default 900), printing when each arrived. A fresh user is a new actor the group must fetch first, which can take a while on a busy instance; the other tests give up after 3 to 5 minutes.

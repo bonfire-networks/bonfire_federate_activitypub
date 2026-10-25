@@ -19,7 +19,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.FollowAcceptLiveTest do
   # committed data: the tunnelled server and the remote fetching back run outside the test process
   @moduletag db_sandbox: false
 
-  alias Bonfire.Federate.ActivityPub.Testing.Interop
+  alias Bonfire.Federate.ActivityPub.Testing.Scenarios
 
   @actor_env "LIVE_TEST_ACTOR"
 
@@ -36,20 +36,8 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.FollowAcceptLiveTest do
       """)
   end
 
-  test "a remote actor Accepts our Follow" do
-    handle = actor_handle!()
-    me = fake_user!()
-
-    assert {:ok, remote} = Interop.fetch(handle)
-    assert {:ok, request} = Interop.follow(handle, as: me)
-
-    # same shape guard as the group probe: strict remotes can't parse an embedded actor here
-    follow_json = Interop.outgoing_json(request) || %{}
-
-    assert is_binary(follow_json["object"]),
-           "our Follow embeds the target actor instead of referencing its id: #{inspect(follow_json["object"])}"
-
-    assert Interop.await_incoming(type: "Accept", from: remote.ap_id),
-           "no Accept received from #{remote.ap_id} — so either our Follow never really went out, or we are dropping incoming Accepts (this is NOT group-specific)"
+  # no Accept means the problem is ours and not group-related: our Follow never really went out, or we drop incoming Accepts
+  test "a remote actor Accepts our Follow", context do
+    Scenarios.follow_accepted(Map.put(context, :local, %{user: fake_user!()}), actor_handle!())
   end
 end

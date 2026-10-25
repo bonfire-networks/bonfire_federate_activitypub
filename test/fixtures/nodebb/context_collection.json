@@ -1,0 +1,16 @@
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "id": "https://nodebb.local/topic/19415",
+  "url": "https://nodebb.local/topic/19415/meilisearch-plugin-refactored-search-in-topic-button",
+  "name": "Meilisearch plugin (refactored) + Search in topic button",
+  "attributedTo": "https://nodebb.local/category/7",
+  "audience": "https://nodebb.local/category/7",
+  "locked": false,
+  "type": "OrderedCollection",
+  "totalItems": 16,
+  "orderedItems": [
+    "https://nodebb.local/post/107755",
+    "https://nodebb.local/post/107776",
+    "https://nodebb.local/post/107841"
+  ]
+}

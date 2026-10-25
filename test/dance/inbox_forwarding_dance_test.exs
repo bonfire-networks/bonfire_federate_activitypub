@@ -5,13 +5,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.InboxForwardingTest do
   With two instances every remote follower of ours is on the sender's server, so a forward that does reach someone is tested with mocked remotes (`Bonfire.Federate.ActivityPub.InboxForwardingTest`). What this shows is the rest of the path holding between real instances: the reply arrives signed (FEP-8b32), is known as a reply to our post, and is skipped only because no inbox is left.
   """
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
-  use Repatch.ExUnit
 
   @moduletag :test_instance
 
   import Bonfire.Federate.ActivityPub.SharedDataDanceCase
 
-  alias ActivityPub.Federator.Forwarder
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Posts
@@ -33,13 +31,23 @@ defmodule Bonfire.Federate.ActivityPub.Dance.InboxForwardingTest do
   test "a reply from the other instance is not forwarded back to it", context do
     alice = context[:local][:user]
 
-    # what the receiver decided about forwarding each activity, watched as it happens (it still runs); `:global`, as the receiving instance's processes are not this test's
+    # what the receiver decided about forwarding each activity, as the forwarder tells it (a telemetry event, sent from whichever instance's process decided)
     test_pid = self()
+    handler = {__MODULE__, make_ref()}
 
-    Repatch.patch(Forwarder, :maybe_forward, [mode: :global], fn received, result, forwarding ->
-      send(test_pid, {:forwarding, received["id"], received["type"], forwarding})
-      Repatch.real(Forwarder.maybe_forward(received, result, forwarding))
-    end)
+    :telemetry.attach(
+      handler,
+      [:activity_pub, :forwarder, :decided],
+      fn _event, _measurements, metadata, _ ->
+        send(
+          test_pid,
+          {:forwarding, metadata.activity_id, metadata.activity_type, metadata.decision}
+        )
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
 
     # signed by its author (FEP-8b32), as only such a reply is forwarded
     Application.put_env(:activity_pub, :sign_object_integrity_proofs, true)

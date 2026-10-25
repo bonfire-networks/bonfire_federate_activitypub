@@ -26,6 +26,8 @@ defmodule Bonfire.Federate.ActivityPub.MixProject do
       deps:
         Mess.deps([
           {:floki, ">= 0.0.0", only: [:dev, :test]},
+          # a Mastodon API client, for `Nomad.MastoAPI`; only tests use it so far
+          {:hunter, "~> 0.8", optional: true},
           {:bonfire_boundaries, git: "https://github.com/bonfire-networks/bonfire_boundaries", optional: true}
         ])
     ]

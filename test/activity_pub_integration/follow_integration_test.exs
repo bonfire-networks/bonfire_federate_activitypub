@@ -44,6 +44,39 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
     :ok
   end
 
+  describe "following by URI" do
+    # a remote actor we have never seen, named only by its URI: the context fetches it
+    test "Follows.follow/3 takes a URI, fetching the actor through federation" do
+      me = fake_user!()
+
+      assert {:ok, _} = Follows.follow(me, @remote_actor)
+
+      {:ok, remote} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(@remote_actor)
+
+      assert Follows.following?(me, remote) or Follows.requested?(me, remote)
+
+      # and unfollowing by URI too
+      assert {:ok, _} = Follows.unfollow(me, @remote_actor)
+      refute Follows.following?(me, remote) or Follows.requested?(me, remote)
+    end
+
+    test "the GraphQL `follow` resolver passes a URI to Follows, through Nomad in process" do
+      me = fake_user!()
+
+      assert {:ok, %{"id" => _}} =
+               Follows.nomad(:follow, me, @remote_actor,
+                 current_user: me,
+                 nomad_transport: :graphql
+               )
+
+      {:ok, remote} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(@remote_actor)
+
+      assert Follows.following?(me, remote) or Follows.requested?(me, remote)
+    end
+  end
+
   describe "" do
     test "follows get queued to federate" do
       me = fake_user!()

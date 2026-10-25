@@ -179,5 +179,92 @@ defmodule Bonfire.Federate.ActivityPub.BlockFederationTest do
       assert Follows.following?(them, me),
              "the boundary stops delivery, so the edge is merely stale — and keeping it is what lets an Undo{Block} restore the prior state"
     end
+
+    # A `Block` says "they cannot see me", which is how we send one (only from the ghost half) and how Mastodon reads one. A silence is a mute, which nobody federates
+    test "a remote's Block is a ghost, not a silence", %{me: me} do
+      them = remote_person(@blocker)
+
+      assert {:ok, _} = receive_block(them, me)
+
+      assert Blocks.is_blocked?(me, :ghost, current_user: them)
+      refute Blocks.is_blocked?(me, :silence, current_user: them)
+    end
+
+    test "one of us blocked by a remote can no longer see or answer their posts, from before the block or after",
+         %{me: me} do
+      them = remote_person(@blocker)
+      neighbour = fake_user!()
+      before = receive_post(@blocker)
+
+      assert Bonfire.Boundaries.can?(me, :read, before),
+             "control: the post can be read before the block"
+
+      assert {:ok, _} = receive_block(them, me)
+      later = receive_post(@blocker)
+
+      for post <- [before, later] do
+        refute Bonfire.Boundaries.can?(me, :read, post)
+        refute Bonfire.Boundaries.can?(me, :reply, post)
+
+        assert Bonfire.Boundaries.can?(neighbour, :read, post),
+               "the block is about one of us, not everyone"
+      end
+    end
+
+    # a remote's block applied before it denied anything left only this: one of us in their `ghost_them` circle, with no ACL reading it
+    test "a block that arrived before it denied anything is put right by the backfill", %{me: me} do
+      them = remote_person(@blocker)
+      neighbour = fake_user!()
+      post = receive_post(@blocker)
+
+      [ghost_them] = Bonfire.Boundaries.Circles.stereotype_circles_for(them, [:ghost_them])
+      Bonfire.Boundaries.Circles.add_to_circles(me, ghost_them)
+
+      assert Bonfire.Boundaries.can?(me, :read, post),
+             "control: encircled with no ACL reading the circle, the block denies nothing"
+
+      migration = Bonfire.Boundaries.Scaffold.RemoteBlocksDataMigration
+      migration.base_query() |> repo().all() |> migration.migrate()
+
+      refute Bonfire.Boundaries.can?(me, :read, post)
+      assert Bonfire.Boundaries.can?(neighbour, :read, post)
+
+      assert migration.base_query() |> repo().all() |> Enum.all?(&(&1.id != id(them))),
+             "and once put right, they are not picked up again"
+    end
+  end
+
+  defp receive_block(blocker, blocked) do
+    Blocks.ap_receive_activity(
+      blocker,
+      %{data: %{"type" => "Block"}},
+      %{data: %{"id" => Bonfire.Common.URIs.canonical_url(blocked)}}
+    )
+  end
+
+  # a public post by `actor`, delivered to our inbox
+  defp receive_post(actor) do
+    id = "#{actor}/notes/#{Needle.UID.generate()}"
+    public = ActivityPub.Config.public_uri()
+
+    {:ok, activity} =
+      ActivityPub.Federator.Transformer.handle_incoming(%{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => "Create",
+        "id" => "#{id}/activity",
+        "actor" => actor,
+        "to" => [public],
+        "object" => %{
+          "type" => "Note",
+          "id" => id,
+          "attributedTo" => actor,
+          "content" => "a post",
+          "to" => [public],
+          "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+        }
+      })
+
+    {:ok, post} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(activity)
+    post
   end
 end

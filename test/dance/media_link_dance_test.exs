@@ -9,6 +9,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MediaLinkTest do
 
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
+  alias Bonfire.Federate.ActivityPub.Testing.Tester
+  alias Bonfire.Federate.ActivityPub.Testing.Scenarios
 
   @tag :test_instance
   test "a link/article Media (as created by comments_embed) federates as a link, not an audio file",
@@ -110,44 +112,19 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MediaLinkTest do
     end)
   end
 
-  @tag :test_instance
-  test "a post's image attachment keeps its alt text on the other instance", context do
-    local_user = context[:local][:user]
+  # every tester that can find and show a post
+  @receivers [{Tester.NomadTester, {:dance_instance, :remote}}, Tester.FedifyTester]
 
-    alt = "A sunset over the sea #{System.unique_integer([:positive])}"
-
-    {:ok, media} =
-      Bonfire.Files.upload(
-        Bonfire.Files.ImageUploader,
-        local_user,
-        Bonfire.Files.Simulation.image_file(),
-        %{metadata: %{"alt" => alt, "label" => "beach.png"}}
-      )
-
-    {:ok, post} =
-      Bonfire.Posts.publish(
-        current_user: local_user,
-        boundary: "public",
-        post_attrs: %{
-          post_content: %{html_body: "look at this"},
-          uploaded_media: [media]
-        }
-      )
-
-    canonical_url = Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
-
-    TestInstanceRepo.apply(fn ->
-      Logger.metadata(action: "fetch the post with an image attachment on the remote instance")
-
-      assert {:ok, remote_post} =
-               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
-               |> repo().maybe_preload([:post_content, :media])
-
-      assert [remote_media] = remote_post.media
-
-      assert Bonfire.Files.Media.media_alt(remote_media, false) == alt,
-             "alt text is the whole point of `name` on an AS2 attachment, so it has to survive the round trip"
-    end)
+  # a scenario, us to them (`Testing.Tester`): run once for each receiver
+  for receiver <- @receivers do
+    @tag :test_instance
+    @tag receiver: receiver
+    # ExUnit's own `skip:`, which still applies under `--only test_instance`
+    if reason = Tester.skip_reason(receiver, [:resolve, :find_post]), do: @tag(skip: reason)
+    # real servers' accounts run the same scenario in `live_federation/media_link_live_test.exs`
+    test "#{inspect(receiver)}: a post's image attachment keeps its alt text", context do
+      Scenarios.alt_text(context, Tester.new(context[:receiver], context))
+    end
   end
 
   @tag :test_instance

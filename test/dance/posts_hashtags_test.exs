@@ -1,40 +1,44 @@
 defmodule Bonfire.Federate.ActivityPub.Dance.PostsHashtagsTest do
+  @moduledoc """
+  A public post with hashtags (`Testing.Scenarios.posts_hashtags/3`), run for each pair of sender and receiver here, both ways: us to the dance's other instance and to Fedify's CLI, and the dance's other instance to us. Real servers' accounts run the same scenario in `live_federation/posts_hashtags_live_test.exs`.
+  """
   use Bonfire.Federate.ActivityPub.SharedDataDanceCase, async: false
 
   @moduletag :test_instance
 
-  import Untangle
-  import Bonfire.Common.Config, only: [repo: 0]
-  import Bonfire.Federate.ActivityPub.SharedDataDanceCase
+  alias Bonfire.Federate.ActivityPub.Testing.Tester
+  alias Bonfire.Federate.ActivityPub.Testing.Scenarios
 
-  alias Bonfire.Common.TestInstanceRepo
-  alias Bonfire.Federate.ActivityPub.AdapterUtils
+  @us {Tester.NomadTester, :local}
+  @dance_instance {Tester.NomadTester, {:dance_instance, :remote}}
 
-  alias Bonfire.Posts
-  alias Bonfire.Social.PostContents
-  alias Bonfire.Social.Graph.Follows
+  # who posts, and who finds and shows the post; the GraphQL ones post through our GraphQL API in process, and through the other instance's over HTTP
+  @pairs [
+    {@us, @dance_instance, "us to the dance's other instance"},
+    {@us, Tester.FedifyTester, "us to Fedify"},
+    {@dance_instance, @us, "the dance's other instance to us"},
+    {{Tester.NomadTester, {:graphql, :local}}, @dance_instance,
+     "us, through our GraphQL API, to the dance's other instance"},
+    # disabled until the C2S plan is done (see `Nomad.C2S`): {{Tester.NomadTester, {:c2s, :remote}}, @us, "the dance's other instance, through its ActivityPub client-to-server outbox, to us"},
+    {{Tester.NomadTester, {:graphql, :remote}}, @us,
+     "the dance's other instance, through its GraphQL API over HTTP, to us"}
+  ]
 
-  @tag :test_instance
-  test "can make a public post with hashtags, and fetch it",
-       context do
-    user = context[:local][:user]
+  for {sender, receiver, direction} <- @pairs do
+    @tag :test_instance
+    @tag sender: sender, receiver: receiver
+    # ExUnit's own `skip:`, which still applies under `--only test_instance`
+    if reason =
+         Tester.skip_reason(sender, [:post, :uri_of]) ||
+           Tester.skip_reason(receiver, [:resolve, :find_post]),
+       do: @tag(skip: reason)
 
-    Logger.metadata(action: "create local post 1")
-    attrs = %{post_content: %{html_body: "test content one with hashtags #elixir #bonfire"}}
-    {:ok, post} = Posts.publish(current_user: user, post_attrs: attrs, boundary: "public")
-
-    canonical_url =
-      Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
-      |> info("canonical_url")
-
-    TestInstanceRepo.apply(fn ->
-      Logger.metadata(action: "fetch post 1 by canonical_url")
-
-      assert {:ok, object} =
-               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
-               |> repo().maybe_preload(:post_content)
-
-      assert object.post_content.html_body =~ "test content one with hashtags"
-    end)
+    test "#{direction}: finds a public post, and shows its text and hashtags", context do
+      Scenarios.posts_hashtags(
+        context,
+        Tester.new(context[:sender], context),
+        Tester.new(context[:receiver], context)
+      )
+    end
   end
 end

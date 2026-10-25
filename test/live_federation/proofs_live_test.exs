@@ -7,7 +7,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.ProofsLiveTest do
 
   What arrives and what we send are read through `ActivityPub.Observer`, as nothing else keeps a document as it was on the wire.
 
-  Whether a server relies on our proof when it cannot rely on the HTTP signature (a forwarded reply) is `dance/inbox_forwarding_live_dance_test.exs`.
+  Whether a server relies on our proof when it cannot rely on the HTTP signature (a forwarded reply) is `inbox_forwarding_live_test.exs`.
 
   It needs an account on each server and a bore tunnel, so the server can fetch our actor back. Put the URL and an access token (scopes `read`, `write`, `follow`) in the git-ignored `.env`, one pair per server, and run it through the tunnel recipe:
 
@@ -37,7 +37,7 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.ProofsLiveTest do
   # {server, whether it signs the activities it delivers with proofs}: the FEP-8b32 implementations with a Mastodon-compatible API to drive them (the FEP lists Mastodon for verification only; Mitra signs "all outgoing activities", not the objects it serves on a fetch, `FEDERATION.md`)
   @servers [{"mitra", true}, {"mastodon", false}]
 
-  # the servers whose inbox refuses a delivery with no valid HTTP signature before reading it, whatever proof it carries: Mastodon (`require_actor_signature!`, 401 "Request not signed", seen 24 October), whose proof check is tested by a forward instead (`dance/inbox_forwarding_live_dance_test.exs`)
+  # the servers whose inbox refuses a delivery with no valid HTTP signature before reading it, whatever proof it carries: Mastodon (`require_actor_signature!`, 401 "Request not signed", seen 24 October), whose proof check is tested by a forward instead (`inbox_forwarding_live_test.exs`)
   @needs_http_signature ["mastodon"]
 
   setup do

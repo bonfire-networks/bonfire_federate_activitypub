@@ -545,17 +545,21 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
       previous_pointer_id = e(object, :pointer_id, nil)
 
+      # a placeholder that replies to it are threaded under (`AdapterUtils.get_or_create_placeholder/1`): it is created under that id, so they stay where they are
+      placeholder_id = if !local?, do: AdapterUtils.placeholder_id(ap_id)
+
       pointer_id =
-        if local? do
-          debug("activity is local (prob processed via C2S)")
+        placeholder_id ||
+          if local? do
+            debug("activity is local (prob processed via C2S)")
 
-          # TODO: better architecture, maybe updating these instead of deleting?
+            # TODO: better architecture, maybe updating these instead of deleting?
 
-          if pointer_id = AdapterUtils.pointer_id_from_url(ap_id) do
-            # set pointer ID to the same one as was initially created in AP db
-            pointer_id
-          end
-        end ||
+            if pointer_id = AdapterUtils.pointer_id_from_url(ap_id) do
+              # set pointer ID to the same one as was initially created in AP db
+              pointer_id
+            end
+          end ||
           with published when is_binary(published) <-
                  e(object, :data, "published", nil) || e(activity, :data, "published", nil) do
             DatesTimes.generate_ulid_if_past(published)
@@ -572,6 +576,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
       # A local C2S activity is not federated by `ActivityPub.create/2` (which skips `maybe_federate` when `from_c2s`), so it has to be published from here, but it still needs a local object first: the `ActivityPub.Object` stored by `Object.insert` is not a pointable and never reaches a feed.
       publish_after_create? = local? and module == fallback_module
+
+      if placeholder_id, do: prepare_placeholder_fill(placeholder_id)
 
       with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
              Utils.maybe_apply(
@@ -598,6 +604,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
           "AP - created object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
         )
 
+        if placeholder_id == pointable_object_id, do: fill_placeholder(placeholder_id, type)
+
         link_ap_object(object, pointable_object_id,
           activity: activity,
           ap_id: ap_id,
@@ -606,6 +614,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         )
 
         maybe_apply_comments_enabled(character, object, pointable_object_id)
+
+        # replies that reached us before this object did, now that it is linked to its AP object
+        Utils.maybe_apply(Bonfire.Social.Threads, :adopt_orphaned_replies, [
+          pointable_object,
+          object
+        ])
 
         if publish_after_create? do
           info("Local C2S activity handled by the fallback module, federating it now")
@@ -616,10 +630,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       else
         {:ok, :skipped} ->
           debug(ap_id, "AP - object skipped (no Bonfire record needed)")
+          if placeholder_id, do: restore_placeholder(placeholder_id)
           {:ok, :skipped}
 
         e ->
           debug(e, "Could not create object")
+          if placeholder_id, do: restore_placeholder(placeholder_id)
 
           error(
             "Could not create object for #{ap_id}: #{Types.to_string_or_inspect(Errors.error_msg(e))}"
@@ -742,6 +758,36 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
     {:no_federation_module_match, :ignore}
+  end
+
+  # Before the object is created under its placeholder's id: the object gets a `Replied` of its own in the placeholder's place, and the pointer is undeleted now rather than once it is created, as whoever is shown it as it is created (`Bonfire.Social.LivePush`, which runs in its creation) checks it exists
+  defp prepare_placeholder_fill(id) do
+    import Ecto.Query
+
+    Utils.maybe_apply(Bonfire.Social.Threads, :unplace_placeholder, [id])
+
+    from(p in Needle.Pointer, where: p.id == ^id)
+    |> repo().update_all(set: [deleted_at: nil])
+  end
+
+  # its creation failed, so it is a placeholder again (soft-deleted, which only hard-deletes a row of its `APActivity` type, of which it has none), standing where it can without knowing its thread
+  defp restore_placeholder(id) do
+    import Ecto.Query
+
+    from(p in Needle.Pointer, where: p.id == ^id)
+    |> repo().update_all(set: [deleted_at: DateTime.utc_now()])
+
+    Utils.maybe_apply(Bonfire.Social.Threads, :place_placeholder, [id])
+  end
+
+  # the object is created under its placeholder's id, whose pointer the creation keeps as it was (Needle's insert triggers do `on conflict do nothing` on it): so it is repointed to the object's type here, and what in its thread depends on where it landed is put right
+  defp fill_placeholder(id, type) do
+    import Ecto.Query
+
+    from(p in Needle.Pointer, where: p.id == ^id)
+    |> repo().update_all(set: [table_id: Needle.Tables.id!(type)])
+
+    Utils.maybe_apply(Bonfire.Social.Threads, :placeholder_filled, [id])
   end
 
   @doc """
