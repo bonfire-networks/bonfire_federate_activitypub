@@ -32,6 +32,11 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
           transform_keys: &String.capitalize/1
         )
 
+    # Env vars that existed before `incoming_signatures` (see `ActivityPub.Safety`), each setting its key only when it is set, over the defaults in ember's `activity_pub.exs`
+    # a delivery with no signature of any kind, which its origin does not serve either, is accepted with ACCEPT_UNSIGNED_ACTIVITIES=1
+    if System.get_env("ACCEPT_UNSIGNED_ACTIVITIES") == "1" do
+      config :activity_pub, :incoming_signatures, unsigned: :accept
+    end
     # Record every document a remote sends us verbatim, pushed or fetched, for interop research — see `Testing.Interop.capture/2`.
     # Writes unbounded amounts of other instances' traffic to disk, so it stays a dev/test tool: gated on the same `:env` check that decides whether `Testing.Interop` is compiled at all, so the two can't disagree, and off even there unless explicitly asked for.
     if @env in [:test, :dev] and

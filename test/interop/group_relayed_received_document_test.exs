@@ -114,6 +114,21 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
     |> sign(key)
   end
 
+  # the post's origin answers 404 for it (the setup's catch-all), which confirms the deletion
+  defp signed_delete(%{key: key, group_ap_id: group_ap_id, incoming: incoming}, actor \\ @author) do
+    %{
+      "@context" => @context,
+      "id" => "#{@post}/delete/#{System.unique_integer([:positive])}",
+      "type" => "Delete",
+      "actor" => actor,
+      "to" => incoming["to"],
+      "cc" => incoming["cc"],
+      "audience" => group_ap_id,
+      "object" => @post
+    }
+    |> sign(key, verification_method: @author <> "#ed25519-key")
+  end
+
   test "the group announces a member's signed edit with the document as it reached us", context do
     update = signed_update(context)
     assert {:ok, _} = delivered(update, @author)
@@ -135,5 +150,26 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
 
     refute_received {:published, "Announce", _},
                     "the group passed on an edit it refused"
+  end
+
+  test "the group announces a member's signed delete with the document as it reached us",
+       context do
+    delete = signed_delete(context)
+    assert {:ok, _} = delivered(delete, @author)
+
+    # the received document is used only when it is the stored activity, so it must keep the author's id
+    assert {:ok, %{data: %{"type" => "Delete"}}} =
+             ActivityPub.Object.get_cached(ap_id: delete["id"])
+
+    assert_received {:published, "Announce", ^delete},
+                    "the group's Announce goes out without the author's document, so its followers get our normalised copy, which the author's proof does not cover"
+  end
+
+  test "the group does not announce a delete of the post by someone else", context do
+    delete = signed_delete(context, @stranger)
+    delivered(delete, @stranger)
+
+    refute_received {:published, "Announce", _},
+                    "the group passed on a delete it refused"
   end
 end
