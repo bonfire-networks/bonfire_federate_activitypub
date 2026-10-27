@@ -3,8 +3,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ProofsTest do
   FEP-8b32 across a real federation: how the receiving instance stores what the other instance sent (the `authenticated` column of `ap_object`).
 
     * a post FETCHED by its id is `fetched`
-    * a post DELIVERED with a valid HTTP signature is `http_signature`, like the `Create` around it, whether or not it carries a proof: the proof is only looked at when the HTTP signature cannot be relied on
-    * a post DELIVERED with no valid HTTP signature and a proof is `integrity_proof`, which is how a forwarded copy is authenticated
+    * a post DELIVERED with a valid HTTP signature and no proof is `http_signature`, like the `Create` around it
+    * a post DELIVERED with a proof that holds is `integrity_proof`, with or without a valid HTTP signature: the proof is checked at receipt (FEP-8b32: recipients SHOULD verify), and is what still vouches for the post wherever it is passed on; without an HTTP signature it is how a forwarded copy is authenticated
     * a post DELIVERED with neither is vouched for by nobody
 
   Both instances run in one VM, so the `sign_object_integrity_proofs` setting and the patch that takes the HTTP signature off are the sender's and the receiver's alike; they only change what is SENT.
@@ -26,7 +26,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.ProofsTest do
   # {name, sent with an HTTP signature, sent with a proof, the post as stored, the `Create` as stored}
   @deliveries [
     {"HTTP signature, no proof", true, false, :http_signature, :http_signature},
-    {"HTTP signature and proof", true, true, :http_signature, :http_signature},
+    {"HTTP signature and proof", true, true, :integrity_proof, :integrity_proof},
     {"proof, no HTTP signature", false, true, :integrity_proof, :integrity_proof},
     {"neither", false, false, :fetched, :fetched}
   ]
