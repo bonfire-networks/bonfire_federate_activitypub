@@ -419,7 +419,8 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       # debug(feed_entry)
     end
 
-    test "creates a Post for an incoming Note with the Note's published date" do
+    # dated by `ActivityPub.Utils.published_at/2`: what we fetched from its origin keeps its date however old; a delivery only within a range, so a sender cannot float or bury a post with a date it chose
+    test "creates a Post for a Note fetched from its origin with the Note's published date, however old" do
       {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
@@ -431,7 +432,7 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
 
       params = remote_activity_json(actor, to)
 
-      {:ok, activity} = ActivityPub.create(params)
+      {:ok, activity} = ActivityPub.create(params, already_fetched: true)
 
       assert actor.data["id"] == activity.data["actor"]
       assert params.object["content"] == activity.object.data["content"]
@@ -456,6 +457,23 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
         |> String.replace(".000", "")
 
       assert date == params.object["published"]
+    end
+
+    test "creates a Post for a Note delivered with an old published date dated when it was received" do
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      recipient = fake_user!()
+      recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
+
+      params = remote_activity_json(actor, [recipient_actor, ActivityPub.Config.public_uri()])
+
+      {:ok, activity} = ActivityPub.create(params, from_inbox: true)
+
+      assert {:ok, post} = {:ok, activity.pointer}
+
+      date = DatesTimes.date_from_pointer(post.id)
+
+      assert abs(DateTime.diff(date, DateTime.utc_now(), :millisecond)) < to_timeout(minute: 1),
+             "dated #{inspect(date)}, not when received, for a delivery published #{params.object["published"]}"
     end
 
     test "creates a reply for an incoming note" do

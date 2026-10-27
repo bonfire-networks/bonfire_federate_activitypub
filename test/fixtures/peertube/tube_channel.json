@@ -1,0 +1,73 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "RsaSignature2017": "https://w3id.org/security#RsaSignature2017"
+    },
+    {
+      "discoverable": "toot:discoverable",
+      "email": "sc:email",
+      "indexable": "toot:indexable",
+      "lemmy": "https://join-lemmy.org/ns#",
+      "playerSettings": "pt:playerSettings",
+      "playlists": {
+        "@id": "pt:playlists",
+        "@type": "@id"
+      },
+      "postingRestrictedToMods": "lemmy:postingRestrictedToMods",
+      "pt": "https://joinpeertube.org/ns#",
+      "sc": "http://schema.org/",
+      "support": {
+        "@id": "pt:support",
+        "@type": "sc:Text"
+      },
+      "toot": "http://joinmastodon.org/ns#"
+    }
+  ],
+  "attributedTo": [
+    "https://tube.tchncs.local/accounts/bonfirenetworks"
+  ],
+  "discoverable": true,
+  "email": null,
+  "endpoints": {
+    "sharedInbox": "https://tube.tchncs.local/inbox"
+  },
+  "followers": "https://tube.tchncs.local/video-channels/bonfire/followers",
+  "following": "https://tube.tchncs.local/video-channels/bonfire/following",
+  "id": "https://tube.tchncs.local/video-channels/bonfire",
+  "inbox": "https://tube.tchncs.local/video-channels/bonfire/inbox",
+  "indexable": true,
+  "name": "Bonfire",
+  "outbox": "https://tube.tchncs.local/video-channels/bonfire/outbox",
+  "playerSettings": "https://tube.tchncs.local/video-channels/bonfire/player-settings",
+  "playlists": "https://tube.tchncs.local/video-channels/bonfire/playlists",
+  "postingRestrictedToMods": true,
+  "preferredUsername": "bonfire",
+  "publicKey": {
+    "id": "https://tube.tchncs.local/video-channels/bonfire#main-key",
+    "owner": "https://tube.tchncs.local/video-channels/bonfire",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAusN1vAcco/14apy/7gjU\nE71qHrMiBI+LAtnx0JfTfDyX+m+2QyaPNae/XuXcoWmZxwx80adtIwHaqOar9vJ+\nMbMBycSoB4rCvYaSpAdy7YPKqnanUZcFd05J4zbh9xfvD6IHx4GVQlbAcKxt33Kc\n3/R68b5D2YbV4KdDAlOoYa+ThQtsqkGTT0/5tk3VgP+B+fbsRfNSGbqrcuFwk9TS\noaBqYeKgtmbpmd0x6WTNMbmFLsdH4xR9ZRsgdo0B+dtg+FeCQ/iuMjEO+/R7N8sL\nZzNUNaaKymlFE2fiyg4FXeVyxvtXxllmrO3NeUqIkFK5zoXtGXPXIY3jdWe6oV0I\nSwIDAQAB\n-----END PUBLIC KEY-----"
+  },
+  "published": "2022-06-24T19:42:43.307Z",
+  "summary": null,
+  "support": null,
+  "type": "Group",
+  "url": [
+    {
+      "href": "https://tube.tchncs.local/c/bonfire/videos",
+      "mediaType": "text/html",
+      "type": "Link"
+    },
+    {
+      "href": "https://tube.tchncs.local/c/bonfire",
+      "mediaType": "text/html",
+      "type": "Link"
+    },
+    {
+      "href": "https://tube.tchncs.local/video-channels/bonfire",
+      "mediaType": "text/html",
+      "type": "Link"
+    }
+  ]
+}

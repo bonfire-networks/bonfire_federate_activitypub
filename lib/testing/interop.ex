@@ -269,12 +269,14 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     defp incoming(filters, since), do: activities(false, filters, since)
 
     defp activities(local?, filters, since) do
+      # `updated_at`: when it was stored (`inserted_at` is when it happened)
       from(o in Object,
-        where: o.local == ^local? and o.inserted_at >= ^since,
+        where: o.local == ^local? and o.updated_at >= ^since,
         order_by: [desc: o.id],
         limit: 100
       )
-      |> repo().all()
+      # through `Object.many/1`, so a row stored as it arrived comes with its data merged
+      |> Object.many()
       |> Enum.find(&matches?(&1.data, filters))
     end
 

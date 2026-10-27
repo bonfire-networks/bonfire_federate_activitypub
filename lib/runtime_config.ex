@@ -37,6 +37,7 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
     if System.get_env("ACCEPT_UNSIGNED_ACTIVITIES") == "1" do
       config :activity_pub, :incoming_signatures, unsigned: :accept
     end
+
     # Record every document a remote sends us verbatim, pushed or fetched, for interop research — see `Testing.Interop.capture/2`.
     # Writes unbounded amounts of other instances' traffic to disk, so it stays a dev/test tool: gated on the same `:env` check that decides whether `Testing.Interop` is compiled at all, so the two can't disagree, and off even there unless explicitly asked for.
     if @env in [:test, :dev] and

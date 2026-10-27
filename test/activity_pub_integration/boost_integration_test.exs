@@ -205,6 +205,89 @@ defmodule Bonfire.Federate.ActivityPub.BoostIntegrationTest do
              )
     end
 
+    # a repeat boost from another instance is decided by the same rule as a local one (`can_reboost_after`): not discarded on receipt as a duplicate while the first boost stands
+    defp remote_reboost_setup do
+      user = fake_user!()
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: user,
+          post_attrs: %{post_content: %{html_body: "content"}},
+          boundary: "public"
+        )
+
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      {:ok, actor} =
+        ActivityPub.Actor.get_cached_or_fetch(ap_id: "https://mocked.local/users/karen")
+
+      {:ok, booster} = Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(actor)
+
+      announce = fn n ->
+        ActivityPub.Federator.Transformer.handle_incoming(
+          %{
+            "id" => "#{actor.ap_id}/announces/#{System.unique_integer([:positive])}-#{n}",
+            "type" => "Announce",
+            "actor" => actor.ap_id,
+            "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+            "object" => ap_activity.object.data["id"]
+          },
+          from_inbox: true,
+          authenticated: :http_signature,
+          signed_by: actor.ap_id
+        )
+      end
+
+      %{post: post, booster: booster, announce: announce}
+    end
+
+    test "a remote reboost is received when this instance allows reboosts" do
+      context = remote_reboost_setup()
+      Process.put([:bonfire_social, Bonfire.Social.Boosts, :can_reboost_after], true)
+
+      assert {:ok, %{data: %{"id" => first_id}}} = context.announce.(1)
+      assert 1 == Boosts.count(context.booster, context.post), "control: the first boost landed"
+
+      # received longer ago than `duplicate_announce_window`, within which a second one is taken as a remote's duplicate copy
+      repo().update_all(
+        from(o in ActivityPub.Object, where: fragment("(?)->>'id' = ?", o.data, ^first_id)),
+        set: [
+          updated_at:
+            NaiveDateTime.add(NaiveDateTime.utc_now(), -to_timeout(hour: 1), :millisecond)
+        ]
+      )
+
+      context.announce.(2)
+
+      assert 2 == Boosts.count(context.booster, context.post),
+             "the reboost was discarded on receipt as a duplicate"
+    end
+
+    test "a second remote boost right after the first is a duplicate copy, even where reboosts are always allowed" do
+      context = remote_reboost_setup()
+      Process.put([:bonfire_social, Bonfire.Social.Boosts, :can_reboost_after], true)
+
+      assert {:ok, _} = context.announce.(1)
+      assert 1 == Boosts.count(context.booster, context.post), "control: the first boost landed"
+
+      context.announce.(2)
+
+      assert 1 == Boosts.count(context.booster, context.post),
+             "a copy within the window was taken as a reboost"
+    end
+
+    test "a remote reboost is not a second boost when this instance does not allow reboosts" do
+      context = remote_reboost_setup()
+      Process.put([:bonfire_social, Bonfire.Social.Boosts, :can_reboost_after], false)
+
+      assert {:ok, _} = context.announce.(1)
+      assert 1 == Boosts.count(context.booster, context.post), "control: the first boost landed"
+
+      context.announce.(2)
+
+      assert 1 == Boosts.count(context.booster, context.post)
+    end
+
     test "unboost receiving works" do
       user = fake_user!()
 

@@ -1034,7 +1034,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       ids ->
         ActivityPub.Object.query(ap_id: ids)
-        |> repo().many()
+        # through `Object.many/1`, so a row stored as it arrived (`data_received`) comes with its data merged
+        |> ActivityPub.Object.many()
         |> repo().maybe_preload(:pointer)
         |> Map.new(fn object -> {e(object, :data, "id", nil), object} end)
     end

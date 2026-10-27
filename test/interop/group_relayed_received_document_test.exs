@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
   @moduledoc """
   A member of a REMOTE instance acts on a post in one of OUR groups, with an activity their server signed (FEP-8b32), and the group announces it to its followers (FEP-1b12). A follower elsewhere can rely on the activity inside only if the author's proof still verifies, so the group must pass on the document exactly as it reached us, not the copy we normalised and stored.
 
-  The library carries that document with the delivery (`data_received`) and sends it as the Announce's object (its own tests check the bytes); what this checks is the adapter's part: that what reached our inbox is what the group's Announce is published with, through `AdapterUtils.announce_by_group/2`. And that an activity the group refuses is not announced at all.
+  The library keeps that document with the activity's row (`data_received`, when its proof holds) and sends it as the Announce's object (its own tests check the bytes); what this checks is the adapter's part: that the group announces it, through `AdapterUtils.announce_by_group/2`, with the document as it reached us held for it, and, for a post, that each shape the group sends carries the `Create` as it reached us. And that an activity the group refuses is not announced at all.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
   use Repatch.ExUnit
@@ -61,11 +61,11 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
     # the post, in the group
     assert {:ok, _} = Transformer.handle_incoming(incoming)
 
-    # what is published, and with what document as the Announce's object
+    # what is published
     test_pid = self()
 
     Repatch.patch(ActivityPub.Federator, :publish, [mode: :shared], fn activity, opts ->
-      send(test_pid, {:published, activity.data["type"], opts[:data_received]})
+      send(test_pid, {:published, activity})
       Repatch.real(ActivityPub.Federator.publish(activity, opts))
     end)
 
@@ -85,6 +85,30 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
       },
       :verified
     )
+  end
+
+  # a new post by the member to the group, signed by its author
+  defp signed_create(%{key: key, incoming: incoming}) do
+    n = System.unique_integer([:positive])
+
+    incoming
+    |> Map.put("id", "https://lemmy.local/activities/create/#{n}")
+    |> put_in(["object", "id"], "#{@post}#{n}")
+    |> sign(key, verification_method: @author <> "#ed25519-key")
+  end
+
+  # the group announced something
+  defp announced do
+    assert_received {:published, %{data: %{"type" => "Announce"}} = announce}
+    announce
+  end
+
+  # the activity's row holds it as it reached us, which is what the library sends as the Announce's object
+  defp held_as_received?(document) do
+    {:ok, %ActivityPub.Object{data_received: received}} =
+      ActivityPub.Object.get_cached(ap_id: document["id"])
+
+    received == document
   end
 
   defp signed_update(%{key: key, group_ap_id: group_ap_id, incoming: incoming}, actor \\ @author) do
@@ -129,26 +153,55 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
     |> sign(key, verification_method: @author <> "#ed25519-key")
   end
 
+  test "the group announces a member's signed post with the Create as it reached us, in each shape it sends",
+       context do
+    create = signed_create(context)
+    assert {:ok, _} = delivered(create, @author)
+    announce = announced()
+
+    # a follower elsewhere, so there is an inbox to prepare for
+    {:ok, group} = ActivityPub.Actor.get_cached(ap_id: context.group_ap_id)
+    announce = %{announce | data: Map.update(announce.data, "cc", [@stranger], &[@stranger | &1])}
+
+    creates =
+      for %{json: json} <-
+            ActivityPub.Federator.APPublisher.prepare_publish_params(group, announce),
+          %{"object" => %{"type" => "Create"} = inner} <- [Jason.decode!(json)],
+          do: inner
+
+    assert creates != [], "no shape carried the Create"
+
+    for inner <- creates,
+        do:
+          assert(
+            inner == create,
+            "the Create goes out as we normalised it, which its proof does not cover"
+          )
+  end
+
   test "the group announces a member's signed edit with the document as it reached us", context do
     update = signed_update(context)
     assert {:ok, _} = delivered(update, @author)
 
-    assert_received {:published, "Announce", ^update},
-                    "the group's Announce goes out without the author's document, so its followers get our normalised copy, which the author's proof does not cover"
+    announced()
+
+    assert held_as_received?(update),
+           "the group's Announce goes out without the author's document, so its followers get our normalised copy, which the author's proof does not cover"
   end
 
   test "the group announces a member's signed like with the document as it reached us", context do
     like = signed_like(context)
     assert {:ok, _} = delivered(like, @author)
 
-    assert_received {:published, "Announce", ^like}
+    announced()
+    assert held_as_received?(like)
   end
 
   test "the group does not announce an edit of the post by someone else", context do
     update = signed_update(context, @stranger)
     delivered(update, @stranger)
 
-    refute_received {:published, "Announce", _},
+    refute_received {:published, %{data: %{"type" => "Announce"}}},
                     "the group passed on an edit it refused"
   end
 
@@ -161,15 +214,17 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
     assert {:ok, %{data: %{"type" => "Delete"}}} =
              ActivityPub.Object.get_cached(ap_id: delete["id"])
 
-    assert_received {:published, "Announce", ^delete},
-                    "the group's Announce goes out without the author's document, so its followers get our normalised copy, which the author's proof does not cover"
+    announced()
+
+    assert held_as_received?(delete),
+           "the group's Announce goes out without the author's document, so its followers get our normalised copy, which the author's proof does not cover"
   end
 
   test "the group does not announce a delete of the post by someone else", context do
     delete = signed_delete(context, @stranger)
     delivered(delete, @stranger)
 
-    refute_received {:published, "Announce", _},
+    refute_received {:published, %{data: %{"type" => "Announce"}}},
                     "the group passed on a delete it refused"
   end
 end

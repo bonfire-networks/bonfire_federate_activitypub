@@ -71,7 +71,7 @@ defmodule Bonfire.Federate.ActivityPub.MissingParentThreadUITest do
       conn
       |> visit(discussion_path(opener))
       |> wait_async()
-      |> open_browser()
+      # |> open_browser()
       |> assert_has("[data-id=object_body]", text: "The opening post")
       |> assert_has("[data-role=comment-not-fetched]")
       |> assert_has("[data-id=object_body]", text: "A reply to the post we could not fetch")
@@ -86,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.MissingParentThreadUITest do
     # shown in the open thread as it arrives, in its slot's place
     session
     |> assert_has("[data-id=object_body]", text: "The reply we could not fetch", timeout: 3000)
-    |> open_browser()
+    # |> open_browser()
     |> refute_has("[data-role=comment-not-fetched]", timeout: 3000)
     |> assert_has("[data-id=object_body]", text: "A reply to the post we could not fetch")
     |> assert_has("[data-id=object_body]", text: "A reply to that reply")
@@ -116,7 +116,7 @@ defmodule Bonfire.Federate.ActivityPub.MissingParentThreadUITest do
       conn
       |> visit(discussion_path(opener))
       |> wait_async()
-      |> open_browser()
+      # |> open_browser()
       |> assert_has("[data-id=object_body]", text: "Nested: the opening post")
       |> assert_has("[data-role=comment-not-fetched]", count: 1)
       |> assert_has("[data-id=object_body]", text: "Nested: the reply we received")
@@ -132,7 +132,7 @@ defmodule Bonfire.Federate.ActivityPub.MissingParentThreadUITest do
       text: "Nested: the second reply we could not fetch",
       timeout: 3000
     )
-    |> open_browser()
+    # |> open_browser()
     |> assert_has("[data-role=comment-not-fetched]", count: 1)
     |> assert_has("[data-id=object_body]", text: "Nested: the reply we received")
     # x's server answers now
@@ -147,7 +147,7 @@ defmodule Bonfire.Federate.ActivityPub.MissingParentThreadUITest do
       text: "Nested: the first reply we could not fetch",
       timeout: 3000
     )
-    |> open_browser()
+    # |> open_browser()
     |> refute_has("[data-role=comment-not-fetched]", timeout: 3000)
     |> assert_has("[data-id=object_body]", text: "Nested: the second reply we could not fetch")
     |> assert_has("[data-id=object_body]", text: "Nested: the reply we received")

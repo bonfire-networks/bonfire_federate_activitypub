@@ -58,6 +58,32 @@ defmodule Bonfire.Federate.ActivityPub.DeletedActorWebTest do
            "the tombstone outlived the archive, so the restored group still reads as gone"
   end
 
+  test "a deleted user is served as a Tombstone by username and by id" do
+    user = fake_user!()
+
+    # the actor exists for AP before it is deleted, as it does for any user a peer has fetched
+    assert {:ok, %{username: username}} = ActivityPub.Actor.get_cached(pointer: user)
+
+    assert %{"type" => "Person"} = fetch_actor_json("/pub/person/#{id(user)}"),
+           "control: before deletion the id URL serves the user"
+
+    Oban.Testing.with_testing_mode(:inline, fn ->
+      assert {:ok, _} = Bonfire.Me.Users.enqueue_delete(user)
+    end)
+
+    assert %{"type" => "Tombstone"} = fetch_actor_json("/pub/actors/#{username}"),
+           "the username URL, which a peer holding the username form fetches, answered something other than the tombstone"
+
+    # holds only if a deleted user keeps its pointer row, as a deleted group does: today the row is deleted, which sets the tombstone's `pointer_id` to null, so the id URL finds the tombstone by its AP id instead
+    # user_id = id(user)
+    # assert {:ok, %{data: %{"type" => "Tombstone"}, pointer_id: ^user_id}} =
+    #          ActivityPub.Object.get_uncached(ap_id: ap_id),
+    #        "the tombstone is not linked to the user's id"
+
+    assert %{"type" => "Tombstone"} = fetch_actor_json("/pub/person/#{id(user)}"),
+           "the id URL, which is the actor's AP id for actors created since the ULID cutoff, answered something other than the tombstone, so a peer holding it never learns the user is gone"
+  end
+
   test "a deleted group is served as a Tombstone by username and by id" do
     creator = fake_user!()
     group = federated_group!(creator)

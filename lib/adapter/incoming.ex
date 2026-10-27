@@ -561,8 +561,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
             end
           end ||
           with published when is_binary(published) <-
-                 e(object, :data, "published", nil) || e(activity, :data, "published", nil) do
-            DatesTimes.generate_ulid_if_past(published)
+                 e(object, :data, "published", nil) || e(activity, :data, "published", nil),
+               # dated by the same rule as its AP row (`ActivityPub.Utils.published_at/2`): one we fetched from its origin keeps its date however old, one delivered to us only within a range, so a sender cannot float or bury a post with a date it chose
+               %DateTime{} = date <-
+                 ActivityPub.Utils.published_at(published, received_as(activity, object)) do
+            DatesTimes.generate_ulid(date)
             # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
           else
             _ -> nil
@@ -646,6 +649,17 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     end
   end
 
+  # how a remote post reached us, for `ActivityPub.Utils.published_at/2`: fetched from its origin (its AP copy, or the activity's, marked so), else delivered
+  # fetched from its origin, or vouched for by its author's own proof or LD signature: either way its date is the author's word, as `ActivityPub.Utils.arrival/3` has it for the AP row
+  defp received_as(activity, object) do
+    if Enum.any?(
+         [e(object, :authenticated, nil), e(activity, :authenticated, nil)],
+         &(&1 in [:fetched, :integrity_proof, :ld_signature])
+       ),
+       do: :fetched,
+       else: :delivered
+  end
+
   defp handle_activity_with(
          {:ok, module},
          character,
@@ -666,6 +680,44 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              fallback_fun: &no_federation_module_match/2
            ) do
       {:ok, pointable_object}
+    end
+  end
+
+  # An `Update` of something with no AP row: pruned, or never seen (eg. PeerTube's `Update{Video}`, sent each time a video gets views, for a video we never fetched). The module updates what we hold for its AP id, found as the module would find a pruned post (`AdapterUtils.pointer_id_from_ap_object/1`). When we hold nothing it is a first sighting, made once under the same lock as a `Create` (`create_unless_exists/5`): before, each such `Update` made another copy, as nothing was stored for the next one to find. Made only from its owner, as an `Update` reaches here without the lib's checks on what it embeds
+  defp handle_activity_with(
+         {:ok, module},
+         character,
+         %{data: %{"type" => "Update"} = activity_data} = activity,
+         %{data: %{"id" => ap_id} = object_data} = object
+       )
+       # an embedded object reaches here as a plain map, with no `pointer_id` key at all
+       when is_atom(module) and not is_nil(module) and is_binary(ap_id) and
+              (not is_map_key(object, :pointer_id) or
+                 :erlang.map_get(:pointer_id, object) == nil) do
+    case AdapterUtils.pointer_id_from_ap_object(object) do
+      pointer_id when is_binary(pointer_id) ->
+        # with its id, so the clause below handles it
+        handle_activity_with(
+          {:ok, module},
+          character,
+          activity,
+          Map.put(object, :pointer_id, pointer_id)
+        )
+
+      _ ->
+        if activity_data["actor"] in owner_ids(object_data) do
+          Utils.with_lock({__MODULE__, :ingest, ap_id}, fn ->
+            create_unless_exists(
+              ap_id,
+              module,
+              character,
+              Map.update!(activity, :data, &Map.put(&1, "type", "Create")),
+              object
+            )
+          end)
+        else
+          error(ap_id, "an Update of something we do not hold, from someone other than its owner")
+        end
     end
   end
 
@@ -758,6 +810,14 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     # error(activity, "AP - no module defined to handle_activity_with activity")
     # error(object, "AP - no module defined to handle_activity_with object")
     {:no_federation_module_match, :ignore}
+  end
+
+  # who an object names as its owners: a PeerTube video names its account and its channel
+  defp owner_ids(object_data) do
+    (object_data["attributedTo"] || object_data["actor"])
+    |> List.wrap()
+    |> Enum.map(&ActivityPub.Object.get_ap_id/1)
+    |> Enum.reject(&is_nil/1)
   end
 
   # Before the object is created under its placeholder's id: the object gets a `Replied` of its own in the placeholder's place, and the pointer is undeleted now rather than once it is created, as whoever is shown it as it is created (`Bonfire.Social.LivePush`, which runs in its creation) checks it exists

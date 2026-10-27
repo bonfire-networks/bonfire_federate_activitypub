@@ -1,0 +1,66 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "RsaSignature2017": "https://w3id.org/security#RsaSignature2017"
+    },
+    {
+      "discoverable": "toot:discoverable",
+      "email": "sc:email",
+      "indexable": "toot:indexable",
+      "lemmy": "https://join-lemmy.org/ns#",
+      "playerSettings": "pt:playerSettings",
+      "playlists": {
+        "@id": "pt:playlists",
+        "@type": "@id"
+      },
+      "postingRestrictedToMods": "lemmy:postingRestrictedToMods",
+      "pt": "https://joinpeertube.org/ns#",
+      "sc": "http://schema.org/",
+      "support": {
+        "@id": "pt:support",
+        "@type": "sc:Text"
+      },
+      "toot": "http://joinmastodon.org/ns#"
+    }
+  ],
+  "discoverable": true,
+  "endpoints": {
+    "sharedInbox": "https://tube.tchncs.local/inbox"
+  },
+  "followers": "https://tube.tchncs.local/accounts/bonfirenetworks/followers",
+  "following": "https://tube.tchncs.local/accounts/bonfirenetworks/following",
+  "id": "https://tube.tchncs.local/accounts/bonfirenetworks",
+  "inbox": "https://tube.tchncs.local/accounts/bonfirenetworks/inbox",
+  "indexable": true,
+  "name": "Bonfire",
+  "outbox": "https://tube.tchncs.local/accounts/bonfirenetworks/outbox",
+  "playlists": "https://tube.tchncs.local/accounts/bonfirenetworks/playlists",
+  "preferredUsername": "bonfirenetworks",
+  "publicKey": {
+    "id": "https://tube.tchncs.local/accounts/bonfirenetworks#main-key",
+    "owner": "https://tube.tchncs.local/accounts/bonfirenetworks",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArUm4A/y2gb+Y8/jaGSZW\naUTgqgnjtCnKXEuQiPUtvyGuFGZwWpbLk/k4PIa9gzyXk0+9yisKEezO8F/iyL5h\nmx1bGV+c6ihxdrK4oBCA3NzWVYiJmvBY0W+1969bi9rKTao1OHnpwHQ8WfsENqbi\nwNNZkwrSE0PXzsS9kqEgemPRkEH1KljOneiwI7oWEGWcN7FQYoFMtXmeUiY9mbyh\nLrmESNrEm+4yb0PbhfoWO2JREUutQe5+4WPsquqj/nZO/ePeITz90zwj4evhTsCv\nJ4LV68kO/35fQ7FAOxHpEJQaYjvXVJ6BAgnYlKnyF0XEekHkf4FetcU6t/pS3eXH\nxQIDAQAB\n-----END PUBLIC KEY-----"
+  },
+  "published": "2022-06-24T19:42:43.302Z",
+  "summary": null,
+  "type": "Person",
+  "url": [
+    {
+      "href": "https://tube.tchncs.local/a/bonfirenetworks/video-channels",
+      "mediaType": "text/html",
+      "type": "Link"
+    },
+    {
+      "href": "https://tube.tchncs.local/a/bonfirenetworks",
+      "mediaType": "text/html",
+      "type": "Link"
+    },
+    {
+      "href": "https://tube.tchncs.local/accounts/bonfirenetworks",
+      "mediaType": "text/html",
+      "type": "Link"
+    }
+  ]
+}
