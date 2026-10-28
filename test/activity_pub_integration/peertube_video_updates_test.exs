@@ -99,6 +99,73 @@ defmodule Bonfire.Federate.ActivityPub.PeertubeVideoUpdatesTest do
            "the item still has what the Update changed as it was"
   end
 
+  # The item takes the id the adapter made for the video (so it is dated when the video was published), so making it again meant inserting that id twice: `bonfire_files_media_pkey`. Seen in production on 28 October; a retried job is one way (inserted, then publishing failed, then run again).
+  test "the item of a video is made once when its Create is handled again, as a retried job does",
+       %{video: video} do
+    create = %{
+      "id" => "#{@video_id}/activity",
+      "type" => "Create",
+      "actor" => @account,
+      "to" => video["to"],
+      "cc" => video["cc"],
+      "object" => video
+    }
+
+    assert {:ok, _} = delivered(create)
+    assert [%{id: media_id}] = media_for_video(), "control: the Create made the video an item"
+
+    {:ok, creator} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(@account)
+
+    {:ok, activity} = ActivityPub.Object.get_cached(ap_id: create["id"])
+    {:ok, ap_object} = ActivityPub.Object.get_cached(ap_id: @video_id)
+
+    assert is_binary(ap_object.pointer_id), "control: the adapter made an id for the video"
+
+    feed_activities = fn ->
+      repo().all(from(a in Bonfire.Data.Social.Activity, where: a.object_id == ^media_id))
+    end
+
+    assert [_] = feed_activities.(), "control: the Create put the video in the feed once"
+
+    # the same step again, as a retried job runs it
+    Bonfire.Files.Media.ap_receive_activity(creator, activity, ap_object, [])
+
+    assert [%{id: ^media_id}] = media_for_video()
+    assert [_] = feed_activities.(), "handling it again put the video in the feed twice"
+  end
+
+  # as `maybe_fetch_and_save` finds a link it saved before, by its URL: a copy made before items took the adapter's id has another id
+  test "the item of a video is found by its URL too, when a copy has another id", %{video: video} do
+    create = %{
+      "id" => "#{@video_id}/activity",
+      "type" => "Create",
+      "actor" => @account,
+      "to" => video["to"],
+      "cc" => video["cc"],
+      "object" => video
+    }
+
+    assert {:ok, _} = delivered(create)
+    assert [%{id: media_id}] = media_for_video(), "control: the Create made the video an item"
+
+    {:ok, creator} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(@account)
+
+    {:ok, activity} = ActivityPub.Object.get_cached(ap_id: create["id"])
+    {:ok, ap_object} = ActivityPub.Object.get_cached(ap_id: @video_id)
+
+    # handled once more, for an id no item has
+    Bonfire.Files.Media.ap_receive_activity(
+      creator,
+      activity,
+      %{ap_object | pointer_id: Needle.UID.generate(Bonfire.Files.Media)},
+      []
+    )
+
+    assert [%{id: ^media_id}] = media_for_video()
+  end
+
   test "a Create and an Announce of the same video make one item", %{video: video} do
     # as the account's and the channel's outboxes name it (`tube_account_outbox_page.json`)
     delivered(%{
