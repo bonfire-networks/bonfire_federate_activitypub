@@ -1915,7 +1915,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %Actor{
         id: user_etc.id,
         data: Map.merge(data, actor_declarations(user_etc, type)),
-        keys: e(user_etc, :actor, :signing_key, nil),
+        # a user has the actor mixin on itself; a group (and any other character) keeps it under its character
+        keys:
+          e(user_etc, :actor, :signing_key, nil) ||
+            e(user_etc, :character, :actor, :signing_key, nil),
         local: local?,
         ap_id: id,
         pointer: user_etc,

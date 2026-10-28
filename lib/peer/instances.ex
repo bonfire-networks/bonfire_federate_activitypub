@@ -90,10 +90,14 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   defp create(instance_url, host) do
     # TODO: maybe Peer should be a mixin so it can have the same ID as the Circle representing it?
 
-    with {:ok, peer} <-
+    with {:ok, _inserted} <-
            repo().insert(
-             Peer.changeset(%Peer{}, %{ap_base_uri: instance_url, display_hostname: host})
+             Peer.changeset(%Peer{}, %{ap_base_uri: instance_url, display_hostname: host}),
+             # Another job making an actor of this new instance got here first: its Peer is the one to use. A unique violation would raise, and abort the transaction this runs in (an actor being made), losing it
+             on_conflict: :nothing
            ),
+         # the Peer that is there now: the one just made, or the one that won
+         {:ok, peer} <- get_by_instance_url(instance_url),
          {:ok, _instance_circle} <- get_or_create_instance_circle(host),
          {:ok, _stereo} <-
            Utils.maybe_apply(

@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
   @moduledoc """
   The tags of an `Event` that a local user posts to their own outbox (C2S).
 
-  Nothing models an `Event`, so it is stored as an `APActivity` with the raw AS2 json, and the items of its `tag` have to become real tags there. See `plans/events-categories.md`.
+  Nothing models an `Event`, so it is stored as an `APActivity` with the raw AS2 json, and the items of its `tag` have to become real tags there, on a create and on an update.
   """
   # `@moduletag :federation` comes with this case
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
@@ -148,6 +148,42 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       assert %Bonfire.Data.Social.APActivity{} = activity = posted_activity(conn)
 
       assert topic.id in Enum.map(activity.tags, & &1.id)
+    end
+
+    test "keeps the local topic tagged through an Update that names it, and drops it when the Update does not",
+         %{conn: conn, user: user, username: username} do
+      topic = fake_category!(user, nil, %{type: :topic, name: "Jazz"})
+      iri = Bonfire.Me.Characters.character_url(topic)
+      category = %{"type" => "Category", "id" => iri, "name" => "Jazz"}
+
+      created = post_event(conn, user, username, [category])
+      assert created.status == 201
+      assert topic.id in Enum.map(posted_activity(created).tags, & &1.id), "tagged as it arrived"
+
+      object_id =
+        case json_response(created, 201)["object"] do
+          %{"id" => id} -> id
+          id when is_binary(id) -> id
+        end
+
+      update = fn tags ->
+        %{
+          "type" => "Update",
+          "object" => Map.merge(event_doc(tags), %{"id" => object_id, "name" => "Jazz Night 2"})
+        }
+      end
+
+      still = post_doc(build_conn(), user, username, update.([category]))
+      assert still.status == 201
+
+      assert topic.id in Enum.map(posted_activity(still).tags, & &1.id),
+             "kept by an Update that names it"
+
+      dropped = post_doc(build_conn(), user, username, update.([]))
+      assert dropped.status == 201
+
+      refute topic.id in Enum.map(posted_activity(dropped).tags, & &1.id),
+             "dropped by an Update that does not"
     end
 
     test "has a new local topic tagged for a Category tag with no id",

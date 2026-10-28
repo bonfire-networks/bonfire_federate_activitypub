@@ -87,21 +87,37 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
     end
   end
 
-  describe "an Update of an Event received server to server" do
+  # The Update handling is in the generic APActivity path, so it is run for an Event and for a made-up type that no module claims. When Event gets its own module, only the made-up type still goes through this path.
+  describe "an Update of an object stored as an APActivity, received server to server" do
     @actor "https://mocked.local/users/karen"
     @public "https://www.w3.org/ns/activitystreams#Public"
 
-    defp event(id, name) do
+    defp typed(type, id, name, tags \\ []) do
       %{
-        "type" => "Event",
+        "type" => type,
         "id" => id,
         "attributedTo" => @actor,
         "name" => name,
         "content" => "an event",
         "startTime" => "2026-11-01T18:00:00Z",
         "to" => [@public],
+        "tag" => tags,
         "published" => DateTime.utc_now() |> DateTime.to_iso8601()
       }
+    end
+
+    defp hashtag(name), do: %{"type" => "Hashtag", "name" => "##{name}"}
+
+    # the names of the hashtags (tags that are not characters) of the one record stored for this object id
+    defp hashtag_names(id) do
+      [record] = records_of(id)
+
+      record
+      |> Bonfire.Common.Repo.maybe_preload(tags: [:named, :character])
+      |> Map.get(:tags)
+      |> Enum.reject(& &1.character)
+      |> Enum.map(& &1.named.name)
+      |> Enum.sort()
     end
 
     defp records_of(id) do
@@ -130,25 +146,42 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
       end
     end
 
-    test "updates the event it is about, instead of recording a second one" do
-      id = "#{@actor}/events/#{Needle.UID.generate()}"
+    for type <- ["Event", "Workshop"] do
+      test "updates the #{type} it is about, instead of recording a second one" do
+        type = unquote(type)
+        id = "#{@actor}/objects/#{Needle.UID.generate()}"
 
-      assert {:ok, first} = receive_incoming("Create", event(id, "the first name"))
-      assert first.__struct__ == Bonfire.Data.Social.APActivity
-      assert length(records_of(id)) == 1, "one record after the Create"
+        assert {:ok, first} = receive_incoming("Create", typed(type, id, "the first name"))
+        assert first.__struct__ == Bonfire.Data.Social.APActivity
+        assert length(records_of(id)) == 1, "one record after the Create"
 
-      assert {:ok, _} = receive_incoming("Update", event(id, "the updated name"))
+        assert {:ok, _} = receive_incoming("Update", typed(type, id, "the updated name"))
 
-      assert length(records_of(id)) == 1,
-             "one record after the Update, got #{length(records_of(id))}"
+        assert length(records_of(id)) == 1,
+               "one record after the Update, got #{length(records_of(id))}"
 
-      pointer_id = ActivityPub.Object.get_cached!(ap_id: id).pointer_id
+        pointer_id = ActivityPub.Object.get_cached!(ap_id: id).pointer_id
 
-      assert pointer_id == first.id,
-             "the AP object still points at the first record, not at a new one"
+        assert pointer_id == first.id,
+               "the AP object still points at the first record, not at a new one"
 
-      assert Bonfire.Common.Repo.get(Bonfire.Data.Social.APActivity, first.id).json["name"] ==
-               "the updated name"
+        assert Bonfire.Common.Repo.get(Bonfire.Data.Social.APActivity, first.id).json["name"] ==
+                 "the updated name"
+      end
+    end
+
+    test "re-casts the hashtags on an Update, keeping only the new ones" do
+      id = "#{@actor}/objects/#{Needle.UID.generate()}"
+
+      assert {:ok, _} =
+               receive_incoming("Create", typed("Workshop", id, "a workshop", [hashtag("salad")]))
+
+      assert hashtag_names(id) == ["salad"], "tagged as it arrived"
+
+      assert {:ok, _} =
+               receive_incoming("Update", typed("Workshop", id, "a workshop", [hashtag("soup")]))
+
+      assert hashtag_names(id) == ["soup"]
     end
   end
 end
