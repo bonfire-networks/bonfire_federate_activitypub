@@ -20,10 +20,10 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoSignedFetchTest do
   setup_all do
     mock_global(fn
       %{method: :get, url: @allowed_actor} ->
-        json(Simulate.actor_json(@allowed_actor))
+        json(Simulate.actor_json(@allowed_actor, "ann"))
 
       %{method: :get, url: @outside_actor} ->
-        json(Simulate.actor_json(@outside_actor))
+        json(Simulate.actor_json(@outside_actor, "otto"))
 
       _ ->
         raise Tesla.Mock.Error, "Module request not mocked"
@@ -31,7 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoSignedFetchTest do
   end
 
   setup do
-    Process.put(:federating, true)
+    # no `Process.put(:federating, ...)` here: that override wins over the instance setting, so archipelago mode could never take effect
 
     # these tests are about what the allowlist does, so make sure nothing else already requires signatures
     previous = Application.get_env(:activity_pub, :reject_unsigned)

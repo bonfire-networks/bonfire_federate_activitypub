@@ -779,4 +779,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def federation_allowed?(subject, opts \\ []),
     do: Bonfire.Federate.ActivityPub.federation_allowed?(subject, opts)
+
+  # In archipelago (allowlist-only) mode the signature on a fetch is the only way to tell whether the asker is on the allowlist, so every fetch has to carry one, whatever the instance's "require authentication" setting says
+  def require_signed_fetch?(), do: Bonfire.Federate.ActivityPub.allowlist_only?()
 end
