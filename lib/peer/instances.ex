@@ -90,14 +90,24 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   defp create(instance_url, host) do
     # TODO: maybe Peer should be a mixin so it can have the same ID as the Circle representing it?
 
-    with {:ok, _inserted} <-
-           repo().insert(
-             Peer.changeset(%Peer{}, %{ap_base_uri: instance_url, display_hostname: host}),
-             # Another job making an actor of this new instance got here first: its Peer is the one to use. A unique violation would raise, and abort the transaction this runs in (an actor being made), losing it
+    repo().transact_with(fn ->
+      # Another job making an actor of this new instance may get here at the same time. Its insert waits on the unique index on `ap_base_uri` until the other transaction ends, and then counts 0: the Peer is the winner's, and so are its circles, which are committed by then. A unique violation would raise instead, and abort the transaction this runs in (an actor being made), losing it
+      case repo().insert_all(
+             Peer,
+             [
+               %{id: Needle.UID.generate(Peer), ap_base_uri: instance_url, display_hostname: host}
+             ],
              on_conflict: :nothing
-           ),
-         # the Peer that is there now: the one just made, or the one that won
-         {:ok, peer} <- get_by_instance_url(instance_url),
+           ) do
+        {1, _} -> create_circles(instance_url, host)
+        _ -> get_by_instance_url(instance_url)
+      end
+    end)
+  end
+
+  # only for the job that made the Peer: get-then-create, as done by `Circles.get_or_create_stereotype_circle/2`, would make a second circle if two jobs did it
+  defp create_circles(instance_url, host) do
+    with {:ok, peer} <- get_by_instance_url(instance_url),
          {:ok, _instance_circle} <- get_or_create_instance_circle(host),
          {:ok, _stereo} <-
            Utils.maybe_apply(

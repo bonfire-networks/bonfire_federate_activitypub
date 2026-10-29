@@ -1,6 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.PeerRaceTest do
   @moduledoc """
-  Several remote actors of a new instance made at once (one job each) get the same `Peer`. Each reads the instance's `Peer`, finds none, and makes it, so all but one hit the unique index on `ap_base_uri` (`bonfire_data_activity_pub_peer_ap_base_uri_index`): the violation raised, and the transaction creating the actor was lost with it. The loser reads the `Peer` that won instead.
+  Several remote actors of a new instance made at once (one job each) get the same `Peer`. Each reads the instance's `Peer`, finds none, and makes it, so all but one hit the unique index on `ap_base_uri` (`bonfire_data_activity_pub_peer_ap_base_uri_index`): the violation raised, and the transaction creating the actor was lost with it. The loser reads the `Peer` that won instead, and leaves its circles to the winner: if every job made them, the `Peer` ended with several `:silence_me` circles, and every later call to `Circles.get_or_create_stereotype_circle/2` for it returned an error.
 
   Committed data, with each task on a connection of its own: the sandbox serialises the transactions of one connection, which would hide the race.
   """
@@ -43,5 +43,14 @@ defmodule Bonfire.Federate.ActivityPub.PeerRaceTest do
            "more than one Peer was made for #{host}"
 
     assert repo().aggregate(from(p in Peer, where: p.display_hostname == ^host), :count) == 1
+
+    [{:ok, peer} | _] = results
+
+    # only the job that made the Peer makes its circles
+    assert [_one] = Bonfire.Boundaries.Circles.get_stereotype_circles(peer, [:silence_me]),
+           "the Peer has more or less than one :silence_me circle"
+
+    assert {:ok, _} =
+             Bonfire.Boundaries.Circles.get_or_create_stereotype_circle(peer, :silence_me)
   end
 end

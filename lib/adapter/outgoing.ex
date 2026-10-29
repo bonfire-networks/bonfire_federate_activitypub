@@ -81,6 +81,21 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     # ^ TODO: to disabled only outgoing federation
   end
 
+  # The AP object stored for a local object made from one (a C2S post). Its `pointer_id` is set only after the epic that makes the object has returned (`Incoming.link_ap_object/3`), so a lookup by pointer misses while the object is being federated, and a second `Create` was built that collided with the stored one. The epic hands the AP object over (`ap_object:`), and its id is the one the object's id was made from (`AdapterUtils.pointer_id_from_url/1`): another flow may put a different AP object there, which is left alone.
+  defp existing_ap_object(local_object, opts) do
+    local_id = Enums.id(local_object)
+
+    case opts[:ap_object] do
+      %{data: %{"id" => ap_id}} = ap_object when is_binary(ap_id) ->
+        if AdapterUtils.pointer_id_from_url(ap_id) == local_id,
+          do: {:ok, ap_object},
+          else: ActivityPub.Object.get_cached(pointer: local_id)
+
+      _ ->
+        ActivityPub.Object.get_cached(pointer: local_id)
+    end
+  end
+
   defp maybe_prepare_and_queue(subject, verb, thing, opts)
 
   defp maybe_prepare_and_queue(_subject, verb, %{__struct__: type, id: _id} = character, _opts)
@@ -112,8 +127,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     else
       # Check if there's already an AP object for this local object (e.g. from C2S),
       # and if so federate the original data directly instead of re-creating it
-      with {:ok, existing_ap_object} <-
-             ActivityPub.Object.get_cached(pointer: Enums.id(local_object)),
+      with {:ok, existing_ap_object} <- existing_ap_object(local_object, opts),
            %ActivityPub.Object{} = existing_activity <-
              ActivityPub.Object.get_activity_for_object_ap_id(existing_ap_object.data["id"]) do
         debug(
