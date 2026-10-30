@@ -35,6 +35,55 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorTest do
     assert {:ok, %ActivityPub.Actor{local: true}} = Adapter.get_or_create_service_actor()
   end
 
+  test "is named after the instance's domain, keeps its handle, and says that messaging it reaches the moderators" do
+    assert {:ok, %ActivityPub.Actor{data: data}} = Adapter.get_or_create_service_actor()
+    domain = Bonfire.Common.URIs.base_domain()
+
+    assert data["name"] == "#{domain} federation bot"
+    # the handle does not change
+    assert data["preferredUsername"] =~ "Federation"
+    assert data["summary"] =~ "moderators"
+    assert data["summary"] =~ domain
+  end
+
+  test "a local private mention of the bot is readable by whoever can moderate, who are notified, and by nobody else" do
+    me = Bonfire.Me.Fake.fake_user!()
+    bot = AdapterUtils.get_or_create_service_character()
+    moderator = Bonfire.Me.Fake.instance_moderator!(Bonfire.Me.Fake.fake_user!())
+    {:ok, admin} = Bonfire.Me.Users.make_admin(Bonfire.Me.Fake.fake_user!())
+    someone_else = Bonfire.Me.Fake.fake_user!()
+
+    assert {:ok, post} =
+             Bonfire.Posts.publish(
+               current_user: me,
+               post_attrs: %{
+                 post_content: %{html_body: "hello @#{bot.character.username}, a question"}
+               },
+               boundary: "mentions"
+             )
+
+    # prove the positive first: the bot reads it
+    assert {:ok, _} = Bonfire.Posts.read(post.id, current_user: bot)
+
+    for staff <- [moderator, admin] do
+      assert {:ok, _} = Bonfire.Posts.read(post.id, current_user: staff)
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, post, current_user: staff)
+    end
+
+    assert {:error, _} = Bonfire.Posts.read(post.id, current_user: someone_else)
+
+    # they are not named on it: the post is tagged with the bot only
+    tagged =
+      Bonfire.Common.Repo.all(
+        from(t in Bonfire.Tag.Tagged, where: t.id == ^post.id, select: t.tag_id)
+      )
+
+    assert bot.id in tagged
+    refute moderator.id in tagged
+    refute admin.id in tagged
+  end
+
   test "raises when a remote actor occupies the shared service character id" do
     # make sure ours exists first, so the id below is genuinely contested rather than merely free
     assert {:ok, %ActivityPub.Actor{local: true}} = Adapter.get_or_create_service_actor()

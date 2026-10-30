@@ -2898,9 +2898,21 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ) do
     maybe_apply(Bonfire.Me.Users, :get_or_create_service_character, [
       service_character_id,
-      service_character_username
+      service_character_username,
+      service_character_bio(),
+      service_character_name()
     ])
   end
+
+  # Set when the bot is made, so only a bot made from now on has them. The handle (`service_character_username/0`) stays the same for every instance, so the display name is what says whose bot it is.
+  def service_character_name, do: "#{Bonfire.Common.URIs.base_domain()} federation bot"
+
+  # TODO: moderators should be able to post as, message from, and reply to DMs as this bot, so that a person who writes to it sees one account answer and does not learn who the moderators are
+
+  # Plain English and not `l/1`: it is stored once, in the language of whoever's request made the bot
+  def service_character_bio,
+    do:
+      "The federation bot of the #{Bonfire.Common.URIs.base_domain()} instance. You can send it a message or mention it in a post to reach the moderators of this instance."
 
   def incoming_boundary_circles(activity, object, is_public? \\ nil) do
     is_public? =
@@ -2933,8 +2945,36 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           if is_local? || Bonfire.Federate.ActivityPub.federating?(character), do: id(character)
         end)
 
-      {"custom", to_circles ++ policy_circles}
+      {"custom",
+       to_circles ++
+         Enum.map(
+           moderators_if_service_character(Enum.map(recipients || [], &elem(&1, 1))),
+           &id/1
+         ) ++
+         policy_circles}
     end
+  end
+
+  @doc "Whether the instance's federation bot is among `recipients` (characters or ids; anything else, such as a `{circle, verbs: …}` entry, is skipped)."
+  def service_character_among?(recipients) do
+    recipients
+    |> List.wrap()
+    |> Enum.reject(&is_tuple/1)
+    |> Enum.any?(&(id(&1) == service_character_id()))
+  end
+
+  @doc """
+  The users who can moderate the instance (everyone who holds `:mediate` for it, admins included, as for reports: `Bonfire.Me.Users.list_instance_wide/2`, with their character loaded) when the instance's federation bot is among `recipients` (characters or ids), else `[]`.
+
+  A message to the bot is for the people behind it. They are named as recipients, as users: addressing the staff circles would let them read it but notify nobody (only user ids in `to_circles` are notified). Not to be added to the message's tags where the sender could see them.
+  """
+  def moderators_if_service_character(recipients) do
+    if service_character_among?(recipients),
+      do:
+        maybe_apply(Bonfire.Me.Users, :list_instance_wide, [:mediate, [preload: :internal]],
+          fallback_return: []
+        ),
+      else: []
   end
 
   @doc """

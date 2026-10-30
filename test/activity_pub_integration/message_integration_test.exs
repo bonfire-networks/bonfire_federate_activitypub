@@ -115,6 +115,83 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
         Bonfire.Social.FeedLoader.feed_contains?(:remote, message, current_user: recipient)
     end
 
+    # Not a `Message`: a message names its recipients, so the moderators would see each other and a reply would show them. It is a private post that mentions the bot, which the moderators are given read access to without being tagged.
+    test "a private Note to the instance's federation bot is a post readable by whoever can moderate the instance, who are notified, and by nobody else" do
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, bot} = Bonfire.Federate.ActivityPub.Adapter.get_or_create_service_actor()
+      moderator = Bonfire.Me.Fake.instance_moderator!(fake_user!())
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+      someone_else = fake_user!()
+
+      params = remote_activity_json_with_mentions(actor, bot)
+      {:ok, activity} = ActivityPub.create(params)
+
+      assert %Bonfire.Data.Social.Post{id: post_id} = post = activity.pointer
+
+      for staff <- [moderator, admin] do
+        assert {:ok, _} = Bonfire.Posts.read(post_id, current_user: staff)
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, post, current_user: staff)
+      end
+
+      assert {:error, _} = Bonfire.Posts.read(post_id, current_user: someone_else)
+    end
+
+    test "a public Note that mentions the instance's federation bot is in the notifications of whoever can moderate the instance, and in nobody else's" do
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+      {:ok, bot} = Bonfire.Federate.ActivityPub.Adapter.get_or_create_service_actor()
+      moderator = Bonfire.Me.Fake.instance_moderator!(fake_user!())
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+      someone_else = fake_user!()
+
+      params = remote_activity_json_with_mentions(actor, [bot, ActivityPub.Config.public_uri()])
+      {:ok, activity} = ActivityPub.create(params)
+      post = activity.pointer
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, post,
+               current_user: moderator
+             )
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, post, current_user: admin)
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:notifications, post,
+               current_user: someone_else
+             )
+    end
+
+    # A message to the bot is turned into a private post that mentions it, as an incoming one is, so that the moderators it is for are not named on it as recipients.
+    test "a message a local user sends to the instance's federation bot is a private post readable by whoever can moderate the instance, who are notified, and by nobody else" do
+      me = fake_user!()
+      someone = fake_user!()
+      bot = Bonfire.Federate.ActivityPub.AdapterUtils.get_or_create_service_character()
+      moderator = Bonfire.Me.Fake.instance_moderator!(fake_user!())
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+
+      # prove the positive first: a message to an ordinary user is still a message
+      assert {:ok, %Bonfire.Data.Social.Message{}} =
+               Messages.send(me, %{to_circles: [someone.id], post_content: %{html_body: "hi"}})
+
+      assert {:ok, %Bonfire.Data.Social.Post{id: post_id} = post} =
+               Messages.send(me, %{to_circles: [bot.id], post_content: %{html_body: "hello bot"}})
+
+      for staff <- [moderator, admin] do
+        assert {:ok, _} = Bonfire.Posts.read(post_id, current_user: staff)
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(:notifications, post, current_user: staff)
+      end
+
+      assert {:error, _} = Bonfire.Posts.read(post_id, current_user: fake_user!())
+
+      tagged =
+        repo().all(
+          Ecto.Query.from(t in Bonfire.Tag.Tagged, where: t.id == ^post_id, select: t.tag_id)
+        )
+
+      assert bot.id in tagged
+      refute moderator.id in tagged
+      refute admin.id in tagged
+    end
+
     test "rejects a Message for an incoming private Note for a user with federation disabled" do
       {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
