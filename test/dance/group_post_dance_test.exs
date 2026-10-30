@@ -10,6 +10,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     import Bonfire.Federate.ActivityPub.SharedDataDanceCase
     import Bonfire.Classify.Simulate
 
+    import Bonfire.Federate.ActivityPub.Testing.Interop.Groups,
+      only: [post_held?: 1, remote_member_post_in_group!: 2]
+
     alias Bonfire.Common.TestInstanceRepo
     alias Bonfire.Federate.ActivityPub.AdapterUtils
 
@@ -947,7 +950,6 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "sent without the reporter's name: here, the report isn't theirs"
     end
 
-    # whether this instance still holds a post, by its URL
     # how many `Update`s of this object the current instance holds
     defp updates_of(object_ap_id) do
       import Ecto.Query
@@ -961,58 +963,6 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       |> repo().aggregate(:count)
     end
 
-    defp post_held?(post_url) do
-      with {:ok, %{pointer_id: id}} when is_binary(id) <-
-             ActivityPub.Object.get_cached(ap_id: post_url),
-           {:ok, _} <- Bonfire.Common.Needles.get(id, skip_boundary_check: true) do
-        true
-      else
-        _ -> false
-      end
-    end
-
-    # someone on the other instance joins a group hosted here and posts in it from there, as their group-page composer does (`group_live.sface`'s smart input opts)
-    defp remote_member_post_in_group!(context, html_body) do
-      group =
-        fancy_fake_category!(context[:local][:user],
-          type: :group,
-          membership: "open",
-          visibility: "global",
-          participation: "anyone"
-        )
-
-      {remote_post_id, post_url} =
-        TestInstanceRepo.apply(fn ->
-          assert {:ok, group_on_remote} =
-                   AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
-
-          author = context[:remote][:user]
-
-          assert {:ok, _} =
-                   Bonfire.Classify.Categories.join_and_follow_group(author, group_on_remote)
-
-          {:ok, post} =
-            Posts.publish(
-              current_user: author,
-              post_attrs: %{post_content: %{html_body: html_body}},
-              context_id: id(group_on_remote),
-              to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(group_on_remote),
-              to_boundaries:
-                List.wrap(
-                  Bonfire.Classify.Boundaries.read_default_content_visibility(group_on_remote)
-                )
-            )
-
-          {id(post),
-           post
-           |> repo().maybe_preload([:peered, created: [:peered]])
-           |> Bonfire.Common.URIs.canonical_url()}
-        end)
-
-      assert post_held?(post_url), "control: the post reached the group's instance"
-
-      %{group: group, remote_post_id: remote_post_id, post_url: post_url}
-    end
 
     # A group on this instance, a member of it who is NOT the group's moderator, someone on the other instance following the group, and a post the member published in it, asserted to have reached that follower and to be in the group there: the starting point for what moderators and authors do to such a post
     defp member_post_in_followed_group!(context, html_body) do

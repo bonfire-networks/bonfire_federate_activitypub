@@ -1,6 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
   @moduledoc """
-  What a person on a microblog server sees of one of OUR groups: the follow works, a post in the group arrives on their timeline as a boost BY the group (or, on a server that files a relayed post under the group itself, as its author's post marked as in the group), a reply from them is filed in the group, and a deletion is followed. The result is read from the account's own timeline through its Mastodon-compatible API, which is the only place the Mastodon, GoToSocial, Akkoma, Pleroma, Sharkey, Firefish and Mitra rows of the interop checklist can be answered (`group_live_test.exs` can only tell whether a delivery was accepted, not what the server made of it).
+  What a person on a microblog server sees of one of OUR groups: the follow works, a post in the group arrives on their timeline as a boost BY the group (or, on a server that files a relayed post under the group itself, as its author's post marked as in the group), a reply from them is filed in the group, a moderator's removal of a post takes it out of the group and keeps it on its author's profile, and a deletion is followed. The result is read from the account's own timeline through its Mastodon-compatible API, which is the only place the Mastodon, GoToSocial, Akkoma, Pleroma, Sharkey, Firefish and Mitra rows of the interop checklist can be answered (`group_live_test.exs` can only tell whether a delivery was accepted, not what the server made of it).
 
   It needs an account on the server, and a bore tunnel so the server can fetch our group back. Put the URL and an access token (scopes `read`, `write`, `follow`) in the git-ignored `.env`, one pair per server, and run it through the tunnel recipe:
 
@@ -24,6 +24,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
 
   alias Bonfire.Federate.ActivityPub.Testing.Interop
   alias Bonfire.Federate.ActivityPub.Testing.MastodonApi
+
+  import MastodonApi,
+    only: [entries_showing: 3, shows_text?: 4, shown_post: 1, timeline_dump: 1]
 
   @servers ~w(mastodon gotosocial akkoma pleroma sharkey firefish mitra)
 
@@ -187,6 +190,33 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
         end
       end
 
+      # T5b: a moderator of the group, not the post's author, takes the untitled probe out of the group. The group takes its boost back (`Undo{Announce}`) and the moderator's `Delete` with a `summary` goes out too (Lemmy's removal shape); a server that reads that as the post's deletion would drop it from the author's profile as well, which is the accepted risk of sending both
+      author_id = get_in(shown_post(entry), ["account", "id"])
+      moderator = fake_user!()
+
+      {:ok, _} =
+        Bonfire.Classify.Categories.add_moderator(creator, group[:category], id(moderator))
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.remove_post_from_group(
+                 moderator,
+                 group[:category],
+                 post
+               )
+
+      removed? =
+        await(fn -> entries_showing(api, post_ap_id, group_url) == [] end, div(wait, 2))
+
+      IO.puts(
+        "after a moderator removed it from the group, #{name} #{if removed?, do: "no longer shows the post in the group", else: "STILL SHOWS the post in the group"}"
+      )
+
+      assert removed?,
+             "#{name} still shows the post in the group after #{div(wait, 2)}s: the group's `Undo{Announce}` and the moderator's `Delete` did not take it out"
+
+      assert on_profile?(api, author_id, [post_ap_id]),
+             "removed from the group, the post should stay on its author's profile on #{name}, but it is gone: the moderator's `Delete` was read as the post's deletion"
+
       # T6: deleting the titled post takes it (its boost, or the post filed in the group) off the timeline
       assert {:ok, _} = Bonfire.Social.Objects.delete(titled, current_user: creator)
 
@@ -199,7 +229,6 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
       assert gone?, "#{name} still shows the deleted post after #{div(wait, 2)}s"
 
       # T7: the posts themselves leave the author's profile, which only a `Delete` from the author does (`Activity::Delete` takes `Status.find_by(uri:, account: author)`). The untitled probe is deleted now too, so a run leaves nothing of its own on the server.
-      author_id = get_in(shown_post(entry), ["account", "id"])
       assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: creator)
 
       profile_clean? =
@@ -246,48 +275,6 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupAccountLiveTest do
 
   defp following?(api, account_id) do
     match?({:ok, %{"following" => true}}, MastodonApi.relationship(api, account_id))
-  end
-
-  # the home-timeline entries that show the post with this AP id as a post in the group (a boost of it, or the post itself marked as in the group), [] when it is not there; nil on a failed read so `await/2` tries again
-  defp entries_showing(api, ap_id, group_url) do
-    case MastodonApi.home_timeline(api, limit: 40) do
-      {:ok, statuses} -> Enum.filter(statuses, &MastodonApi.shows_post?(&1, ap_id, group_url))
-      _ -> nil
-    end
-  end
-
-  # whether the home timeline shows the post with this AP id with this text in it; false on a failed read so `await/2` tries again
-  defp shows_text?(api, ap_id, group_url, text) do
-    case entries_showing(api, ap_id, group_url) do
-      entries when is_list(entries) ->
-        Enum.any?(entries, &((shown_post(&1)["content"] || "") =~ text))
-
-      _ ->
-        false
-    end
-  end
-
-  # the post itself: inside the boost when the entry is one, else the entry
-  defp shown_post(entry), do: entry["reblog"] || entry
-
-  # what the home timeline holds, for a failure message: who posted each status, its URI, what it boosts, and the group it is filed in; a server that shows the post some other way than as a boost shows up here
-  defp timeline_dump(api) do
-    case MastodonApi.home_timeline(api, limit: 40) do
-      {:ok, statuses} ->
-        statuses
-        |> Enum.map(
-          &%{
-            by: get_in(&1, ["account", "acct"]),
-            uri: &1["uri"],
-            boosts: get_in(&1, ["reblog", "uri"]),
-            group: get_in(&1, ["group", "acct"])
-          }
-        )
-        |> inspect(limit: :infinity)
-
-      other ->
-        "(could not read the timeline: #{inspect(other)})"
-    end
   end
 
   # whether any of these posts is still listed on the author's profile; a failed read counts as "still there", so a flaky answer never reads as a clean profile

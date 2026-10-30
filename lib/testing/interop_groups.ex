@@ -172,6 +172,82 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
       group
     end
 
+    @doc "Whether this instance holds the post at `post_url`: an AP object for it, with a local post made from it."
+    def post_held?(post_url) do
+      with {:ok, %{pointer_id: id}} when is_binary(id) <-
+             ActivityPub.Object.get_cached(ap_id: post_url),
+           {:ok, _} <- Bonfire.Common.Needles.get(id, skip_boundary_check: true) do
+        true
+      else
+        _ -> false
+      end
+    end
+
+    @doc """
+    Someone on the dance's other instance (`context[:remote][:user]`) joins a group hosted here and posts in it from there, as their group-page composer does (`group_live.sface`'s smart input opts). The group is `group` (what `hosted_group/1` gives), or a new open, global one made by `context[:local][:user]`: open, as the post has to reach the group's instance and be announced.
+
+    Gives `%{group:, remote_post_id:, post_url:}`, and raises when the post did not reach this instance.
+    """
+    def remote_member_post_in_group!(context, html_body, group \\ nil) do
+      group =
+        group ||
+          maybe_apply(
+            Bonfire.Classify.Simulate,
+            :fancy_fake_category!,
+            [
+              context[:local][:user],
+              [type: :group, membership: "open", visibility: "global", participation: "anyone"]
+            ],
+            fallback_return: nil
+          ) || raise "could not create a group to host"
+
+      {remote_post_id, post_url} =
+        Bonfire.Common.TestInstanceRepo.apply(fn ->
+          {:ok, group_on_remote} =
+            Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_and_create_by_uri(
+              group[:canonical_url]
+            )
+
+          author = context[:remote][:user]
+
+          {:ok, _} =
+            maybe_apply(
+              Bonfire.Classify.Categories,
+              :join_and_follow_group,
+              [author, group_on_remote],
+              fallback_return: nil
+            )
+
+          {:ok, post} =
+            maybe_apply(Bonfire.Posts, :publish, [
+              [
+                current_user: author,
+                post_attrs: %{post_content: %{html_body: html_body}},
+                context_id: id(group_on_remote),
+                to_circles:
+                  maybe_apply(Bonfire.Classify.Boundaries, :post_circles_for_group, [
+                    group_on_remote
+                  ]),
+                to_boundaries:
+                  List.wrap(
+                    maybe_apply(Bonfire.Classify.Boundaries, :read_default_content_visibility, [
+                      group_on_remote
+                    ])
+                  )
+              ]
+            ])
+
+          {id(post),
+           post
+           |> Bonfire.Common.Config.repo().maybe_preload([:peered, created: [:peered]])
+           |> Bonfire.Common.URIs.canonical_url()}
+        end)
+
+      post_held?(post_url) || raise "control: the post did not reach the group's instance"
+
+      %{group: group, remote_post_id: remote_post_id, post_url: post_url}
+    end
+
     defp fetch_moderators(actor, opts) do
       case e(actor, :data, "attributedTo", nil) do
         url when is_binary(url) ->

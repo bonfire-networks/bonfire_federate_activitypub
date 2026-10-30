@@ -81,6 +81,59 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
         (entry["uri"] == ap_id and get_in(entry, ["group", "actor_id"]) == group_url)
     end
 
+    @doc "The home-timeline entries that show the post `ap_id` as a post in the group (`shows_post?/3`): `[]` when it is not there, `nil` on a failed read, so `Interop.await/2` tries again."
+    def entries_showing(%__MODULE__{} = client, ap_id, group_url) do
+      case home_timeline(client, limit: 40) do
+        {:ok, statuses} -> Enum.filter(statuses, &shows_post?(&1, ap_id, group_url))
+        _ -> nil
+      end
+    end
+
+    @doc "Whether the home timeline shows the post `ap_id` in the group with `text` in its content; `false` on a failed read, so `Interop.await/2` tries again."
+    def shows_text?(%__MODULE__{} = client, ap_id, group_url, text) do
+      case entries_showing(client, ap_id, group_url) do
+        entries when is_list(entries) ->
+          Enum.any?(entries, &((shown_post(&1)["content"] || "") =~ text))
+
+        _ ->
+          false
+      end
+    end
+
+    @doc "Whether the home timeline holds the status with this AP id (`uri`) with `text` in its content; `false` when it does not, or on a failed read, so `Interop.await/2` tries again. For a post that is not in a group (`shows_text?/4` is for one that is)."
+    def shows_status_text?(%__MODULE__{} = client, ap_id, text) do
+      case home_timeline(client, limit: 40) do
+        {:ok, statuses} ->
+          Enum.any?(statuses, &(&1["uri"] == ap_id and (&1["content"] || "") =~ text))
+
+        _ ->
+          false
+      end
+    end
+
+    @doc "The post itself: inside the boost when the timeline entry is one, else the entry."
+    def shown_post(entry), do: entry["reblog"] || entry
+
+    @doc "What the home timeline holds, for a failure message: who posted each status, its URI, what it boosts, and the group it is filed in. A server that shows a post some other way than as a boost shows up here."
+    def timeline_dump(%__MODULE__{} = client) do
+      case home_timeline(client, limit: 40) do
+        {:ok, statuses} ->
+          statuses
+          |> Enum.map(
+            &%{
+              by: get_in(&1, ["account", "acct"]),
+              uri: &1["uri"],
+              boosts: get_in(&1, ["reblog", "uri"]),
+              group: get_in(&1, ["group", "acct"])
+            }
+          )
+          |> inspect(limit: :infinity)
+
+        other ->
+          "(could not read the timeline: #{inspect(other)})"
+      end
+    end
+
     @doc "The statuses of an account, newest first. Options: `:limit` (default 40)."
     def account_statuses(%__MODULE__{} = client, account_id, opts \\ []),
       do: get(client, "/api/v1/accounts/#{account_id}/statuses", limit: opts[:limit] || 40)
