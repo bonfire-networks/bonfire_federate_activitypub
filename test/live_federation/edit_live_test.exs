@@ -59,7 +59,10 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.EditLiveTest do
 
       assert Interop.await(
                fn ->
-                 match?({:ok, %{"following" => true}}, MastodonApi.relationship(api, account["id"]))
+                 match?(
+                   {:ok, %{"following" => true}},
+                   MastodonApi.relationship(api, account["id"])
+                 )
                end,
                seconds: wait
              ),
@@ -111,7 +114,9 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.EditLiveTest do
           IO.puts("cleanup: #{name} unfollowed, following: #{inspect(relationship["following"])}")
 
         other ->
-          IO.puts("cleanup FAILED: could not unfollow #{author_url} on #{name}: #{inspect(other)}")
+          IO.puts(
+            "cleanup FAILED: could not unfollow #{author_url} on #{name}: #{inspect(other)}"
+          )
       end
     end
   end

@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
   @moduledoc """
   What a threadiverse community sends when its moderators act, and what we currently do with it.
 
-  Unlike the post fixtures next door, these are NOT outbox captures: a community outbox only ever holds post announces, because Lemmy builds it from a `PostQuery`. They come from Lemmy's own committed test assets (`crates/apub/apub/assets/lemmy/activities/`), which its deserialization tests run against, so they are authoritative rather than approximations. Only hostnames were rewritten.
+  Unlike the post fixtures, these are NOT outbox captures: a community outbox only ever holds post announces, so they come from Lemmy's own committed test assets (`crates/apub/apub/assets/lemmy/activities/`), which its deserialization tests run against, so they are authoritative rather than approximations. Only hostnames were rewritten.
 
   The five shapes, and what each is for:
 
@@ -305,6 +305,41 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       refute Bonfire.Boundaries.can?(banned, :reply, post), "control: with a target, it bans"
     end
 
+    # the same rule for lifting a ban as for placing one. Each Undo has an id of its own, or the control would be taken for the same delivery
+    test "an Undo of the ban from an actor with no authority over the group is refused", %{
+      post: post,
+      banned: banned,
+      ban: ban
+    } do
+      receive_moderation(ban)
+      refute Bonfire.Boundaries.can?(banned, :reply, post), "control: the ban applied"
+
+      undo =
+        fixture("mod_unban_user.json")
+        |> Map.merge(%{
+          "actor" => ban["actor"],
+          "cc" => ban["cc"],
+          "audience" => ban["audience"],
+          "object" => ban
+        })
+
+      # served, and neither a moderator of the community nor the person banned
+      receive_moderation(
+        Map.merge(undo, %{
+          "actor" => "http://lemmy.local/u/lemmy_alpha",
+          "id" => "#{undo["id"]}/by-stranger"
+        })
+      )
+
+      refute Bonfire.Boundaries.can?(banned, :reply, post),
+             "a stranger's Undo must not lift a ban a moderator placed"
+
+      receive_moderation(undo)
+
+      assert Bonfire.Boundaries.can?(banned, :reply, post),
+             "control: the moderator's Undo lifts the ban"
+    end
+
     test "from an actor with no authority over the group is refused", %{
       post: post,
       banned: banned,
@@ -502,10 +537,22 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       %{post: post, someone: someone, undo: undo} = lock_then_undo(context)
 
       # an actor the mock DOES serve, on another host than the community, so the refusal is about standing and not a failed fetch
-      receive_moderation(Map.put(undo, "actor", "http://lemmy2.local/u/lemmy_alpha"))
+      # with an id of its own, or the control below would be taken for the same delivery
+      receive_moderation(
+        Map.merge(undo, %{
+          "actor" => "http://lemmy2.local/u/lemmy_alpha",
+          "id" => "#{undo["id"]}/by-stranger"
+        })
+      )
 
       refute Bonfire.Boundaries.can?(someone, :reply, post),
              "a stranger's Undo must not reopen a thread a moderator closed"
+
+      # the control, so the refusal above means the sender's standing and not Undos being ignored: the moderator's own reopens it
+      assert {:ok, _} = receive_moderation(undo)
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post),
+             "control: the moderator's Undo reopens the thread"
     end
 
     # A community relays its members' votes the same way (`Announce{Like}`), which is how a follower's instance counts votes cast elsewhere. An upvote is a `Like`; a downvote is a `Dislike`, which we have no concept for yet
@@ -693,6 +740,57 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                current_user: reader
              ),
              "the removal takes it out of the group"
+    end
+
+    # The id of that `Delete` is public (the community relays it), and the stored copy goes back to the adapter whenever it is relayed: only the community it names may say the community accepted it, or anybody could have it applied again
+    test "a stranger's Announce of a removal we applied does not apply it again", %{
+      text_post: removed,
+      announced_by: community,
+      community_moderator: moderator
+    } do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: removed)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      reader = fake_user!()
+
+      in_group? = fn ->
+        !!Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+          by: mirror,
+          current_user: reader
+        )
+      end
+
+      remove =
+        fixture("mod_remove_note.json")
+        |> Map.merge(%{"object" => removed, "audience" => community, "actor" => moderator})
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(remove)
+      refute in_group?.(), "control: the moderator's removal took it out"
+
+      # the community shares it again, as it may
+      {:ok, _} =
+        Bonfire.Social.Boosts.boost(mirror, post,
+          skip_federation: true,
+          skip_boundary_check: true
+        )
+
+      assert in_group?.(), "control: it is in the group again"
+
+      stranger = "http://lemmy2.local/u/lemmy_alpha"
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: stranger)
+
+      ActivityPub.Federator.Transformer.handle_incoming(%{
+        "type" => "Announce",
+        "id" => "http://lemmy2.local/activities/announce/#{System.unique_integer([:positive])}",
+        "actor" => stranger,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "object" => remove
+      })
+
+      assert in_group?.(),
+             "somebody who is not the community had a moderator's removal applied again"
     end
 
     # How a follower's instance actually hears of that removal: the community relays its moderator's `Delete` as `Announce{Delete}`, as it relays votes
@@ -1026,10 +1124,67 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
              "nor take it out of the group"
     end
 
+    # A `Delete` with a reason is read as a removal, and handed to the adapter without asking the origin whether the object is gone. Its `formerType` is the sender's word for what the object is, so it must not turn a removal into a deletion of something the origin still serves
+    for {name, object_key} <- [{"a post", :text_post}, {"an actor", :community_moderator}] do
+      test "a stranger's Delete with a reason that calls #{name} an actor deletes nothing",
+           context do
+        target = context[unquote(object_key)]
+
+        {:ok, before} =
+          Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(target)
+
+        # known here, as any actor that has delivered to us would be: from one we have never seen the delivery does not get as far as the object, and this test would pass without proving anything about it
+        {:ok, _} =
+          ActivityPub.Actor.get_cached_or_fetch(ap_id: "http://lemmy2.local/u/lemmy_alpha")
+
+        # and its origin still serves it: otherwise the origin saying it is gone is evidence, and the deletion would be a true one
+        {:ok, %{data: stored}} = ActivityPub.Object.get_cached(ap_id: target)
+        serve(Map.put(context.served, target, stored))
+
+        fixture("mod_remove_note.json")
+        |> Map.merge(%{
+          "object" => target,
+          "actor" => "http://lemmy2.local/u/lemmy_alpha",
+          "formerType" => "Person",
+          "id" => "http://lemmy2.local/activities/delete/#{System.unique_integer([:positive])}"
+        })
+        |> receive_moderation()
+
+        assert {:ok, _} = Bonfire.Common.Needles.get(id(before), skip_boundary_check: true),
+               "a stranger deleted #{unquote(name)} its origin still serves"
+      end
+    end
+
     # A moderator of one community must not be able to close threads elsewhere, so naming a group
     # you do moderate is not enough: the object has to be in it.
-    test "a Lock of an object that is not in the named group is refused", %{reported: in_group} do
+    test "a Lock of an object that is not in the named group is refused", %{
+      reported: in_group,
+      announced_by: community,
+      community_moderator: moderator
+    } do
       someone = fake_user!()
+
+      # the sender is the community's own moderator and the group is the one it announced from, so only where the object is can refuse it below. This control is that same Lock on a post that IS in the group
+      {:ok, %{pointer_id: in_group_pointer_id}} = ActivityPub.Object.get_cached(ap_id: in_group)
+      in_group_post = Bonfire.Common.Needles.get!(in_group_pointer_id, skip_boundary_check: true)
+
+      assert Bonfire.Boundaries.can?(someone, :reply, in_group_post),
+             "control: the thread in the group starts out open"
+
+      lock = fn object, id ->
+        fixture("mod_lock_page.json")
+        |> Map.merge(%{
+          "object" => object,
+          "audience" => community,
+          "actor" => moderator,
+          "id" => "#{fixture("mod_lock_page.json")["id"]}/#{id}"
+        })
+      end
+
+      receive_moderation(lock.(in_group, "in-group"))
+
+      refute Bonfire.Boundaries.can?(someone, :reply, in_group_post),
+             "control: this moderator's Lock closes a thread in their group"
 
       author = fake_user!()
 
@@ -1040,16 +1195,12 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                  boundary: "public"
                )
 
-      refute in_group == nil
-
       elsewhere_url =
         elsewhere
         |> repo().maybe_preload([:peered, created: [creator: [character: [:peered]]]])
         |> Bonfire.Common.URIs.canonical_url()
 
-      fixture("mod_lock_page.json")
-      |> Map.put("object", elsewhere_url)
-      |> receive_moderation()
+      receive_moderation(lock.(elsewhere_url, "elsewhere"))
 
       assert Bonfire.Boundaries.can?(someone, :reply, elsewhere),
              "the activity names a community this actor moderates, but the thread is not in it"
@@ -1135,6 +1286,75 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       refute promoted in moderator_urls(group),
              "an actor with no standing in this community must not be able to name its moderators"
     end
+
+    # `Incoming.receive_activity/1` fetches a `target` only when it is a bare URL, so one written inline in the activity reaches the handler as its sender wrote it. The re-sync has to read the community's collection, never the activity's: otherwise whoever may send an `Add` there chooses the moderators
+    test "an Add whose target is an inline collection does not change the moderators", %{
+      announced_by: community,
+      community_moderator: existing_mod,
+      moderators_collection: collection,
+      served: served
+    } do
+      {:ok, group} =
+        Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      attacker = "#{community |> String.split("/c/") |> List.first()}/u/attacker"
+
+      # served, so a handler that adopted the activity's list COULD resolve it: unserved, this passes for the wrong reason
+      serve(Map.put(served, attacker, person_actor(attacker)))
+
+      before = Enum.sort(moderator_urls(group))
+      assert existing_mod in before, "control: the community lists the existing moderator"
+      refute attacker in before
+
+      assert {:ok, %{pointer: %Bonfire.Classify.Category{}}} =
+               fixture("mod_add_mod.json")
+               |> Map.merge(%{
+                 "actor" => existing_mod,
+                 "object" => attacker,
+                 "target" => moderators_collection(collection, [attacker]),
+                 "cc" => [community]
+               })
+               |> receive_moderation(),
+             "control: a listed moderator's Add is still handled as a group change"
+
+      refute attacker in moderator_urls(group), "the activity's own list must not be adopted"
+      assert existing_mod in moderator_urls(group), "nor may it demote the community's moderators"
+      assert Enum.sort(moderator_urls(group)) == before
+    end
+
+    test "an Add with an inline target still re-syncs from the community's own list", %{
+      announced_by: community,
+      community_moderator: existing_mod,
+      moderators_collection: collection,
+      served: served
+    } do
+      {:ok, group} =
+        Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      host = community |> String.split("/c/") |> List.first()
+      promoted = "#{host}/u/newly_promoted"
+      attacker = "#{host}/u/attacker"
+
+      # the community's list is what changed; the activity claims another
+      serve(
+        served
+        |> Map.put(promoted, person_actor(promoted))
+        |> Map.put(attacker, person_actor(attacker))
+        |> Map.put(collection, moderators_collection(collection, [existing_mod, promoted]))
+      )
+
+      fixture("mod_add_mod.json")
+      |> Map.merge(%{
+        "actor" => existing_mod,
+        "object" => promoted,
+        "target" => moderators_collection(collection, [attacker]),
+        "cc" => [community]
+      })
+      |> receive_moderation()
+
+      assert promoted in moderator_urls(group), "what the community publishes is adopted"
+      refute attacker in moderator_urls(group), "what the activity claims is not"
+    end
   end
 
   # One of OUR users whom the community lists as a moderator acts on it: the real activity goes to the community, which applies it and announces it to its followers, us included, and that echo is what applies it here. Until then it is pending: the moderation record is written, with a request on it (`Requests`, kept on this instance), which the echo (or an `Accept`) accepts and a `Reject` refuses
@@ -1200,13 +1420,42 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
         )
       end
 
+      # somebody else's server: one the mock serves, on another host than the community, so a refusal is the check and not a failed fetch
+      stranger = "http://lemmy2.local/u/lemmy_alpha"
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: stranger)
+
+      # `actor` refusing what our moderator sent, or passing it on as if it had applied it. Ids on the sender's own host, as a real delivery's are
+      reject = fn actor, %{data: ours} ->
+        ActivityPub.Federator.Transformer.handle_incoming(%{
+          "type" => "Reject",
+          "id" => "#{origin(actor)}/activities/reject/#{System.unique_integer([:positive])}",
+          "actor" => actor,
+          "to" => [ours["actor"]],
+          "object" => ours
+        })
+      end
+
+      relay = fn actor, %{data: ours} ->
+        ActivityPub.Federator.Transformer.handle_incoming(%{
+          "type" => "Announce",
+          "id" => "#{origin(actor)}/activities/announce/#{System.unique_integer([:positive])}",
+          "actor" => actor,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["#{actor}/followers"],
+          "object" => ours
+        })
+      end
+
       {:ok,
        local_moderator: local_moderator,
        mirror: mirror,
        post: post,
        sent: sent,
        echo: echo,
-       request: request}
+       request: request,
+       stranger: stranger,
+       reject: reject,
+       relay: relay}
     end
 
     # who belongs to a community is for its own instance to say: our mirror of it holds what it told us, so removing someone from the mirror would only be undone by the next sync
@@ -1491,6 +1740,309 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       assert {:ok, _} = Bonfire.Common.Needles.get(id(post), skip_boundary_check: true),
              "removed from the group, not deleted"
     end
+
+    # What our moderator sent is the community's to answer: the ids are public (a ban goes to Public and the community relays it), so a `Reject` or an `Announce` from anyone else must change nothing, and neither may a `Reject` after the community applied it (undoing that takes an `Undo`)
+    for apply_now <- [false, true] do
+      test "a Reject of the Lock by somebody but the community changes nothing (applied at once: #{apply_now})",
+           %{
+             local_moderator: local_moderator,
+             announced_by: community,
+             post: post,
+             sent: sent,
+             request: request,
+             stranger: stranger,
+             reject: reject
+           } do
+        someone = fake_user!()
+
+        {:ok, record} =
+          Bonfire.Boundaries.Blocks.lock(post,
+            current_user: local_moderator,
+            apply_now: unquote(apply_now)
+          )
+
+        [lock] = sent.("Lock")
+
+        reject.(stranger, lock)
+
+        assert Bonfire.Boundaries.can?(someone, :reply, post) == not unquote(apply_now),
+               "as it was"
+
+        assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:lock, record),
+               "still pending"
+
+        reject.(community, lock)
+
+        assert Bonfire.Boundaries.can?(someone, :reply, post),
+               "control: the community's own Reject undoes it"
+
+        assert {:ok, %{ignored_at: %DateTime{}}} = request.(:lock, record)
+      end
+
+      test "a Reject of the ban by somebody but the community changes nothing (applied at once: #{apply_now})",
+           %{
+             local_moderator: local_moderator,
+             mirror: mirror,
+             announced_by: community,
+             post: post,
+             sent: sent,
+             request: request,
+             stranger: stranger,
+             reject: reject
+           } do
+        banned = fake_user!()
+
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Blocks.block(banned, :silence,
+                   current_user: local_moderator,
+                   on_behalf_of: mirror,
+                   apply_now: unquote(apply_now)
+                 )
+
+        [ban] = sent.("Block")
+        {:ok, record} = Bonfire.Social.Moderations.record_of(ban)
+
+        reject.(stranger, ban)
+
+        assert Bonfire.Boundaries.can?(banned, :reply, post) == not unquote(apply_now),
+               "as it was"
+
+        assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:silence, record),
+               "still pending"
+
+        reject.(community, ban)
+
+        assert Bonfire.Boundaries.can?(banned, :reply, post),
+               "control: the community's own Reject lifts it"
+
+        assert {:ok, %{ignored_at: %DateTime{}}} = request.(:silence, record)
+      end
+
+      test "a Reject of the removal by somebody but the community changes nothing (applied at once: #{apply_now})",
+           %{
+             local_moderator: local_moderator,
+             mirror: mirror,
+             announced_by: community,
+             post: post,
+             sent: sent,
+             request: request,
+             stranger: stranger,
+             reject: reject
+           } do
+        reader = fake_user!()
+
+        in_group? = fn ->
+          !!Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+            by: mirror,
+            current_user: reader
+          )
+        end
+
+        assert {:ok, _} =
+                 Bonfire.Classify.Categories.remove_post_from_group(local_moderator, mirror, post,
+                   apply_now: unquote(apply_now)
+                 )
+
+        [delete] = sent.("Delete")
+        {:ok, record} = Bonfire.Social.Moderations.record_of(delete)
+
+        reject.(stranger, delete)
+
+        assert in_group?.() == not unquote(apply_now), "as it was"
+
+        assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:hide, record),
+               "still pending"
+
+        reject.(community, delete)
+        assert in_group?.(), "control: the community's own Reject puts it back"
+        assert {:ok, %{ignored_at: %DateTime{}}} = request.(:hide, record)
+      end
+    end
+
+    test "a Reject of the Lock after the community applied it leaves it locked", %{
+      local_moderator: local_moderator,
+      announced_by: community,
+      post: post,
+      sent: sent,
+      echo: echo,
+      request: request,
+      reject: reject
+    } do
+      someone = fake_user!()
+      {:ok, record} = Bonfire.Boundaries.Blocks.lock(post, current_user: local_moderator)
+      [lock] = sent.("Lock")
+
+      assert {:ok, _} = echo.(lock)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post),
+             "control: applied once the community did"
+
+      reject.(community, lock)
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post), "still locked"
+      assert {:ok, %{accepted_at: %DateTime{}, ignored_at: nil}} = request.(:lock, record)
+    end
+
+    test "a Reject of the ban after the community applied it leaves them banned", %{
+      local_moderator: local_moderator,
+      mirror: mirror,
+      announced_by: community,
+      post: post,
+      sent: sent,
+      echo: echo,
+      request: request,
+      reject: reject
+    } do
+      banned = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(banned, :silence,
+                 current_user: local_moderator,
+                 on_behalf_of: mirror
+               )
+
+      [ban] = sent.("Block")
+      {:ok, record} = Bonfire.Social.Moderations.record_of(ban)
+
+      assert {:ok, _} = echo.(ban)
+
+      refute Bonfire.Boundaries.can?(banned, :reply, post),
+             "control: applied once the community did"
+
+      reject.(community, ban)
+
+      refute Bonfire.Boundaries.can?(banned, :reply, post), "still banned"
+      assert {:ok, %{accepted_at: %DateTime{}, ignored_at: nil}} = request.(:silence, record)
+    end
+
+    test "a Reject of the removal after the community applied it leaves the post out", %{
+      local_moderator: local_moderator,
+      mirror: mirror,
+      announced_by: community,
+      post: post,
+      sent: sent,
+      echo: echo,
+      request: request,
+      reject: reject
+    } do
+      reader = fake_user!()
+
+      in_group? = fn ->
+        !!Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+          by: mirror,
+          current_user: reader
+        )
+      end
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.remove_post_from_group(local_moderator, mirror, post)
+
+      [delete] = sent.("Delete")
+      {:ok, record} = Bonfire.Social.Moderations.record_of(delete)
+
+      assert {:ok, _} = echo.(delete)
+      refute in_group?.(), "control: out once the community did"
+
+      reject.(community, delete)
+
+      refute in_group?.(), "still out"
+      assert {:ok, %{accepted_at: %DateTime{}, ignored_at: nil}} = request.(:hide, record)
+    end
+
+    test "a stranger's Announce of the Lock does not confirm it", %{
+      local_moderator: local_moderator,
+      post: post,
+      sent: sent,
+      echo: echo,
+      request: request,
+      stranger: stranger,
+      relay: relay
+    } do
+      someone = fake_user!()
+      {:ok, record} = Bonfire.Boundaries.Blocks.lock(post, current_user: local_moderator)
+      [lock] = sent.("Lock")
+
+      relay.(stranger, lock)
+
+      assert Bonfire.Boundaries.can?(someone, :reply, post), "not applied"
+
+      assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:lock, record),
+             "still pending"
+
+      assert {:ok, _} = echo.(lock)
+      refute Bonfire.Boundaries.can?(someone, :reply, post), "control: the community's does"
+      assert {:ok, %{accepted_at: %DateTime{}}} = request.(:lock, record)
+    end
+
+    test "a stranger's Announce of the ban does not confirm it", %{
+      local_moderator: local_moderator,
+      mirror: mirror,
+      post: post,
+      sent: sent,
+      echo: echo,
+      request: request,
+      stranger: stranger,
+      relay: relay
+    } do
+      banned = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Boundaries.Blocks.block(banned, :silence,
+                 current_user: local_moderator,
+                 on_behalf_of: mirror
+               )
+
+      [ban] = sent.("Block")
+      {:ok, record} = Bonfire.Social.Moderations.record_of(ban)
+
+      relay.(stranger, ban)
+
+      assert Bonfire.Boundaries.can?(banned, :reply, post), "not applied"
+      assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:silence, record), "pending"
+
+      assert {:ok, _} = echo.(ban)
+      refute Bonfire.Boundaries.can?(banned, :reply, post), "control: the community's does"
+    end
+
+    test "a stranger's Announce of the removal does not confirm it", %{
+      local_moderator: local_moderator,
+      mirror: mirror,
+      post: post,
+      sent: sent,
+      echo: echo,
+      request: request,
+      stranger: stranger,
+      relay: relay
+    } do
+      reader = fake_user!()
+
+      in_group? = fn ->
+        !!Bonfire.Social.FeedLoader.feed_contains?(:user_activities, post,
+          by: mirror,
+          current_user: reader
+        )
+      end
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.remove_post_from_group(local_moderator, mirror, post)
+
+      [delete] = sent.("Delete")
+      {:ok, record} = Bonfire.Social.Moderations.record_of(delete)
+
+      relay.(stranger, delete)
+
+      assert in_group?.(), "not applied"
+      assert {:ok, %{accepted_at: nil, ignored_at: nil}} = request.(:hide, record), "pending"
+
+      assert {:ok, _} = echo.(delete)
+      refute in_group?.(), "control: the community's does"
+    end
+  end
+
+  # the scheme and host of a URL, where an activity of that actor has its ids
+  defp origin(url) do
+    uri = URI.parse(url)
+    "#{uri.scheme}://#{uri.host}"
   end
 
   # delivered once, as a real delivery is: the transformer hands the activity to the adapter itself, so calling `Incoming.receive_activity/1` after it applied everything twice

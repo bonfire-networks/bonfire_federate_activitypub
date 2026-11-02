@@ -29,6 +29,8 @@ defmodule Bonfire.Federate.ActivityPub.PeertubeVideoUpdatesTest do
       %{method: :get, url: @account} -> json(fixture("tube_account.json"))
       %{method: :get, url: @channel} -> json(fixture("tube_channel.json"))
       %{method: :get, url: @video_id} -> json(video)
+      # another server's, which the sender of an Update has nothing to do with
+      %{method: :get, url: "https://victim.local" <> _} -> %Tesla.Env{status: 404, body: ""}
       env -> apply(ActivityPub.Test.HttpRequestMock, :request, [env])
     end)
 
@@ -58,10 +60,12 @@ defmodule Bonfire.Federate.ActivityPub.PeertubeVideoUpdatesTest do
     }
   end
 
-  defp media_for_video do
+  defp media_for_video, do: media_for(@video_id)
+
+  defp media_for(video_id) do
     repo().all(
       from(m in Bonfire.Files.Media,
-        where: fragment("?->'json_ld'->>'id'", m.metadata) == ^@video_id
+        where: fragment("?->'json_ld'->>'id'", m.metadata) == ^video_id
       )
     )
   end
@@ -81,6 +85,26 @@ defmodule Bonfire.Federate.ActivityPub.PeertubeVideoUpdatesTest do
 
     assert get_in(media.metadata, ["json_ld", "views"]) == 850,
            "the second Update did not update the item the first one made"
+  end
+
+  # The `Update` of an object we do not hold is made the object (above), so the id of the object has to be one its sender can speak for: otherwise an actor on any server could take the id of a post on another before we ever hear of the real one, and what the real one says would be refused as already held
+  test "an Update of a video on another server than the account sending it makes nothing", %{
+    video: video
+  } do
+    victim_id = "https://victim.local/videos/watch/stolen"
+
+    # it still names the account and the channel as its owners: the sender chose that
+    forged = Map.put(video, "id", victim_id)
+
+    delivered(%{update_of(video, 1) | "object" => forged})
+
+    assert media_for(victim_id) == [], "an Update made an item under another server's id"
+
+    assert {:error, :not_found} = ActivityPub.Object.get_cached(ap_id: victim_id)
+
+    # the control: the same Update with the video on the sender's own server makes it (the test above)
+    delivered(update_of(video, 2))
+    assert [_] = media_for_video()
   end
 
   test "an Update of a video we hold updates it, rather than making another", %{video: video} do

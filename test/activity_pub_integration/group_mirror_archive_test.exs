@@ -108,4 +108,76 @@ defmodule Bonfire.Federate.ActivityPub.GroupMirrorArchiveTest do
              Categories.get(id(mirror), skip_boundary_check: true),
            "the origin restored the group, but its mirror stayed archived"
   end
+
+  # An Undo is believed only once the origin serves the group again, as the Delete was only believed once it stopped. Whoever sends it, what the origin serves is what decides
+  test "an Undo of a Delete does not restore a mirror while its origin still does not serve it" do
+    assert {:ok, mirror} =
+             Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(
+               APSimulate.actor_json(@remote_group, "tests", %{"type" => "Group"})
+             )
+
+    delete = %{
+      "id" => "https://mocked.local/activities/delete-still-gone",
+      "type" => "Delete",
+      "actor" => @remote_mod,
+      "object" => @remote_group,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+    }
+
+    undo = fn id ->
+      %{
+        "id" => "https://mocked.local/activities/#{id}",
+        "type" => "Undo",
+        "actor" => @remote_mod,
+        "object" => delete,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+      }
+    end
+
+    serve_tombstone()
+    Transformer.handle_incoming(delete)
+
+    refute repo().get(Category, id(mirror)), "control: the origin's Delete archived the mirror"
+
+    # the origin still answers 410
+    Transformer.handle_incoming(undo.("undo-delete-still-gone"))
+
+    refute repo().get(Category, id(mirror)),
+           "an Undo restored a mirror whose origin still does not serve it"
+
+    # the control: the origin serves it again
+    serve_group()
+    Transformer.handle_incoming(undo.("undo-delete-served-again"))
+
+    assert {:ok, %Category{type: :group}} = Categories.get(id(mirror), skip_boundary_check: true),
+           "the origin serves the group again, so the Undo restores the mirror"
+  end
+
+  # Only a deletion we believed can be taken back, and only by whoever sent it: the origin serving the group says nothing about who archived our mirror, and an admin here may have
+  test "an Undo of a Delete nobody sent does not restore a mirror our admin archived" do
+    assert {:ok, mirror} =
+             Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(
+               APSimulate.actor_json(@remote_group, "tests", %{"type" => "Group"})
+             )
+
+    assert {:ok, _} = Categories.soft_delete(mirror, current_user: fake_user!())
+
+    refute repo().get(Category, id(mirror)), "control: archived here, by us"
+
+    Transformer.handle_incoming(%{
+      "id" => "https://mocked.local/activities/undo-delete-never-sent",
+      "type" => "Undo",
+      "actor" => @remote_mod,
+      "object" => %{
+        "id" => "https://mocked.local/activities/delete-never-sent",
+        "type" => "Delete",
+        "actor" => @remote_mod,
+        "object" => @remote_group
+      },
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+    })
+
+    refute repo().get(Category, id(mirror)),
+           "an Undo of a Delete nobody sent restored what our admin archived"
+  end
 end

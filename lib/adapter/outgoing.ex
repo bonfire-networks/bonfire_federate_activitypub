@@ -516,7 +516,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     end
   end
 
-  @doc "A group we host refusing a moderation activity (a `Lock`, a ban's `Block`, a removal's `Delete`) from someone elsewhere tells them, with a `Reject` of it from the group, so their instance takes back what it applied on their side (`Bonfire.Social.Moderations.refuse_applied/2` there). Nothing for a group we only mirror, whose origin answers, nor for an activity of our own."
+  @doc "A group we host refusing a moderation activity (a `Lock`, a ban's `Block`, a removal's `Delete`) from someone elsewhere tells them, with a `Reject` of it from the group, so their instance takes back what it applied on their side (`Bonfire.Social.Moderations.refuse_applied/3` there). Nothing for a group we only mirror, whose origin answers, nor for an activity of our own."
   def send_reject(%{} = subject, %{local: false, data: data} = activity) do
     with {:ok, %{local: true} = actor} <- ActivityPub.Actor.get_cached(pointer: subject),
          {:ok, reject} <-

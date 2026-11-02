@@ -201,6 +201,42 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
     end
   end
 
+  # The answered `Join` stays stored after they leave, and is found by its id alone, so an `Accept` may only settle a join still waiting here. Late, or sent by someone with an old `Join` of theirs, it must not put back someone who left
+  describe "the group's Accept of a Join" do
+    for openness <- ["open", "moderated"] do
+      test "after they left does not make them a member again (#{openness} group)" do
+        user = fake_user!()
+        group = remote_group(unquote(openness))
+        assert {:ok, _} = Categories.join_group(user, group)
+        assert [join] = sent("Join", user)
+
+        assert {:ok, _} = Categories.leave_group(user, group)
+        assert [_] = sent("Leave", user), "control: the group was told they left"
+        refute Categories.member?(user, group), "control: they left"
+        refute join_requested?(user, group)
+
+        assert {:ok, _} = Transformer.handle_incoming(answer("Accept", join)),
+               "the Accept never reached the handler, so this test proves nothing"
+
+        refute Categories.member?(user, group), "a late Accept put back someone who left"
+      end
+    end
+
+    # an open group admits at once and records no request, so its instant Accept has nothing to settle: it must leave them a member, as it does now
+    test "arriving at once for an open group keeps them a member" do
+      user = fake_user!()
+      group = remote_group("open")
+      assert {:ok, _} = Categories.join_group(user, group)
+      assert Categories.member?(user, group), "an open group admits at once"
+      refute join_requested?(user, group), "and records no request for the Accept to settle"
+      assert [join] = sent("Join", user)
+
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", join))
+
+      assert Categories.member?(user, group)
+    end
+  end
+
   # Lemmy, PieFed, Mbin and NodeBB never answer a `Join`, since following is joining there. Their actors declare no `members` collection, which is how we tell them apart from a group that answers joins itself. Not `openness`: we fill that in on storage from `manuallyApprovesFollowers` (`Transformer.fix_openness/1`), so every stored group that reviews followers has one
   describe "joining a remote group where following is joining, which reviews followers" do
     @follow_is_join %{"manuallyApprovesFollowers" => true}

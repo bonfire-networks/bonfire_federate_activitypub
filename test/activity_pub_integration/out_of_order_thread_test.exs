@@ -218,6 +218,62 @@ defmodule Bonfire.Federate.ActivityPub.OutOfOrderThreadTest do
     assert_counts(opener, 2, 0)
   end
 
+  # The opener a placeholder stands under is named by the SENDER, in `context`. Under a remote opener that is its author's server's call (the test above), but a post of ours has boundaries of its own: a reply that names it must not get into a thread its author locked just because the post it answers is not there to be checked
+  describe "a reply whose parent we cannot fetch, naming one of our posts as its context" do
+    setup do
+      # a refused reply starts a thread of its own instead of raising out of the job
+      Process.put(
+        [:bonfire_social, Bonfire.Social.Threads, :start_new_thread_if_reply_not_allowed],
+        true
+      )
+
+      alice = fake_user!()
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: alice,
+          boundary: "public",
+          post_attrs: %{post_content: %{html_body: "<p>opener</p>"}}
+        )
+
+      {:ok, %{data: %{"id" => opener_ap_id}}} = ActivityPub.Object.get_cached(pointer: post.id)
+
+      # unfetchable: 404, as when its server is down
+      missing = %{"id" => "#{@other_replier}/notes/missing-#{System.unique_integer([:positive])}"}
+
+      %{
+        alice: alice,
+        post: post,
+        reply: note("reply", missing) |> Map.put("context", opener_ap_id)
+      }
+    end
+
+    defp in_thread_of?(note, %{id: opener_id}) do
+      replied = replied(note)
+      replied.thread_id == opener_id or opener_id in (replied.path || [])
+    end
+
+    test "control: an open opener takes it", %{post: post, reply: reply} do
+      receive_in(ActivityPub.Federator.Workers.ReceiverWorker, create(reply))
+
+      assert in_thread_of?(reply, post), "so the setup does reach the opener through `context`"
+    end
+
+    test "a locked opener does not", %{alice: alice, post: post, reply: reply} do
+      {:ok, _} = Bonfire.Boundaries.Blocks.lock(post, current_user: alice)
+
+      {:ok, replier} = AdapterUtils.get_or_fetch_character_by_ap_id(@other_replier)
+
+      refute Bonfire.Boundaries.can?(replier, :reply, post.id),
+             "control: the replier may not reply to it"
+
+      receive_in(ActivityPub.Federator.Workers.ReceiverWorker, create(reply))
+
+      refute in_thread_of?(reply, post),
+             "a made-up `context` put a reply in a thread its author locked"
+    end
+  end
+
   # Whichever way a reply reaches us, the post it answers is fetched with it, so it arrives in its thread. Each delivery goes through the inbox worker that takes it in production, which is what decides whether the parent is fetched right away (`Fetcher.maybe_fetch/2`)
   describe "the post a reply answers is fetched with it, when the reply" do
     setup %{served: served} do

@@ -1054,6 +1054,51 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
       refute Enum.any?(inboxes(moderator_actor, ban), &(&1 in their_inboxes))
     end
 
+    # A removal is addressed to Public so the group can relay it, but, as a ban, it is not for the moderator's own followers, who would get the reason too
+    test "a removal goes to the group's side and not to the moderator's remote followers", %{
+      moderator: moderator,
+      moderator_actor: moderator_actor,
+      group: group,
+      person: person,
+      their_inboxes: their_inboxes
+    } do
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(person, group)
+      post = post_in_group(person, group, "<p>a member's post the group will drop</p>")
+      {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+      assert {:ok, _} = Bonfire.Classify.Categories.remove_post_from_group(moderator, group, post)
+
+      assert %{data: %{"summary" => summary, "audience" => audience}} =
+               delete = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete"),
+             "control: a moderator's removal is sent"
+
+      assert is_binary(summary) and audience == group_ap_id(group),
+             "control: with its reason, and naming the group"
+
+      refute Enum.any?(inboxes(moderator_actor, delete), &(&1 in their_inboxes)),
+             "the moderator's own followers got the removal and its reason"
+    end
+
+    test "control: an author's own Delete still reaches the author's remote followers", %{
+      group: group,
+      person: person,
+      their_inboxes: their_inboxes
+    } do
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(person, group)
+      {:ok, _} = Follows.follow(remote_follower(), person, skip_boundary_check: true)
+      {:ok, person_actor} = ActivityPub.Actor.get_cached(pointer: person)
+
+      post = post_in_group(person, group, "<p>soon gone</p>")
+      {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
+
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: person)
+
+      delete = ActivityPub.Object.get_activity_for_object_ap_id(ap_id, "Delete")
+      refute delete.data["summary"], "control: an author's Delete carries no reason"
+
+      assert Enum.any?(inboxes(person_actor, delete), &(&1 in their_inboxes))
+    end
+
     # The moderator's `Block` reaches the banned person's own instance only through the group's relay to its followers, and a block ghosts them, so the publisher skips them there. The group's own `Block` goes to them directly instead, for a block only: a ghost reads on the other side as the group blocking them, which a silence is not
     test "a block also sends the group's own Block straight to the banned person's instance", %{
       moderator: moderator,

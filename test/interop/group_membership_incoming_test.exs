@@ -138,6 +138,64 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
     end)
   end
 
+  # a group we only MIRROR: its members are its own instance's to decide, and our mirror learns the outcome from the group's own answer
+  @mirror "https://elsewhere.local/groups/cooks"
+
+  defp mirror!(openness) do
+    group_json =
+      APSimulate.actor_json(@mirror, "cooks", %{"type" => "Group", "openness" => openness})
+
+    mock(fn
+      %{method: :get, url: @remote_actor} ->
+        json(APSimulate.actor_json(@remote_actor, "joiner"))
+
+      %{method: :get, url: @mirror} ->
+        json(group_json)
+
+      %{method: :post} ->
+        %Tesla.Env{status: 202, body: ""}
+
+      %{method: :get} ->
+        %Tesla.Env{status: 404, body: ""}
+    end)
+
+    {:ok, mirror} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(group_json)
+    {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
+    mirror
+  end
+
+  defp join_requested?(user, group),
+    do: Bonfire.Social.Requests.requested?(user, Bonfire.Boundaries.Verbs.get_id!(:join), group)
+
+  describe "a Join or Follow aimed at a group we only mirror" do
+    for type <- ["Join", "Follow"], openness <- ["open", "moderated"] do
+      test "a #{type} of a #{openness} mirror changes nothing here, and is not accepted for it",
+           %{
+             group: group,
+             group_ap_id: group_ap_id
+           } do
+        mirror = mirror!(unquote(openness))
+
+        # the control: the same activity at our own open group reaches the handler, and is accepted
+        assert {:ok, _} =
+                 Transformer.handle_incoming(membership_activity(unquote(type), group_ap_id))
+
+        user = remote_user()
+        assert Categories.member?(user, group)
+        assert [_] = accepts_of(unquote(type), group_ap_id)
+
+        Transformer.handle_incoming(membership_activity(unquote(type), @mirror))
+
+        refute Categories.member?(user, mirror), "added to the members of a group we do not host"
+        refute join_requested?(user, mirror), "filed a join request for a group we do not host"
+        refute Bonfire.Social.Graph.Follows.following?(user, mirror)
+
+        assert accepts_of(unquote(type), @mirror) == [],
+               "answered in the name of a group hosted elsewhere"
+      end
+    end
+  end
+
   describe "an incoming Join" do
     # A peer that sends `Join` (Mobilizon) sends `Follow` separately, but gets a group's content by being a member. Our delivery goes to followers, so a remote member is made a LOCAL follower: recorded here, federated nowhere, and tied to the `Join` so leaving removes it.
     test "makes them a member and a local follower, sending nothing as them", %{

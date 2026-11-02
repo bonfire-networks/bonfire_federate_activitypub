@@ -65,7 +65,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         assert Interop.await(
                  fn ->
-                   match?({:ok, %{"following" => true}}, MastodonApi.relationship(api, account["id"]))
+                   match?(
+                     {:ok, %{"following" => true}},
+                     MastodonApi.relationship(api, account["id"])
+                   )
                  end,
                  seconds: wait
                ),
@@ -111,9 +114,16 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       after
         # the account is a real person's, so say what happened to the follow
         case Tester.unfollow(follower, group_url) do
-          :ok -> :ok
-          {:ok, _} -> IO.puts("cleanup: #{name} unfollowed #{group_url}")
-          other -> IO.puts("cleanup FAILED: could not unfollow #{group_url} on #{name}: #{inspect(other)}")
+          :ok ->
+            :ok
+
+          {:ok, _} ->
+            IO.puts("cleanup: #{name} unfollowed #{group_url}")
+
+          other ->
+            IO.puts(
+              "cleanup FAILED: could not unfollow #{group_url} on #{name}: #{inspect(other)}"
+            )
         end
       end
     end

@@ -289,6 +289,107 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
     end
   end
 
+  # `broader` is what the actor's own server says about its own groups, so it is followed only to a group on the actor's own host, as it is at home. One naming a group on ANOTHER host (ours included) would put a stranger's group in that group's topic list, its sidebar and the `narrower` collection it serves to other servers, and every `Update` would put it back
+  describe "a broader group on another host than the actor's" do
+    setup do
+      creator = fake_user!()
+
+      group =
+        Bonfire.Classify.Simulate.fake_group!(creator, %{
+          membership: "open",
+          visibility: "global",
+          participation: "anyone"
+        })
+
+      {:ok,
+       creator: creator, group: group, group_ap_id: Categories.format_actor(group).data["id"]}
+    end
+
+    # whether the category sits under the group in the tree, as its parent or its custodian
+    defp filed_in?(category, group) do
+      tree = category |> Repo.preload(:tree, force: true) |> e(:tree, nil)
+      e(tree, :parent_id, nil) == id(group) or e(tree, :custodian_id, nil) == id(group)
+    end
+
+    test "ours: a mirror naming one of our groups is not filed in it", %{
+      served: served,
+      creator: creator,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      local_topic = Bonfire.Classify.Simulate.fake_category!(creator, group, %{type: :topic})
+      assert filed_in?(local_topic, group), "control: the probe sees a topic that is in the group"
+
+      evil = "https://evil.local/pub/actors/#{System.unique_integer([:positive])}"
+      serve(%{evil => bonfire_actor(served, evil, %{"broader" => group_ap_id})})
+
+      assert {:ok, %Bonfire.Classify.Category{} = mirror} =
+               Adapter.maybe_create_remote_actor(%{"id" => evil})
+
+      refute filed_in?(mirror, group), "a stranger's group was filed in one of ours"
+    end
+
+    test "another host's: not filed under that group's mirror, while one on the parent's own host is",
+         %{served: served} do
+      n = System.unique_integer([:positive])
+      parent = "https://elsewhere.local/pub/actors/parent#{n}"
+      sibling = "https://elsewhere.local/pub/actors/topic#{n}"
+      child = "https://bonfire.local/pub/actors/child#{n}"
+
+      serve(%{
+        parent =>
+          bonfire_actor(served, parent, %{
+            "members" => "#{parent}/members",
+            "capabilities" => %{"acceptsJoins" => true}
+          }),
+        sibling => bonfire_actor(served, sibling, %{"broader" => parent}),
+        child => bonfire_actor(served, child, %{"broader" => parent})
+      })
+
+      assert {:ok, sibling_mirror} = Adapter.maybe_create_remote_actor(%{"id" => sibling})
+
+      assert {:ok, parent_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(parent)
+
+      assert parent_id_of(sibling_mirror) == id(parent_mirror),
+             "control: on the parent's own host, it is filed under it"
+
+      assert {:ok, mirror} = Adapter.maybe_create_remote_actor(%{"id" => child})
+      assert parent_id_of(mirror) == nil, "filed under a group on another host"
+    end
+
+    test "an Update naming one of ours doesn't move a mirror out of its parent", %{
+      served: served,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      id = "https://bonfire.local/pub/actors/#{System.unique_integer([:positive])}"
+      before = bonfire_actor(served, id, %{"broader" => @bonfire_parent})
+      serve_with_parent(served, id, before)
+
+      assert {:ok, mirror} = Adapter.maybe_create_remote_actor(%{"id" => id})
+
+      assert parent_id_of(mirror) == id(parent_mirror!()),
+             "control: filed under its own host's group"
+
+      updated = Map.put(before, "broader", group_ap_id)
+      serve_with_parent(served, id, updated)
+
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Update",
+                 "id" => "#{id}/activities/update/hijack",
+                 "actor" => id,
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "object" => updated
+               })
+
+      assert {:ok, reloaded} = Categories.get(id(mirror), skip_boundary_check: true)
+      assert parent_id_of(reloaded) == id(parent_mirror!())
+      refute filed_in?(reloaded, group)
+    end
+  end
+
   # a parent may name a parent in turn, and a chain may be a cycle (FEP-9b2b: "limit how far you follow them"), so the chain is followed as deep as incoming threads may be (`federation_incoming_max_recursion`) and a cycle isn't followed round
   describe "a chain of broader groups" do
     setup %{served: served} do

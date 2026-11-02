@@ -963,7 +963,6 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       |> repo().aggregate(:count)
     end
 
-
     # A group on this instance, a member of it who is NOT the group's moderator, someone on the other instance following the group, and a post the member published in it, asserted to have reached that follower and to be in the group there: the starting point for what moderators and authors do to such a post
     defp member_post_in_followed_group!(context, html_body) do
       moderator = context[:local][:user]
