@@ -84,6 +84,66 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       assert obj["content"] =~ attrs.post_content.html_body
     end
 
+    # A post is served by its own boundary, which depends on how it reached the group: one published IN a group kept off the fediverse takes the group's boundaries, so stays here; one its author published with a federated boundary and then shared into the group (the group boosts it) keeps its own, so is fetchable, and only the group's boost of it stays here
+    test "a post in a non-federated group is served by its own boundary" do
+      creator = fake_user!()
+      member = fake_user!()
+
+      group =
+        Bonfire.Classify.Simulate.fake_group!(creator, %{
+          membership: "local:members",
+          visibility: "nonfederated:preview",
+          participation: "local:contributors"
+        })
+
+      {:ok, _} =
+        Bonfire.Classify.Categories.add_member(creator, group, id(member),
+          skip_boundary_check: true
+        )
+
+      # published with its own public boundary, then shared into the group
+      {:ok, federated} =
+        Posts.publish(
+          current_user: member,
+          post_attrs: %{post_content: %{html_body: "<p>federated text</p>"}},
+          boundary: "public"
+        )
+
+      assert {:ok, _} = Bonfire.Social.Boosts.boost(group, federated)
+
+      assert Bonfire.Social.Boosts.boosted?(group, federated),
+             "control: shared into the group"
+
+      kept_here =
+        Bonfire.Classify.Simulate.fake_post_in_group!(member, group, "<p>kept-here text</p>")
+
+      fetch = fn post -> build_conn() |> get("/pub/objects/#{post.id}") end
+
+      served = fetch.(federated)
+      assert served.status == 200, "control: a federated post is served (#{served.status})"
+      assert served.resp_body =~ "federated text"
+
+      refused = fetch.(kept_here)
+      assert refused.status in [401, 403, 404], "served (#{refused.status}) a non-federated post"
+      refute refused.resp_body =~ "kept-here text"
+    end
+
+    test "a local-only post is not served" do
+      user = fake_user!()
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: user,
+          post_attrs: %{post_content: %{html_body: "<p>local-only text</p>"}},
+          boundary: "local"
+        )
+
+      conn = build_conn() |> get("/pub/objects/#{post.id}")
+
+      assert conn.status in [401, 403, 404], "served (#{conn.status}) a local-only post"
+      refute conn.resp_body =~ "local-only text"
+    end
+
     test "fetch local post from AP API with Pointer ID, and take into account unindexable setting" do
       user =
         fake_user!()

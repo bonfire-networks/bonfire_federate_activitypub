@@ -133,4 +133,62 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupSettingsRedirectTest do
       |> refute_has("#{request} button", text: "Delete group")
     end
   end
+
+  # Who moderates a group and what it is called are its origin's to say: a moderator of our mirror changing either here would change it for our users only, with nothing sent, until the next sync puts it back. Refused for now, until those changes are sent to the group's server (the TODO at `Categories.hosted_here/1`)
+  describe "a mirror's moderators and name are its origin's" do
+    setup do
+      other = fake_user!()
+      {:ok, %{ap_id: other_ap_id}} = ActivityPub.Actor.get_cached(pointer: other)
+      %{other: other, other_ap_id: other_ap_id}
+    end
+
+    test "a moderator here can't remove or add one of the mirror's moderators, and can on a group hosted here",
+         %{group: group, me: me, other: other, other_ap_id: other_ap_id} do
+      {:ok, %{ap_id: my_ap_id}} = ActivityPub.Actor.get_cached(pointer: me)
+
+      listed = %{
+        "type" => "OrderedCollection",
+        "id" => @moderators,
+        "orderedItems" => [my_ap_id, other_ap_id]
+      }
+
+      assert {:ok, _} = Categories.sync_remote_moderators(group, listed)
+      assert Bonfire.Boundaries.can?(other, :mediate, group), "control: listed by the origin"
+
+      assert {:error, _} = Categories.remove_moderator(me, group, id(other))
+
+      assert Bonfire.Boundaries.can?(other, :mediate, group),
+             "demoted here, though the origin lists them"
+
+      newcomer = fake_user!()
+      assert {:error, _} = Categories.add_moderator(me, group, id(newcomer))
+
+      refute Bonfire.Boundaries.can?(newcomer, :mediate, group),
+             "promoted here, though the origin doesn't list them"
+
+      # control: a group hosted here
+      local = Bonfire.Classify.Simulate.fake_group!(me)
+      assert {:ok, _} = Categories.add_moderator(me, local, id(other))
+      assert {:ok, _} = Categories.remove_moderator(me, local, id(other))
+      refute Bonfire.Boundaries.can?(other, :mediate, local)
+    end
+
+    test "a moderator here can't rename the mirror, and can rename a group hosted here", %{
+      group: group,
+      me: me
+    } do
+      before = e(Bonfire.Common.Repo.maybe_preload(group, :profile), :profile, :name, nil)
+
+      assert {:error, _} = Categories.update(me, group, %{profile: %{name: "Renamed here"}})
+
+      {:ok, reloaded} = Categories.get(id(group), skip_boundary_check: true)
+
+      assert e(Bonfire.Common.Repo.maybe_preload(reloaded, :profile), :profile, :name, nil) ==
+               before
+
+      # control: a group hosted here
+      local = Bonfire.Classify.Simulate.fake_group!(me)
+      assert {:ok, _} = Categories.update(me, local, %{profile: %{name: "Renamed here"}})
+    end
+  end
 end

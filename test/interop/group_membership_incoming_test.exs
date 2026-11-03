@@ -184,7 +184,11 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
         assert Categories.member?(user, group)
         assert [_] = accepts_of(unquote(type), group_ap_id)
 
-        Transformer.handle_incoming(membership_activity(unquote(type), @mirror))
+        result = Transformer.handle_incoming(membership_activity(unquote(type), @mirror))
+
+        # a refusal a retry won't change: the delivery job is cancelled, not retried. The Follow is refused before our handler, as it was
+        if unquote(type) == "Join",
+          do: assert({:cancel, _} = result, "got #{inspect(result)}")
 
         refute Categories.member?(user, mirror), "added to the members of a group we do not host"
         refute join_requested?(user, mirror), "filed a join request for a group we do not host"

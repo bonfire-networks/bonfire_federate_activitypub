@@ -430,6 +430,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
 
     This is the only way to obtain honest interop fixtures. `incoming/1`, `ap_object.data` and `actor.data` are all post-transformer, so a test built from them asserts that we produce what we produced, and they hold nothing at all for the documents we rejected, which are exactly the interesting ones. Fixtures have to be the wire bytes, including the fields we don't understand yet.
     """
+    # TODO: skip a post or activity that is not addressed to Public (a direct message delivered to us, a followers-only post), so what gets committed as a fixture is only what its author made public; actors, collections and our own test actors' handshakes stay captured
     def capture(document, context) do
       dir = Path.join([fixtures_path(), "captured", document_host(document, context)])
       File.mkdir_p!(dir)

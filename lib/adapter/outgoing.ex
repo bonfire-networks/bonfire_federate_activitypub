@@ -202,7 +202,7 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
     |> group_announces(announce_target)
   end
 
-  # What happens in a group we host is announced by the group to its followers, who only know about it through the group's announcement of it: an edit, a vote and its undoing, a lock and its undoing, a ban from the group, a deletion. Done here, once the publisher of whatever type built the activity, so no type's module has to remember to (`AdapterUtils.group_announce_target_of_activity/1` says which activities and for what). A `Create` is announced by the group's auto-boost.
+  # What happens in a group we host is announced by the group to its followers, who only know about it through the group's announcement of it: an edit, a like and its undoing, a lock and its undoing, a ban from the group, a deletion. Done here, once the publisher of whatever type built the activity, so no type's module has to remember to (`AdapterUtils.group_announce_target_of_activity/1` says which activities and for what). A `Create` is announced by the group's auto-boost.
   defp group_announces({:ok, activity} = result) do
     group_announces(result, AdapterUtils.group_announce_target_of_activity(activity))
   end

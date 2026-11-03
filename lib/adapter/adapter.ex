@@ -85,6 +85,21 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def items_listed?(_actor_or_collection, _kind), do: true
 
+  # Whether a local actor may be served over ActivityPub by any route: its own boundaries must let the `activity_pub` circle read it (`AdapterUtils.character_ap_readable?/2`), as for what it sends (`Outgoing.federate_outgoing?/2`). One that can't be found here is not this check's to refuse.
+  # a cached local actor carries its character, so there is nothing to look up
+  defp servable?(%{pointer: %{id: _} = character}),
+    do: AdapterUtils.remotely_reachable?(character)
+
+  defp servable?(username_or_ap_id) when is_binary(username_or_ap_id) do
+    case AdapterUtils.get_character(username_or_ap_id, skip_boundary_check: true) do
+      {:ok, character} -> AdapterUtils.remotely_reachable?(character)
+      _ -> true
+    end
+  end
+
+  defp servable?(%{username: username}) when is_binary(username), do: servable?(username)
+  defp servable?(_), do: true
+
   defp roster_listed?(group_or_id),
     do:
       maybe_apply(Bonfire.Classify.Categories, :roster_listed?, [group_or_id],
@@ -154,6 +169,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       fallback_return: []
     )
     |> List.flatten()
+    # a local user blocked instance-wide is deactivated, and not named as anyone's follower
+    |> then(&maybe_apply(Bonfire.Me.Users, :check_active, [&1], fallback_return: &1))
   end
 
   @doc """
@@ -658,6 +675,7 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   end
 
   # Resolved to the character's id first, because `URIs.path/1` turns an id into its TYPED path (a group lands on its group page), whereas a bare username can only be read as a person's `/@name`. Unboundarised on purpose: this builds a path rather than serving anything, and the page it leads to applies the viewer's own boundaries. The AP-gated `AdapterUtils.get_character_by_username/2` would refuse exactly the private groups a browser most needs sending somewhere useful.
+  # TODO: the redirect answers differently for a private group that exists than for a username that doesn't, so its existence can be probed: answer as for a missing one when the AP routes would not serve the character (`federate_actor?/3`), as they do
   defp get_url_by_username(username) do
     with {:ok, %{id: id}} <- Bonfire.Me.Characters.by_username(username),
          path when is_binary(path) <- URIs.path(id) do
@@ -737,8 +755,11 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def get_locale, do: Bonfire.Common.Localise.get_locale_id()
 
-  def federate_actor?(actor, direction \\ nil, by_actor \\ nil),
-    do: federation_allowed?(actor, direction: direction, by_actor: by_actor)
+  # a local actor being SERVED (`:out`, it is `by_actor`, as the AP routes ask) must also be one its own boundaries let reach the fediverse: a group kept off it is served by no route, whatever the instance's federation mode
+  def federate_actor?(actor, direction \\ nil, by_actor \\ nil) do
+    federation_allowed?(actor, direction: direction, by_actor: by_actor) &&
+      (direction != :out or is_nil(by_actor) or servable?(by_actor))
+  end
 
   def transform_outgoing(data, target_host \\ nil, target_actor_id \\ nil)
 

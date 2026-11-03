@@ -103,12 +103,11 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
     announce
   end
 
-  # the activity's row holds it as it reached us, which is what the library sends as the Announce's object
+  # the activity's row holds it as it reached us (a `Create` or `Update` with its object put back, `Object.received_document/1`), which is what the library sends as the Announce's object
   defp held_as_received?(document) do
-    {:ok, %ActivityPub.Object{data_received: received}} =
-      ActivityPub.Object.get_cached(ap_id: document["id"])
+    {:ok, row} = ActivityPub.Object.get_cached(ap_id: document["id"])
 
-    received == document
+    ActivityPub.Object.received_document(row) == document
   end
 
   defp signed_update(%{key: key, group_ap_id: group_ap_id, incoming: incoming}, actor \\ @author) do

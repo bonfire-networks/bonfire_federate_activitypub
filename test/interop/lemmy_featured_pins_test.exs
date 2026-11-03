@@ -1,6 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.LemmyFeaturedPinsTest do
   @moduledoc """
-  A Lemmy moderator features a post with an `Add` to the community's `featured` collection, and unfeatures it with a `Remove`, cc'd to the community, which announces it (`send_add_featured_post` in Lemmy's `crates/apub/activities/src/community/collection_add.rs`). We pin the post into our mirror of the community, never onto the moderator, and only when the sender has authority over the community (`Categories.authority_over_group?/2`).
+  A Lemmy moderator features a post with an `Add` to the community's `featured` collection, and unfeatures it with a `Remove`, cc'd to the community, which announces it (`send_add_featured_post` in Lemmy's `crates/apub/activities/src/community/collection_add.rs`). We pin the post into our mirror of the community, never onto the moderator, and only when the sender is the community or one of its moderators (`Categories.listed_moderator?/2`): sharing its host is not enough, since the pin is applied as the activity says.
 
   `add_featured_post.json` and `remove_featured_post.json` follow Lemmy's committed assets (`crates/apub/apub/assets/lemmy/activities/community/`), with hostnames, ids and the post rewritten to the community and post the other fixtures here use.
   """
@@ -15,6 +15,7 @@ defmodule Bonfire.Federate.ActivityPub.LemmyFeaturedPinsTest do
   # read from this checkout rather than through `fixture/2`, whose path comes from wherever `ThreadiverseFixtures` was compiled
   @featured_fixtures Path.join([__DIR__, "..", "fixtures", "lemmy"])
   @stranger "https://elsewhere.local/u/stranger"
+  @neighbour "https://lemmy.local/u/neighbour"
 
   @technology %{
     name: "Lemmy",
@@ -31,6 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.LemmyFeaturedPinsTest do
     served =
       Map.new(served_for([@technology]))
       |> Map.put(@stranger, author_actor(@stranger))
+      |> Map.put(@neighbour, author_actor(@neighbour))
       # the lib dereferences an Add's `target`; Lemmy serves its community's `featured` as an OrderedCollection
       |> Map.put("#{@community}/featured", %{
         "type" => "OrderedCollection",
@@ -114,5 +116,37 @@ defmodule Bonfire.Federate.ActivityPub.LemmyFeaturedPinsTest do
 
     refute Pins.pinned?(id(group), post)
     refute Pins.pinned?(id(stranger), post)
+  end
+
+  # sharing the community's host is not authority over it: any account there could otherwise feature into it
+  test "an Add from an account on the community's own host that doesn't moderate it is refused",
+       %{
+         group: group,
+         post: post
+       } do
+    {:ok, neighbour} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(@neighbour)
+
+    featured_fixture("add_featured_post.json")
+    |> Map.merge(%{"actor" => @neighbour, "id" => "#{@neighbour}/activities/add/1"})
+    |> receive_announce()
+
+    refute Pins.pinned?(id(group), post)
+    refute Pins.pinned?(id(neighbour), post)
+  end
+
+  test "a Remove from an account on the community's own host that doesn't moderate it leaves the pin",
+       %{group: group, post: post} do
+    {:ok, _} =
+      Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(@neighbour)
+
+    receive_announce(featured_fixture("add_featured_post.json"))
+    assert Pins.pinned?(id(group), post), "control: pinned"
+
+    featured_fixture("remove_featured_post.json")
+    |> Map.merge(%{"actor" => @neighbour, "id" => "#{@neighbour}/activities/remove/1"})
+    |> receive_announce()
+
+    assert Pins.pinned?(id(group), post)
   end
 end

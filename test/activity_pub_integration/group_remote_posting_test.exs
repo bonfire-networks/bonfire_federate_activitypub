@@ -108,6 +108,25 @@ defmodule Bonfire.Federate.ActivityPub.GroupRemotePostingTest do
            "this is the exact shape the production report produced: the community in `cc`, nothing in `to`, no `Public` anywhere"
   end
 
+  # A community elsewhere is addressed only by a post whose boundary suits it: PieFed re-announces whatever `Create` is addressed to one of its communities as Public to all its followers, whatever the post's own `to` (`pyfedi/app/activitypub/routes.py:1895-1922`), and Lemmy refuses a non-public one in a public community. So a followers-only or mentions-only post in its thread goes to whom it names, and not to the community
+  test "a post that isn't public isn't addressed to a public community elsewhere, while a public one is" do
+    group = mirrored_community()
+    user = fake_user!()
+    post = post_in_group_as_composer_would(user, group, "<p>into the community</p>")
+    post = repo().maybe_preload(post, [:tree, replied: [thread: [created: :creator]]])
+
+    public = Bonfire.Federate.ActivityPub.AdapterUtils.determine_recipients(user, post, true)
+    assert @community in public.cc, "control: a public post is addressed to the community"
+    assert public.audience == @community
+
+    not_public = Bonfire.Federate.ActivityPub.AdapterUtils.determine_recipients(user, post, false)
+
+    refute @community in not_public.cc,
+           "a non-public post was addressed to a public community elsewhere"
+
+    assert is_nil(not_public.audience), "and named it as its audience, which PieFed reads too"
+  end
+
   # Deleting a post of ours that's in a community elsewhere has to reach the community, which then relays it to its followers. Lemmy accepts a plain `Delete` of a post from anyone on the post's own instance who isn't banned from the community (`verify_delete_post_or_comment`, `verify_domains_match(actor, object_id)`), so the author's and our admin's both count, as long as the community is addressed
   describe "deleting a post of ours in a mirrored community" do
     test "by its author sends their Delete to the community" do

@@ -1654,6 +1654,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   # A TOPIC is followed rather than joined, and belongs to a group: it names that group with FEP-9b2b's `broader` and its scheme (`inScheme`), declares the group's membership as its own only when that parent has one (its members are who may take part), and says nothing about joining (no `openness`, no `acceptsJoins`)
+  # TODO: a topic's `broader` (and the `members` it declares) may name a parent group kept off the fediverse, which then shows up by name: leave the parent out when the AP routes would not serve it (`Adapter.federate_actor?/3` with the parent as `by_actor`)
   defp category_kind_declarations(%{type: :topic} = topic, _dims) do
     parent = category_parent(topic)
 
@@ -2329,7 +2330,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       |> Enum.uniq()
       |> debug("direct_recipients")
 
-    audience = maybe_determine_audience(object)
+    audience = if audience_suits?(object, is_public?), do: maybe_determine_audience(object)
 
     %{
       to: if(is_public?, do: [public_uri()], else: []),
@@ -2391,6 +2392,30 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   # Returns a bare ap_id or nil, NOT a list. Lemmy types `audience` as `Option<ObjectId<ApubCommunity>>` on both its `Note` and `Page`, and unlike `to`/`cc` it has no `deserialize_one_or_many`, so an array is rejected outright: a live post into a real community answered `400 data did not match any variant of untagged enum AnnouncableActivities` until this was scalar.
   # Every capture we hold sends a bare string too.
   # Public for activities ABOUT an object in a group as well (a `Lock` names the group whose moderator closed the thread), so "which group is this in" has the one answer.
+  # A group hosted elsewhere is addressed (and named as the audience) only by a post whose boundary suits it: a public post in a public group, a non-public one in a group that isn't. PieFed re-announces any `Create` addressed to one of its communities as Public to all its followers, whatever the post's own `to` (`pyfedi/app/activitypub/routes.py:1895-1922`), and Lemmy refuses a non-public post in a public community and a public one in a private community (`verify_visibility`). So a followers-only or mentions-only post in a public community's thread goes to whom it names, not to the community. A group we host is addressed as before: it relays only public posts itself. 
+  defp audience_suits?(object, is_public?) do
+    case group_actor_of(object) do
+      {:ok, %{local: false, pointer_id: group_id}} when is_binary(group_id) ->
+        remote_group_public?(group_id) == is_public?
+
+      _ ->
+        true
+    end
+  end
+
+  # what the mirror holds of the group's visibility, as its origin declares it (`Categories.create_remote/2`)
+  defp remote_group_public?(group_id) do
+    with {:ok, group} <- get_character_by_id(group_id) do
+      group
+      |> Bonfire.Boundaries.Presets.group_dimension_slugs()
+      |> Map.get(:visibility)
+      |> Bonfire.Boundaries.Presets.slug_scope() == "global"
+    else
+      # not found: as before
+      _ -> true
+    end
+  end
+
   def maybe_determine_audience(object) do
     case group_actor_of(object) do
       {:ok, %{ap_id: ap_id}} when is_binary(ap_id) -> ap_id
@@ -2407,14 +2432,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   """
   def group_announce_target(object) do
     with {:ok, %{local: true} = group_actor} <- group_actor_of(object) do
-      # a vote is addressed to the post's author and the group rather than Public, so the announce's own check would refuse it: announced when the POST is public, as the threadiverse relays votes
+      # a like is addressed to the post's author and the group rather than Public, so the announce's own check would refuse it: announced when the POST is public, as the threadiverse relays upvotes
       %{group: group_actor, public?: object_ap_public?(object)}
     else
       _ -> nil
     end
   end
 
-  # The activities a group announces to its followers when they are about something in it, as Lemmy's communities do for every announcable activity (`send_activity_in_community`): an edit or a deletion of a post, a vote, a lock, a ban from the group, and the `Undo` of the last three. Not a `Create`, which the group's auto-boost announces.
+  # The activities a group announces to its followers when they are about something in it, as Lemmy's communities do for every announcable activity (`send_activity_in_community`): an edit or a deletion of a post, a like (the threadiverse's upvote), a lock, a ban from the group, and the `Undo` of the last three. Not a `Create`, which the group's auto-boost announces, and so not a poll vote either, which is addressed to the poll's author alone: the poll's updated counts are what followers get.
   @announced_by_group ["Update", "Delete", "Like", "Lock", "Block"]
   @announced_by_group_when_undone ["Like", "Lock", "Block"]
 

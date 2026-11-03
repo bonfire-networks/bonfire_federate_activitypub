@@ -630,8 +630,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
     end
   end
 
-  # A like reaches the post's author and the group, and nobody else: followers' instances only count a vote the group relays, as Lemmy, PieFed, Mbin and NodeBB all do. Without it a post's count on their copy of the group is only their own users' votes
-  describe "the group relays votes on a post published in it" do
+  # A like reaches the post's author and the group, and nobody else: followers' instances only count an upvote the group relays, as Lemmy, PieFed, Mbin and NodeBB all do. Without it a post's count on their copy of the group is only their own users' upvotes
+  describe "the group relays likes on a post published in it" do
     setup do
       mock(fn
         %{method: :get, url: @remote_actor} -> json(APSimulate.actor_json(@remote_actor))
@@ -696,6 +696,42 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
       assert %{data: %{"type" => "Announce"}} =
                ActivityPub.Object.get_existing_announce(group_ap_id(group), activity)
+    end
+
+    # a poll vote is addressed to the poll's author alone, and a relay would publish who voted for what: the poll's own updated counts are what followers see
+    test "but not a vote in a poll published in it", %{group: group} do
+      creator = fake_user!()
+
+      assert {:ok, question} =
+               Bonfire.Poll.Fake.fake_question_with_choices(%{}, nil,
+                 current_user: creator,
+                 context_id: uid(group),
+                 to_circles: [uid(group)],
+                 boundary: "public"
+               )
+
+      [choice | _] = repo().maybe_preload(question, :choices).choices
+
+      assert {:ok, vote} =
+               Bonfire.Poll.Votes.vote(fake_user!(), question, [%{choice_id: uid(choice)}])
+
+      assert %ActivityPub.Object{data: %{"type" => "Create"}} =
+               vote_activity = Outgoing.ap_activity!(vote),
+             "control: the vote federated"
+
+      refute ActivityPub.Object.get_existing_announce(group_ap_id(group), vote_activity)
+
+      liker = fake_user!()
+      assert {:ok, _} = Bonfire.Social.Likes.like(liker, question)
+      {:ok, %{ap_id: liker_ap_id}} = ActivityPub.Actor.get_cached(pointer: liker)
+      {:ok, ap_question} = ActivityPub.Object.get_cached(pointer: question)
+
+      assert %{data: %{"type" => "Announce"}} =
+               ActivityPub.Object.get_existing_announce(
+                 group_ap_id(group),
+                 ActivityPub.Object.get_existing_like(liker_ap_id, ap_question.data["id"])
+               ),
+             "control: a like on the same poll is relayed, so the poll is the group's"
     end
   end
 
@@ -912,6 +948,36 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
 
     assert {:ok, %{data: %{"type" => type}}} = ActivityPub.Object.get_cached(ap_id: ap_id)
     refute type == "Tombstone", "and our own copy of its AP object stays as it was"
+  end
+
+  # the removal's Delete is relayed by the post's own group: one naming another group the moderator moderates must not make the post's group announce a removal its moderators never made
+  test "a moderator naming one group can't make another announce a removal" do
+    moderator = fake_user!()
+    group_a = public_group(moderator)
+    group_b = public_group(fake_user!())
+    author = fake_user!()
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(author, group_a)
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(author, group_b)
+
+    in_a = post_in_group(author, group_a, "<p>in A</p>")
+    in_b = post_in_group(author, group_b, "<p>in B</p>")
+    assert {:ok, %{data: %{"id" => ap_a}}} = ActivityPub.Object.get_cached(pointer: in_a)
+    assert {:ok, %{data: %{"id" => ap_b}}} = ActivityPub.Object.get_cached(pointer: in_b)
+
+    assert {:error, _} =
+             Bonfire.Classify.Categories.remove_post_from_group(moderator, group_a, in_b)
+
+    refute ActivityPub.Object.get_activity_for_object_ap_id(ap_b, "Delete"),
+           "a removal of B's post was sent"
+
+    assert Bonfire.Social.Boosts.boosted?(group_b, in_b)
+
+    # control: the same moderator's removal of their group's post is sent, and relayed by it
+    assert {:ok, _} =
+             Bonfire.Classify.Categories.remove_post_from_group(moderator, group_a, in_a)
+
+    assert %{} = delete_a = ActivityPub.Object.get_activity_for_object_ap_id(ap_a, "Delete")
+    assert ActivityPub.Object.get_existing_announce(group_ap_id(group_a), delete_a)
   end
 
   test "the group announces a reply in its thread" do

@@ -441,7 +441,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "control: the same Lock from one of its moderators there closes it, so the refusal above is about who sent it"
     end
 
-    # The rest of a moderator's actions, each across instances (the group plan's inventory against `moderation-log.md`'s verbs)
+    # The rest of a moderator's actions, each across instances
 
     # The `Undo` embeds the `Lock` it takes back, so the follower's instance reopens the thread that `Lock` names (`Blocks.ap_receive_locked_object/1`), not the embedded activity
     test "a moderator unlocking a member's post in a group reopens it on a follower's instance",

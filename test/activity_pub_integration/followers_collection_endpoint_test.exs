@@ -1,8 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.FollowersCollectionEndpointTest do
   @moduledoc """
-  T4 (team-docs/plans/ap-followers-collections-tdd.md): the `followers` collection through
-  Bonfire's router with a mixed local + remote follower fixture, plus the per-request DB query
-  bound — the number that was ~150+ per request during the 2026-08-30 storm.
+  The `followers` collection through Bonfire's router with a mixed local + remote follower fixture, plus the per-request DB query bound, as a page once cost ~150+ queries a request.
   """
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
   import Tesla.Mock
@@ -163,6 +161,42 @@ defmodule Bonfire.Federate.ActivityPub.FollowersCollectionEndpointTest do
         assert [_ | _] = get_collection(followers_url(person_actor))["first"]["orderedItems"]
       end
     end
+  end
+
+  # a local user blocked instance-wide is deactivated (`Users.is_active?/1`): served lists don't name them
+  describe "a deactivated local user" do
+    test "is not listed among the followers of someone they follow", %{user: user, actor: actor} do
+      deactivated = fake_user!("ep_deactivated_follower")
+      {:ok, _} = Follows.follow(deactivated, user)
+
+      assert URIs.canonical_url(deactivated) in served_items(followers_url(actor)),
+             "control: listed while active"
+
+      {:ok, _} = Bonfire.Boundaries.Blocks.block(deactivated, :instance_wide)
+
+      refute URIs.canonical_url(deactivated) in served_items(followers_url(actor))
+    end
+
+    test "is not listed in the following of someone who follows them", %{user: user, actor: actor} do
+      deactivated = fake_user!("ep_deactivated_followed")
+      {:ok, _} = Follows.follow(user, deactivated)
+      following = "#{ActivityPub.Utils.ap_base_url()}/actors/#{actor.username}/following"
+
+      assert URIs.canonical_url(deactivated) in served_items(following),
+             "control: listed while active"
+
+      {:ok, _} = Bonfire.Boundaries.Blocks.block(deactivated, :instance_wide)
+
+      refute URIs.canonical_url(deactivated) in served_items(following)
+    end
+  end
+
+  # every page's items, from the first page on
+  defp served_items(collection_url) do
+    Stream.iterate(1, &(&1 + 1))
+    |> Stream.map(&get_collection("#{collection_url}?page=#{&1}")["orderedItems"])
+    |> Enum.take_while(&match?([_ | _], &1))
+    |> List.flatten()
   end
 
   describe "T4-a: envelope with mixed local + remote followers" do

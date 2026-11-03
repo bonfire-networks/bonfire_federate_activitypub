@@ -109,6 +109,27 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
            "the `/conversation/<uuid>` id is what a reply must carry back, so it must not be dropped"
   end
 
+  # The container's owner is named as the group of what it relays, which gives it a group's standing over the post, eg to relay later activities on it unverified. A conversation's owner can also be a Person (whoever started the thread), whose relay still delivers the post but makes them no group
+  describe "who the relayed post's group is" do
+    test "a forum relaying is named as the post's group", %{add: add, note: note} do
+      receive_add(add)
+
+      assert {:ok, object} = ActivityPub.Object.get_cached(ap_id: note["id"])
+      assert @forum in List.wrap(object.data["audience"])
+    end
+
+    test "a Person relaying their own conversation still delivers the post, but is not named as its group",
+         %{add: add, note: note} do
+      person = note["attributedTo"]
+      add |> Map.put("actor", person) |> receive_add()
+
+      assert {:ok, object} = ActivityPub.Object.get_cached(ap_id: note["id"]),
+             "the post still arrives"
+
+      refute person in List.wrap(object.data["audience"])
+    end
+  end
+
   # `Add` is a general verb: "put this object in that collection". Only a container owner adding to
   # its OWN container is the 1b12-equivalent relay, so these two must not be mistaken for one.
   describe "what is NOT a container relay" do

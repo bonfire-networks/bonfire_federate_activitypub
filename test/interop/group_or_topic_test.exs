@@ -289,7 +289,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
     end
   end
 
-  # `broader` is what the actor's own server says about its own groups, so it is followed only to a group on the actor's own host, as it is at home. One naming a group on ANOTHER host (ours included) would put a stranger's group in that group's topic list, its sidebar and the `narrower` collection it serves to other servers, and every `Update` would put it back
+  # `broader` is what the actor's own server says about its own groups, so it is followed to a group on the actor's own host, as it is at home. A group on ANOTHER host has to agree: its own `narrower` must list the child, or any server could put its groups in that group's topic list, its sidebar and the `narrower` collection it serves, and every `Update` would put them back. One of OURS is not filed into by a remote child (our `narrower` lists only what is already filed in it)
   describe "a broader group on another host than the actor's" do
     setup do
       creator = fake_user!()
@@ -356,6 +356,152 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
       assert {:ok, mirror} = Adapter.maybe_create_remote_actor(%{"id" => child})
       assert parent_id_of(mirror) == nil, "filed under a group on another host"
+    end
+
+    # a parent on another host that lists the child in its own `narrower` has agreed to it
+    defp listing(narrower, items) do
+      %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "id" => narrower,
+        "type" => "Collection",
+        "totalItems" => length(items),
+        "items" => items
+      }
+    end
+
+    defp elsewhere_parent(served, parent, narrower) do
+      bonfire_actor(served, parent, %{
+        "members" => "#{parent}/members",
+        "capabilities" => %{"acceptsJoins" => true},
+        "narrower" => narrower
+      })
+    end
+
+    test "another host's that lists the child: filed under that group's mirror, and not one that doesn't list it",
+         %{served: served} do
+      n = System.unique_integer([:positive])
+      parent = "https://elsewhere.local/pub/actors/parent#{n}"
+      narrower = "#{parent}/narrower"
+      child = "https://bonfire.local/pub/actors/child#{n}"
+      unlisted = "https://bonfire.local/pub/actors/unlisted#{n}"
+
+      serve(%{
+        parent => elsewhere_parent(served, parent, narrower),
+        narrower => listing(narrower, [child]),
+        child => bonfire_actor(served, child, %{"broader" => parent}),
+        unlisted => bonfire_actor(served, unlisted, %{"broader" => parent})
+      })
+
+      assert {:ok, mirror} = Adapter.maybe_create_remote_actor(%{"id" => child})
+
+      assert {:ok, parent_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(parent)
+
+      assert parent_id_of(mirror) == id(parent_mirror), "listed by the parent, so filed in it"
+
+      # control: the same parent, naming a child it doesn't list
+      assert {:ok, unlisted_mirror} = Adapter.maybe_create_remote_actor(%{"id" => unlisted})
+      assert parent_id_of(unlisted_mirror) == nil, "not listed by the parent, so not filed in it"
+    end
+
+    # a topic shares its parent's members collection, which is how it is told from a subgroup with members of its own; a parent that doesn't list it is still read for that, but not mirrored for it (it stays a topic, at the top level)
+    test "a topic naming another host's group that doesn't list it stays a topic, and that group isn't mirrored for it",
+         %{served: served} do
+      n = System.unique_integer([:positive])
+      parent = "https://elsewhere.local/pub/actors/parent#{n}"
+      narrower = "#{parent}/narrower"
+      child = "https://bonfire.local/pub/actors/child#{n}"
+
+      serve(%{
+        parent => elsewhere_parent(served, parent, narrower),
+        narrower => listing(narrower, []),
+        child =>
+          bonfire_actor(served, child, %{"broader" => parent, "members" => "#{parent}/members"})
+      })
+
+      assert {:ok, %{type: :topic} = mirror} = Adapter.maybe_create_remote_actor(%{"id" => child})
+      assert parent_id_of(mirror) == nil, "control: not listed, so not filed"
+
+      assert {:error, :not_found} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(parent),
+             "a group that didn't agree to the child was mirrored for it"
+    end
+
+    test "an Update naming another host's group that lists it moves the mirror there", %{
+      served: served
+    } do
+      n = System.unique_integer([:positive])
+      id = "https://bonfire.local/pub/actors/#{n}"
+      parent = "https://elsewhere.local/pub/actors/parent#{n}"
+      narrower = "#{parent}/narrower"
+      before = bonfire_actor(served, id, %{"broader" => @bonfire_parent})
+      serve_with_parent(served, id, before)
+
+      assert {:ok, mirror} = Adapter.maybe_create_remote_actor(%{"id" => id})
+      assert parent_id_of(mirror) == id(parent_mirror!()), "control: under its own host's group"
+
+      updated = Map.put(before, "broader", parent)
+
+      serve(%{
+        id => updated,
+        parent => elsewhere_parent(served, parent, narrower),
+        narrower => listing(narrower, [id])
+      })
+
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Update",
+                 "id" => "#{id}/activities/update/moved",
+                 "actor" => id,
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "object" => updated
+               })
+
+      assert {:ok, parent_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(parent)
+
+      assert {:ok, reloaded} = Categories.get(id(mirror), skip_boundary_check: true)
+      assert parent_id_of(reloaded) == id(parent_mirror)
+    end
+
+    # one filed in one of ours before that was refused stays there until its next Update, which takes it out (no data migration)
+    test "a mirror filed in one of ours before is taken out on its next Update", %{
+      served: served,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      evil = "https://evil.local/pub/actors/#{System.unique_integer([:positive])}"
+      actor = bonfire_actor(served, evil, %{"broader" => group_ap_id})
+      serve(%{evil => actor})
+
+      assert {:ok, mirror} = Adapter.maybe_create_remote_actor(%{"id" => evil})
+
+      # as it could have been filed before: straight into the tree
+      mirror = Repo.preload(mirror, :tree, force: true)
+      if mirror.tree, do: Repo.delete!(mirror.tree)
+
+      Bonfire.Classify.Tree.changeset(%Bonfire.Classify.Tree{id: id(mirror)}, %{
+        parent: group,
+        custodian_id: id(group)
+      })
+      |> Repo.insert!()
+
+      assert filed_in?(mirror, group), "control: filed in ours, as before the fix"
+
+      # its next Update, which changes something (an unchanged actor document is not re-applied)
+      updated = Map.put(actor, "summary", "edited #{System.unique_integer([:positive])}")
+      serve(%{evil => updated})
+
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Update",
+                 "id" => "#{evil}/activities/update/again",
+                 "actor" => evil,
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "object" => updated
+               })
+
+      refute filed_in?(mirror, group), "still in one of ours after its Update"
     end
 
     test "an Update naming one of ours doesn't move a mirror out of its parent", %{
@@ -576,6 +722,49 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
         _ ->
           :ok
+      end
+    end
+
+    # the other way round: a group lists a child on another host that names it back, so both sides agree, and the child is filed under it
+    test "files a child on another host that names the group back", %{served: served} do
+      n = System.unique_integer([:positive])
+      group = "https://elsewhere.local/pub/actors/group#{n}"
+      narrower = "#{group}/narrower"
+      child = "https://bonfire.local/pub/actors/child#{n}"
+      stranger = "https://bonfire.local/pub/actors/stranger#{n}"
+
+      serve(%{
+        group =>
+          bonfire_actor(served, group, %{
+            "members" => "#{group}/members",
+            "capabilities" => %{"acceptsJoins" => true},
+            "narrower" => narrower
+          }),
+        narrower => %{
+          "@context" => "https://www.w3.org/ns/activitystreams",
+          "id" => narrower,
+          "type" => "Collection",
+          "totalItems" => 2,
+          "items" => [child, stranger]
+        },
+        child => bonfire_actor(served, child, %{"broader" => group}),
+        # listed, but naming no group
+        stranger => bonfire_actor(served, stranger, %{"postingRestrictedToMods" => true})
+      })
+
+      assert {:ok, group_mirror} = Adapter.maybe_create_remote_actor(%{"id" => group})
+      assert {:ok, _} = Categories.sync_remote_children(group_mirror)
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, child_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(child)
+
+      assert parent_id_of(child_mirror) == id(group_mirror)
+
+      # control: listed, but it doesn't name the group, so it isn't filed there
+      case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(stranger) do
+        {:ok, stranger_mirror} -> refute parent_id_of(stranger_mirror) == id(group_mirror)
+        _ -> :ok
       end
     end
 

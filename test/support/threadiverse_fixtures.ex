@@ -90,6 +90,30 @@ defmodule Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures do
     )
   end
 
+  @doc "The inbox a delivery to this actor goes to: its shared inbox if it has one, as `APPublisher` picks it."
+  def inbox_of(ap_id) do
+    {:ok, actor} = ActivityPub.Actor.get_cached(ap_id: ap_id)
+    ActivityPub.Federator.APPublisher.maybe_use_sharedinbox(actor.data)
+  end
+
+  @doc "Each stored `Flag` carrying this comment (`content`, which both kinds carry), as `{:anonymous | :named, inboxes}`: anonymous when our service actor sent it, named when the reporter did, with the inboxes its delivery would go to (`APPublisher.prepare_publish_params/2`, what the delivery job runs; nothing is sent)."
+  def flag_inboxes(comment) do
+    service = ActivityPub.Utils.service_actor!().ap_id
+
+    for %{data: %{"type" => "Flag", "content" => ^comment} = data} = flag <-
+          repo().all(ActivityPub.Object) do
+      {:ok, actor} = ActivityPub.Actor.get_cached(ap_id: data["actor"])
+
+      inboxes =
+        actor
+        |> ActivityPub.Federator.APPublisher.prepare_publish_params(flag)
+        |> Enum.map(& &1.inbox)
+        |> Enum.sort()
+
+      {if(data["actor"] == service, do: :anonymous, else: :named), inboxes}
+    end
+  end
+
   def author_actor(ap_id) do
     Bonfire.Federate.ActivityPub.Simulate.actor_json("https://mocked.local/users/karen")
     |> Map.merge(%{

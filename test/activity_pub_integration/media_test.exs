@@ -61,6 +61,65 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
       refute data["id"] == url
     end
 
+    test "the canonical_url of a link Media is its AP id, not the external URL in its path" do
+      user = Bonfire.Me.Fake.fake_user!()
+      url = "https://example.com/federated/article"
+
+      {:ok, media} =
+        Bonfire.Files.Media.insert(user, url, %{media_type: "link", size: 0}, %{
+          url: url,
+          media_type: "link"
+        })
+
+      assert {:ok, _} = Bonfire.Files.Media.publish(user, media, boundary: "public")
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: media)
+
+      # remote interaction hands this to the visitor's instance, which must be able to fetch it
+      assert Bonfire.Common.URIs.canonical_url(media, preload_if_needed: true) == data["id"]
+    end
+
+    test "a public link Media is served as a Page at its AP id, and a local one is not" do
+      user = Bonfire.Me.Fake.fake_user!()
+
+      fetch = fn media ->
+        {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: media)
+
+        build_conn()
+        |> put_req_header("accept", "application/activity+json")
+        |> get(URI.parse(ap_id).path)
+      end
+
+      public_url = "https://example.com/served/public"
+
+      {:ok, public_media} =
+        Bonfire.Files.Media.insert(user, public_url, %{media_type: "link", size: 0}, %{
+          url: public_url,
+          media_type: "link"
+        })
+
+      assert {:ok, _} = Bonfire.Files.Media.publish(user, public_media, boundary: "public")
+
+      conn = fetch.(public_media)
+      assert conn.status == 200
+      assert %{"type" => "Page"} = Jason.decode!(conn.resp_body)
+
+      local_url = "https://example.com/served/local"
+
+      {:ok, local_media} =
+        Bonfire.Files.Media.insert(user, local_url, %{media_type: "link", size: 0}, %{
+          url: local_url,
+          media_type: "link"
+        })
+
+      assert {:ok, _} = Bonfire.Files.Media.publish(user, local_media, boundary: "local")
+
+      case ActivityPub.Object.get_cached(pointer: local_media) do
+        {:ok, _} -> refute fetch.(local_media).status == 200
+        # never stored as an AP object, so there is nothing to serve
+        {:error, :not_found} -> :ok
+      end
+    end
+
     test "a public Media is addressed publicly" do
       user = Bonfire.Me.Fake.fake_user!()
       url = "https://example.com/public/article"

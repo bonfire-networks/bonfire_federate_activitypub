@@ -134,6 +134,43 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseFlagUITest do
     assert List.wrap(to) == [moderator_ap_id], "sent to the group's moderator elsewhere"
   end
 
+  # where the named report is delivered: to the moderator elsewhere only, since it says who reported, and not to the author's instance (here, our own)
+  test "a named report on a post in a local group goes to its moderator elsewhere only",
+       %{post: remote_post, me: me} do
+    group =
+      Bonfire.Classify.Simulate.fake_group!(me, %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+
+    remote_moderator =
+      Bonfire.Social.Objects.object_creator(Bonfire.Social.Objects.preload_creator(remote_post))
+
+    {:ok, _} =
+      Bonfire.Classify.Categories.join_group(remote_moderator, group, skip_boundary_check: true)
+
+    {:ok, _} = Bonfire.Classify.Categories.add_moderator(me, group, id(remote_moderator))
+
+    author = fake_user!()
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(author, group)
+    post_by_other = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>theirs</p>")
+
+    {:ok, %{ap_id: moderator_ap_id}} = ActivityPub.Actor.get_cached(pointer: remote_moderator)
+    moderator_inbox = inbox_of(moderator_ap_id)
+
+    assert {:ok, _} =
+             Bonfire.Social.Flags.flag(me, post_by_other,
+               comment: "to the mods",
+               forward_to_group: true
+             )
+
+    assert [{:named, inboxes}] = flag_inboxes("to the mods")
+    assert moderator_inbox in inboxes, "control: the moderator elsewhere gets it"
+    assert inboxes == [moderator_inbox], "only the moderator elsewhere gets it"
+  end
+
   # the control: the same form, for a post in a LOCAL group whose moderators are all here, who see reports on its moderation page
   test "a post in a local group offers no such checkbox", %{conn: conn, me: me} do
     # open, so the post is really in the group (a group that reviews joins would leave the author's join a request, and their post outside it, so the missing checkbox would prove nothing)

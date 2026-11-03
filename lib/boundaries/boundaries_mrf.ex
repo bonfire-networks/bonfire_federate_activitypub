@@ -205,6 +205,7 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
             opts
           )
 
+      # TODO: this keeps every recipient of the `Block`, not only the person it blocks, so someone else the sender ghosted can still receive it: filter the other recipients as for any activity
       :ghost == check_block_type and is_local? and block_activity?(activity) ->
         debug(
           "a Block (or its Undo) keeps the person it blocks as its recipient: they are ghosted by the time it is made, and telling their server is what it is for"

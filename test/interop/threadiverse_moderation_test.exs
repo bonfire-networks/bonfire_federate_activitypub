@@ -20,6 +20,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
   import Tesla.Mock
 
+  import Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures,
+    only: [flag_inboxes: 1, inbox_of: 1]
+
   @fixtures Path.join([__DIR__, "..", "fixtures", "lemmy"])
   @community "http://lemmy.local/c/main"
 
@@ -188,6 +191,81 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       assert flags_by.(local_only) == []
       assert flags_saying.("local spam") == []
     end
+
+    # Where each report is delivered. The named one says who reported, so it goes to the group's moderators only: the author's instance gets the anonymous one, if asked for, and never the name.
+    defp reported_post(reported) do
+      {:ok, %{pointer_id: pointer_id, data: %{"attributedTo" => author}}} =
+        ActivityPub.Object.get_cached(ap_id: reported)
+
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      {post, author}
+    end
+
+    # the fixtures put the group and the author on different shared inboxes, which is what lets the tests below tell a delivery to one from a delivery to the other
+    defp separate_inboxes(community, author) do
+      group_inbox = inbox_of(community)
+      author_inbox = inbox_of(author)
+      assert group_inbox != author_inbox, "control: the group and the author have inboxes apart"
+      {group_inbox, author_inbox}
+    end
+
+    test "a named report goes to the group, and not to the author's instance", %{
+      text_post: reported,
+      announced_by: community
+    } do
+      {post, author} = reported_post(reported)
+      {group_inbox, author_inbox} = separate_inboxes(community, author)
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(fake_user!(), post,
+                 comment: "named only",
+                 forward_to_group: true
+               )
+
+      assert [{:named, inboxes}] = flag_inboxes("named only")
+      assert group_inbox in inboxes, "control: the group gets it"
+      refute author_inbox in inboxes, "the author's instance learns who reported them"
+    end
+
+    test "an anonymous report goes to the author's instance, and names the group too", %{
+      text_post: reported,
+      announced_by: community
+    } do
+      {post, author} = reported_post(reported)
+      {group_inbox, author_inbox} = separate_inboxes(community, author)
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(fake_user!(), post,
+                 comment: "anonymous only",
+                 forward: true
+               )
+
+      assert [{:anonymous, inboxes}] = flag_inboxes("anonymous only")
+      assert author_inbox in inboxes
+      assert group_inbox in inboxes
+    end
+
+    test "with both asked for, the author's instance gets only the anonymous one", %{
+      text_post: reported,
+      announced_by: community
+    } do
+      {post, author} = reported_post(reported)
+      {group_inbox, author_inbox} = separate_inboxes(community, author)
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(fake_user!(), post,
+                 comment: "both",
+                 forward: true,
+                 forward_to_group: true
+               )
+
+      flags = flag_inboxes("both")
+
+      assert for({:anonymous, inboxes} <- flags, do: inboxes) == [[author_inbox]]
+
+      assert for({:named, inboxes} <- flags, do: inboxes) == [[group_inbox]],
+             "the named one goes to the group only"
+    end
   end
 
   # A report withdrawn here has to be withdrawn wherever it went, or it stays open in other moderators' queues: an `Undo` of each `Flag` that went out, from the same actor, since only the sender may undo it
@@ -233,6 +311,45 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
       assert Enum.any?(undos, fn {_, undo} -> List.wrap(undo["bcc"]) != [] end),
              "the anonymous report's Undo keeps the author's account it was sent to"
+    end
+
+    # dismissing is not withdrawing: an admin here dismissing someone's report takes it off our queue, and sends nothing in the reporter's name to where it went
+    test "an admin dismissing someone's report sends no Undo in their name", %{
+      text_post: reported
+    } do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: reported)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+      reporter = fake_user!()
+
+      assert {:ok, _} =
+               Bonfire.Social.Flags.flag(reporter, post,
+                 comment: "dismissed later",
+                 forward: true,
+                 forward_to_group: true
+               )
+
+      objects = fn -> Bonfire.Common.Repo.all(ActivityPub.Object) end
+
+      sent_ids =
+        for %{data: %{"type" => "Flag", "content" => "dismissed later", "id" => id}} <- objects.(),
+            do: id
+
+      assert length(sent_ids) == 2, "control: both reports went out"
+
+      admin = fake_admin!()
+
+      dismissed = Bonfire.Social.Flags.unflag(reporter, post, current_user: admin)
+      refute match?({:error, _}, dismissed), "control: the admin may dismiss it"
+
+      refute Bonfire.Social.Flags.flagged?(reporter, post), "control: dismissed here"
+
+      assert [] ==
+               for(
+                 %{data: %{"type" => "Undo", "object" => %{"id" => flag_id}}} <- objects.(),
+                 flag_id in sent_ids,
+                 do: flag_id
+               ),
+             "a dismissal withdrew the report in the reporter's name"
     end
   end
 
@@ -632,6 +749,34 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       ActivityPub.Federator.Transformer.handle_incoming(relayed)
 
       assert [_] = lock_records.(), "the relayed copy doesn't lock it again"
+    end
+
+    # with no id, a redelivery can't be told from a new Lock, and each would write another moderation record: refused, as any activity with no id is
+    test "a Lock with no id is refused, and writes no record", %{
+      text_post: locked,
+      announced_by: community,
+      community_moderator: moderator
+    } do
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: locked)
+      post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      lock =
+        fixture("mod_lock_page.json")
+        |> Map.merge(%{"object" => locked, "audience" => community, "actor" => moderator})
+        |> Map.delete("id")
+
+      refute match?({:ok, _}, ActivityPub.Federator.Transformer.handle_incoming(lock))
+      refute match?({:ok, _}, ActivityPub.Federator.Transformer.handle_incoming(lock))
+
+      assert Bonfire.Boundaries.can?(fake_user!(), :reply, post), "the thread stays open"
+    end
+
+    test "an Undo of a Lock with no id is refused", context do
+      %{post: post, someone: someone, undo: undo} = lock_then_undo(context)
+
+      refute match?({:ok, _}, receive_moderation(Map.delete(undo, "id")))
+
+      refute Bonfire.Boundaries.can?(someone, :reply, post), "the thread stays locked"
     end
 
     # One of OUR users who the community lists as a moderator acts on a post in it: the community applies it and announces it to its followers, us included (`send_activity_in_community`), so its echo comes back with an id we already hold, since we stored the activity when we sent it, and an actor who is local. That echo is what applies the action here, rather than applying it before the community has
@@ -1088,7 +1233,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
              "a stranger's Lock must not close a thread on this instance"
     end
 
-    # The same rule for a removal: a moderator's `Delete` takes a post out of the group only if its actor may moderate the group HERE (`:mediate` on the mirror, which its moderators circle, synced from the group's declared moderators, holds). Being on the group's own instance is not enough for an action that takes effect (Mayel, 12 October), unlike `Add`/`Remove` of moderators, which only trigger a re-sync from the origin
+    # The same rule for a removal: a moderator's `Delete` takes a post out of the group only if its actor may moderate the group HERE (`:mediate` on the mirror, which its moderators circle, synced from the group's declared moderators, holds). Being on the group's own instance is not enough for an action that takes effect, unlike `Add`/`Remove` of moderators, which only trigger a re-sync from the origin
     test "a removal from an actor with no authority over the group is refused", %{
       text_post: removed,
       announced_by: community
@@ -1206,6 +1351,96 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
              "the activity names a community this actor moderates, but the thread is not in it"
     end
 
+    # The same for a removal: naming the community they moderate, a moderator sends a removal of a post in ANOTHER community we follow. It is ignored: no record in their community's log, and the post stays in its own. (A removal of one of OUR posts by a remote moderator never reaches the handler: a remote actor may not delete a local object, so only a post held from elsewhere tests this.)
+    test "a removal of a post that is not in the named group is ignored", %{
+      text_post: removed,
+      announced_by: community,
+      community_moderator: moderator,
+      served: served
+    } do
+      {:ok, mirror} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(community)
+
+      # a second community on the same instance, with a post of its own, announced to us as the first one's was
+      other_community = String.replace(community, ~r"/c/[^/]+$", "/c/other")
+      n = System.unique_integer([:positive])
+
+      other_announce =
+        fixture("announce_create_page_text.json")
+        |> Jason.encode!()
+        |> String.replace(community, other_community)
+        |> Jason.decode!()
+        |> Map.put("id", "#{other_community}/activities/announce/#{n}")
+        |> put_in(["object", "id"], "#{other_community}/activities/create/#{n}")
+        |> put_in(["object", "object", "id"], "#{other_community}/post/#{n}")
+
+      elsewhere_url = other_announce["object"]["object"]["id"]
+
+      serve(
+        served
+        # a username of its own: `community_actor/1` calls every community `main`, which would make it the same group as the first
+        |> Map.put(
+          other_community,
+          Map.put(community_actor(other_community), "preferredUsername", "other")
+        )
+        |> Map.put(elsewhere_url, other_announce["object"]["object"])
+      )
+
+      ActivityPub.Federator.Transformer.handle_incoming(other_announce)
+
+      {:ok, other} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(other_community)
+
+      {:ok, %{pointer_id: elsewhere_id}} = ActivityPub.Object.get_cached(ap_id: elsewhere_url)
+      elsewhere = Bonfire.Common.Needles.get!(elsewhere_id, skip_boundary_check: true)
+
+      assert Bonfire.Social.Boosts.boosted?(other, elsewhere), "control: in the other community"
+      refute Bonfire.Social.Boosts.boosted?(mirror, elsewhere), "control: not in theirs"
+
+      hide_verb = Bonfire.Boundaries.Verbs.get_id!(:hide)
+
+      hides = fn object_id ->
+        import Ecto.Query, only: [from: 2]
+
+        from(a in Bonfire.Data.Social.Activity,
+          where: a.object_id == ^object_id and a.verb_id == ^hide_verb
+        )
+        |> repo().all()
+      end
+
+      removal = fn object, id ->
+        fixture("mod_remove_note.json")
+        |> Map.merge(%{
+          "object" => object,
+          "audience" => community,
+          "actor" => moderator,
+          "id" => "#{fixture("mod_remove_note.json")["id"]}/#{id}"
+        })
+      end
+
+      receive_moderation(removal.(elsewhere_url, "elsewhere"))
+
+      assert {:ok, _} = Bonfire.Common.Needles.get(id(elsewhere), skip_boundary_check: true)
+      assert Bonfire.Social.Boosts.boosted?(other, elsewhere), "taken out of a group it is in"
+      assert [] = hides.(id(elsewhere)), "a removal recorded in a group the post is not in"
+
+      # control: the same moderator's removal of the community's post applies
+      {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: removed)
+      reader = fake_user!()
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:user_activities, pointer_id,
+               by: mirror,
+               current_user: reader
+             )
+
+      receive_moderation(removal.(removed, "in-group"))
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:user_activities, pointer_id,
+               by: mirror,
+               current_user: reader
+             )
+    end
+
     # Who moderates a community changes, and a mirror that never hears about it keeps handing
     # `:moderate` to the wrong people. Applied as a re-sync of the community's own collection rather
     # than as a delta, so what we end up asserting is what the origin publishes.
@@ -1285,6 +1520,37 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
       refute promoted in moderator_urls(group),
              "an actor with no standing in this community must not be able to name its moderators"
+    end
+
+    test "an Add from the community itself re-syncs its moderators", %{
+      announced_by: community,
+      community_moderator: existing_mod,
+      moderators_collection: collection,
+      served: served
+    } do
+      {:ok, group} =
+        Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      promoted = "#{community |> String.split("/c/") |> List.first()}/u/promoted_by_community"
+
+      serve(
+        served
+        |> Map.put(promoted, person_actor(promoted))
+        |> Map.put(collection, moderators_collection(collection, [existing_mod, promoted]))
+      )
+
+      assert {:ok, %{pointer: %Bonfire.Classify.Category{}}} =
+               fixture("mod_add_mod.json")
+               |> Map.merge(%{
+                 "actor" => community,
+                 "object" => promoted,
+                 "target" => collection,
+                 "cc" => [community],
+                 "id" => "#{community}/activities/add/#{System.unique_integer([:positive])}"
+               })
+               |> receive_moderation()
+
+      assert promoted in moderator_urls(group)
     end
 
     # `Incoming.receive_activity/1` fetches a `target` only when it is a bare URL, so one written inline in the activity reaches the handler as its sender wrote it. The re-sync has to read the community's collection, never the activity's: otherwise whoever may send an `Add` there chooses the moderators
@@ -1763,7 +2029,8 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
         [lock] = sent.("Lock")
 
-        reject.(stranger, lock)
+        # a refusal that won't change on a retry: the delivery job is cancelled, not retried
+        assert {:cancel, _} = reject.(stranger, lock)
 
         assert Bonfire.Boundaries.can?(someone, :reply, post) == not unquote(apply_now),
                "as it was"
@@ -1877,7 +2144,8 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       refute Bonfire.Boundaries.can?(someone, :reply, post),
              "control: applied once the community did"
 
-      reject.(community, lock)
+      # too late to refuse, and a retry won't change that: cancelled, not retried
+      assert {:cancel, _} = reject.(community, lock)
 
       refute Bonfire.Boundaries.can?(someone, :reply, post), "still locked"
       assert {:ok, %{accepted_at: %DateTime{}, ignored_at: nil}} = request.(:lock, record)

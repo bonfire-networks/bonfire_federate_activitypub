@@ -32,8 +32,10 @@ defmodule Bonfire.Federate.ActivityPub.RuntimeConfig do
           transform_keys: &String.capitalize/1
         )
 
-    # Env vars that existed before `incoming_signatures` (see `ActivityPub.Safety`), each setting its key only when it is set, over the defaults in ember's `activity_pub.exs`
+    # Env vars that existed before `incoming_signatures` (see `ActivityPub.Safety`), each setting its key only when it is set, over the defaults in ember's `activity_pub.exs`:
+
     # a delivery with no signature of any kind, which its origin does not serve either, is accepted with ACCEPT_UNSIGNED_ACTIVITIES=1
+    # ⚠️ this takes anyone's word for who sent an activity: anyone can then send activities as any actor, and only the origin checks (an object's id on its actor's host) still hold. We recommend not enabling it outside of testing.
     if System.get_env("ACCEPT_UNSIGNED_ACTIVITIES") == "1" do
       config :activity_pub, :incoming_signatures, unsigned: :accept
     end
