@@ -101,22 +101,27 @@ defmodule Bonfire.Federate.ActivityPub.AllowlistSettingsTest do
 
   describe "instance allowlist-only mode overrides user settings" do
     setup do
+      instance_config = Application.get_env(:activity_pub, :instance)
       Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, true)
+
+      # the saved mode lands in Application env, which the sandbox doesn't roll back: put back what was there, without the DB, since `on_exit` runs after the test's sandbox connection is gone
+      on_exit(fn -> Application.put_env(:activity_pub, :instance, instance_config) end)
       :ok
     end
 
-    setup do
-      on_exit(fn ->
-        parent = self()
-
-        Task.start(fn ->
-          Ecto.Adapters.SQL.Sandbox.allow(Bonfire.Common.Repo, parent, self())
-          Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
-        end)
-      end)
-
-      :ok
-    end
+    # this never reset anything: the `Settings.set` inside it queries the DB from a process the sandbox no longer allows, and the unawaited Task hides the failure
+    # setup do
+    #   on_exit(fn ->
+    #     parent = self()
+    #
+    #     Task.start(fn ->
+    #       Ecto.Adapters.SQL.Sandbox.allow(Bonfire.Common.Repo, parent, self())
+    #       Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
+    #     end)
+    #   end)
+    #
+    #   :ok
+    # end
 
     test "user safety settings hides Automatic option when instance is in archipelago mode",
          %{conn: conn} do

@@ -43,6 +43,10 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoSignedFetchTest do
         else: Application.put_env(:activity_pub, :reject_unsigned, previous)
     end)
 
+    # archipelago mode is saved into Application env, which the sandbox doesn't roll back, so put back what was there
+    instance_config = Application.get_env(:activity_pub, :instance)
+    on_exit(fn -> Application.put_env(:activity_pub, :instance, instance_config) end)
+
     # both remote actors are known while the instance is still open, as they would be in practice
     {:ok, _} = Actor.get_cached_or_fetch(ap_id: @allowed_actor)
     {:ok, _} = Actor.get_cached_or_fetch(ap_id: @outside_actor)

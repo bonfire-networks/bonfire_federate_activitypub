@@ -17,16 +17,21 @@ defmodule Bonfire.Federate.ActivityPub.InteractionReachableTest do
     # default to open federation; reset after each test (cross-process, see allowlist_settings_test).
     # NOTE: the instance-wide `federating`/`allowlist_only` reset is now also done globally in the
     # federation ConnCase/DataCase setup (so a restrictive mode can't leak across modules).
+    instance_config = Application.get_env(:activity_pub, :instance)
     Bonfire.Federate.ActivityPub.set_federating(:instance, true)
 
-    on_exit(fn ->
-      parent = self()
+    # the saved mode lands in Application env, which the sandbox doesn't roll back: put back what was there, without the DB, since `on_exit` runs after the test's sandbox connection is gone
+    on_exit(fn -> Application.put_env(:activity_pub, :instance, instance_config) end)
 
-      Task.start(fn ->
-        Ecto.Adapters.SQL.Sandbox.allow(Bonfire.Common.Repo, parent, self())
-        Bonfire.Federate.ActivityPub.set_federating(:instance, true)
-      end)
-    end)
+    # this never reset anything: the `Settings.set` inside it queries the DB from a process the sandbox no longer allows, and the unawaited Task hides the failure
+    # on_exit(fn ->
+    #   parent = self()
+    #
+    #   Task.start(fn ->
+    #     Ecto.Adapters.SQL.Sandbox.allow(Bonfire.Common.Repo, parent, self())
+    #     Bonfire.Federate.ActivityPub.set_federating(:instance, true)
+    #   end)
+    # end)
 
     me = fake_user!()
     {:ok, me: me}
