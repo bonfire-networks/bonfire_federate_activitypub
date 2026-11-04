@@ -18,7 +18,19 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
   # a third on the same host, so a test can leave TWO standing after a ghost and get the shared-inbox path
   @third "https://ghosthost.local/users/third"
   @elsewhere "https://otherhost.local/users/elsewhere"
-  @remote_actors [@ghosted, @neighbour, @third, @elsewhere]
+  # each alone on its host, so blocking the host touches nobody else here
+  @on_ghosted_instance "https://ghostedinstance.local/users/resident"
+  @on_my_ghosted_instance "https://myghostedinstance.local/users/resident"
+  @silenced "https://silencedhost.local/users/silenced"
+  @remote_actors [
+    @ghosted,
+    @neighbour,
+    @third,
+    @elsewhere,
+    @on_ghosted_instance,
+    @on_my_ghosted_instance,
+    @silenced
+  ]
 
   setup_all do
     mock_global(fn
@@ -285,5 +297,67 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
 
     assert Follows.following?(author, other),
            "whether I keep reading them is my business and a separate act, which is what silencing is for"
+  end
+
+  # The publisher checks all of an actor's followers in one pass (`APPublisher.get_external_followers_except/3`), so every kind of block it must apply is set at once here, each on its own follower and host, beside followers it must keep. Silencing is about what I see from them, not what they see from me, so a silenced follower still receives.
+  describe "the followers a public post fans out to, checked all at once" do
+    setup %{author: author} do
+      followers =
+        for ap_id <- [
+              @elsewhere,
+              @ghosted,
+              @on_ghosted_instance,
+              @on_my_ghosted_instance,
+              @silenced
+            ],
+            into: %{},
+            do: {ap_id, remote_follower_of(author, ap_id)}
+
+      assert {:ok, _} = Blocks.block(followers[@ghosted], :ghost, current_user: author)
+
+      assert {:ok, ghosted_instance} =
+               Bonfire.Federate.ActivityPub.Instances.get_or_create(@on_ghosted_instance)
+
+      assert {:ok, _} = Blocks.block(ghosted_instance, :ghost, :instance_wide)
+
+      assert {:ok, my_ghosted_instance} =
+               Bonfire.Federate.ActivityPub.Instances.get_or_create(@on_my_ghosted_instance)
+
+      assert {:ok, _} = Blocks.block(my_ghosted_instance, :ghost, current_user: author)
+
+      assert {:ok, _} = Blocks.block(followers[@silenced], :silence, current_user: author)
+
+      %{followers: followers}
+    end
+
+    test "drops a ghosted follower and followers on ghosted instances, and keeps the rest", %{
+      author_actor: author_actor
+    } do
+      kept =
+        author_actor
+        |> ActivityPub.Federator.APPublisher.get_external_followers_except(:publish, [])
+        |> Enum.map(& &1.ap_id)
+        |> Enum.sort()
+
+      assert kept == Enum.sort([@elsewhere, @silenced]),
+             "only the follower nobody blocked and the silenced one should be kept, got #{inspect(kept)}"
+    end
+
+    test "gives each follower the same answer as checking them one at a time", %{
+      author_actor: author_actor,
+      followers: followers
+    } do
+      one_at_a_time =
+        for {ap_id, follower} <- followers,
+            deliverable?(author_actor, follower),
+            do: ap_id
+
+      kept =
+        author_actor
+        |> ActivityPub.Federator.APPublisher.get_external_followers_except(:publish, [])
+        |> Enum.map(& &1.ap_id)
+
+      assert Enum.sort(kept) == Enum.sort(one_at_a_time)
+    end
   end
 end

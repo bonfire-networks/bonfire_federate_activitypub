@@ -126,6 +126,66 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
            |> redirected_to() == actor_id
   end
 
+  # Lemmy fetches the instance root with an ActivityPub `Accept` after each fetch of one of our actors, to read the site's actor; ours is the service actor, the one nodeinfo names
+  for accept <- [
+        "application/activity+json",
+        ~s(application/ld+json; profile="https://www.w3.org/ns/activitystreams")
+      ] do
+    test "the instance root fetched with `#{accept}` goes to the service actor" do
+      assert {:ok, %{ap_id: service_actor_id}} = ActivityPub.Utils.service_actor()
+      # the positive first: the service actor is ours
+      assert service_actor_id =~ Bonfire.Common.URIs.base_url()
+
+      assert build_conn()
+             |> put_req_header("accept", unquote(accept))
+             |> get("/")
+             |> redirected_to() == service_actor_id
+    end
+  end
+
+  # a page that names no actor or object, other than the root, has nothing to send the fetch to, so it gets the page as HTML rather than a 500
+  test "a page with no actor or object, fetched with an ActivityPub `Accept`, gives the page as HTML" do
+    conn =
+      build_conn()
+      |> put_req_header("accept", "application/activity+json")
+      |> get("/about")
+
+    assert html_response(conn, 200) =~ "<html"
+  end
+
+  # an instance may require signatures (as demo.bonfire.cafe does) and Lemmy before 1.0 doesn't sign its fetches, so the actor the root sends it to must be readable unsigned
+  describe "when `reject_unsigned` is `:all`" do
+    setup do
+      previous = Application.get_env(:activity_pub, :reject_unsigned)
+      Application.put_env(:activity_pub, :reject_unsigned, :all)
+      on_exit(fn -> Application.put_env(:activity_pub, :reject_unsigned, previous) end)
+    end
+
+    test "control: a user's actor can't be fetched unsigned" do
+      user = fake_user!()
+
+      assert build_conn()
+             |> put_req_header("accept", "application/activity+json")
+             |> get("/pub/actors/#{user.character.username}")
+             |> Map.fetch!(:status) == 401
+    end
+
+    test "the service actor the instance root goes to can be fetched unsigned" do
+      service_actor_id =
+        build_conn()
+        |> put_req_header("accept", "application/activity+json")
+        |> get("/")
+        |> redirected_to()
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/activity+json")
+        |> get(URI.parse(service_actor_id).path)
+
+      assert json_response(conn, 200)["id"] == service_actor_id
+    end
+  end
+
   # AS2 Core §2.3: date/time values MUST conform to the RFC3339 `date-time` production, and "an uppercase 'Z' character MUST be used in the absence of a numeric time zone offset".
   # We used to serialise `updated` from a NaiveDateTime (no zone), which made Lemmy (strict RFC3339) reject the WHOLE actor with "premature end of input", breaking every interaction with Lemmy instances, not just group federation.
   test "date fields in the served actor carry a timezone (RFC3339), so strict consumers can parse it" do

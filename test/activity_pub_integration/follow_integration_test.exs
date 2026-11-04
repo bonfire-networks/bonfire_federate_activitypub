@@ -8,6 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
   @remote_instance "https://mocked.local"
   @actor_name "karen@mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
+  # an actor that approves its followers by hand
+  @locked_actor @remote_instance <> "/users/locked"
 
   setup do
     test_pid = self()
@@ -20,6 +22,11 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
+
+      %{method: :get, url: @locked_actor} ->
+        json(
+          Simulate.actor_json(@locked_actor, "locked", %{"manuallyApprovesFollowers" => true})
+        )
 
       %{
         method: :get,
@@ -297,5 +304,289 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       Bonfire.Federate.ActivityPub.Incoming.receive_activity(unfollow_activity)
       refute Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
+  end
+
+  # Lemmy 0.19 never sends the Accept of the first Follow it gets from an instance it hadn't seen, so a Follow still pending a few minutes after its delivery is sent once more, with a new id
+  describe "re-sending a pending Follow" do
+    test "a delivered Follow queues one check for a re-send" do
+      %{follow_activity: follow_activity} = follow_and_deliver()
+
+      assert [job] = resend_checks()
+      assert job.args["follow_id"] == follow_activity.data["id"]
+
+      seconds_ahead = DateTime.diff(job.scheduled_at, DateTime.utc_now())
+
+      assert seconds_ahead in 230..240,
+             "the check should run about 4 minutes after the delivery, it runs in #{seconds_ahead}s"
+    end
+
+    test "a Follow still pending when the check runs is sent once more, with a new id, and that id is stored" do
+      %{follow_activity: follow_activity} = follow_and_deliver()
+      first_id = follow_activity.data["id"]
+
+      assert [check] = resend_checks()
+      assert {:ok, _} = run_check(check)
+
+      drain_deliveries()
+
+      assert [%{"id" => resent_id}] =
+               delivered_follows() |> Enum.uniq_by(& &1["id"]),
+             "one more Follow was delivered"
+
+      assert resent_id != first_id, "the re-sent Follow has a new id"
+      assert {:ok, _} = ActivityPub.Object.get_cached(ap_id: resent_id), "and it is stored"
+
+      assert [] == resend_checks(%{"follow_id" => resent_id}),
+             "the re-sent Follow gets no check of its own"
+
+      assert [%{args: %{"follow_id" => ^first_id}}] = resend_checks()
+    end
+
+    test "an Accept of the re-sent Follow makes us a follower" do
+      %{
+        follower: follower,
+        followed: followed,
+        ap_follower: ap_follower,
+        ap_followed: ap_followed,
+        follow_activity: follow_activity
+      } = follow_and_deliver()
+
+      resent = resend_now()
+
+      {:ok, accept} =
+        ActivityPub.accept(%{
+          actor: ap_followed,
+          to: [ap_follower.data],
+          object: resent.data,
+          local: false
+        })
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
+
+      assert Follows.following?(follower, followed)
+      assert stored_state(follow_activity) == "accept"
+      assert stored_state(resent) == "accept"
+    end
+
+    test "no re-send once the Follow was Accepted" do
+      %{
+        follower: follower,
+        followed: followed,
+        ap_follower: ap_follower,
+        ap_followed: ap_followed,
+        follow_activity: follow_activity
+      } = follow_and_deliver()
+
+      {:ok, accept} =
+        ActivityPub.accept(%{
+          actor: ap_followed,
+          to: [ap_follower.data],
+          object: follow_activity.data,
+          local: false
+        })
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
+      assert Follows.following?(follower, followed), "control: the Accept made us a follower"
+
+      assert_no_resend(follow_activity)
+    end
+
+    test "no re-send once it was Rejected" do
+      %{
+        follower: follower,
+        followed: followed,
+        ap_follower: ap_follower,
+        ap_followed: ap_followed,
+        follow_activity: follow_activity
+      } = follow_and_deliver()
+
+      {:ok, reject} =
+        ActivityPub.reject(%{
+          actor: ap_followed,
+          to: [ap_follower.data["id"]],
+          object: follow_activity.data["id"],
+          local: false
+        })
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(reject)
+      refute Follows.requested?(follower, followed), "control: the Reject ended the request"
+
+      assert_no_resend(follow_activity)
+    end
+
+    test "no re-send after an unfollow" do
+      %{follower: follower, followed: followed, follow_activity: follow_activity} =
+        follow_and_deliver()
+
+      assert {:ok, _} = Follows.unfollow(follower, followed)
+      refute Follows.requested?(follower, followed), "control: the request was withdrawn"
+      drain_deliveries()
+
+      assert_no_resend(follow_activity)
+    end
+
+    test "no re-send for a Follow that a newer one replaced" do
+      %{follower: follower, followed: followed, follow_activity: follow_activity} =
+        follow_and_deliver()
+
+      assert {:ok, _} = Follows.unfollow(follower, followed)
+      drain_deliveries()
+
+      assert {:ok, _} = Follows.follow(follower, followed)
+      assert Follows.requested?(follower, followed), "control: we asked to follow again"
+      drain_deliveries()
+
+      assert [%{"id" => newer_id} | _] = delivered_follows(), "control: a newer Follow went out"
+      assert newer_id != follow_activity.data["id"]
+
+      assert_no_resend(follow_activity)
+    end
+
+    test "no check for an actor that approves followers by hand" do
+      %{follower: follower, followed: followed} = follow_and_deliver(@locked_actor)
+      assert Follows.requested?(follower, followed), "control: the follow is pending"
+
+      assert [] == resend_checks()
+    end
+
+    test "the check snoozes while the host is failing" do
+      %{follow_activity: follow_activity} = follow_and_deliver()
+      inbox = "https://mocked.local/users/karen/inbox"
+
+      ActivityPub.Instances.set_unreachable(inbox, NaiveDateTime.add(now(), -3600))
+
+      delivered_follows()
+      assert [check] = resend_checks(%{"follow_id" => follow_activity.data["id"]})
+      assert {:snooze, seconds} = run_check(check)
+      assert seconds > 0
+
+      drain_deliveries()
+      assert [] == delivered_follows(), "no Follow was re-sent"
+    end
+
+    test "the check is cancelled once the host is written off" do
+      %{follow_activity: follow_activity} = follow_and_deliver()
+      inbox = "https://mocked.local/users/karen/inbox"
+
+      # failing for longer than a delivery is kept
+      max_age_days = ActivityPub.Config.get([:instance, :federation_delivery_max_age_days], 6)
+
+      ActivityPub.Instances.set_unreachable(
+        inbox,
+        NaiveDateTime.add(now(), -(max_age_days + 1) * 24 * 3600)
+      )
+
+      delivered_follows()
+      assert [check] = resend_checks(%{"follow_id" => follow_activity.data["id"]})
+      assert {:cancel, _} = run_check(check)
+
+      Oban.Testing.refute_enqueued(repo(),
+        worker: ActivityPub.Federator.Workers.PublisherWorker,
+        args: %{"op" => "publish"}
+      )
+
+      drain_deliveries()
+      assert [] == delivered_follows(), "no Follow was re-sent"
+    end
+
+    test "with `:resend_pending_follow_after` set to `false`, no check is queued" do
+      previous = Application.fetch_env(:activity_pub, :resend_pending_follow_after)
+      Application.put_env(:activity_pub, :resend_pending_follow_after, false)
+
+      on_exit(fn ->
+        case previous do
+          {:ok, value} -> Application.put_env(:activity_pub, :resend_pending_follow_after, value)
+          :error -> Application.delete_env(:activity_pub, :resend_pending_follow_after)
+        end
+      end)
+
+      follow_and_deliver()
+
+      assert [] == resend_checks()
+    end
+  end
+
+  defp now, do: NaiveDateTime.utc_now(Calendar.ISO) |> NaiveDateTime.truncate(:second)
+
+  # runs the check of this Follow: it cancels, and delivers nothing
+  defp assert_no_resend(follow_activity) do
+    # whatever went out before the check
+    delivered_follows()
+
+    assert [check] = resend_checks(%{"follow_id" => follow_activity.data["id"]})
+    assert {:cancel, _} = run_check(check)
+
+    drain_deliveries()
+    assert [] == delivered_follows(), "no Follow was re-sent"
+  end
+
+  # follows a remote actor, then runs the delivery jobs, so the Follow reaches the mocked inbox
+  defp follow_and_deliver(actor_id \\ @remote_actor) do
+    follower = fake_user!()
+    {:ok, ap_follower} = ActivityPub.Federator.Adapter.get_actor_by_id(follower.id)
+    {:ok, ap_followed} = ActivityPub.Actor.get_cached_or_fetch(ap_id: actor_id)
+    {:ok, followed} = Bonfire.Me.Users.by_ap_id(actor_id)
+
+    {:ok, follow} = Follows.follow(follower, followed)
+    assert {:ok, follow_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(follow)
+
+    drain_deliveries()
+
+    assert [%{"id" => delivered_id} | _] = delivered_follows(),
+           "control: the Follow was delivered"
+
+    assert delivered_id == follow_activity.data["id"]
+
+    %{
+      follower: follower,
+      followed: followed,
+      ap_follower: ap_follower,
+      ap_followed: ap_followed,
+      follow_activity: follow_activity
+    }
+  end
+
+  # runs what is queued for delivery now, and the deliveries those jobs queue, but not what is scheduled later (such as the check itself)
+  defp drain_deliveries do
+    queue = Oban.drain_queue(queue: :federator_outgoing, with_recursion: true)
+    assert queue[:failure] == 0, "a delivery job failed: #{inspect(queue)}"
+    queue
+  end
+
+  # the Follows that reached an inbox since the last call, read from the mailbox
+  defp delivered_follows(acc \\ []) do
+    receive do
+      {:delivered, _url, body} ->
+        case Jason.decode!(body) do
+          %{"type" => "Follow"} = follow -> delivered_follows(acc ++ [follow])
+          _ -> delivered_follows(acc)
+        end
+    after
+      0 -> acc
+    end
+  end
+
+  # runs the queued check as Oban would when it is due
+  defp run_check(check), do: ActivityPub.Federator.Workers.PublisherWorker.perform(check)
+
+  # runs the one queued check, and returns the Follow it re-sent
+  defp resend_now do
+    assert [check] = resend_checks()
+    assert {:ok, _} = run_check(check)
+    drain_deliveries()
+
+    assert [%{"id" => resent_id} | _] = delivered_follows(), "control: a Follow was re-sent"
+    {:ok, resent} = ActivityPub.Object.get_cached(ap_id: resent_id)
+    resent
+  end
+
+  # read from the database, as the cache may hold an older copy
+  defp stored_state(%{id: id}), do: repo().get!(ActivityPub.Object, id).data["state"]
+
+  defp resend_checks(args \\ %{}) do
+    Oban.Testing.all_enqueued(repo(),
+      worker: ActivityPub.Federator.Workers.PublisherWorker,
+      args: Map.merge(%{"op" => "resend_pending_follow"}, args)
+    )
   end
 end

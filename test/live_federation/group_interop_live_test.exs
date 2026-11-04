@@ -8,6 +8,8 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
       LIVE_TEST_GROUP='!test5677754@lemmy.world' just test-federation-live-DRAGONS extensions/bonfire_federate_activitypub/test/live_federation/group_interop_live_test.exs
 
+  Add `LIVE_TEST_REJECT_UNSIGNED=true` (or `all`) to run with "Require authentication from federated servers" on (see `require_signatures_as_asked/0`).
+
   The bore tunnel matters: these remotes fetch our actor back (signed) before accepting anything, so without it nothing can succeed. All the probing/polling lives in `Bonfire.Federate.ActivityPub.Testing.Interop` (+ `.Groups`) so it can be reused from IEx.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
@@ -54,7 +56,39 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
   setup do
     Process.put(:federating, true)
+    require_signatures_as_asked()
     :ok
+  end
+
+  # `LIVE_TEST_REJECT_UNSIGNED` runs this instance with "Require authentication from federated servers" (the `:reject_unsigned` config key) set to `true` (required, except for public actors) or `all` (required for everything), so a run shows whether the remote can still reach us with it on. The server the remote fetches from runs in this VM, so the app config reaches it. Unset, the config is left as it is (off in tests).
+  defp require_signatures_as_asked do
+    case System.get_env("LIVE_TEST_REJECT_UNSIGNED") do
+      value when value in [nil, ""] ->
+        :ok
+
+      value ->
+        previous = Application.get_env(:activity_pub, :reject_unsigned)
+
+        Application.put_env(
+          :activity_pub,
+          :reject_unsigned,
+          case value do
+            "all" -> :all
+            "true" -> true
+            other -> flunk("LIVE_TEST_REJECT_UNSIGNED is `true` or `all`, not #{inspect(other)}")
+          end
+        )
+
+        IO.puts(
+          "\n── reject_unsigned: #{inspect(ActivityPub.Config.signed_fetch_required())} ──\n"
+        )
+
+        on_exit(fn ->
+          if is_nil(previous),
+            do: Application.delete_env(:activity_pub, :reject_unsigned),
+            else: Application.put_env(:activity_pub, :reject_unsigned, previous)
+        end)
+    end
   end
 
   defp group_handle! do
@@ -180,6 +214,53 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
 
       assert map_size(arrivals) == pending_before,
              "only #{map_size(arrivals)} of #{pending_before} followers were Accepted in #{wait}s"
+    end
+
+    # What the Join button does against an open group that never answers a `Join` (Mbin ignores it, and its FollowHandler always Accepts the `Follow`): the `Accept` of our `Follow` has to leave us a member and following, with no follow or join request waiting. Leaves and unfollows at the end.
+    @tag timeout: :timer.minutes(10)
+    test "after the Join button, the group's Accept of our Follow leaves us a member with no request waiting" do
+      handle = group_handle!()
+      me = fake_user!()
+      {:ok, actor} = Interop.fetch(handle)
+
+      {:ok, pointer} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(actor,
+          skip_boundary_check: true
+        )
+
+      {:ok, group} = Bonfire.Classify.Categories.get(id(pointer), skip_boundary_check: true)
+      join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+      since = DateTime.utc_now()
+
+      assert {:ok, joined} = Bonfire.Classify.Categories.join_and_follow_group(me, group)
+      IO.inspect(joined, label: "join_and_follow_group answer")
+
+      assert Interop.await_incoming([type: "Accept", from: actor.ap_id],
+               seconds: reply_wait(300),
+               since: since
+             ),
+             "no Accept from #{actor.ap_id}"
+
+      member? = Bonfire.Classify.Categories.member?(me, group)
+      following? = Bonfire.Social.Graph.Follows.following?(me, group)
+      follow_requested? = Bonfire.Social.Graph.Follows.requested?(me, group)
+      join_requested? = Bonfire.Social.Requests.requested?(me, join_verb, group)
+
+      IO.inspect(
+        %{
+          member: member?,
+          following: following?,
+          follow_requested: follow_requested?,
+          join_requested: join_requested?
+        },
+        label: "after the Accept"
+      )
+
+      Bonfire.Classify.Categories.leave_group(me, group)
+      Bonfire.Classify.Categories.unfollow_group(me, group)
+
+      assert member? and following?
+      refute follow_requested? or join_requested?
     end
 
     # Captures the group's own fan-out for software whose outbox never shows it (Mbin's is a literal `{}`, Friendica's holds no relays, Smithereen's `Add{Note}` is only ever delivered), where a delivery is the only way to see it. Someone has to post in the group while this waits, so it needs a group that is active or a person who posts once it says "following". `LIVE_TEST_GROUP` takes the actor URL (Mbin does not resolve a magazine by handle), `LIVE_TEST_RELAY_TYPE` is the activity to wait for ("Announce" by default, "Add" for Smithereen), and `AP_CAPTURE_JSON` keeps the wire bytes. Unfollows at the end, so the group stops delivering to this instance.

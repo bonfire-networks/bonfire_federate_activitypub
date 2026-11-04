@@ -124,35 +124,8 @@ defmodule Bonfire.Federate.ActivityPub do
   Pass `block_types:` to scope the block check (`:ghost`, `:silence`, `:any`).
   """
   def federation_allowed?(subject, opts \\ []) do
-    # translate direction → block_types (set by federate_actor? shim in adapter)
-    block_types =
-      case opts[:direction] do
-        :out -> :ghost
-        :in -> :silence
-        _ -> opts[:block_types] || :any
-      end
-
-    # resolve by_actor (AP Actor struct) to local character for per-user block/allowlist context
-    local_user =
-      case opts[:by_actor] do
-        nil ->
-          case opts[:user_ids] do
-            ids when is_list(ids) and ids != [] -> ids
-            id when is_binary(id) -> id
-            _ -> Utils.current_user(opts[:user_ids]) || Utils.current_user(opts)
-          end
-
-        by_actor ->
-          case Utils.maybe_apply(
-                 Bonfire.Federate.ActivityPub.AdapterUtils,
-                 :get_character,
-                 [by_actor],
-                 fallback_return: nil
-               ) do
-            {:ok, character} -> character
-            _ -> nil
-          end
-      end
+    block_types = block_types_for(opts)
+    local_user = local_user_for(opts)
 
     mode = federation_mode(local_user || subject, opts)
 
@@ -164,13 +137,7 @@ defmodule Bonfire.Federate.ActivityPub do
 
         # callers that already enforce blocks (e.g. via `can?`) can pass `skip_block_check: true`
         # to avoid the redundant block query
-        #
-        # `local_user` is threaded in because a PER-USER block is a question about whose list to read, and the publisher identifies the blocker with `by_actor` rather than `current_user`: without this, fanning a post out to followers consults only instance-wide blocks, so someone I ghosted keeps receiving my posts
-        block_opts =
-          case local_user do
-            nil -> opts
-            user -> Keyword.put_new(Utils.to_options(opts), :current_user, user)
-          end
+        block_opts = block_opts_for(opts, local_user)
 
         not_blocked =
           opts[:skip_block_check] == true or
@@ -188,6 +155,146 @@ defmodule Bonfire.Federate.ActivityPub do
              Bonfire.Federate.ActivityPub.Peered.actor_allowlisted?(subject_to_check, opts))
       )
       |> info("federation_allowed?")
+  end
+
+  @doc """
+  Keeps those of `subjects` that `federation_allowed?/2` allows with the same `opts`, eg. the followers a post fans out to.
+
+  What `federation_allowed?/2` looks up for each subject is looked up once for all of them: the acting user and the federation mode, the subjects' `Peered` records, their instances' circles, and which of those subjects and instances are blocked. Each subject is then checked by `federation_allowed?/2` itself, which reads these from `opts[:resolved]`, so the rules are the same ones. Anything not looked up here (a subject that is not an `ActivityPub.Actor`, or the per-user allowlist in allowlist-only mode) is still queried per subject.
+  """
+  def filter_federation_allowed(subjects, opts \\ [])
+
+  def filter_federation_allowed([], _opts), do: []
+
+  def filter_federation_allowed(subjects, opts) when is_list(subjects) do
+    opts = Utils.to_options(opts)
+    local_user = local_user_for(opts)
+
+    # the mode depends on the subject only when there is no acting user
+    opts =
+      if local_user,
+        do: Keyword.put_new(opts, :federation_mode, federation_mode(local_user, opts)),
+        else: opts
+
+    if opts[:federation_mode] == false do
+      []
+    else
+      resolved = resolve_for_federation_checks(subjects, local_user, opts)
+
+      opts =
+        Keyword.put(opts, :resolved, Map.merge(opts[:resolved] || %{}, resolved))
+
+      Enum.filter(subjects, &federation_allowed?(&1, opts))
+    end
+  end
+
+  defp resolve_for_federation_checks(subjects, local_user, opts) do
+    actors =
+      Enum.filter(subjects, fn
+        %ActivityPub.Actor{ap_id: ap_id, pointer_id: pointer_id} ->
+          is_binary(ap_id) and is_binary(pointer_id)
+
+        _ ->
+          false
+      end)
+
+    # by pointer id, as `Peered.get/1` finds an actor's Peered, but keyed by the actor's id, as `Peered.get_or_nil/2` reads them
+    peereds_by_id =
+      actors
+      |> Enum.map(& &1.pointer_id)
+      |> Bonfire.Federate.ActivityPub.Peered.list_by_uids()
+      |> Map.new(&{&1.id, &1})
+
+    peered_by_urls =
+      for %{ap_id: ap_id, pointer_id: pointer_id} <- actors,
+          Map.has_key?(peereds_by_id, pointer_id),
+          into: %{},
+          do: {ap_id, peereds_by_id[pointer_id]}
+
+    hosts =
+      peered_by_urls
+      |> Map.values()
+      |> Enum.map(fn peered ->
+        case peered do
+          %{peer: %{display_hostname: host}} when is_binary(host) -> host
+          _ -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    found_circles = Bonfire.Federate.ActivityPub.Instances.get_instance_circles(hosts)
+
+    # `:none` for a host with no circle, so it is not looked up again for each of its actors
+    circles_by_hosts = Map.new(hosts, &{&1, Map.get(found_circles, &1, :none)})
+
+    # what `federation_allowed?/2` checks for blocks: an actor's Peered, or the actor's own id when it has none, and its instance's circle
+    block_subjects =
+      Enum.map(actors, &(peered_by_urls[&1.ap_id] || &1.pointer_id)) ++
+        (circles_by_hosts |> Map.values() |> Enum.reject(&(&1 == :none)))
+
+    blocked =
+      if opts[:skip_block_check] != true do
+        Utils.maybe_apply(
+          Bonfire.Boundaries.Blocks,
+          :blocked_subset_for,
+          [block_subjects, block_types_for(opts), block_opts_for(opts, local_user)],
+          fallback_return: nil
+        )
+      end
+
+    %{
+      local_user: local_user,
+      peered_by_urls: peered_by_urls,
+      allowlist_circles_by_hosts: circles_by_hosts,
+      blocked: blocked
+    }
+  end
+
+  # translate direction → block_types (set by federate_actor? shim in adapter)
+  defp block_types_for(opts) do
+    case opts[:direction] do
+      :out -> :ghost
+      :in -> :silence
+      _ -> opts[:block_types] || :any
+    end
+  end
+
+  # resolve by_actor (AP Actor struct) to local character for per-user block/allowlist context, unless `filter_federation_allowed/2` already did it for every subject
+  defp local_user_for(opts) do
+    case opts[:resolved] do
+      %{local_user: local_user} ->
+        local_user
+
+      _ ->
+        case opts[:by_actor] do
+          nil ->
+            case opts[:user_ids] do
+              ids when is_list(ids) and ids != [] -> ids
+              id when is_binary(id) -> id
+              _ -> Utils.current_user(opts[:user_ids]) || Utils.current_user(opts)
+            end
+
+          by_actor ->
+            case Utils.maybe_apply(
+                   Bonfire.Federate.ActivityPub.AdapterUtils,
+                   :get_character,
+                   [by_actor],
+                   fallback_return: nil
+                 ) do
+              {:ok, character} -> character
+              _ -> nil
+            end
+        end
+    end
+  end
+
+  # `local_user` is threaded in because a PER-USER block is a question about whose list to read, and the publisher identifies the blocker with `by_actor` rather than `current_user`: without this, fanning a post out to followers consults only instance-wide blocks, so someone I ghosted keeps receiving my posts
+  defp block_opts_for(opts, local_user) do
+    case local_user do
+      nil -> opts
+      user -> Keyword.put_new(Utils.to_options(opts), :current_user, user)
+    end
   end
 
   @doc """

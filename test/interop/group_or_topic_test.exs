@@ -812,6 +812,117 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
              "not again within the interval"
     end
 
+    # as search and the groups page look a group up (`Bonfire.Search.LiveHandler`, `Bonfire.UI.Groups.ExploreLive`), with the AP caches on as in prod
+    test "a group found by its URL has its topics mirrored, with the AP cache on", ctx do
+      ap_cache_on()
+      serve_narrower(ctx, [ctx.topic])
+      searcher = fake_user!()
+
+      assert {:ok, %{type: :group} = group} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
+                 ctx.group,
+                 user_id: id(searcher)
+               )
+
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, topic} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic),
+             "the listed topic is mirrored"
+
+      assert parent_id_of(topic) == id(group)
+    end
+
+    # as Bonfire serves its `narrower`: the collection links its first page, which holds the items
+    test "a group whose collection is served in pages has its topics mirrored when it's found",
+         ctx do
+      ap_cache_on()
+      page = "#{ctx.narrower}?page=1"
+
+      serve(
+        ctx.actors
+        |> Map.put(ctx.narrower, %{
+          "@context" => "https://www.w3.org/ns/activitystreams",
+          "id" => ctx.narrower,
+          "type" => "OrderedCollection",
+          "totalItems" => 1,
+          "first" => page
+        })
+        |> Map.put(page, %{
+          "@context" => "https://www.w3.org/ns/activitystreams",
+          "id" => page,
+          "type" => "OrderedCollectionPage",
+          "partOf" => ctx.narrower,
+          "orderedItems" => [ctx.topic]
+        })
+      )
+
+      assert {:ok, %{type: :group} = group} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
+                 ctx.group,
+                 user_id: id(fake_user!())
+               )
+
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, topic} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic),
+             "the topic on the collection's first page is mirrored"
+
+      assert parent_id_of(topic) == id(group)
+    end
+
+    # joining is a trigger too (`join_group/3`, and `follow_group/3`, which pressing Join also calls): it must still mirror the topics when the sync made with the mirror got none, as when the collection couldn't be read then, and someone joins within the `children_sync_interval`
+    test "a group someone here joins has its topics mirrored, when the sync made with its mirror got none",
+         ctx do
+      assert_join_mirrors_topics(ctx, ctx.actors)
+    end
+
+    test "a group someone here asks to join has its topics mirrored, when the sync made with its mirror got none",
+         ctx do
+      actors =
+        Map.update!(ctx.actors, ctx.group, &Map.put(&1, "openness", "moderated"))
+
+      assert_join_mirrors_topics(ctx, actors)
+    end
+
+    defp assert_join_mirrors_topics(ctx, actors) do
+      ap_cache_on()
+      # the collection can't be read yet: a 404
+      serve(actors)
+
+      assert {:ok, %{type: :group} = group} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_by_url_ap_id_or_username(
+                 ctx.group,
+                 user_id: id(fake_user!())
+               )
+
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:error, :not_found} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic),
+             "control: nothing was mirrored when the mirror was made"
+
+      # and now it can be read
+      serve_narrower(%{ctx | actors: actors}, [ctx.topic])
+
+      assert {:ok, joined} = Categories.join_and_follow_group(fake_user!(), id(group))
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, topic} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic),
+             "the listed topic is mirrored once someone joins (#{inspect(joined)})"
+
+      assert parent_id_of(topic) == id(group)
+    end
+
+    # tests bypass the AP caches by default, where prod has them on
+    defp ap_cache_on do
+      Process.put(:activity_pub_enable_cache, true)
+      ActivityPub.Utils.cache_clear()
+      on_exit(fn -> ActivityPub.Utils.cache_clear() end)
+    end
+
     test "isn't synced for a local group", %{served: _served} do
       group = Bonfire.Classify.Simulate.fake_group!(fake_user!())
       assert :skip == Categories.maybe_sync_remote_children(group)

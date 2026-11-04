@@ -140,6 +140,21 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
 
   def filter_by_origin(query, _all), do: query
 
+  @doc "Batch-load `Peered` records (with their `peer`) for a list of ids, as `get_by_uid/1` loads one."
+  def list_by_uids(ids) when is_list(ids) do
+    case ids |> Enum.filter(&is_binary/1) |> Enum.uniq() do
+      [] ->
+        []
+
+      ids ->
+        repo().many(
+          from(p in Peered)
+          |> where([p], p.id in ^ids)
+          |> proload(:peer)
+        )
+    end
+  end
+
   @doc "Batch-load `Peered` records for a list of canonical URIs (to pre-resolve recipients and avoid n+1 in the MRF filter)."
   def list_by_canonical_uris(canonical_uris) when is_list(canonical_uris) do
     case canonical_uris |> Enum.filter(&is_binary/1) |> Enum.uniq() do

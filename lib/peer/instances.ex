@@ -271,10 +271,11 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   # prefer an instance circle pre-resolved for the whole recipient set (`opts[:resolved]`, built by
-  # `BoundariesMRF.filter/2`), falling back to a single `get_instance_circle/1` query when absent
+  # `BoundariesMRF.filter/2` or `Bonfire.Federate.ActivityPub.filter_federation_allowed/2`), falling back to a single `get_instance_circle/1` query when absent. `:none` there means the host was looked up and has no circle
   defp instance_circle_for(host, opts) do
     case ed(opts, :resolved, :allowlist_circles_by_hosts, host, nil) do
       nil -> get_instance_circle(host)
+      :none -> {:error, :not_found}
       circle -> {:ok, circle}
     end
   end
@@ -319,7 +320,7 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
   end
 
   def instance_blocked?(%Peer{display_hostname: display_hostname} = _peer, block_type, opts) do
-    with {:ok, circle} <- get_instance_circle(display_hostname) |> debug("instance_circle") do
+    with {:ok, circle} <- instance_circle_for(display_hostname, opts) |> debug("instance_circle") do
       Bonfire.Boundaries.Blocks.is_blocked?(circle, block_type, opts)
     else
       _ ->

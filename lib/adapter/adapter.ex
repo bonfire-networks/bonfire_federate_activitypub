@@ -406,6 +406,37 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     end
   end
 
+  # a new key for an actor that had none (`ActivityPub.Safety.Keys.ensure_keys_present/1`): written only if the actor still has no key, in one statement, as requests that make a key at once must all end up with the first one saved; the actor returned carries the key then stored, read again, as the one we were given was loaded before it
+  def update_local_actor(actor, %{keys: pem, keep_stored_keys: true}) when is_binary(pem) do
+    with {:ok, character} <- AdapterUtils.get_or_fetch_character_by_ap_id(actor) do
+      import Ecto.Query, only: [from: 2]
+
+      {_count, _} =
+        repo().insert_all(
+          Bonfire.Data.ActivityPub.Actor,
+          [%{id: id(character), signing_key: pem}],
+          conflict_target: [:id],
+          on_conflict:
+            from(a in Bonfire.Data.ActivityPub.Actor,
+              where: is_nil(a.signing_key),
+              update: [set: [signing_key: fragment("EXCLUDED.signing_key")]]
+            )
+        )
+
+      # a character holds its key itself, a user or group under its character (`AdapterUtils.format_actor/2` reads either)
+      character =
+        case character do
+          %Bonfire.Data.Identity.Character{} -> repo().preload(character, [:actor], force: true)
+          _ -> repo().preload(character, [character: [:actor]], force: true)
+        end
+
+      case AdapterUtils.character_to_actor(character) do
+        %ActivityPub.Actor{} = saved -> {:ok, saved}
+        other -> error(other, "Could not format the actor after saving its key")
+      end
+    end
+  end
+
   def update_local_actor(actor, params) do
     case AdapterUtils.get_or_fetch_character_by_ap_id(actor) do
       # {:error, :not_found} ->
@@ -800,6 +831,9 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   def federation_allowed?(subject, opts \\ []),
     do: Bonfire.Federate.ActivityPub.federation_allowed?(subject, opts)
+
+  def filter_federation_allowed(subjects, opts \\ []),
+    do: Bonfire.Federate.ActivityPub.filter_federation_allowed(subjects, opts)
 
   # In archipelago (allowlist-only) mode the signature on a fetch is the only way to tell whether the asker is on the allowlist, so every fetch has to carry one, whatever the instance's "require authentication" setting says
   def require_signed_fetch?(), do: Bonfire.Federate.ActivityPub.allowlist_only?()

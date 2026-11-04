@@ -618,6 +618,9 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
         maybe_apply_comments_enabled(character, object, pointable_object_id)
 
+        if !local?,
+          do: maybe_put_in_feed_of_group_not_announcing(activity, object, pointable_object)
+
         # replies that reached us before this object did, now that it is linked to its AP object
         Utils.maybe_apply(Bonfire.Social.Threads, :adopt_orphaned_replies, [
           pointable_object,
@@ -648,6 +651,39 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       end
     end
   end
+
+  # A group hosted elsewhere whose software never announces what its own server's users write in it (Mbin: their `Create` goes straight to the group's followers, see `Bonfire.Social.Tags.announces_own_content?/1`) gets such a post in our copy of its feed when the author's `Create` arrives, as its `Announce` would have put it there. Only the groups we already mirror, named in the object's or the activity's `audience`, `to` or `cc`, and on the author's own host, which is what makes it the group's own server's content: a post from anywhere else is announced by the group as usual.
+  defp maybe_put_in_feed_of_group_not_announcing(activity, object, pointable_object) do
+    activity_data = e(activity, :data, %{})
+    object_data = e(object, :data, %{})
+    author_host = activity_data["actor"] |> ActivityPub.Object.get_ap_id() |> host_of()
+
+    if author_host do
+      ([object_data["audience"], activity_data["audience"]] ++
+         List.wrap(object_data["to"]) ++
+         List.wrap(object_data["cc"]) ++
+         List.wrap(activity_data["to"]) ++ List.wrap(activity_data["cc"]))
+      |> Enum.map(&ActivityPub.Object.get_ap_id/1)
+      |> Enum.filter(&(is_binary(&1) and host_of(&1) == author_host))
+      |> Enum.uniq()
+      |> Enum.map(&AdapterUtils.mirrored_group/1)
+      |> Enum.reject(&is_nil/1)
+      |> repo().maybe_preload(character: [:peered])
+      |> Enum.reject(
+        &Utils.maybe_apply(Bonfire.Social.Tags, :announces_own_content?, [&1],
+          fallback_return: true
+        )
+      )
+      |> Enum.each(
+        &Utils.maybe_apply(Bonfire.Social.Tags, :put_in_mirror_feed, [&1, pointable_object],
+          fallback_return: nil
+        )
+      )
+    end
+  end
+
+  defp host_of(url) when is_binary(url), do: URI.parse(url).host
+  defp host_of(_), do: nil
 
   # how a remote post reached us, for `ActivityPub.Utils.published_at/2`: fetched from its origin (its AP copy, or the activity's, marked so), else delivered
   # fetched from its origin, or vouched for by its author's own proof or LD signature: either way its date is the author's word, as `ActivityPub.Utils.arrival/3` has it for the AP row

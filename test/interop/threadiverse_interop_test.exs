@@ -234,45 +234,54 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
              "an Accept of our Follow should leave us following the community"
     end
 
-    # the Join button sends a `Follow` and a `Join`, and Mbin answers only the `Follow`, so its `Accept` is what has to settle the join request too
+    # the Join button sends a `Follow` and a `Join`, and Mbin answers only the `Follow`, so its `Accept` is what has to settle the join request too. Both captured shapes: the older one, and Mbin 1.11's, which embeds our Follow with its FEP-8b32 proof (stripped from the fixture, as the host rewrite breaks it) and addresses it to the magazine alone, captured from a live run of the same Join (`group_interop_live_test.exs`)
     test "after the Join button, the community's Accept of our Follow makes us a member" do
-      follower = fake_user!()
-      {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
-
       %{id: community} = Enum.find(@implementors, &(&1.name == "Mbin"))
       {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
 
       join_verb_id = Bonfire.Boundaries.Verbs.get_id!(:join)
 
-      # an open magazine admits at once, and the Follow sent alongside waits for Mbin's answer
-      assert {:ok, %{member: true, requested: true}} =
-               Bonfire.Classify.Categories.join_and_follow_group(follower, group)
+      for accept_file <- ["accept_follow.json", "accept_follow_after_join.json"] do
+        follower = fake_user!()
+        {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
 
-      assert Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group)
+        # an open magazine admits at once, and the Follow sent alongside waits for Mbin's answer
+        assert {:ok, %{member: true, requested: true}} =
+                 Bonfire.Classify.Categories.join_and_follow_group(follower, group)
 
-      # what Mbin answers is the Follow we sent it, as the AP store has it
-      assert %{data: %{"id" => _}} =
-               follow_activity =
-               ActivityPub.Object.fetch_latest_activity(follower_actor.ap_id, community, "Follow"),
-             "the Join button should send the magazine a Follow, which is the only thing Mbin answers"
+        assert Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group)
 
-      accept =
-        fixture("mbin", "accept_follow.json")
-        |> put_in(["object", "id"], follow_activity.data["id"])
-        |> put_in(["object", "actor"], follower_actor.ap_id)
+        # what Mbin answers is the Follow we sent it, as the AP store has it
+        assert %{data: %{"id" => _}} =
+                 follow_activity =
+                 ActivityPub.Object.fetch_latest_activity(
+                   follower_actor.ap_id,
+                   community,
+                   "Follow"
+                 ),
+               "the Join button should send the magazine a Follow, which is the only thing Mbin answers"
 
-      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(accept)
+        # bound to this run's Follow and to the magazine it was sent to (the newer capture is from another magazine)
+        accept =
+          fixture("mbin", accept_file)
+          |> Map.put("actor", community)
+          |> put_in(["object", "id"], follow_activity.data["id"])
+          |> put_in(["object", "actor"], follower_actor.ap_id)
+          |> put_in(["object", "object"], community)
 
-      assert Bonfire.Classify.Categories.member?(follower, group),
-             "Mbin's Accept of our Follow should make us a member"
+        assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(accept)
 
-      assert Bonfire.Social.Graph.Follows.following?(follower, group)
+        assert Bonfire.Classify.Categories.member?(follower, group),
+               "#{accept_file}: Mbin's Accept of our Follow should make us a member"
 
-      refute Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group),
-             "and leave no follow request waiting"
+        assert Bonfire.Social.Graph.Follows.following?(follower, group), accept_file
 
-      refute Bonfire.Social.Requests.requested?(follower, join_verb_id, group),
-             "nor a join request"
+        refute Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group),
+               "#{accept_file}: and leave no follow request waiting"
+
+        refute Bonfire.Social.Requests.requested?(follower, join_verb_id, group),
+               "#{accept_file}: nor a join request"
+      end
     end
 
     # a community that approves its followers is mirrored as reviewing joins, so Join leaves a join request waiting, and software that never answers the `Join` settles it only through its `Accept` of the Follow. Mbin's magazines don't declare `manuallyApprovesFollowers` (its `GroupFactory` leaves it out), so this is a mirror made some other way, or a community of software that does declare it, answering as Mbin does
@@ -450,11 +459,11 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
 
   # A community announces a post to its followers, and our copy of the community shows it once that `Announce` arrives. Mbin sends it to every follower but the server the post came from (`AnnounceHandler.php`, its inbox filter), so a post made here would never reach our copy's feed that way
   describe "a post made here into a community hosted elsewhere" do
-    # what the community's server says it runs, as its nodeinfo would, on top of the captured actors the setup serves
-    defp serve_nodeinfo(host, software_name) do
+    # what the community's server says it runs, as its nodeinfo would, on top of the captured actors the setup serves, and any `also_served` `%{url => body}`
+    defp serve_nodeinfo(host, software_name, also_served \\ %{}) do
       # what an earlier test learned about the same made-up host must not answer for this one
       ActivityPub.Instances.delete_host_cache(host, :software)
-      served = served()
+      served = Map.merge(served(), also_served)
 
       mock(fn
         %{method: :get, url: "https://" <> _ = url} = env ->
@@ -528,6 +537,110 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
 
       refute on_the_community_page?(group, post),
              "Lemmy announces a post back to the server it came from, so that Announce is what puts it on the page"
+    end
+  end
+
+  # Mbin never announces what a user of the magazine's own server writes in it: the author's `Create` goes straight to the magazine's subscribers (`Outbox/CreateHandler.php`), and the magazine announces only what arrived from another server (`Inbox/CreateHandler.php`). So that `Create` is all we ever get, and it has to put the post on our copy of the magazine's page
+  describe "content written on the community's own server" do
+    @mbin_magazine "https://mbin.local/m/foo_test"
+
+    # the captured `Create` with its own ids, so each test's post is a new one to us
+    defp mbin_create_variant(create, suffix) do
+      create
+      |> Map.update!("id", &"#{&1}/#{suffix}")
+      |> update_in(["object", "id"], &"#{&1}/#{suffix}")
+    end
+
+    # the same `Create` written by someone on another server, as Mbin would deliver it to us had we followed them
+    defp by_author_elsewhere(create, author) do
+      host = URI.parse(author).host
+
+      create
+      |> Map.merge(%{"actor" => author, "id" => "https://#{host}/activities/#{System.unique_integer([:positive])}"})
+      |> update_in(["object"], fn object ->
+        Map.merge(object, %{
+          "attributedTo" => author,
+          "id" => "https://#{host}/objects/#{System.unique_integer([:positive])}"
+        })
+      end)
+    end
+
+    defp receive_in_magazine(create, software) do
+      serve_nodeinfo("mbin.local", software, %{create["actor"] => author_actor(create["actor"])})
+      {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => @mbin_magazine})
+
+      receive_announce(create)
+      {group, announced_post!("Mbin", create["object"]["id"])}
+    end
+
+    test "on Mbin, a thread by one of its users is on our copy of the community's page" do
+      create =
+        fixture("mbin", "create_page_by_local_author.json") |> mbin_create_variant("own_thread")
+
+      {group, post} = receive_in_magazine(create, "mbin")
+
+      assert on_the_community_page?(group, post),
+             "Mbin never announces its own users' threads, so their Create has to put them on the page"
+
+      refute Bonfire.Social.Boosts.boosted?(group, post),
+             "nothing should be done in the community's name: it never boosted the post"
+    end
+
+    test "on Mbin, a microblog post by one of its users is on our copy of the community's page" do
+      create =
+        fixture("mbin", "create_note_by_local_author.json")
+        |> mbin_create_variant("own_microblog")
+        |> update_in(["object"], &Map.delete(&1, "inReplyTo"))
+
+      {group, post} = receive_in_magazine(create, "mbin")
+
+      assert on_the_community_page?(group, post)
+      refute Bonfire.Social.Boosts.boosted?(group, post)
+    end
+
+    test "on Mbin, a comment by one of its users is in its thread on our copy of the community's page" do
+      thread_create =
+        fixture("mbin", "create_page_by_local_author.json")
+        |> mbin_create_variant("commented_thread")
+
+      {group, thread} = receive_in_magazine(thread_create, "mbin")
+
+      comment_create =
+        fixture("mbin", "create_note_by_local_author.json")
+        |> mbin_create_variant("comment")
+        |> put_in(["object", "inReplyTo"], thread_create["object"]["id"])
+
+      receive_announce(comment_create)
+      comment = announced_post!("Mbin", comment_create["object"]["id"])
+
+      # the positive first: the comment arrived as a reply in that thread
+      assert e(comment, :replied, :thread_id, nil) == id(thread)
+
+      assert on_the_community_page?(group, comment),
+             "a comment by one of Mbin's own users is not announced either, so its Create has to put it in the thread on the page"
+
+      refute Bonfire.Social.Boosts.boosted?(group, comment)
+    end
+
+    test "on Lemmy, the same Create waits for the community's Announce" do
+      create =
+        fixture("mbin", "create_page_by_local_author.json") |> mbin_create_variant("on_lemmy")
+
+      {group, post} = receive_in_magazine(create, "lemmy")
+
+      refute on_the_community_page?(group, post),
+             "Lemmy announces its own users' posts, so that Announce is what puts them on the page"
+    end
+
+    test "on Mbin, a Create by someone on another server waits for the community's Announce" do
+      create =
+        fixture("mbin", "create_page_by_local_author.json")
+        |> by_author_elsewhere("https://friendica.local/profile/someone")
+
+      {group, post} = receive_in_magazine(create, "mbin")
+
+      refute on_the_community_page?(group, post),
+             "Mbin announces a post from another server, so that Announce is what puts it on the page"
     end
   end
 

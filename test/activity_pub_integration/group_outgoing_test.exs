@@ -96,6 +96,34 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
            "Lemmy reads addressing from `to`/`cc` alone, so the group has to be there as well"
   end
 
+  # A preview group may be found by anyone and goes to the public search index, but a guest may only see its posts, not read them, so a post in it must not be addressed to everyone, or remote servers show its content to all
+  test "a post in a preview group is not addressed to Public" do
+    creator = fake_user!()
+    group = Simulate.fake_group!(creator)
+
+    assert :ok =
+             Bonfire.Classify.Boundaries.replace(group, creator, %{
+               membership: "open",
+               visibility: "preview",
+               participation: "anyone",
+               default_content_visibility: "public:preview"
+             })
+
+    assert {:ok, post} =
+             Bonfire.Posts.publish(
+               current_user: creator,
+               post_attrs: %{post_content: %{html_body: "<p>a preview of a post</p>"}},
+               boundary: "public:preview",
+               publish_in: uid(group)
+             )
+
+    data = Outgoing.ap_activity!(post).data
+    addressing = List.wrap(data["to"]) ++ List.wrap(data["cc"])
+
+    assert group_ap_id(group) in addressing, "control: the post federates to the group"
+    refute ActivityPub.Config.public_uri() in addressing
+  end
+
   # Regression guard for a shape bug only the ACTIVITY showed, while the object stayed correct: `BoundariesMRF.filter_recipients_field/8` filters each addressing field through a list, and used to write the filtered LIST back even when handed a single value, so a scalar `audience` became `["<group>"]` inside `ActivityPub.Object.insert/4`, after every place that builds addressing.
   test "the activity's audience is a scalar, as every implementation sends it" do
     creator = fake_user!()

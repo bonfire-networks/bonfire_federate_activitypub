@@ -2100,6 +2100,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
         _ ->
           {:ok, Characters.mark_as(user_etc, :remote)}
       end
+    else
+      {:error, reason} = error ->
+        maybe_made_by_another_request(actor, reason) || error
+
+      other ->
+        other
     end
   end
 
@@ -2155,6 +2161,32 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       ActivityPub.Actor.format_remote_actor(object)
       |> debug("cfa")
       |> create_remote_actor()
+
+  # Another request can make the same actor while this one does (eg. two signed fetches at once from someone we haven't met, each fetching the signer to get their key). Both find no character, and the character's unique username lets only one insert through: ours waits on it, then fails and rolls back, or, if the other one committed between the two checks in `create_remote_actor/1`, the handle is already taken. Either way the actor exists, so it is read back and returned as if made here. Only when it is the same actor, the one whose `Peered` holds this AP id: a different actor holding the handle (or one it folds to) stays an error, as does any other failure.
+  defp maybe_made_by_another_request(actor, reason) do
+    if username_taken?(reason) do
+      case get_pointable_by_peered_ap_id(actor.data["id"]) do
+        {:ok, character} ->
+          info(actor.data["id"], "another request made this actor at the same time, use it")
+          {:ok, Characters.mark_as(character, :remote)}
+
+        _ ->
+          nil
+      end
+    end
+  end
+
+  defp username_taken?(:username_taken), do: true
+
+  # after a failed insert, Postgres refuses every query until the transaction ends, so the actor can't be read back when ours ran inside a caller's transaction (a new group creating its moderators); that one is lost either way
+  defp username_taken?(%Ecto.Changeset{changes: %{character: %Ecto.Changeset{errors: errors}}}) do
+    not repo().in_transaction?() and
+      Enum.any?(errors, fn {field, {_message, opts}} ->
+        field in [:username, :username_hash] and opts[:constraint] == :unique
+      end)
+  end
+
+  defp username_taken?(_), do: false
 
   @doc """
   Checks whether two actors share a verified alias relationship by consulting AP actor data
@@ -2616,11 +2648,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
        |> Enum.reject(&(&1 in exclude_ids))
        |> debug("granted followers (excluding already addressed)")
        |> ActivityPub.Actor.list_cached()
-       |> Enum.filter(
-         &Bonfire.Federate.ActivityPub.federation_allowed?(&1,
-           current_user: character,
-           federation_mode: federation_mode
-         )
+       |> Bonfire.Federate.ActivityPub.filter_federation_allowed(
+         current_user: character,
+         federation_mode: federation_mode
        )}
     else
       [] ->

@@ -158,13 +158,16 @@ defmodule Bonfire.Federate.ActivityPub.GroupRelayedReceivedDocumentTest do
     assert {:ok, _} = delivered(create, @author)
     announce = announced()
 
-    # a follower elsewhere, so there is an inbox to prepare for
+    # a follower elsewhere, so there is an inbox to prepare for: known to us, as only an actor we hold is delivered to (the group's Announce no longer addresses the author, whose inbox this used to rely on)
+    {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @stranger)
     {:ok, group} = ActivityPub.Actor.get_cached(ap_id: context.group_ap_id)
     announce = %{announce | data: Map.update(announce.data, "cc", [@stranger], &[@stranger | &1])}
 
+    params = ActivityPub.Federator.APPublisher.prepare_publish_params(group, announce)
+    assert params != [], "control: no inbox to prepare for"
+
     creates =
-      for %{json: json} <-
-            ActivityPub.Federator.APPublisher.prepare_publish_params(group, announce),
+      for %{json: json} <- params,
           %{"object" => %{"type" => "Create"} = inner} <- [Jason.decode!(json)],
           do: inner
 
