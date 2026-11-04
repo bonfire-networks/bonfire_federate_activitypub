@@ -7,6 +7,13 @@ defmodule Bonfire.Federate.ActivityPub.NodeinfoAdapter do
     Bonfire.Common.URIs.base_url()
   end
 
+  def application_actor_uri() do
+    case ActivityPub.Utils.service_actor() do
+      {:ok, %{ap_id: ap_id}} -> ap_id
+      _ -> nil
+    end
+  end
+
   def gather_nodeinfo_data() do
     app_name = maybe_apply(Bonfire.Application, :name, [])
     # instance = Application.get_env(:activity_pub, :instance)

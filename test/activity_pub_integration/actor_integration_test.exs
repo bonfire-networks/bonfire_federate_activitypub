@@ -109,19 +109,21 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert ret["publicKey"]
   end
 
+  # straight to the actor's own id, which for an actor made under the ULID scheme is `/pub/person/<ULID>` rather than its name's URL
   test "fetch user from AP API with friendly URL and Accept header" do
     user = fake_user!()
+    actor_id = Bonfire.Common.URIs.canonical_url(user, preload_if_needed: true)
 
     assert build_conn()
            |> put_req_header("accept", "application/activity+json")
            |> get("/@#{user.character.username}")
-           |> redirected_to() =~ "/pub/actors/#{user.character.username}"
+           |> redirected_to() == actor_id
 
     # again with URI encoded to check for a caching bug
     assert build_conn()
            |> put_req_header("accept", "application/activity+json")
            |> get("/%40#{user.character.username}")
-           |> redirected_to() =~ "/pub/actors/#{user.character.username}"
+           |> redirected_to() == actor_id
   end
 
   # AS2 Core §2.3: date/time values MUST conform to the RFC3339 `date-time` production, and "an uppercase 'Z' character MUST be used in the absence of a numeric time zone offset".
@@ -287,6 +289,35 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
 
     assert true == undiscoverable(user)
     assert :disabled == indexer_modularity(user)
+  end
+
+  # a remote bio arrives as HTML its server already formatted, so it is kept as sent rather than run through our formatter, which links bare URLs and mentions in a local bio. A real TLD, as the formatter does not link a `.local` host
+  test "a remote actor's summary is stored as it arrives when the actor is updated" do
+    {actor, user} = fetch_remote_user(@remote_actor)
+    summary = "<p>Notes at https://example.com/notes</p>"
+
+    assert {:ok, _} =
+             Bonfire.Federate.ActivityPub.Adapter.update_remote_actor(
+               user,
+               Map.put(actor.data, "summary", summary)
+             )
+
+    {_actor, user} = fetch_remote_user(@remote_actor)
+    assert user.profile.summary == summary
+  end
+
+  # our limit on a name's length is for what people type here, so a remote user's server is not refused it, on update as on creation
+  test "a remote user's update with a 2-character name is applied" do
+    {actor, user} = fetch_remote_user(@remote_actor)
+
+    assert {:ok, _} =
+             Bonfire.Federate.ActivityPub.Adapter.update_remote_actor(
+               user,
+               Map.put(actor.data, "name", "Jo")
+             )
+
+    {_actor, user} = fetch_remote_user(@remote_actor)
+    assert user.profile.name == "Jo"
   end
 
   test "can follow pointers to remote actors" do

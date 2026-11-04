@@ -31,7 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.HashtagHandlingTest do
   end
 
   describe "outgoing hashtag handling" do
-    test "trailing hashtags on bottom line are stripped from html_body content" do
+    test "trailing hashtags on the bottom line stay links in html_body, and are hidden when rendered" do
       user = fake_user!()
 
       {:ok, post} =
@@ -50,9 +50,23 @@ defmodule Bonfire.Federate.ActivityPub.HashtagHandlingTest do
       # The main content should be preserved
       assert post.post_content.html_body =~ "data protection"
 
-      # The trailing hashtags should be wrapped in invisible spans
-      assert post.post_content.html_body =~ ~r/<span class="invisible">.*#privacy.*<\/span>/s
-      assert post.post_content.html_body =~ ~r/<span class="invisible">.*#gdpr.*<\/span>/s
+      # The trailing hashtags are stored as ordinary links, with no HTML around them
+      refute post.post_content.html_body =~ "invisible"
+      assert post.post_content.html_body =~ "#privacy"
+      assert post.post_content.html_body =~ "#gdpr"
+
+      # and are hidden when the body is rendered
+      rendered =
+        post.post_content.html_body
+        |> Bonfire.Common.Text.maybe_markdown_to_html(hide_trailing_hashtags: true)
+        |> Floki.parse_fragment!()
+
+      assert rendered |> Floki.find(".invisible a") |> Enum.map(&Floki.text/1) == [
+               "#privacy",
+               "#gdpr"
+             ]
+
+      refute rendered |> Floki.find(".invisible") |> Floki.text() =~ "data protection"
 
       # But the hashtags should still be associated via tags
       hashtag_names =
@@ -85,6 +99,91 @@ defmodule Bonfire.Federate.ActivityPub.HashtagHandlingTest do
       assert post.post_content.html_body =~ "#privacy"
       assert post.post_content.html_body =~ "#gdpr"
     end
+
+    test "the outgoing object hides trailing hashtags in its content, and its markdown source holds no HTML" do
+      Process.put(:federating, true)
+      user = fake_user!()
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: user,
+          post_attrs: %{
+            post_content: %{
+              html_body: "This is a post about data protection.\n#privacy #gdpr"
+            }
+          },
+          boundary: "public"
+        )
+
+      assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+      object = ap_activity.object.data
+
+      # other servers read `content`: the hashtags are links marked as tags (so Mastodon doesn't fetch link previews for them), and the trailing line of them is hidden
+      content = Floki.parse_fragment!(object["content"])
+      assert Floki.text(content) =~ "data protection"
+
+      assert content |> Floki.find(~s(a[rel="tag ugc"])) |> Enum.map(&Floki.text/1) == [
+               "#privacy",
+               "#gdpr"
+             ]
+
+      assert content |> Floki.find(".invisible a") |> Enum.map(&Floki.text/1) == [
+               "#privacy",
+               "#gdpr"
+             ]
+
+      refute content |> Floki.find(".invisible") |> Floki.text() =~ "data protection"
+
+      # servers that read `source` (eg. Mbin) render it as markdown, which shows any HTML in it escaped
+      assert %{"mediaType" => "text/markdown", "content" => source} = object["source"]
+      assert source =~ "data protection"
+      refute source =~ "<"
+      assert source =~ ~r{\[#privacy\]\(https?://[^)]+/hashtag/privacy\)}
+      assert source =~ ~r{\[#gdpr\]\(https?://[^)]+/hashtag/gdpr\)}
+    end
+
+    # not run: posts stored with their trailing hashtags in a `<span class="invisible">` get no special handling, so their `source` keeps the span as stored. This checked a special case that turned it into a paragraph of its own
+    # test "a post stored with its trailing hashtags in an invisible span sends a markdown source without it" do
+    #   Process.put(:federating, true)
+    #   user = fake_user!()
+    #
+    #   {:ok, post} =
+    #     Bonfire.Posts.publish(
+    #       current_user: user,
+    #       post_attrs: %{
+    #         post_content: %{
+    #           html_body: "This is a post about data protection.\n#privacy #gdpr"
+    #         }
+    #       },
+    #       boundary: "public"
+    #     )
+    #
+    #   # how posts were stored before trailing hashtags were hidden at render
+    #   post_content =
+    #     post.post_content
+    #     |> Ecto.Changeset.change(
+    #       html_body:
+    #         ~s|This is a post about data protection.<span class="invisible"> [#privacy](/hashtag/privacy) [#gdpr](/hashtag/gdpr)</span>|
+    #     )
+    #     |> repo().update!()
+    #
+    #   post = %{post | post_content: post_content}
+    #
+    #   assert {:ok, ap_activity} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+    #   object = ap_activity.object.data
+    #
+    #   assert %{"content" => source} = object["source"]
+    #   assert source =~ "data protection"
+    #   refute source =~ "<"
+    #   assert source =~ ~r{\[#privacy\]\(https?://[^)]+/hashtag/privacy\)}
+    #   assert source =~ ~r{\[#gdpr\]\(https?://[^)]+/hashtag/gdpr\)}
+    #
+    #   # `content` still hides them through the stored span
+    #   assert object["content"]
+    #          |> Floki.parse_fragment!()
+    #          |> Floki.find(".invisible a")
+    #          |> Enum.map(&Floki.text/1) == ["#privacy", "#gdpr"]
+    # end
   end
 
   describe "incoming hashtag handling" do

@@ -132,7 +132,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
         assert e(group, :profile, :name, nil) == actor["name"],
                "#{name}: a mirrored community should carry its own name"
 
-        assert e(group, :profile, :summary, nil) == actor["summary"],
+        # its text, as its HTML is cleaned up when stored, as a remote user's bio is
+        assert Bonfire.Common.Text.text_only(e(group, :profile, :summary, nil)) ==
+                 Bonfire.Common.Text.text_only(actor["summary"]),
                "#{name}: and its own description"
       end
     end
@@ -231,6 +233,99 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       assert Bonfire.Social.Graph.Follows.following?(follower, group),
              "an Accept of our Follow should leave us following the community"
     end
+
+    # the Join button sends a `Follow` and a `Join`, and Mbin answers only the `Follow`, so its `Accept` is what has to settle the join request too
+    test "after the Join button, the community's Accept of our Follow makes us a member" do
+      follower = fake_user!()
+      {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
+
+      %{id: community} = Enum.find(@implementors, &(&1.name == "Mbin"))
+      {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      join_verb_id = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+      # an open magazine admits at once, and the Follow sent alongside waits for Mbin's answer
+      assert {:ok, %{member: true, requested: true}} =
+               Bonfire.Classify.Categories.join_and_follow_group(follower, group)
+
+      assert Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group)
+
+      # what Mbin answers is the Follow we sent it, as the AP store has it
+      assert %{data: %{"id" => _}} =
+               follow_activity =
+               ActivityPub.Object.fetch_latest_activity(follower_actor.ap_id, community, "Follow"),
+             "the Join button should send the magazine a Follow, which is the only thing Mbin answers"
+
+      accept =
+        fixture("mbin", "accept_follow.json")
+        |> put_in(["object", "id"], follow_activity.data["id"])
+        |> put_in(["object", "actor"], follower_actor.ap_id)
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(accept)
+
+      assert Bonfire.Classify.Categories.member?(follower, group),
+             "Mbin's Accept of our Follow should make us a member"
+
+      assert Bonfire.Social.Graph.Follows.following?(follower, group)
+
+      refute Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group),
+             "and leave no follow request waiting"
+
+      refute Bonfire.Social.Requests.requested?(follower, join_verb_id, group),
+             "nor a join request"
+    end
+
+    # a community that approves its followers is mirrored as reviewing joins, so Join leaves a join request waiting, and software that never answers the `Join` settles it only through its `Accept` of the Follow. Mbin's magazines don't declare `manuallyApprovesFollowers` (its `GroupFactory` leaves it out), so this is a mirror made some other way, or a community of software that does declare it, answering as Mbin does
+    test "after the Join button on a community that approves followers, its Accept makes us a member" do
+      follower = fake_user!()
+      {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
+
+      %{id: community, dir: dir, actor: actor_file} =
+        Enum.find(@implementors, &(&1.name == "Mbin"))
+
+      {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      Adapter.update_remote_actor(
+        group,
+        fixture(dir, actor_file)
+        |> Map.put("manuallyApprovesFollowers", true)
+        # as storing an incoming actor does
+        |> ActivityPub.Federator.Transformer.fix_openness()
+      )
+
+      {:ok, group} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+
+      # the positive first: the mirror reviews joins, which is the case this is about
+      assert Bonfire.Boundaries.Presets.group_dimension_slugs(group)[:membership] == "on_request"
+
+      join_verb_id = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+      assert {:ok, %{requested: true} = answer} =
+               Bonfire.Classify.Categories.join_and_follow_group(follower, group)
+
+      refute answer[:member]
+      assert Bonfire.Social.Requests.requested?(follower, join_verb_id, group)
+      assert Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group)
+
+      assert %{data: %{"id" => _}} =
+               follow_activity =
+               ActivityPub.Object.fetch_latest_activity(follower_actor.ap_id, community, "Follow")
+
+      accept =
+        fixture("mbin", "accept_follow.json")
+        |> put_in(["object", "id"], follow_activity.data["id"])
+        |> put_in(["object", "actor"], follower_actor.ap_id)
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(accept)
+
+      assert Bonfire.Social.Graph.Follows.following?(follower, group)
+
+      assert Bonfire.Classify.Categories.member?(follower, group),
+             "Mbin's Accept of our Follow should settle the join request too"
+
+      refute Bonfire.Social.Requests.requested?(follower, join_verb_id, group),
+             "and leave no join request waiting"
+    end
   end
 
   describe "the announced post" do
@@ -250,7 +345,90 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
                  current_user: group
                ),
                "#{name}: the announced #{object["type"]} should land in the community's feed"
+
+        # the feed the group's page shows is its outbox, which the check above, by who acted, doesn't look at
+        {:ok, group} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+        group = Bonfire.Common.Repo.maybe_preload(group, :character)
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(:recent_discussions, post,
+                 feed_ids: Bonfire.Classify.Categories.group_feed_ids(group),
+                 current_user: fake_user!()
+               ),
+               "#{name}: the announced #{object["type"]} should be on the community's page"
       end
+    end
+
+    # the "All known groups" feed takes every group's outbox, a mirror's included, so the community's boost is what brings the post in, as on its page
+    test "is in All known groups, through the community's boost" do
+      for %{name: name, dir: dir, id: community, announces: [announce_file | _]} <-
+            with_announces() do
+        announce = fixture(dir, announce_file)
+        object = announce["object"]["object"]
+
+        receive_announce(announce)
+
+        post = announced_post!(name, object["id"])
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(:known_groups, post,
+                 current_user: fake_user!()
+               ),
+               "#{name}: the announced #{object["type"]} should be in All known groups (#{community})"
+      end
+    end
+
+    test "is in My groups once I joined the community" do
+      for %{name: name, dir: dir, id: community, announces: [announce_file | _]} <-
+            with_announces() do
+        announce = fixture(dir, announce_file)
+        object = announce["object"]["object"]
+
+        receive_announce(announce)
+
+        group = AdapterUtils.get_character_by_ap_id!(community)
+        post = announced_post!(name, object["id"])
+        member = fake_user!()
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(:my_groups, post, current_user: member),
+               "#{name}: control: not in My groups before joining"
+
+        assert {:ok, _} = Bonfire.Classify.Categories.join_group(member, group)
+
+        assert Bonfire.Classify.Categories.member?(member, group),
+               "#{name}: control: joining the mirror made a member, not a requester"
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(:my_groups, post, current_user: member),
+               "#{name}: the announced #{object["type"]} should be in My groups once joined"
+      end
+    end
+
+    # Mbin delivers a comment's `Create` straight to the server of the thread's author, and the magazine's `Announce` of that same `Create` to its followers, so where the thread was started here both reach us, the `Create` first. The `Announce` still has to make the community's boost of it
+    test "is on the community's page when its Create arrived before the community's Announce" do
+      %{id: community, dir: dir, announces: [announce_file | _]} =
+        Enum.find(@implementors, &(&1.name == "Mbin (a remote author's post)"))
+
+      announce = fixture(dir, announce_file)
+      object = announce["object"]["object"]
+
+      # the author's own delivery, before the community relays it
+      receive_announce(announce["object"])
+      post = announced_post!("Mbin", object["id"])
+      group = AdapterUtils.get_character_by_ap_id!(community)
+
+      # the positive first: the post is here, and not yet the community's
+      refute Bonfire.Social.Boosts.boosted?(group, post)
+
+      receive_announce(announce)
+
+      assert Bonfire.Social.Boosts.boosted?(group, post),
+             "the community's Announce of a Create we already hold should still be its boost"
+
+      {:ok, group} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+      group = repo().maybe_preload(group, :character)
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:recent_discussions, post,
+               feed_ids: Bonfire.Classify.Categories.group_feed_ids(group),
+               current_user: fake_user!()
+             )
     end
 
     test "keeps its title and original author" do
@@ -270,7 +448,152 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     end
   end
 
+  # A community announces a post to its followers, and our copy of the community shows it once that `Announce` arrives. Mbin sends it to every follower but the server the post came from (`AnnounceHandler.php`, its inbox filter), so a post made here would never reach our copy's feed that way
+  describe "a post made here into a community hosted elsewhere" do
+    # what the community's server says it runs, as its nodeinfo would, on top of the captured actors the setup serves
+    defp serve_nodeinfo(host, software_name) do
+      # what an earlier test learned about the same made-up host must not answer for this one
+      ActivityPub.Instances.delete_host_cache(host, :software)
+      served = served()
+
+      mock(fn
+        %{method: :get, url: "https://" <> _ = url} = env ->
+          cond do
+            url == "https://#{host}/.well-known/nodeinfo" ->
+              json(%{
+                "links" => [
+                  %{
+                    "rel" => "http://nodeinfo.diaspora.software/ns/schema/2.0",
+                    "href" => "https://#{host}/nodeinfo/2.0"
+                  }
+                ]
+              })
+
+            url == "https://#{host}/nodeinfo/2.0" ->
+              %Tesla.Env{
+                env
+                | status: 200,
+                  body: Jason.encode!(%{"software" => %{"name" => software_name}})
+              }
+
+            body = served[url] ->
+              json(body)
+
+            true ->
+              %Tesla.Env{status: 404, body: ""}
+          end
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+      end)
+    end
+
+    defp on_the_community_page?(group, post) do
+      {:ok, group} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+      group = repo().maybe_preload(group, :character)
+
+      Bonfire.Social.FeedLoader.feed_contains?(:recent_discussions, post,
+        feed_ids: Bonfire.Classify.Categories.group_feed_ids(group),
+        current_user: fake_user!()
+      )
+    end
+
+    test "on Mbin, shows on our copy of the community's page, though its Announce never comes back" do
+      serve_nodeinfo("mbin.local", "mbin")
+      %{id: community} = Enum.find(@implementors, &(&1.name == "Mbin"))
+      {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      post = Bonfire.Classify.Simulate.fake_post_in_group!(fake_user!(), group, "<p>from here</p>")
+
+      # the positive first: the post went into the community, which is what puts it on the page
+      assert {:ok, _, in_group} = Bonfire.Classify.Categories.group_of_object(post)
+      assert id(in_group) == id(group)
+
+      assert on_the_community_page?(group, post),
+             "a post made here into an Mbin magazine should be on our copy of its page"
+
+      refute Bonfire.Social.Boosts.boosted?(group, post),
+             "nothing should be done in the community's name: it never boosted the post"
+    end
+
+    test "on Lemmy, waits for the community's Announce as before" do
+      serve_nodeinfo("lemmy.local", "lemmy")
+      %{id: community} = Enum.find(@implementors, &(&1.name == "Lemmy"))
+      {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      post = Bonfire.Classify.Simulate.fake_post_in_group!(fake_user!(), group, "<p>from here</p>")
+
+      assert {:ok, _, in_group} = Bonfire.Classify.Categories.group_of_object(post)
+      assert id(in_group) == id(group)
+
+      refute on_the_community_page?(group, post),
+             "Lemmy announces a post back to the server it came from, so that Announce is what puts it on the page"
+    end
+  end
+
   # `commentsEnabled` is how this family states a thread's reply status ON THE POST, where `Lock` states a change to it. Both mean the same thing locally, so both end in the same `:lock` block: this is the case of a thread that was already closed when we first saw it, which is what a backfill or a first fetch of an old thread looks like.
+  # Mbin gives each thread a `summary` of its shortened title and its #tags, for software that shows `summary` but not `name` (`EntryPageFactory.php`). Shown here under the title, it only says the title twice, so a summary that is just the title, or just the start of the body, cut short and followed by hashtags, is dropped; a summary that says something else is kept
+  describe "a summary that only repeats the post" do
+    defp receive_create_by_mbin_author(create) do
+      author = create["actor"]
+      served = served()
+
+      mock(fn
+        %{method: :get, url: ^author} -> json(author_actor(author))
+        %{method: :get, url: url} -> if body = served[url], do: json(body), else: %Tesla.Env{status: 404, body: ""}
+        %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+      end)
+
+      receive_announce(create)
+      announced_post!("Mbin", create["object"]["id"])
+    end
+
+    test "is dropped when it is the title cut short, followed by hashtags" do
+      create = fixture("mbin", "create_page_by_local_author.json")
+      # the positive first: the capture carries the shape this is about
+      assert create["object"]["summary"] =~ "..."
+      assert create["object"]["summary"] =~ "#foo_test"
+
+      post = receive_create_by_mbin_author(create)
+
+      assert e(post, :post_content, :name, nil) == create["object"]["name"]
+      assert e(post, :post_content, :summary, nil) in [nil, ""]
+    end
+
+    test "is dropped when it is the start of the body, cut short, followed by hashtags" do
+      create =
+        fixture("mbin", "create_page_by_local_author.json")
+        |> update_in(["object"], fn object ->
+          object
+          |> Map.delete("name")
+          |> Map.put("summary", "A collective claiming data as a tool… #foo_test")
+          |> Map.put("id", object["id"] <> "/untitled")
+        end)
+        |> Map.update!("id", &(&1 <> "/untitled"))
+
+      post = receive_create_by_mbin_author(create)
+
+      # the positive first: the body arrived
+      assert e(post, :post_content, :html_body, nil) =~ "A collective claiming data"
+      assert e(post, :post_content, :summary, nil) in [nil, ""]
+    end
+
+    test "is kept when it says something the title and body don't" do
+      create =
+        fixture("mbin", "create_page_by_local_author.json")
+        |> update_in(["object"], fn object ->
+          object
+          |> Map.put("summary", "Content warning: talk of surveillance")
+          |> Map.put("id", object["id"] <> "/warned")
+        end)
+        |> Map.update!("id", &(&1 <> "/warned"))
+
+      post = receive_create_by_mbin_author(create)
+
+      assert e(post, :post_content, :summary, nil) =~ "Content warning: talk of surveillance"
+    end
+  end
+
   describe "a thread closed to replies" do
     test "arrives closed when the post says comments are disabled" do
       someone = fake_user!()

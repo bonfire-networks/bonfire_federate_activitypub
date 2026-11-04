@@ -181,6 +181,94 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
   end
 
   # a rename reaches a mirror through `Categories.update_remote_actor/2`, the same `update/4` a local rename goes through, so it is what would echo the origin's rename back as ours
+  # a remote group's summary arrives as HTML its server already formatted, so it is kept as sent rather than run through our formatter, which links bare URLs and mentions in a local bio. A real TLD, as the formatter does not link a `.local` host
+  test "a mirrored group's summary is stored as it arrives, when it is created and when it is updated" do
+    created_summary = "<p>Notes at https://example.com/notes</p>"
+    updated_summary = "<p>Moved to https://example.com/elsewhere</p>"
+
+    created =
+      APSimulate.actor_json(@remote_group, "tests", %{
+        "type" => "Group",
+        "summary" => created_summary
+      })
+
+    # the mirror is made from the actor as its server serves it
+    mock(fn
+      %{method: :get, url: @remote_group} -> json(created)
+      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+    end)
+
+    assert {:ok, mirror} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(created)
+
+    assert {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
+    assert Bonfire.Common.Repo.maybe_preload(mirror, :profile).profile.summary == created_summary
+
+    updated =
+      APSimulate.actor_json(@remote_group, "tests", %{
+        "type" => "Group",
+        "summary" => updated_summary
+      })
+
+    mock(fn
+      %{method: :get, url: @remote_group} -> json(updated)
+      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+    end)
+
+    assert {:ok, _} =
+             Transformer.handle_incoming(%{
+               "type" => "Update",
+               "actor" => @remote_group,
+               "object" => updated
+             })
+
+    assert {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
+    assert Bonfire.Common.Repo.maybe_preload(mirror, :profile).profile.summary == updated_summary
+  end
+
+  # our own limits on a name's and a bio's length are for what people type here, and a community elsewhere (eg. a Lemmy one titled "AI", or with a long sidebar) must still mirror and take its updates
+  test "a mirrored group with a 2-character name and a summary over our limit is created and updated" do
+    long_summary = "<p>" <> String.duplicate("a ", 5200) <> "</p>"
+
+    created =
+      APSimulate.actor_json(@remote_group, "tests", %{
+        "type" => "Group",
+        "name" => "AI",
+        "summary" => long_summary
+      })
+
+    mock(fn
+      %{method: :get, url: @remote_group} -> json(created)
+      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+    end)
+
+    assert {:ok, mirror} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(created)
+    assert {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
+    mirror = Bonfire.Common.Repo.maybe_preload(mirror, :profile)
+    assert mirror.profile.name == "AI"
+    assert mirror.profile.summary == long_summary
+
+    renamed = Map.put(created, "name", "ML")
+
+    mock(fn
+      %{method: :get, url: @remote_group} -> json(renamed)
+      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+    end)
+
+    assert {:ok, _} =
+             Transformer.handle_incoming(%{
+               "type" => "Update",
+               "actor" => @remote_group,
+               "object" => renamed
+             })
+
+    assert {:ok, mirror} = Categories.get(id(mirror), skip_boundary_check: true)
+    assert Bonfire.Common.Repo.maybe_preload(mirror, :profile).profile.name == "ML"
+  end
+
   test "an incoming Update renames a mirrored group, and federates nothing back" do
     assert {:ok, mirror} =
              Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(
