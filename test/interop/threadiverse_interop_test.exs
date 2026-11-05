@@ -538,7 +538,8 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       %{id: community} = Enum.find(@implementors, &(&1.name == "Mbin"))
       {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
 
-      post = Bonfire.Classify.Simulate.fake_post_in_group!(fake_user!(), group, "<p>from here</p>")
+      post =
+        Bonfire.Classify.Simulate.fake_post_in_group!(fake_user!(), group, "<p>from here</p>")
 
       # the positive first: the post went into the community, which is what puts it on the page
       assert {:ok, _, in_group} = Bonfire.Classify.Categories.group_of_object(post)
@@ -556,7 +557,8 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       %{id: community} = Enum.find(@implementors, &(&1.name == "Lemmy"))
       {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
 
-      post = Bonfire.Classify.Simulate.fake_post_in_group!(fake_user!(), group, "<p>from here</p>")
+      post =
+        Bonfire.Classify.Simulate.fake_post_in_group!(fake_user!(), group, "<p>from here</p>")
 
       assert {:ok, _, in_group} = Bonfire.Classify.Categories.group_of_object(post)
       assert id(in_group) == id(group)
@@ -582,7 +584,10 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       host = URI.parse(author).host
 
       create
-      |> Map.merge(%{"actor" => author, "id" => "https://#{host}/activities/#{System.unique_integer([:positive])}"})
+      |> Map.merge(%{
+        "actor" => author,
+        "id" => "https://#{host}/activities/#{System.unique_integer([:positive])}"
+      })
       |> update_in(["object"], fn object ->
         Map.merge(object, %{
           "attributedTo" => author,
@@ -678,9 +683,14 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       served = served()
 
       mock(fn
-        %{method: :get, url: ^author} -> json(author_actor(author))
-        %{method: :get, url: url} -> if body = served[url], do: json(body), else: %Tesla.Env{status: 404, body: ""}
-        %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+        %{method: :get, url: ^author} ->
+          json(author_actor(author))
+
+        %{method: :get, url: url} ->
+          if body = served[url], do: json(body), else: %Tesla.Env{status: 404, body: ""}
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
       end)
 
       receive_announce(create)

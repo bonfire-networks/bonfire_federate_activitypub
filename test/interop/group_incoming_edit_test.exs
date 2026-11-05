@@ -115,7 +115,10 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingEditTest do
       original: original
     } do
       assert {:ok, _} =
-               relayed_update(note, author, "<p>The comment, edited by its author</p>",
+               relayed_update(
+                 note,
+                 author,
+                 "<p>The comment, edited by its author</p>",
                  @lemmy_comments.id
                )
                |> ActivityPub.Federator.Transformer.handle_incoming()
@@ -137,7 +140,10 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingEditTest do
 
       # control: the same relay does apply the author's own edit afterwards
       assert {:ok, _} =
-               relayed_update(note, author, "<p>The comment, edited by its author</p>",
+               relayed_update(
+                 note,
+                 author,
+                 "<p>The comment, edited by its author</p>",
                  @lemmy_comments.id
                )
                |> ActivityPub.Federator.Transformer.handle_incoming()

@@ -398,7 +398,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupMentionFanoutCostTest do
 
       jobs_line =
         jobs
-        |> Enum.map_join(", ", fn {queue, op, n, bytes} -> "#{queue}/#{op}=#{n} (#{bytes} bytes)" end)
+        |> Enum.map_join(", ", fn {queue, op, n, bytes} ->
+          "#{queue}/#{op}=#{n} (#{bytes} bytes)"
+        end)
 
       IO.puts("FANOUT    jobs inserted: #{if jobs_line == "", do: "none", else: jobs_line}")
 
@@ -412,5 +414,6 @@ defmodule Bonfire.Federate.ActivityPub.GroupMentionFanoutCostTest do
     end
   end
 
-  defp native_ms(native), do: Float.round(System.convert_time_unit(native, :native, :microsecond) / 1000, 1)
+  defp native_ms(native),
+    do: Float.round(System.convert_time_unit(native, :native, :microsecond) / 1000, 1)
 end

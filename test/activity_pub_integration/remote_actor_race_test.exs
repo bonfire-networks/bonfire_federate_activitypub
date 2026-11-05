@@ -49,7 +49,8 @@ defmodule Bonfire.Federate.ActivityPub.RemoteActorRaceTest do
     actor_id: actor_id,
     username: username
   } do
-    results = at_once(fn -> ActivityPub.Federator.Fetcher.fetch_fresh_object_from_id(actor_id) end)
+    results =
+      at_once(fn -> ActivityPub.Federator.Fetcher.fetch_fresh_object_from_id(actor_id) end)
 
     failed = Enum.reject(results, &match?({:ok, %ActivityPub.Actor{}}, &1))
     assert failed == [], "#{length(failed)} of #{@tasks} failed: #{inspect(failed, limit: 3)}"
@@ -67,7 +68,9 @@ defmodule Bonfire.Federate.ActivityPub.RemoteActorRaceTest do
     actor_id: actor_id
   } do
     results =
-      at_once(fn -> ActivityPub.Safety.HTTP.Signatures.fetch_fresh_public_key(actor_id <> "#main-key") end)
+      at_once(fn ->
+        ActivityPub.Safety.HTTP.Signatures.fetch_fresh_public_key(actor_id <> "#main-key")
+      end)
 
     failed = Enum.reject(results, &match?({:ok, key} when not is_nil(key), &1))
     assert failed == [], "#{length(failed)} of #{@tasks} failed: #{inspect(failed, limit: 3)}"
@@ -100,8 +103,13 @@ defmodule Bonfire.Federate.ActivityPub.RemoteActorRaceTest do
             fragment("?->>'user_id'", j.args) == ^AdapterUtils.service_character_id()
       )
 
-    activities = repo().all(from(j in service_actor_jobs, select: fragment("?->>'activity_id'", j.args)))
-    repo().delete_all(from(o in ActivityPub.Object, where: o.id in ^Enum.reject(activities, &is_nil/1)))
+    activities =
+      repo().all(from(j in service_actor_jobs, select: fragment("?->>'activity_id'", j.args)))
+
+    repo().delete_all(
+      from(o in ActivityPub.Object, where: o.id in ^Enum.reject(activities, &is_nil/1))
+    )
+
     repo().delete_all(service_actor_jobs)
 
     repo().delete_all(from(p in Needle.Pointer, where: p.id >= ^started and p.id <= ^ended))

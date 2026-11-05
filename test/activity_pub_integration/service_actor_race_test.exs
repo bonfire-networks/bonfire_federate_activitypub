@@ -41,10 +41,17 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
   } do
     results = at_once(fn -> ActivityPub.Utils.service_actor() end)
 
-    failed = Enum.reject(results, &match?({:ok, %ActivityPub.Actor{keys: keys}} when is_binary(keys), &1))
+    failed =
+      Enum.reject(
+        results,
+        &match?({:ok, %ActivityPub.Actor{keys: keys}} when is_binary(keys), &1)
+      )
+
     assert failed == [], "#{length(failed)} of #{@tasks} failed: #{inspect(failed, limit: 3)}"
 
-    assert results |> Enum.map(fn {:ok, actor} -> actor.pointer_id || id(actor.pointer) end) |> Enum.uniq() ==
+    assert results
+           |> Enum.map(fn {:ok, actor} -> actor.pointer_id || id(actor.pointer) end)
+           |> Enum.uniq() ==
              [service_id]
 
     assert repo().aggregate(from(c in Character, where: c.id == ^service_id), :count) == 1
@@ -112,7 +119,9 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
       )
       |> List.flatten()
 
-    caretaken = repo().all(from(c in Caretaker, where: c.caretaker_id == ^service_id, select: c.id))
+    caretaken =
+      repo().all(from(c in Caretaker, where: c.caretaker_id == ^service_id, select: c.id))
+
     encircles = repo().all(from(e in Encircle, where: e.subject_id == ^service_id, select: e.id))
 
     # a grant's row goes with its ACL, but its pointer stays unless deleted too
@@ -137,6 +146,7 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
 
     ids =
       Enum.reject([service_id | feeds ++ caretaken ++ encircles ++ grants ++ accounts], &is_nil/1)
+
     repo().delete_all(from(p in Needle.Pointer, where: p.id in ^ids))
 
     # saving its key used to queue an `Update` of the service actor for delivery: the activity and its job are removed, those queued while the test ran
@@ -146,7 +156,11 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
       )
 
     activities = repo().all(from(j in jobs, select: fragment("?->>'activity_id'", j.args)))
-    repo().delete_all(from(o in ActivityPub.Object, where: o.id in ^Enum.reject(activities, &is_nil/1)))
+
+    repo().delete_all(
+      from(o in ActivityPub.Object, where: o.id in ^Enum.reject(activities, &is_nil/1))
+    )
+
     repo().delete_all(jobs)
   end
 end

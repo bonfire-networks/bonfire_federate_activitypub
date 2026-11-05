@@ -49,7 +49,13 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingReplyAudienceTest do
 
     {:ok, actor} = ActivityPub.Actor.get_cached(pointer: group)
 
-    %{creator: creator, member: member, outsider: outsider, group: group, group_ap_id: actor.ap_id}
+    %{
+      creator: creator,
+      member: member,
+      outsider: outsider,
+      group: group,
+      group_ap_id: actor.ap_id
+    }
   end
 
   defp publish_parent(creator, group, boundary) do
@@ -124,7 +130,13 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingReplyAudienceTest do
   end
 
   test "a followers-only comment from a remote instance on a public post in our public group can't be seen by guests or non-followers",
-       %{creator: creator, member: member, outsider: outsider, group: group, group_ap_id: group_ap_id} do
+       %{
+         creator: creator,
+         member: member,
+         outsider: outsider,
+         group: group,
+         group_ap_id: group_ap_id
+       } do
     parent = publish_parent(creator, group, "public")
     creator_ap_id = ActivityPub.Actor.get_cached!(pointer: creator).ap_id
 
@@ -174,12 +186,21 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingReplyAudienceTest do
   end
 
   test "a followers-only comment from a remote instance on a public post in our public group can be read by its author's followers here",
-       %{creator: creator, member: member, outsider: outsider, group: group, group_ap_id: group_ap_id} do
+       %{
+         creator: creator,
+         member: member,
+         outsider: outsider,
+         group: group,
+         group_ap_id: group_ap_id
+       } do
     follower = fake_user!()
     follow_author_accepted(follower)
 
     parent = publish_parent(creator, group, "public")
-    assert Bonfire.Boundaries.can?(follower, [:see, :read], parent), "control: the follower can read the parent"
+
+    assert Bonfire.Boundaries.can?(follower, [:see, :read], parent),
+           "control: the follower can read the parent"
+
     creator_ap_id = ActivityPub.Actor.get_cached!(pointer: creator).ap_id
 
     reply =
@@ -202,7 +223,13 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingReplyAudienceTest do
   end
 
   test "a public comment from a remote instance on a members-only post in our public group is members-only",
-       %{creator: creator, member: member, outsider: outsider, group: group, group_ap_id: group_ap_id} do
+       %{
+         creator: creator,
+         member: member,
+         outsider: outsider,
+         group: group,
+         group_ap_id: group_ap_id
+       } do
     parent = publish_parent(creator, group, "members:private")
 
     join_group(group, group_ap_id)
@@ -223,10 +250,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingReplyAudienceTest do
   end
 
   test "a comment from a remote instance naming a non-member, on a members-only post in our public group, isn't readable by that non-member but is by the members it names",
-       %{creator: creator, member: member, outsider: outsider, group: group, group_ap_id: group_ap_id} do
+       %{
+         creator: creator,
+         member: member,
+         outsider: outsider,
+         group: group,
+         group_ap_id: group_ap_id
+       } do
     parent = publish_parent(creator, group, "members:private")
     join_group(group, group_ap_id)
-    refute Bonfire.Boundaries.can?(outsider, [:see, :read], parent), "control: the non-member can't read the parent"
+
+    refute Bonfire.Boundaries.can?(outsider, [:see, :read], parent),
+           "control: the non-member can't read the parent"
 
     [creator_ap_id, member_ap_id, outsider_ap_id] =
       Enum.map([creator, member, outsider], &ActivityPub.Actor.get_cached!(pointer: &1).ap_id)

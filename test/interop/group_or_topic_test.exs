@@ -921,6 +921,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
     defp assert_join_mirrors_topics(ctx, actors) do
       ap_cache_on()
+
       # the 404 below is remembered for `[:activity_pub, :fetch_error_cache_ttl]` (a minute by default) and not fetched again in that time, and someone joins later than that: a few ms here
       fetch_error_cache_ttl(5)
       # the collection can't be read yet: a 404

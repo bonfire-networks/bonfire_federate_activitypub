@@ -39,7 +39,9 @@ defmodule Bonfire.Federate.ActivityPub.MbinOwnPostUITest do
         %Tesla.Env{status: 404, body: ""}
     end)
 
-    {:ok, group} = Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => @magazine})
+    {:ok, group} =
+      Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => @magazine})
+
     account = fake_account!()
     me = fake_user!(account)
 

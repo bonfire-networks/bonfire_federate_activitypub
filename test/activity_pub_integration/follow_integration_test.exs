@@ -24,9 +24,7 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
         json(Simulate.actor_json(@remote_actor))
 
       %{method: :get, url: @locked_actor} ->
-        json(
-          Simulate.actor_json(@locked_actor, "locked", %{"manuallyApprovesFollowers" => true})
-        )
+        json(Simulate.actor_json(@locked_actor, "locked", %{"manuallyApprovesFollowers" => true}))
 
       %{
         method: :get,
