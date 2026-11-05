@@ -82,6 +82,25 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
     assert object["name"] == "Renamed group"
   end
 
+  test "marking a group sensitive federates an Update carrying it" do
+    creator = fake_user!()
+
+    group =
+      Simulate.fake_group!(creator, %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+
+    assert {:ok, _} = Categories.update(creator, group, %{sensitive: true})
+
+    assert %{data: %{"object" => object}} = actor_update_activity(group),
+           "a group marked sensitive that tells nobody stays unmarked on every Lemmy, PieFed and Mbin mirror, so their NSFW filters never apply to it"
+
+    assert object["sensitive"] == true
+  end
+
   # Archiving changes what the group declares (`postingRestrictedToMods` becomes true, since it now accepts nothing), and a declaration nobody is told about does no work: existing followers keep offering their users a compose button for a group that has closed.
   @tag skip:
          "2026-09-08: `soft_delete/2` deliberately does NOT push an actor Update. Delivering one for an already-archived group crashes a LINKED process in the delivery path, taking the caller's DB connection with it, so archiving itself failed — it broke every archive test across `bonfire_ui_groups`, sidebar pins and this extension in CI. A linked exit cannot be rescued at the call site, so the push was removed until the delivery crash is understood (archived rows are excluded from the default fetch, so delivery re-loading the group is the likely cause). The DECLARATION is correct either way and is covered by `group_actor_declarations_test.exs`; only telling existing followers is missing."

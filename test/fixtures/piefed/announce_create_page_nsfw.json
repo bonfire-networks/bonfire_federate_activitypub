@@ -1,0 +1,73 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1"
+  ],
+  "id": "https://piefed.local/activities/announce/Hx7pQ2mLk9Zt3Wd",
+  "type": "Announce",
+  "actor": "https://piefed.local/c/nsfw_photos",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://piefed.local/c/nsfw_photos/followers"
+  ],
+  "object": {
+    "id": "https://piefed.local/activities/create/Rk2vN8sYb4Qe6Jm",
+    "type": "Create",
+    "actor": "https://piefed.local/u/lumen",
+    "to": [
+      "https://piefed.local/c/nsfw_photos",
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [],
+    "audience": "https://piefed.local/c/nsfw_photos",
+    "object": {
+      "id": "https://piefed.local/post/2100001",
+      "type": "Page",
+      "attributedTo": "https://piefed.local/u/lumen",
+      "to": [
+        "https://piefed.local/c/nsfw_photos",
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "cc": [],
+      "tag": [],
+      "audience": "https://piefed.local/c/nsfw_photos",
+      "content": "<p>Window light, one reflector.</p>\n",
+      "mediaType": "text/html",
+      "source": {
+        "content": "Window light, one reflector.",
+        "mediaType": "text/markdown"
+      },
+      "published": "2026-10-02T10:00:00.000000+00:00",
+      "language": {
+        "identifier": "en",
+        "name": "English"
+      },
+      "name": "Morning light study",
+      "attachment": [
+        {
+          "type": "Image",
+          "url": "https://piefed.local/static/media/posts/morning-light.webp",
+          "name": "A figure by a window, back to the camera"
+        }
+      ],
+      "commentsEnabled": true,
+      "sensitive": true,
+      "nsfl": false,
+      "genAI": false,
+      "stickied": false,
+      "interactionPolicy": {
+        "canQuote": {
+          "automaticApproval": [
+            "https://www.w3.org/ns/activitystreams#Public"
+          ]
+        }
+      },
+      "image": {
+        "type": "Image",
+        "url": "https://piefed.local/static/media/posts/morning-light.webp"
+      }
+    }
+  }
+}

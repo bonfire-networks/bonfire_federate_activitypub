@@ -539,6 +539,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
       posting_restricted_to_mods: data["postingRestrictedToMods"] == true,
       # whether it's listed: Lemmy 1.0 sends `false` for an Unlisted community, which "doesn't appear in community list"
       discoverable: data["discoverable"],
+      # a content warning on the whole group: Lemmy's and PieFed's NSFW community, Mbin's adult magazine. Absent reads as not marked, as for the declarations above
+      sensitive: data["sensitive"] == true,
       # what kind of category it is (`Bonfire.Classify.Categories.remote_type/1`): a membership collection (Bonfire, Mobilizon, Smithereen), and FEP-9b2b's `broader`, the group a topic or subgroup is in
       members: ActivityPub.Object.get_ap_id(data["members"]),
       broader: ActivityPub.Object.get_ap_id(data["broader"])

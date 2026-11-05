@@ -1,0 +1,54 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "actor": "https://mbin.local/u/reader",
+  "audience": "https://mbin.local/m/adult_comics",
+  "cc": [
+    "https://mbin.local/m/adult_comics",
+    "https://mbin.local/u/reader/followers"
+  ],
+  "id": "https://mbin.local/f/object/01a16000-bbbb-7000-8000-000000000002",
+  "object": {
+    "id": "https://mbin.local/m/adult_comics/t/5100001/-/comment/7200001",
+    "type": "Note",
+    "attributedTo": "https://mbin.local/u/reader",
+    "inReplyTo": "https://mbin.local/m/adult_comics/t/5100001",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://mbin.local/u/inkwell"
+    ],
+    "cc": [
+      "https://mbin.local/m/adult_comics",
+      "https://mbin.local/u/reader/followers"
+    ],
+    "audience": "https://mbin.local/m/adult_comics",
+    "sensitive": true,
+    "content": "<p>The lettering on this page is great.</p>\n",
+    "mediaType": "text/html",
+    "source": {
+      "content": "The lettering on this page is great.",
+      "mediaType": "text/markdown"
+    },
+    "url": "https://mbin.local/m/adult_comics/t/5100001/-/comment/7200001",
+    "tag": [
+      {
+        "href": "https://mbin.local/tag/adult_comics",
+        "name": "#adult_comics",
+        "type": "Hashtag"
+      }
+    ],
+    "published": "2026-10-03T13:00:00+00:00",
+    "contentMap": {
+      "en": "<p>The lettering on this page is great.</p>\n"
+    }
+  },
+  "published": "2026-10-03T13:00:00+00:00",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public",
+    "https://mbin.local/u/inkwell"
+  ],
+  "type": "Create"
+}

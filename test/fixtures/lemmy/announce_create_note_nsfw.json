@@ -1,0 +1,66 @@
+{
+  "actor": "https://lemmy.local/c/nsfw_art",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "object": {
+    "id": "https://lemmy.local/activities/create/9d4c2b1a-3e5f-4a6b-8c7d-0e1f2a3b4c5d",
+    "actor": "https://lemmy.local/u/critic",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "object": {
+      "type": "Note",
+      "id": "https://lemmy.local/comment/31000001",
+      "attributedTo": "https://lemmy.local/u/critic",
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "cc": [
+        "https://lemmy.local/c/nsfw_art",
+        "https://lemmy.local/u/sketcher"
+      ],
+      "content": "<p>The weight on the back foot reads really well.</p>\n",
+      "mediaType": "text/html",
+      "source": {
+        "content": "The weight on the back foot reads really well.",
+        "mediaType": "text/markdown"
+      },
+      "inReplyTo": "https://lemmy.local/post/61000001",
+      "published": "2026-10-01T19:30:00.000000Z",
+      "tag": [
+        {
+          "href": "https://lemmy.local/u/sketcher",
+          "name": "@sketcher@lemmy.local",
+          "type": "Mention"
+        }
+      ],
+      "distinguished": false,
+      "language": {
+        "identifier": "en",
+        "name": "English"
+      },
+      "audience": "https://lemmy.local/c/nsfw_art",
+      "attachment": [],
+      "context": "https://lemmy.local/comment/31000001/context"
+    },
+    "cc": [
+      "https://lemmy.local/c/nsfw_art",
+      "https://lemmy.local/u/sketcher"
+    ],
+    "tag": [
+      {
+        "href": "https://lemmy.local/u/sketcher",
+        "name": "@sketcher@lemmy.local",
+        "type": "Mention"
+      }
+    ],
+    "type": "Create",
+    "audience": "https://lemmy.local/c/nsfw_art"
+  },
+  "cc": [
+    "https://lemmy.local/c/nsfw_art/followers"
+  ],
+  "type": "Announce",
+  "id": "https://lemmy.local/activities/announce/create/7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d"
+}

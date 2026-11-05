@@ -1,0 +1,48 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1"
+  ],
+  "type": "Create",
+  "id": "https://bonfire-remote.local/pub/activities/01JBONFIRECREATE0000000001",
+  "actor": "https://bonfire-remote.local/pub/actors/ada",
+  "audience": "https://bonfire.local/pub/group/GROUP",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public",
+    "https://bonfire.local/pub/group/GROUP"
+  ],
+  "cc": [
+    "https://bonfire-remote.local/pub/actors/ada/followers"
+  ],
+  "object": {
+    "type": "Note",
+    "id": "https://bonfire-remote.local/pub/objects/01JBONFIRENOTE000000000001",
+    "attributedTo": "https://bonfire-remote.local/pub/actors/ada",
+    "audience": "https://bonfire.local/pub/group/GROUP",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://bonfire.local/pub/group/GROUP"
+    ],
+    "cc": [
+      "https://bonfire-remote.local/pub/actors/ada/followers"
+    ],
+    "indexable": true,
+    "sensitive": false,
+    "content": "<p>Meeting notes from Tuesday, nothing graphic in this one.</p>",
+    "source": {
+      "content": "Meeting notes from Tuesday, nothing graphic in this one.",
+      "mediaType": "text/markdown"
+    },
+    "inReplyTo": null,
+    "context": "https://bonfire-remote.local/pub/objects/01JBONFIRENOTE000000000001",
+    "tag": [
+      {
+        "href": "https://bonfire.local/pub/group/GROUP",
+        "name": "@GROUP",
+        "type": "Mention"
+      }
+    ],
+    "published": "2026-10-04T09:00:00.000000Z"
+  },
+  "published": "2026-10-04T09:00:00.000000Z"
+}

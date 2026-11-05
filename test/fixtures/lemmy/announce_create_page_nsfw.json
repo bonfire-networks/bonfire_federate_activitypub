@@ -1,0 +1,66 @@
+{
+  "actor": "https://lemmy.local/c/nsfw_art",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "object": {
+    "id": "https://lemmy.local/activities/create/5b0e6a3c-0f1d-4a7e-9a52-6f3c1d2e7b10",
+    "actor": "https://lemmy.local/u/sketcher",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "object": {
+      "type": "Page",
+      "id": "https://lemmy.local/post/61000001",
+      "attributedTo": "https://lemmy.local/u/sketcher",
+      "to": [
+        "https://lemmy.local/c/nsfw_art",
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "cc": [],
+      "name": "Charcoal life study, 20 minute pose",
+      "content": "<p>From Thursday's open studio.</p>\n",
+      "mediaType": "text/html",
+      "source": {
+        "content": "From Thursday's open studio.",
+        "mediaType": "text/markdown"
+      },
+      "attachment": [
+        {
+          "href": "https://lemmy.local/pictrs/image/life-study.webp",
+          "mediaType": "image/webp",
+          "type": "Link"
+        }
+      ],
+      "image": {
+        "type": "Image",
+        "url": "https://lemmy.local/pictrs/image/life-study-thumb.webp"
+      },
+      "sensitive": true,
+      "language": {
+        "identifier": "en",
+        "name": "English"
+      },
+      "published": "2026-10-01T18:00:00.000000Z",
+      "audience": "https://lemmy.local/c/nsfw_art",
+      "tag": [
+        {
+          "href": "https://lemmy.local/post/61000001",
+          "name": "#nsfw_art",
+          "type": "Hashtag"
+        }
+      ],
+      "context": "https://lemmy.local/post/61000001/context"
+    },
+    "cc": [
+      "https://lemmy.local/c/nsfw_art"
+    ],
+    "type": "Create",
+    "audience": "https://lemmy.local/c/nsfw_art"
+  },
+  "cc": [
+    "https://lemmy.local/c/nsfw_art/followers"
+  ],
+  "type": "Announce",
+  "id": "https://lemmy.local/activities/announce/create/1c7e2f4a-6b8d-4e3a-8f11-2a9d5c6b7e01"
+}

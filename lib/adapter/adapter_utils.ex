@@ -1647,7 +1647,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # ^ commented out 2026-10-18: archiving now marks the group's pointer deleted, so an archived group has no row to read this from and is served as its tombstone rather than as an actor declaring anything
       "manuallyApprovesFollowers" => manually_approves?,
       # whether peers should list it, from whether the fediverse may `see` it here (an unlisted visibility grants read but not see), so what we declare can't drift from what we enforce. Overrides the user-level `undiscoverable` setting `do_format_actor/2` puts in, which says nothing about a group. Lemmy 1.0 reads `false` as Unlisted
-      "discoverable" => Bonfire.Boundaries.can?(:activity_pub, :see, group) == true
+      "discoverable" => Bonfire.Boundaries.can?(:activity_pub, :see, group) == true,
+      # a content warning on the whole group, which Lemmy, PieFed and Mbin read as NSFW (and then mark every post in it so). Sent as `false` too, so a peer clears its copy on an `Update`. A topic sends its own mark, not its parent's
+      "sensitive" =>
+        maybe_apply(Bonfire.Classify.Categories, :sensitive?, [group], fallback_return: false) ==
+          true
     })
     # what kind of category it is, so another Bonfire mirrors a group as a group and a topic as a topic (`Bonfire.Classify.Categories.remote_type/1` reads it)
     |> Map.merge(category_kind_declarations(group, dims))
@@ -1776,6 +1780,8 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
             :actor,
             # :tags,
             :extra_info,
+            # a group's or topic's sensitive mark, for `actor_declarations/2`
+            :sensitive,
             profile: [:image, :icon],
             character: [
               # FIXME? should we used aliased, aliased, or a cross-reference of both?
@@ -3002,6 +3008,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
       {"custom",
        to_circles ++
+         addressed_author_followers_circle_ids(activity) ++
          Enum.map(
            moderators_if_service_character(Enum.map(recipients || [], &elem(&1, 1))),
            &id/1
@@ -3044,29 +3051,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   """
   def ap_incoming_interaction_policy_to_verb_grants(activity, interaction_policy)
       when is_map(interaction_policy) do
-    actor =
-      case e(activity, "actor", nil) || e(activity, :data, "actor", nil) do
-        actor when is_map(actor) ->
-          actor
-
-        actor when is_binary(actor) ->
-          ActivityPub.Actor.get_cached!(ap_id: actor) |> e(:data, nil)
-
-        _ ->
-          nil
-      end
+    actor = incoming_actor_data(activity)
 
     author_id = e(actor, "id", nil)
 
     # the policy's audiences we have a circle for
-    circles_by_url =
-      [
-        {ActivityPub.Config.public_uri(), :local},
-        {e(actor, "followers", nil), :followers},
-        {e(actor, "following", nil), :followed}
-      ]
-      |> Map.new()
-      |> Map.delete(nil)
+    circles_by_url = incoming_circles_by_url(actor)
 
     # an `interactionPolicy` key, and the verbs it's about
     policy_verbs =
@@ -3108,6 +3098,59 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def ap_incoming_interaction_policy_to_verb_grants(_, interaction_policy) do
     debug(interaction_policy, "no valid interaction_policy")
     []
+  end
+
+  @doc "The actor data (a map) of an incoming activity's author: embedded in the activity, or from the cache by its id. `nil` if neither."
+  def incoming_actor_data(activity) do
+    case e(activity, "actor", nil) || e(activity, :data, "actor", nil) do
+      actor when is_map(actor) ->
+        actor
+
+      actor when is_binary(actor) ->
+        ActivityPub.Actor.get_cached!(ap_id: actor) |> e(:data, nil)
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc "The audience URLs of an incoming object we have a circle for, each to that circle: Public to `:local`, and the author's own followers and following collections to the `:followers` and `:followed` stereotypes (which `Bonfire.Boundaries.Circles.resolve_id/2` resolves to the author's own circle)."
+  def incoming_circles_by_url(actor_data) do
+    [
+      {ActivityPub.Config.public_uri(), :local},
+      {e(actor_data, "followers", nil), :followers},
+      {e(actor_data, "following", nil), :followed}
+    ]
+    |> Map.new()
+    |> Map.delete(nil)
+  end
+
+  @doc """
+  The id of the author's own followers circle, in a list, when an incoming activity is addressed to the author's followers collection, else `[]`. A local user's follow of the author adds them to that circle, so it stands here for the collection.
+
+  Only the author's own collection maps. Another actor's followers collection (eg. of someone the author replies to) is a list that only that actor's server holds, and we can't resolve it: our circle of that actor's followers holds only the followers we know of, and the author may not be allowed to address them. So those are left out, and only the local users named directly get the object.
+  """
+  def addressed_author_followers_circle_ids(activity) do
+    actor = incoming_actor_data(activity)
+
+    with true <- addressed_to_author_followers?(activity, actor),
+         {:ok, %{pointer_id: author_id}} when is_binary(author_id) <-
+           ActivityPub.Actor.get_cached(ap_id: e(actor, "id", nil)),
+         circle_id when is_binary(circle_id) <-
+           Bonfire.Boundaries.Circles.resolve_id(:followers, author_id) do
+      [circle_id]
+    else
+      _ -> []
+    end
+  end
+
+  @doc "Whether an incoming activity is addressed to its author's own followers collection (as a followers-only post is, and a direct message never is)."
+  def addressed_to_author_followers?(activity, actor_data \\ nil) do
+    circles_by_url = incoming_circles_by_url(actor_data || incoming_actor_data(activity))
+
+    activity
+    |> all_object_recipients()
+    |> Enum.any?(&(circles_by_url[&1] == :followers))
   end
 
   # replaced by `ap_incoming_interaction_policy_to_verb_grants/2`: roles are ladders, so a policy about one verb granted or denied several (an author-only `canLike` also blocked replies), and a grant included reading, opening a private object to people it wasn't sent to

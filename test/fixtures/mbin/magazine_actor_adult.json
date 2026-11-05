@@ -1,0 +1,39 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "type": "Group",
+  "id": "https://mbin.local/m/adult_comics",
+  "name": "Adult Comics",
+  "preferredUsername": "adult_comics",
+  "inbox": "https://mbin.local/m/adult_comics/inbox",
+  "outbox": "https://mbin.local/m/adult_comics/outbox",
+  "followers": "https://mbin.local/m/adult_comics/followers",
+  "featured": "https://mbin.local/m/adult_comics/pinned",
+  "url": "https://mbin.local/m/adult_comics",
+  "summary": "<p>Comics for grown-ups: nudity and mature themes. Credit the artist.</p>\n",
+  "source": {
+    "content": "Comics for grown-ups: nudity and mature themes. Credit the artist.",
+    "mediaType": "text/markdown"
+  },
+  "sensitive": true,
+  "attributedTo": "https://mbin.local/m/adult_comics/moderators",
+  "postingRestrictedToMods": false,
+  "discoverable": true,
+  "indexable": true,
+  "endpoints": {
+    "sharedInbox": "https://mbin.local/f/inbox"
+  },
+  "published": "2024-06-01T09:00:00+00:00",
+  "updated": "2026-10-03T08:00:00+00:00",
+  "icon": {
+    "type": "Image",
+    "url": "https://media.mbin.local/ad/01/adult-comics-icon.png"
+  },
+  "image": {
+    "type": "Image",
+    "url": "https://media.mbin.local/ad/02/adult-comics-banner.png"
+  }
+}

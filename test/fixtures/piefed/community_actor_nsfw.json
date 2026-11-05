@@ -1,0 +1,53 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1"
+  ],
+  "type": "Group",
+  "id": "https://piefed.local/c/nsfw_photos",
+  "name": "NSFW Photography",
+  "postingWarning": "Adults only. Post your own work.",
+  "sensitive": true,
+  "preferredUsername": "nsfw_photos",
+  "inbox": "https://piefed.local/c/nsfw_photos/inbox",
+  "outbox": "https://piefed.local/c/nsfw_photos/outbox",
+  "followers": "https://piefed.local/c/nsfw_photos/followers",
+  "moderators": "https://piefed.local/c/nsfw_photos/moderators",
+  "featured": "https://piefed.local/c/nsfw_photos/featured",
+  "attributedTo": "https://piefed.local/c/nsfw_photos/moderators",
+  "postingRestrictedToMods": false,
+  "questionAnswer": false,
+  "defaultPostType": "image",
+  "newModsWanted": false,
+  "privateMods": false,
+  "genAI": false,
+  "url": "https://piefed.local/c/nsfw_photos",
+  "endpoints": {
+    "sharedInbox": "https://piefed.local/inbox"
+  },
+  "published": "2025-01-10T12:00:00.000000+00:00",
+  "updated": "2026-10-02T09:00:00.000000+00:00",
+  "lemmy:tagsForPosts": [],
+  "tag": [],
+  "postUrlType": "friendly",
+  "defaultHashtag": null,
+  "summary": "<p>Artistic nude and boudoir photography by the people who took it.</p>\n",
+  "source": {
+    "content": "Artistic nude and boudoir photography by the people who took it.",
+    "mediaType": "text/markdown"
+  },
+  "icon": {
+    "type": "Image",
+    "url": "https://piefed.local/static/media/communities/nsfw-photos-icon.webp"
+  },
+  "image": {
+    "type": "Image",
+    "url": "https://piefed.local/static/media/communities/nsfw-photos-banner.webp"
+  },
+  "language": [
+    {
+      "identifier": "en",
+      "name": "English"
+    }
+  ]
+}

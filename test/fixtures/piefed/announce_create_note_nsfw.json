@@ -1,0 +1,66 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1"
+  ],
+  "id": "https://piefed.local/activities/announce/Tz5nW1qXc8Lp2Ve",
+  "type": "Announce",
+  "actor": "https://piefed.local/c/nsfw_photos",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://piefed.local/c/nsfw_photos/followers"
+  ],
+  "object": {
+    "id": "https://piefed.local/activities/create/Mb6tF3hRd9Kq1Xs",
+    "type": "Create",
+    "actor": "https://piefed.local/u/shutter",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+      "https://piefed.local/c/nsfw_photos",
+      "https://piefed.local/u/lumen"
+    ],
+    "audience": "https://piefed.local/c/nsfw_photos",
+    "object": {
+      "id": "https://piefed.local/comment/880001",
+      "url": "https://piefed.local/comment/880001",
+      "type": "Note",
+      "attributedTo": "https://piefed.local/u/shutter",
+      "to": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ],
+      "cc": [
+        "https://piefed.local/c/nsfw_photos",
+        "https://piefed.local/u/lumen"
+      ],
+      "tag": [
+        {
+          "href": "https://piefed.local/u/lumen",
+          "name": "@lumen@piefed.local",
+          "type": "Mention"
+        }
+      ],
+      "audience": "https://piefed.local/c/nsfw_photos",
+      "content": "<p>Lovely falloff on the shadow side.</p>\n",
+      "mediaType": "text/html",
+      "source": {
+        "content": "Lovely falloff on the shadow side.",
+        "mediaType": "text/markdown"
+      },
+      "inReplyTo": "https://piefed.local/post/2100001",
+      "published": "2026-10-02T11:15:00.000000+00:00",
+      "language": {
+        "identifier": "en",
+        "name": "English"
+      },
+      "contentMap": {
+        "en": "<p>Lovely falloff on the shadow side.</p>\n"
+      },
+      "distinguished": false,
+      "flair": null
+    }
+  }
+}

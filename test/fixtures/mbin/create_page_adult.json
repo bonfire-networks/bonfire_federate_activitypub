@@ -1,0 +1,55 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://mbin.local/contexts"
+  ],
+  "actor": "https://mbin.local/u/inkwell",
+  "audience": "https://mbin.local/m/adult_comics",
+  "cc": [
+    "https://mbin.local/u/inkwell/followers"
+  ],
+  "id": "https://mbin.local/f/object/01a16000-aaaa-7000-8000-000000000001",
+  "object": {
+    "id": "https://mbin.local/m/adult_comics/t/5100001",
+    "type": "Page",
+    "attributedTo": "https://mbin.local/u/inkwell",
+    "inReplyTo": null,
+    "to": [
+      "https://mbin.local/m/adult_comics",
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+      "https://mbin.local/u/inkwell/followers"
+    ],
+    "name": "Night Shift, page 12",
+    "audience": "https://mbin.local/m/adult_comics",
+    "content": "<p>The next page of Night Shift. Nudity on the second panel.</p>\n",
+    "summary": "Night Shift, page 12 #adult_comics",
+    "mediaType": "text/html",
+    "source": {
+      "content": "The next page of Night Shift. Nudity on the second panel.",
+      "mediaType": "text/markdown"
+    },
+    "tag": [
+      {
+        "href": "https://mbin.local/tag/adult_comics",
+        "name": "#adult_comics",
+        "type": "Hashtag"
+      }
+    ],
+    "commentsEnabled": true,
+    "sensitive": true,
+    "stickied": false,
+    "published": "2026-10-03T12:00:00+00:00",
+    "contentMap": {
+      "en": "<p>The next page of Night Shift. Nudity on the second panel.</p>\n"
+    }
+  },
+  "published": "2026-10-03T12:00:00+00:00",
+  "to": [
+    "https://mbin.local/m/adult_comics",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Create"
+}

@@ -812,6 +812,39 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
              "not again within the interval"
     end
 
+    # a mirror made before groups declared `narrower` is fetched again to catch up, but Lemmy, PieFed and Mbin groups never declare it, and an actor just fetched to make its mirror is as fresh as it gets
+    test "a group that lists no topics, as Lemmy's don't, is fetched once to mirror it, and not again when someone here joins",
+         %{served: served} do
+      me = self()
+
+      mock(fn
+        %{method: :get, url: url} ->
+          send(me, {:fetched, url})
+
+          case served[url] do
+            nil -> %Tesla.Env{status: 404, body: ""}
+            body -> json(body)
+          end
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+      end)
+
+      assert {:ok, %{type: :group} = group} = Adapter.maybe_create_remote_actor(%{"id" => @lemmy})
+      assert fetches_of(@lemmy) == 1, "fetched once, to mirror it"
+
+      assert {:ok, _} = Categories.join_and_follow_group(fake_user!(), id(group))
+      assert fetches_of(@lemmy) == 0, "not fetched again when someone here joins"
+    end
+
+    defp fetches_of(url, count \\ 0) do
+      receive do
+        {:fetched, ^url} -> fetches_of(url, count + 1)
+      after
+        0 -> count
+      end
+    end
+
     # as search and the groups page look a group up (`Bonfire.Search.LiveHandler`, `Bonfire.UI.Groups.ExploreLive`), with the AP caches on as in prod
     test "a group found by its URL has its topics mirrored, with the AP cache on", ctx do
       ap_cache_on()
@@ -888,6 +921,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
     defp assert_join_mirrors_topics(ctx, actors) do
       ap_cache_on()
+      # the 404 below is remembered for `[:activity_pub, :fetch_error_cache_ttl]` (a minute by default) and not fetched again in that time, and someone joins later than that: a few ms here
+      fetch_error_cache_ttl(5)
       # the collection can't be read yet: a 404
       serve(actors)
 
@@ -905,6 +940,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
       # and now it can be read
       serve_narrower(%{ctx | actors: actors}, [ctx.topic])
+      # the 404 is no longer remembered by the time someone joins
+      Process.sleep(10)
 
       assert {:ok, joined} = Categories.join_and_follow_group(fake_user!(), id(group))
       Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
@@ -921,6 +958,17 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
       Process.put(:activity_pub_enable_cache, true)
       ActivityPub.Utils.cache_clear()
       on_exit(fn -> ActivityPub.Utils.cache_clear() end)
+    end
+
+    defp fetch_error_cache_ttl(ttl) do
+      previous = Application.get_env(:activity_pub, :fetch_error_cache_ttl)
+      Application.put_env(:activity_pub, :fetch_error_cache_ttl, ttl)
+
+      on_exit(fn ->
+        if previous,
+          do: Application.put_env(:activity_pub, :fetch_error_cache_ttl, previous),
+          else: Application.delete_env(:activity_pub, :fetch_error_cache_ttl)
+      end)
     end
 
     test "isn't synced for a local group", %{served: _served} do

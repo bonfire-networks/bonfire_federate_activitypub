@@ -1,0 +1,48 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1"
+  ],
+  "type": "Create",
+  "id": "https://bonfire-remote.local/pub/activities/01JBONFIRECREATE0000000002",
+  "actor": "https://bonfire-remote.local/pub/actors/ada",
+  "audience": "https://bonfire.local/pub/group/GROUP",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public",
+    "https://bonfire.local/pub/group/GROUP"
+  ],
+  "cc": [
+    "https://bonfire-remote.local/pub/actors/ada/followers"
+  ],
+  "object": {
+    "type": "Note",
+    "id": "https://bonfire-remote.local/pub/objects/01JBONFIRENOTE000000000002",
+    "attributedTo": "https://bonfire-remote.local/pub/actors/ada",
+    "audience": "https://bonfire.local/pub/group/GROUP",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "https://bonfire.local/pub/group/GROUP"
+    ],
+    "cc": [
+      "https://bonfire-remote.local/pub/actors/ada/followers"
+    ],
+    "indexable": true,
+    "sensitive": true,
+    "content": "<p>Photos from the field hospital, some are hard to look at.</p>",
+    "source": {
+      "content": "Photos from the field hospital, some are hard to look at.",
+      "mediaType": "text/markdown"
+    },
+    "inReplyTo": null,
+    "context": "https://bonfire-remote.local/pub/objects/01JBONFIRENOTE000000000002",
+    "tag": [
+      {
+        "href": "https://bonfire.local/pub/group/GROUP",
+        "name": "@GROUP",
+        "type": "Mention"
+      }
+    ],
+    "published": "2026-10-04T10:00:00.000000Z"
+  },
+  "published": "2026-10-04T10:00:00.000000Z"
+}

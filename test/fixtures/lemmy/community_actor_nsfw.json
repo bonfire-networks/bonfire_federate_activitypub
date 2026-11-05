@@ -1,0 +1,41 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "type": "Group",
+  "id": "https://lemmy.local/c/nsfw_art",
+  "preferredUsername": "nsfw_art",
+  "inbox": "https://lemmy.local/c/nsfw_art/inbox",
+  "followers": "https://lemmy.local/c/nsfw_art/followers",
+  "name": "NSFW Art",
+  "description": "Figure drawing and other art with nudity.",
+  "summary": "<p>Figure drawing, life studies and other art with nudity.</p>\n<p>Rules: tag the artist, no photos of real people.</p>\n",
+  "source": {
+    "content": "Figure drawing, life studies and other art with nudity.\n\nRules: tag the artist, no photos of real people.",
+    "mediaType": "text/markdown"
+  },
+  "mediaType": "text/html",
+  "icon": {
+    "type": "Image",
+    "url": "https://lemmy.local/pictrs/image/nsfw-art-icon.webp"
+  },
+  "image": {
+    "type": "Image",
+    "url": "https://lemmy.local/pictrs/image/nsfw-art-banner.webp"
+  },
+  "sensitive": true,
+  "featured": "https://lemmy.local/c/nsfw_art/featured",
+  "outbox": "https://lemmy.local/c/nsfw_art/outbox",
+  "endpoints": {
+    "sharedInbox": "https://lemmy.local/inbox"
+  },
+  "language": [],
+  "published": "2024-03-02T10:11:12.123456Z",
+  "updated": "2026-09-30T08:00:00.000000Z",
+  "postingRestrictedToMods": false,
+  "attributedTo": "https://lemmy.local/c/nsfw_art/moderators",
+  "manuallyApprovesFollowers": false,
+  "discoverable": true,
+  "tag": []
+}

@@ -385,6 +385,32 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
       end
     end
 
+    # the /groups origin menu narrows the feed by where each group is hosted, so a mirror's posts are from other instances
+    test "is in All known groups from other instances, not from this instance" do
+      for %{name: name, dir: dir, id: community, announces: [announce_file | _]} <-
+            with_announces() do
+        announce = fixture(dir, announce_file)
+        object = announce["object"]["object"]
+
+        receive_announce(announce)
+
+        post = announced_post!(name, object["id"])
+        reader = fake_user!()
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(:known_groups, post,
+                 current_user: reader,
+                 feed_filters: %{in_groups: [:all, :remote]}
+               ),
+               "#{name}: the announced #{object["type"]} should be in the mirrors' feed (#{community})"
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(:known_groups, post,
+                 current_user: reader,
+                 feed_filters: %{in_groups: [:all, :local]}
+               ),
+               "#{name}: the announced #{object["type"]} should not be in this instance's groups' feed"
+      end
+    end
+
     test "is in My groups once I joined the community" do
       for %{name: name, dir: dir, id: community, announces: [announce_file | _]} <-
             with_announces() do

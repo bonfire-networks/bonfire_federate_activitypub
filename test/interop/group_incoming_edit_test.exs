@@ -20,12 +20,21 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingEditTest do
     actor: "community_actor.json",
     announces: ["announce_create_page_text.json"]
   }
+  # the only captured Lemmy comment (a `Note` replying to the post in `announce_create_page_nsfw.json`) is in this community
+  @lemmy_comments %{
+    name: "Lemmy",
+    dir: "lemmy",
+    id: "https://lemmy.local/c/nsfw_art",
+    actor: "community_actor_nsfw.json",
+    announces: ["announce_create_page_nsfw.json", "announce_create_note_nsfw.json"]
+  }
   # someone on the same instance who did not write the post
   @stranger "https://lemmy.local/u/mallory"
   @public "https://www.w3.org/ns/activitystreams#Public"
 
   setup do
-    served = Map.new(served_for([@lemmy]) ++ [{@stranger, author_actor(@stranger)}])
+    served =
+      Map.new(served_for([@lemmy, @lemmy_comments]) ++ [{@stranger, author_actor(@stranger)}])
 
     mock(fn
       %{method: :get, url: url} ->
@@ -83,8 +92,62 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingEditTest do
     assert html_body(page["id"]) =~ "edited by its author"
   end
 
+  describe "a comment (a `Note` with `inReplyTo` on the thread)" do
+    setup do
+      [page_file, note_file] = @lemmy_comments.announces
+      receive_announce(fixture(@lemmy_comments.dir, page_file))
+
+      announce = fixture(@lemmy_comments.dir, note_file)
+      create = announce["object"]
+      note = create["object"]
+      assert is_binary(note["inReplyTo"]), "control: the fixture is a reply"
+
+      receive_announce(announce)
+      original = html_body(note["id"])
+      assert is_binary(original), "control: the announced comment should be stored with a body"
+
+      {:ok, note: note, author: create["actor"], original: original}
+    end
+
+    test "an edit of a comment by its author, relayed by the group, is applied", %{
+      note: note,
+      author: author,
+      original: original
+    } do
+      assert {:ok, _} =
+               relayed_update(note, author, "<p>The comment, edited by its author</p>",
+                 @lemmy_comments.id
+               )
+               |> ActivityPub.Federator.Transformer.handle_incoming()
+
+      refute html_body(note["id"]) == original
+      assert html_body(note["id"]) =~ "edited by its author"
+    end
+
+    test "an edit of a comment by someone other than its author is not applied", %{
+      note: note,
+      author: author,
+      original: original
+    } do
+      ActivityPub.Federator.Transformer.handle_incoming(
+        relayed_update(note, @stranger, "<p>Hijacked by a stranger</p>", @lemmy_comments.id)
+      )
+
+      assert html_body(note["id"]) == original
+
+      # control: the same relay does apply the author's own edit afterwards
+      assert {:ok, _} =
+               relayed_update(note, author, "<p>The comment, edited by its author</p>",
+                 @lemmy_comments.id
+               )
+               |> ActivityPub.Federator.Transformer.handle_incoming()
+
+      assert html_body(note["id"]) =~ "edited by its author"
+    end
+  end
+
   # the group's `Announce` of an `Update` that `actor` sent for the post `page`
-  defp relayed_update(page, actor, new_body) do
+  defp relayed_update(page, actor, new_body, community \\ @community) do
     unique = System.unique_integer([:positive])
 
     update = %{
@@ -92,18 +155,18 @@ defmodule Bonfire.Federate.ActivityPub.GroupIncomingEditTest do
       "id" => "#{page["id"]}/update/#{unique}",
       "type" => "Update",
       "actor" => actor,
-      "to" => [@public, "#{@community}/followers"],
-      "audience" => @community,
+      "to" => [@public, "#{community}/followers"],
+      "audience" => community,
       "object" => Map.merge(page, %{"content" => new_body, "attributedTo" => actor})
     }
 
     %{
       "@context" => "https://www.w3.org/ns/activitystreams",
-      "id" => "#{@community}/activities/announce/#{unique}",
+      "id" => "#{community}/activities/announce/#{unique}",
       "type" => "Announce",
-      "actor" => @community,
+      "actor" => community,
       "to" => [@public],
-      "cc" => ["#{@community}/followers"],
+      "cc" => ["#{community}/followers"],
       "object" => update
     }
   end
