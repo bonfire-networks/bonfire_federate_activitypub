@@ -31,7 +31,7 @@ defmodule Bonfire.Federate.ActivityPub.Testing.Scenarios do
   end
 
   @doc """
-  Our user follows a remote actor (`target`, a handle or URI, a person or a group), and it accepts: our `Follow` references it by id (strict servers cannot parse an embedded actor), and its `Accept` reaches us. Checked on our side, through `Testing.Interop`: what we sent, and what we received. `wait:` is how long to wait for the `Accept`, in seconds (default 90).
+  Our user follows a remote actor (`target`, a handle or URI, a person or a group), and it accepts: our `Follow` references it by id (strict servers cannot parse an embedded actor), and its `Accept` reaches us. Checked on our side, through `Testing.Interop`: what we sent, and what we received. `wait:` is how long to wait for the `Accept`, in seconds (default 90). `resend_after:` (milliseconds) runs the check of a pending Follow (`ActivityPub.Federator.PendingFollows.check/2`) that long after the Follow if no `Accept` came, for a caller that has turned off the scheduled check, so the re-send goes out after its delay as in prod.
   """
   def follow_accepted(context, target, opts \\ []) do
     assert {:ok, actor} = Interop.fetch(target)
@@ -47,10 +47,33 @@ defmodule Bonfire.Federate.ActivityPub.Testing.Scenarios do
     assert is_binary(follow.data["object"]),
            "our Follow embeds the actor instead of referencing its id: #{inspect(follow.data["object"])}"
 
-    assert Interop.await_incoming([type: "Accept", from: actor.ap_id],
-             seconds: opts[:wait] || 90,
-             since: since
-           ),
+    wait = opts[:wait] || 90
+    accept = [type: "Accept", from: actor.ap_id]
+
+    # Replaced: with `resend_after:`, the check for a re-send runs here after its delay, as Oban's inline engine would run it at once
+    # assert Interop.await_incoming([type: "Accept", from: actor.ap_id],
+    #          seconds: opts[:wait] || 90,
+    #          since: since
+    #        ),
+    #        "no Accept from #{actor.ap_id}: it could not fetch or parse our Follow or our actor, or we dropped its Accept"
+    accepted =
+      case opts[:resend_after] do
+        after_ms when is_integer(after_ms) ->
+          first_wait = min(div(after_ms, 1000), wait)
+
+          Interop.await_incoming(accept, seconds: first_wait, since: since) ||
+            (
+              ActivityPub.Federator.PendingFollows.check(follow.data["id"], actor.data["inbox"])
+              |> IO.inspect(label: "no Accept after #{first_wait}s, so the check of the Follow ran")
+
+              Interop.await_incoming(accept, seconds: wait - first_wait, since: since)
+            )
+
+        _ ->
+          Interop.await_incoming(accept, seconds: wait, since: since)
+      end
+
+    assert accepted,
            "no Accept from #{actor.ap_id}: it could not fetch or parse our Follow or our actor, or we dropped its Accept"
   end
 

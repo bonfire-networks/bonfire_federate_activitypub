@@ -91,6 +91,22 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
     end
   end
 
+  # Turns off the scheduled check for re-sending a pending Follow (`:resend_pending_follow_after`) until the test ends, and gives its delay in milliseconds (or `false`), for the test to run the check itself once that delay has passed. Oban runs `:inline` here, so a scheduled check would run at once, seconds after the Follow, rather than after the delay as in prod.
+  defp check_pending_follows_by_hand do
+    previous = Application.fetch_env(:activity_pub, :resend_pending_follow_after)
+    resend_after = ActivityPub.Federator.PendingFollows.resend_after()
+    Application.put_env(:activity_pub, :resend_pending_follow_after, false)
+
+    on_exit(fn ->
+      case previous do
+        {:ok, value} -> Application.put_env(:activity_pub, :resend_pending_follow_after, value)
+        :error -> Application.delete_env(:activity_pub, :resend_pending_follow_after)
+      end
+    end)
+
+    resend_after
+  end
+
   defp group_handle! do
     System.get_env(@group_env) ||
       flunk("""
@@ -158,15 +174,22 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
     # REGRESSION GUARD: a Follow round-trip only completes if the remote can fetch and PARSE our actor.
     # This is what caught our `updated` field being serialised without a timezone (AS2 Core §2.3 requires RFC3339 with `Z`), which made Lemmy reject the whole actor with HTTP 400 and silently blocked every interaction with Lemmy instances.
     # `object` must stay a bare id: implementations type a Follow's object as a link, so embedding the actor (which `prepare_outgoing_object/1` used to do) makes them reject it outright. The wait is generous: this is usually FIRST contact with the remote, which has to fetch and parse our actor before it can accept, and the 90s default is not enough against lemmy.world
+    # The Follow is re-sent if it is still pending after `:resend_pending_follow_after` (4 minutes), as Lemmy drops the first Follow from a host it hadn't seen, so the wait covers the re-send and its Accept. The timeout is longer than the wait, as the suite's default (2 minutes) is shorter.
+    @tag timeout: :timer.minutes(10)
     test "the remote Accepts our Follow (proving it can fetch and parse our actor)", context do
+      resend_after = check_pending_follows_by_hand()
+
       Scenarios.follow_accepted(
         Map.put(context, :local, %{user: fake_user!()}),
         group_handle!(),
-        wait: reply_wait(300)
+        # wait: reply_wait(300)
+        # 300 seconds ended 1 minute after the re-send
+        wait: reply_wait(420),
+        resend_after: resend_after
       )
     end
 
-    # Whether a group's `Accept` is slow or missing: several new followers follow at once and each `Accept` is looked for every 10 seconds, up to `LIVE_TEST_ACCEPT_WAIT` seconds (default 900), printing when each arrived. A fresh user is a new actor the group must fetch first, which can take a while on a busy instance; the other tests give up after 3 to 5 minutes.
+    # Whether a group's `Accept` is slow or missing: several new followers follow at once and each `Accept` is looked for every 10 seconds, up to `LIVE_TEST_ACCEPT_WAIT` seconds (default 900), printing when each arrived. A fresh user is a new actor the group must fetch first, which can take a while on a busy instance; the other tests give up after 3 to 5 minutes. A Follow still pending after `:resend_pending_follow_after` (4 minutes) is re-sent, as in prod, and an Accept of either Follow counts.
     @tag timeout: :timer.minutes(25)
     test "every new follower is Accepted, and when" do
       handle = group_handle!()
@@ -174,42 +197,114 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       count = String.to_integer(System.get_env("LIVE_TEST_FOLLOWERS") || "3")
       wait = String.to_integer(System.get_env("LIVE_TEST_ACCEPT_WAIT") || "900")
 
+      # a Follow still pending after this delay is re-sent, by the check run below
+      resend_after = check_pending_follows_by_hand()
+
       started = DateTime.utc_now()
       started_at = System.monotonic_time(:second)
 
+      # follows =
+      #   for _ <- 1..count do
+      #     me = fake_user!()
+      #     assert {:ok, request} = Interop.follow(handle, as: me)
+      #     {me, Interop.outgoing_json(request)["id"] || flunk("no Follow id")}
+      #   end
+      # Replaced: keyed by the first Follow's id, with the ids of that Follow and its re-send, as the group can Accept either one
       follows =
-        for _ <- 1..count do
+        Map.new(1..count, fn _ ->
           me = fake_user!()
           assert {:ok, request} = Interop.follow(handle, as: me)
-          {me, Interop.outgoing_json(request)["id"] || flunk("no Follow id")}
-        end
+          follow_id = Interop.outgoing_json(request)["id"] || flunk("no Follow id")
+          {follow_id, [follow_id]}
+        end)
 
-      pending_before = length(follows)
+      sent_at = System.monotonic_time(:second)
+      pending_before = map_size(follows)
 
-      arrivals =
-        Enum.reduce_while(1..div(wait, 10), %{}, fn _tick, arrived ->
+      # arrivals =
+      #   Enum.reduce_while(1..div(wait, 10), %{}, fn _tick, arrived ->
+      #     Process.sleep(10_000)
+      #
+      #     arrived =
+      #       Enum.reduce(follows, arrived, fn {_me, follow_id}, acc ->
+      #         if Map.has_key?(acc, follow_id) do
+      #           acc
+      #         else
+      #           if Interop.await_incoming(
+      #                [type: "Accept", from: actor.ap_id, about: follow_id],
+      #                seconds: 0,
+      #                since: started
+      #              ),
+      #              do: Map.put(acc, follow_id, System.monotonic_time(:second) - started_at),
+      #              else: acc
+      #         end
+      #       end)
+      #
+      #     if map_size(arrived) == pending_before, do: {:halt, arrived}, else: {:cont, arrived}
+      #   end)
+      # Replaced: it counted only an Accept of the first Follow, and the re-send went out at once under Oban's inline engine, rather than after its delay
+      {arrivals, _follows, _checked} =
+        Enum.reduce_while(1..div(wait, 10), {%{}, follows, MapSet.new()}, fn _tick,
+                                                                               {arrived, follows,
+                                                                                checked} ->
           Process.sleep(10_000)
 
+          # once the delay has passed, each Follow still waiting gets its check, as the scheduled job does in prod; a snoozed check is run again at the next tick
+          {follows, checked} =
+            if is_integer(resend_after) and
+                 (System.monotonic_time(:second) - sent_at) * 1000 >= resend_after do
+              follows
+              |> Enum.reject(fn {first_id, _ids} ->
+                Map.has_key?(arrived, first_id) or first_id in checked
+              end)
+              |> Enum.reduce({follows, checked}, fn {first_id, ids}, {follows, checked} ->
+                case ActivityPub.Federator.PendingFollows.check(first_id, actor.data["inbox"])
+                     |> IO.inspect(label: "check of the pending Follow #{first_id}") do
+                  {:ok, %{data: %{"id" => resent_id}}} ->
+                    {Map.put(follows, first_id, ids ++ [resent_id]), MapSet.put(checked, first_id)}
+
+                  {:snooze, _} ->
+                    {follows, checked}
+
+                  _ ->
+                    {follows, MapSet.put(checked, first_id)}
+                end
+              end)
+            else
+              {follows, checked}
+            end
+
           arrived =
-            Enum.reduce(follows, arrived, fn {_me, follow_id}, acc ->
-              if Map.has_key?(acc, follow_id) do
+            Enum.reduce(follows, arrived, fn {first_id, ids}, acc ->
+              if Map.has_key?(acc, first_id) do
                 acc
               else
-                if Interop.await_incoming(
-                     [type: "Accept", from: actor.ap_id, about: follow_id],
-                     seconds: 0,
-                     since: started
-                   ),
-                   do: Map.put(acc, follow_id, System.monotonic_time(:second) - started_at),
-                   else: acc
+                case Interop.await_incoming(
+                       [type: "Accept", from: actor.ap_id, about: ids],
+                       seconds: 0,
+                       since: started
+                     ) do
+                  nil ->
+                    acc
+
+                  accept ->
+                    which =
+                      if Interop.references?(accept.data["object"], first_id),
+                        do: "first",
+                        else: "re-sent"
+
+                    Map.put(acc, first_id, {System.monotonic_time(:second) - started_at, which})
+                end
               end
             end)
 
-          if map_size(arrived) == pending_before, do: {:halt, arrived}, else: {:cont, arrived}
+          if map_size(arrived) == pending_before,
+            do: {:halt, {arrived, follows, checked}},
+            else: {:cont, {arrived, follows, checked}}
         end)
 
       IO.puts(
-        "\n── Accepts from #{handle}: #{map_size(arrivals)} of #{pending_before}, seconds after the Follows: #{inspect(Map.values(arrivals) |> Enum.sort())} ──\n"
+        "\n── Accepts from #{handle}: #{map_size(arrivals)} of #{pending_before}, seconds after the Follows, and which Follow it Accepted: #{inspect(Map.values(arrivals) |> Enum.sort())} ──\n"
       )
 
       assert map_size(arrivals) == pending_before,

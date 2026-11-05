@@ -195,7 +195,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     @doc """
     Polls until an INGESTED incoming activity matches, or the timeout passes. Returns the `ActivityPub.Object` or nil.
 
-    Filters: `type:` (eg. "Accept"), `from:` (actor ap_id), `about:` (an ap_id the activity's object references, at any nesting), `audience:` (an ap_id it is addressed to, in `audience`/`to`/`cc`). Opts: `seconds:` (default 90), `every:` ms between polls.
+    Filters: `type:` (eg. "Accept"), `from:` (actor ap_id), `about:` (an ap_id the activity's object references, at any nesting, or a list of ap_ids, any of which counts, eg. a Follow and its re-sends), `audience:` (an ap_id it is addressed to, in `audience`/`to`/`cc`). Opts: `seconds:` (default 90), `every:` ms between polls.
 
         Interop.await_incoming(type: "Accept", from: group.ap_id)
         Interop.await_incoming([type: "Announce", from: group.ap_id, about: post_ap_id], seconds: 180)
@@ -284,6 +284,7 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
       Enum.all?(filters, fn
         {:type, type} -> data["type"] == type
         {:from, actor} -> Object.get_ap_id(data["actor"]) == actor
+        {:about, ap_ids} when is_list(ap_ids) -> Enum.any?(ap_ids, &references?(data["object"], &1))
         {:about, ap_id} -> references?(data["object"], ap_id)
         {:audience, ap_id} -> addressed_to?(data, ap_id)
         _ -> true
