@@ -2973,14 +2973,22 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   # Set when the bot is made, so only a bot made from now on has them. The handle (`service_character_username/0`) stays the same for every instance, so the display name is what says whose bot it is.
-  def service_character_name, do: "#{Bonfire.Common.URIs.base_domain()} federation bot"
+  def service_character_name, do: "#{service_character_host()} federation bot"
+
+  # The host alone, with no port: a port is no part of a name, and the bot is made by a migration, which runs before the web endpoint has started and so does not know the port.
+  defp service_character_host do
+    case Bonfire.Common.URIs.base_uri() do
+      %URI{host: host} when is_binary(host) -> host
+      _ -> Bonfire.Common.URIs.base_domain()
+    end
+  end
 
   # TODO: moderators should be able to post as, message from, and reply to DMs as this bot, so that a person who writes to it sees one account answer and does not learn who the moderators are
 
   # Plain English and not `l/1`: it is stored once, in the language of whoever's request made the bot
   def service_character_bio,
     do:
-      "The federation bot of the #{Bonfire.Common.URIs.base_domain()} instance. You can send it a message or mention it in a post to reach the moderators of this instance."
+      "The federation bot of the #{service_character_host()} instance. You can send it a message or mention it in a post to reach the moderators of this instance."
 
   def incoming_boundary_circles(activity, object, is_public? \\ nil) do
     is_public? =

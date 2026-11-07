@@ -37,7 +37,8 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorTest do
 
   test "is named after the instance's domain, keeps its handle, and says that messaging it reaches the moderators" do
     assert {:ok, %ActivityPub.Actor{data: data}} = Adapter.get_or_create_service_actor()
-    domain = Bonfire.Common.URIs.base_domain()
+    # the host alone: the bot is made at install, when the port is not known
+    domain = Bonfire.Common.URIs.base_uri().host
 
     assert data["name"] == "#{domain} federation bot"
     # the handle does not change

@@ -1,6 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
   @moduledoc """
-  Our service actor, which signs our fetches, and its signing key are made on first use: each request looks for them, finds none, and makes them. So the first requests of a new instance that arrive together all make them at once, and all but one hit a unique index (the service character's id is fixed, and so is the row that holds its key): the losers raised or returned an error, and a request that needed the actor to sign got nothing. The loser reads what won instead.
+  Our service actor, which signs our fetches, exists from install (a migration makes it), but its signing key is made on first use: each request looks for the key, finds none, and makes it. So the first requests of a new instance that arrive together all make it at once, and all but one hit a unique index (the row that holds the key has a fixed id): the losers raised or returned an error, and a request that needed the actor to sign got nothing. The loser reads what won instead.
 
   Committed data, with each task on a connection of its own: the sandbox serialises the transactions of one connection, which would hide the race.
   """
@@ -11,12 +11,7 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
   @moduletag :federation
   @moduletag db_sandbox: false
 
-  alias Bonfire.Data.Identity.Account
-  alias Bonfire.Data.Identity.Accounted
-  alias Bonfire.Data.Identity.Caretaker
   alias Bonfire.Data.Identity.Character
-  alias Bonfire.Data.AccessControl.Encircle
-  alias Bonfire.Data.AccessControl.Grant
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
   @tasks 8
@@ -24,14 +19,13 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
   setup do
     service_id = AdapterUtils.service_character_id()
 
-    # the race is in making them, so it can only be seen while there is no service actor: one in the shared DB is not ours to delete
-    assert {:error, :not_found} = Bonfire.Me.Users.by_id(service_id),
-           "a committed service character is already in the test DB, made by something else"
+    # the race is in making the key, so it can only be seen while none is saved: one in the shared DB is not ours to delete
+    assert stored_keys(service_id) == [],
+           "a service actor key is already committed in the test DB, made by something else"
 
-    started = Needle.ULID.generate(System.system_time(:millisecond) - 1)
     started_at = DateTime.utc_now()
 
-    on_exit(fn -> clean_up(service_id, started, started_at) end)
+    on_exit(fn -> clean_up(service_id, started_at) end)
 
     {:ok, service_id: service_id}
   end
@@ -106,48 +100,12 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
     |> Enum.map(fn {:ok, result} -> result end)
   end
 
-  # the data is committed, so it is removed by hand, and only what the test made: the service character, what it is the caretaker of (its circles and ACLs) and the grants in those ACLs or to it, its feeds and the circle memberships it got, and its account. Making a user also makes its account first, on its own, so a request that lost the race can leave an account with no user: those are the accounts made while the test ran that hold no other user.
-  defp clean_up(service_id, started, started_at) do
-    ended = Needle.ULID.generate(System.system_time(:millisecond) + 1)
-
-    feeds =
-      repo().all(
-        from(c in Character,
-          where: c.id == ^service_id,
-          select: [c.inbox_id, c.outbox_id, c.notifications_id]
-        )
-      )
-      |> List.flatten()
-
-    caretaken =
-      repo().all(from(c in Caretaker, where: c.caretaker_id == ^service_id, select: c.id))
-
-    encircles = repo().all(from(e in Encircle, where: e.subject_id == ^service_id, select: e.id))
-
-    # a grant's row goes with its ACL, but its pointer stays unless deleted too
-    grants =
-      repo().all(
-        from(g in Grant,
-          where: g.acl_id in ^caretaken or g.subject_id == ^service_id,
-          select: g.id
-        )
-      )
-
-    accounts =
-      repo().all(
-        from(a in Account,
-          left_join: u in Accounted,
-          on: u.account_id == a.id,
-          where: a.id >= ^started and a.id <= ^ended,
-          where: is_nil(u.id) or u.id == ^service_id,
-          select: a.id
-        )
-      )
-
-    ids =
-      Enum.reject([service_id | feeds ++ caretaken ++ encircles ++ grants ++ accounts], &is_nil/1)
-
-    repo().delete_all(from(p in Needle.Pointer, where: p.id in ^ids))
+  # the data is committed, so it is undone by hand, and only what the test made: the saved signing key. The service character stays, since an install makes it and other tests use it.
+  defp clean_up(service_id, started_at) do
+    repo().update_all(
+      from(a in Bonfire.Data.ActivityPub.Actor, where: a.id == ^service_id),
+      set: [signing_key: nil]
+    )
 
     # saving its key used to queue an `Update` of the service actor for delivery: the activity and its job are removed, those queued while the test ran
     jobs =
