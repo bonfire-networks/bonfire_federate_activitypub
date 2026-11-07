@@ -2096,11 +2096,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
           user_etc
         )
 
+      # a module may create without updating (eg. SharedUsers, for Service actors such as Lemmy bots), so fall back to `Users` as creation does, rather than dropping the avatar and banner
       with {:ok, updated_user} <-
-             maybe_apply(character_module, [:update_remote_actor, :update], [
-               user_etc,
-               %{"profile" => %{"icon_id" => icon_id, "image_id" => banner_id}}
-             ]) do
+             maybe_apply_or(
+               character_module,
+               [:update_remote_actor, :update],
+               [
+                 user_etc,
+                 %{"profile" => %{"icon_id" => icon_id, "image_id" => banner_id}}
+               ],
+               # FIXME: should not depend on Users for fallback
+               &Bonfire.Me.Users.update_remote_actor/2
+             ) do
         {:ok, Characters.mark_as(updated_user, :remote)}
       else
         _ ->
@@ -3017,6 +3024,16 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     end
   end
 
+  @doc "Whether an incoming object names the public collection only in `cc` (or `bto`/`bcc`), never in `to`: what Mastodon sends for an \"unlisted\" post, readable by anyone but kept out of public timelines."
+  def public_in_cc_only?(activity, object) do
+    data =
+      [e(object, :data, nil) || object, e(activity, :data, nil) || activity]
+      |> Enum.filter(&is_map/1)
+
+    Enum.any?(data, &ActivityPub.Utils.has_as_public?([&1["cc"], &1["bto"], &1["bcc"]])) and
+      not Enum.any?(data, &ActivityPub.Utils.has_as_public?(&1["to"]))
+  end
+
   @doc "Whether the instance's federation bot is among `recipients` (characters or ids; anything else, such as a `{circle, verbs: …}` entry, is skipped)."
   def service_character_among?(recipients) do
     recipients
@@ -3439,12 +3456,11 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   Bare domains and instance-level URLs resolve to an instance circle via `Instances`.
   Actor URLs and webfinger handles are fetched remotely.
 
-  Uses `federation_mode: true` to bypass allowlist checks so callers can resolve actors
-  even when in allowlist-only mode (e.g. to add them to an allowlist or blocklist).
+  Pass the circle the result will be added to as `opts[:circle]`. When it is an allowlist or blocklist circle, allowlist checks are bypassed, so an actor can be resolved in allowlist-only mode in order to be allowed (or blocked). For any other circle, or none, resolving respects the allowlist.
 
   Returns `{:ok, subject}`.
   """
-  def resolve_uri(uri, current_user) when is_binary(uri) do
+  def resolve_uri(uri, current_user, opts \\ []) when is_binary(uri) do
     alias Bonfire.Federate.ActivityPub.Instances
 
     is_bare_domain =
@@ -3480,11 +3496,37 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       end
     else
       # federation_mode: true bypasses allowlist check so users can resolve actors even in allowlist-only mode
-      get_by_url_ap_id_or_username(uri,
-        current_user: current_user,
-        federation_mode: true
-      )
+      # get_by_url_ap_id_or_username(uri,
+      #   current_user: current_user,
+      #   federation_mode: true
+      # )
+      # the bypass is only for adding to an allowlist or blocklist, otherwise any non-allowlisted actor could be fetched and added to an ordinary circle
+      if federation_list_circle?(opts[:circle]) do
+        get_by_url_ap_id_or_username(uri, current_user: current_user, federation_mode: true)
+      else
+        # an actor we already know isn't fetched, so the check on the fetch doesn't apply to it: check here that it may be federated with
+        with {:ok, subject} <- get_by_url_ap_id_or_username(uri, current_user: current_user),
+             true <-
+               federation_allowed?(subject, current_user: current_user, skip_block_check: true) ||
+                 {:error, :not_allowed} do
+          {:ok, subject}
+        end
+      end
     end
+  end
+
+  # Allowlist and blocklist circles, per-user (stereotyped) or instance-wide (the built-in stereotype circle itself)
+  defp federation_list_circle?(nil), do: false
+
+  defp federation_list_circle?(circle) do
+    alias Bonfire.Boundaries.Circles
+
+    ids =
+      Circles.ids_for_stereotypes([:allow_them | Bonfire.Boundaries.Blocks.types_blocked(:block)])
+
+    Circles.is_stereotype?(circle, ids) or
+      (is_struct(circle) and
+         e(repo().maybe_preload(circle, :stereotyped), :stereotyped, :stereotype_id, nil) in ids)
   end
 
   @doc """
@@ -3495,7 +3537,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def add_to_circle_by_uri(uri, circle, current_user) when is_binary(uri) do
     alias Bonfire.Boundaries.Circles
 
-    with {:ok, subject} <- resolve_uri(uri, current_user),
+    with {:ok, subject} <- resolve_uri(uri, current_user, circle: circle),
          {:ok, _} <- Circles.add_to_circles(subject, circle) do
       {:ok, subject}
     end

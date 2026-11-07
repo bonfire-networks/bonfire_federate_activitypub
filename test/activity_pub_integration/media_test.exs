@@ -2,6 +2,18 @@ defmodule Bonfire.Federate.ActivityPub.MediaTest do
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
   import Tesla.Mock
 
+  # these tests check what is served, not who may fetch it (that is `signed_fetch_public_actors_test.exs`), so they fetch unsigned, with signed fetches not required
+  setup do
+    previous = Application.get_env(:activity_pub, :reject_unsigned)
+    Application.put_env(:activity_pub, :reject_unsigned, false)
+
+    on_exit(fn ->
+      if is_nil(previous),
+        do: Application.delete_env(:activity_pub, :reject_unsigned),
+        else: Application.put_env(:activity_pub, :reject_unsigned, previous)
+    end)
+  end
+
   alias Bonfire.Posts
   # use Bonfire.Common.Repo
 

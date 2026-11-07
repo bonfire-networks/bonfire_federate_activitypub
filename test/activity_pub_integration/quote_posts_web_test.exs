@@ -7,6 +7,18 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsWebTest do
   alias Bonfire.Posts
   alias Bonfire.Social.Quotes
 
+  # these tests check what is served, not who may fetch it (that is `signed_fetch_public_actors_test.exs`), so they fetch unsigned, with signed fetches not required
+  setup do
+    previous = Application.get_env(:activity_pub, :reject_unsigned)
+    Application.put_env(:activity_pub, :reject_unsigned, false)
+
+    on_exit(fn ->
+      if is_nil(previous),
+        do: Application.delete_env(:activity_pub, :reject_unsigned),
+        else: Application.put_env(:activity_pub, :reject_unsigned, previous)
+    end)
+  end
+
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
 

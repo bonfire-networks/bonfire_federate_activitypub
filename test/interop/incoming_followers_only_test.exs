@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.IncomingFollowersOnlyTest do
   @moduledoc """
   Who can read a followers-only post from another server: its author's followers here, and the local users it names, but nobody else.
 
-  The post is the Mastodon capture in `fixtures/mastodon-post-activity.json`, addressed as Mastodon addresses a followers-only post: the author's followers collection in `to`, the people it mentions in `cc`, no Public anywhere.
+  The post is the Mastodon capture in `fixtures/mastodon-post-activity.json`, addressed as Mastodon addresses a followers-only post: the author's followers collection in `to`, the people it mentions in `cc`, no Public anywhere. The same capture, with Public moved into `cc`, is Mastodon's unlisted post.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
   @moduletag :federation
@@ -139,5 +139,45 @@ defmodule Bonfire.Federate.ActivityPub.IncomingFollowersOnlyTest do
 
     refute Bonfire.Boundaries.can?(other_follower, [:see, :read], post),
            "someone else's followers collection was taken as theirs"
+  end
+
+  # Mastodon's "unlisted" (quiet public) post has the author's followers in `to` and Public only in `cc`. Anyone with the link may read it, but it stays out of public timelines, so it reaches followers' home feeds and no public feed.
+  describe "an unlisted post from another server" do
+    test "a public post is in the public feeds, the control for the unlisted case", %{
+      author: author
+    } do
+      follower = fake_user!()
+      follow_accepted(follower, author)
+
+      post = receive_note(%{to: [ActivityPub.Config.public_uri()], cc: [@author_followers]})
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, follower)
+      assert Bonfire.Social.FeedLoader.feed_contains?(:explore, post, follower)
+      assert Bonfire.Social.FeedLoader.feed_contains?(:my, post, follower)
+    end
+
+    test "can be read by anyone, reaches followers' home feeds, and stays out of public feeds",
+         %{author: author} do
+      follower = fake_user!()
+      non_follower = fake_user!()
+      follow_accepted(follower, author)
+
+      post = receive_note(%{to: [@author_followers], cc: [ActivityPub.Config.public_uri()]})
+
+      assert Bonfire.Boundaries.can?(:guest, [:read], post),
+             "an unlisted post should stay readable by link"
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:my, post, follower),
+             "an unlisted post is missing from a follower's home feed"
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, non_follower),
+             "an unlisted post is in the remote feed"
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:explore, post, non_follower),
+             "an unlisted post is in the explore feed"
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post),
+             "an unlisted post is in the remote feed for guests"
+    end
   end
 end

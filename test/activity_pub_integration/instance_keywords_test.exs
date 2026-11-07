@@ -90,7 +90,7 @@ defmodule Bonfire.Federate.ActivityPub.InstanceKeywordsTest do
          } do
       mentioned = fake_user!()
 
-      assert BlockKeywords.instance_match?(["cheap viagra for everyone"]),
+      assert BlockKeywords.instance_verdict(["cheap viagra for everyone"]) == :reject,
              "the instance's list, as set in setup, is read"
 
       # creating the users queues jobs of its own, so count what the publish adds
@@ -170,11 +170,67 @@ defmodule Bonfire.Federate.ActivityPub.InstanceKeywordsTest do
     end
   end
 
+  describe "the instance's list to warn about" do
+    setup do
+      Process.put([:activity_pub, :mrf_keyword, :warn], ["spoiler"])
+      :ok
+    end
+
+    defp summary_of(post),
+      do: Bonfire.Common.Repo.get(Bonfire.Data.Social.PostContent, id(post)).summary
+
+    test "a matching post is published as asked, with a warning added to it, and federates", %{
+      author: author,
+      reader: reader
+    } do
+      jobs_before = length(publish_jobs())
+      post = publish!(author, "a spoiler about the ending")
+
+      assert readable?(post, current_user: reader)
+      assert Bonfire.Social.Objects.any_sensitive?(post)
+      assert summary_of(post) == "Hidden by filters"
+      assert length(publish_jobs()) > jobs_before, "it federates, with its warning"
+    end
+
+    test "its author's own summary is kept as the warning", %{author: author} do
+      {:ok, post} =
+        Posts.publish(
+          current_user: author,
+          post_attrs: %{
+            post_content: %{html_body: "a spoiler about the ending", summary: "my own warning"}
+          },
+          boundary: "public"
+        )
+
+      assert Bonfire.Social.Objects.any_sensitive?(post)
+      assert summary_of(post) == "my own warning"
+    end
+
+    test "a post edited to include a keyword gets the warning, and the edit federates", %{
+      author: author,
+      reader: reader
+    } do
+      post = publish!(author, "a perfectly normal post")
+      refute Bonfire.Social.Objects.any_sensitive?(post)
+      jobs_before = length(publish_jobs())
+
+      assert {:ok, _} =
+               Bonfire.Social.PostContents.edit(author, id(post), %{
+                 html_body: "now with a spoiler"
+               })
+
+      assert readable?(post, current_user: reader)
+      assert Bonfire.Social.Objects.any_sensitive?(post)
+      assert summary_of(post) == "Hidden by filters"
+      assert length(publish_jobs()) > jobs_before, "the Update is queued"
+    end
+  end
+
   describe "checked once per action" do
     test "publishing, editing and changing the boundary each check the instance's list once", %{
       author: author
     } do
-      mfa = {BlockKeywords, :instance_match?, 1}
+      mfa = {BlockKeywords, :instance_verdict, 1}
 
       assert 1 == call_count(mfa, fn -> publish!(author, "a perfectly normal post") end)
 

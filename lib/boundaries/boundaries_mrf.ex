@@ -163,20 +163,27 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
       from(u in Bonfire.Data.Identity.User, where: u.id in ^user_ids, preload: [:settings])
       |> Bonfire.Common.Repo.many()
-      |> Enum.filter(fn user ->
-        case Boundaries.BlockKeywords.block_keywords_settings(current_user: user) do
-          nil ->
-            false
+      |> Enum.map(&{&1.id, Boundaries.BlockKeywords.block_keywords_lists(current_user: &1)})
+      |> Enum.reject(fn {_id, lists} -> is_nil(lists) end)
+      |> case do
+        [] ->
+          MapSet.new()
 
-          compiled ->
-            Boundaries.BlockKeywords.text_fields_match?(
-              object,
-              ["content", "summary", "name"],
-              compiled
-            ) == true
-        end
-      end)
-      |> MapSet.new(& &1.id)
+        users_lists ->
+          # the post's text, read once for every recipient's lists. Only those who hide it completely are dropped: one who hides it behind a warning gets it, and sees it closed
+          prepared =
+            Boundaries.BlockKeywords.prepare([
+              object["content"],
+              object["summary"],
+              object["name"]
+            ])
+
+          users_lists
+          |> Enum.filter(fn {_id, lists} ->
+            Boundaries.BlockKeywords.verdict(prepared, lists) == :reject
+          end)
+          |> MapSet.new(fn {id, _lists} -> id end)
+      end
     else
       _ -> MapSet.new()
     end

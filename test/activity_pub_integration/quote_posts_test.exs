@@ -532,6 +532,116 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert length(post_tags) > 0
   end
 
+  # Mastodon keeps a quote "Pending" until the quoted author's server sends an Accept whose `object` is the QuoteRequest it sent, addressed to the quoting account, with a `result` it can fetch on the same host
+  test "approving a quote request from Mastodon queues an Accept that Mastodon can match to its QuoteRequest",
+       context do
+    %{accept: accept, quote_request_id: quote_request_id} =
+      receive_quote_request_and_approve(context)
+
+    assert accept_object_id(accept) == quote_request_id
+    assert @remote_actor in List.wrap(accept["to"])
+
+    assert is_binary(accept["result"])
+    assert URI.parse(accept["result"]).host == URI.parse(accept["actor"]).host
+  end
+
+  test "the QuoteAuthorization in the Accept for a quote request from Mastodon can be fetched",
+       context do
+    previous = Application.get_env(:activity_pub, :reject_unsigned)
+    Application.put_env(:activity_pub, :reject_unsigned, false)
+
+    on_exit(fn ->
+      if is_nil(previous),
+        do: Application.delete_env(:activity_pub, :reject_unsigned),
+        else: Application.put_env(:activity_pub, :reject_unsigned, previous)
+    end)
+
+    %{accept: %{"result" => result}, note_id: note_id} =
+      receive_quote_request_and_approve(context)
+
+    {:ok, %{data: %{"id" => quoted_ap_id}}} =
+      ActivityPub.Object.get_cached(pointer: context.original_post)
+
+    conn =
+      Phoenix.ConnTest.build_conn()
+      |> Plug.Conn.put_req_header("accept", "application/activity+json")
+      |> Phoenix.ConnTest.dispatch(
+        Application.fetch_env!(:bonfire, :endpoint_module),
+        :get,
+        URI.parse(result).path
+      )
+
+    assert conn.status == 200
+    authorization = Jason.decode!(conn.resp_body)
+    assert authorization["id"] == result
+    assert authorization["type"] == "QuoteAuthorization"
+    assert authorization["interactingObject"] == note_id
+    assert authorization["interactionTarget"] == quoted_ap_id
+  end
+
+  # A Mastodon user quotes our user's post, which needs approval: Mastodon sends only a QuoteRequest, with the quote post inlined as `instrument`, and our user approves it as the UI does
+  defp receive_quote_request_and_approve(context) do
+    n = System.unique_integer([:positive])
+    note_id = "#{@remote_actor}/statuses/#{n}"
+    quote_request_id = "#{note_id}/quote_request"
+
+    note = %{
+      "id" => note_id,
+      "type" => "Note",
+      "attributedTo" => @remote_actor,
+      "content" => "<p>Quoting this!</p><p>RE: #{context.original_url}</p>",
+      "quote" => context.original_url,
+      "to" => context.to,
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    mock(fn
+      %{method: :get, url: @remote_actor} ->
+        json(Simulate.actor_json(@remote_actor))
+
+      %{method: :get, url: ^note_id} ->
+        json(note)
+
+      %{method: :get} ->
+        %Tesla.Env{status: 404, body: ""}
+    end)
+
+    assert {:ok, _} =
+             ActivityPub.Federator.Transformer.handle_incoming(%{
+               "id" => quote_request_id,
+               "type" => "QuoteRequest",
+               "actor" => @remote_actor,
+               "object" => context.original_url,
+               "instrument" => note
+             })
+
+    assert {:ok, %{pointer_id: quote_post_id}} = ActivityPub.Object.get_cached(ap_id: note_id)
+
+    assert {:ok, request} = Quotes.requested(quote_post_id, context.original_post),
+           "control: the quote needs approval"
+
+    assert [] == queued_accepts(), "control: nothing accepted before approval"
+
+    assert {:ok, _} = Quotes.accept(id(request), current_user: context.user)
+
+    assert [accept] = queued_accepts()
+    %{accept: accept, quote_request_id: quote_request_id, note_id: note_id}
+  end
+
+  defp queued_accepts do
+    Oban.Testing.all_enqueued(repo(), worker: ActivityPub.Federator.Workers.PublisherWorker)
+    |> Enum.filter(&(&1.args["op"] == "publish"))
+    |> Enum.flat_map(fn %{args: %{"activity_id" => activity_id}} ->
+      case ActivityPub.Object.get_cached(id: activity_id) do
+        {:ok, %{data: %{"type" => "Accept"} = data}} -> [data]
+        _ -> []
+      end
+    end)
+  end
+
+  defp accept_object_id(%{"object" => %{"id" => id}}), do: id
+  defp accept_object_id(%{"object" => id}), do: id
+
   test "rejecting a previously accepted quote removes quoteAuthorization from the AP JSON",
        context do
     other_user = fake_user!()

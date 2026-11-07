@@ -6,6 +6,18 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
   alias Bonfire.Posts
   # alias Bonfire.Federate.ActivityPub.AdapterUtils
 
+  # these tests check what is served, not who may fetch it (that is `signed_fetch_public_actors_test.exs`), so they fetch unsigned, with signed fetches not required
+  setup do
+    previous = Application.get_env(:activity_pub, :reject_unsigned)
+    Application.put_env(:activity_pub, :reject_unsigned, false)
+
+    on_exit(fn ->
+      if is_nil(previous),
+        do: Application.delete_env(:activity_pub, :reject_unsigned),
+        else: Application.put_env(:activity_pub, :reject_unsigned, previous)
+    end)
+  end
+
   @remote_instance "https://mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
   # someone else on the same instance, who did not write the post and has no right to edit it
@@ -233,6 +245,35 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
 
       # Should be inferred as sensitive from summary presence
       assert post.sensitive.is_sensitive == true
+    end
+
+    test "process remote activity with summary and sensitive: null infers sensitive" do
+      data =
+        "../fixtures/mastodon-post-activity.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      object =
+        data["object"]
+        |> Map.put("sensitive", nil)
+        |> Map.put("summary", "content warning text")
+
+      assert Map.has_key?(object, "sensitive") and is_nil(object["sensitive"]),
+             "control: the key is present and null, not missing"
+
+      {:ok, data} =
+        data
+        |> Map.put("object", object)
+        |> ActivityPub.Federator.Transformer.handle_incoming(fetch_collection: false)
+
+      assert {:ok, post} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+               |> repo().maybe_preload([:post_content, :sensitive])
+
+      assert post.__struct__ == Bonfire.Data.Social.Post
+      assert e(post, :post_content, :summary, nil) == "content warning text"
+      assert e(post, :sensitive, :is_sensitive, nil) == true
     end
 
     test "process remote activity with summary and sensitive: false respects explicit flag" do
@@ -617,6 +658,121 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       # Verify the Bonfire post was deleted even though AP object was already pruned
       refute repo().exists?(Bonfire.Data.Social.Post, id: bonfire_post.id),
              "Post should be deleted from Bonfire even when AP object was pruned"
+    end
+
+    # A receiving instance that can't take the Delete on the sender's word fetches the object again to confirm it, so the origin has to answer "deleted" as soon as the post is deleted, even when the live JSON was cached by an earlier fetch
+    test "a deleted local post is served as deleted at once, and its Delete is queued for a remote follower" do
+      Process.put(:activity_pub_enable_cache, true)
+
+      user = fake_user!()
+
+      {:ok, follower_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+
+      {:ok, follower} =
+        Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(follower_actor)
+
+      {:ok, _} = Bonfire.Social.Graph.Follows.follow(follower, user, skip_boundary_check: true)
+
+      follower_inbox =
+        get_in(follower_actor.data, ["endpoints", "sharedInbox"]) || follower_actor.data["inbox"]
+
+      {:ok, post} =
+        Posts.publish(
+          current_user: user,
+          post_attrs: %{post_content: %{html_body: "a post deleted later"}},
+          boundary: "public"
+        )
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(post)
+
+      # the remote instance fetches it, which caches its JSON here
+      live =
+        build_conn()
+        |> get("/pub/objects/#{post.id}")
+        |> response(200)
+        |> Jason.decode!()
+
+      assert live["type"] == "Note", "control: the post is served live before the delete"
+
+      assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: user)
+
+      resp = build_conn() |> get("/pub/objects/#{post.id}")
+
+      assert resp.status in [404, 410] or
+               (resp.status == 200 and Jason.decode!(resp.resp_body)["type"] == "Tombstone"),
+             "a deleted post must not be served as live, got #{resp.status}: #{resp.resp_body}"
+
+      delete_activity =
+        Oban.Testing.all_enqueued(repo(), worker: ActivityPub.Federator.Workers.PublisherWorker)
+        |> Enum.filter(&(&1.args["op"] == "publish"))
+        |> Enum.map(&ActivityPub.Object.get_cached!(id: &1.args["activity_id"]))
+        |> Enum.find(&(e(&1, :data, "type", nil) == "Delete"))
+
+      assert %{data: %{"object" => deleted_id}} = delete_activity,
+             "a Delete should be queued for publishing"
+
+      assert deleted_id == live["id"]
+
+      assert {:ok, _} = Bonfire.Federate.ActivityPub.Outgoing.push_now!(delete_activity)
+
+      delete_inboxes =
+        Oban.Testing.all_enqueued(repo(), worker: ActivityPub.Federator.Workers.PublisherWorker)
+        |> Enum.filter(
+          &(&1.args["op"] == "publish_one" and
+              get_in(&1.args, ["params", "id"]) == delete_activity.data["id"])
+        )
+        |> Enum.map(&get_in(&1.args, ["params", "inbox"]))
+
+      assert follower_inbox in delete_inboxes,
+             "the Delete should be delivered to the remote follower, got #{inspect(delete_inboxes)}"
+    end
+
+    test "incoming Delete confirmed by the origin serving a Tombstone removes the post from the feed" do
+      post_id = "#{@remote_actor}/statuses/deleted-at-origin-#{Needle.UID.generate()}"
+      content = "a remote post deleted at its origin #{post_id}"
+
+      assert {:ok, %{pointer: %{id: pointer_id}}} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "type" => "Create",
+                 "id" => post_id <> "/activity",
+                 "actor" => @remote_actor,
+                 "to" => [ActivityPub.Config.public_uri()],
+                 "object" => %{
+                   "id" => post_id,
+                   "type" => "Note",
+                   "attributedTo" => @remote_actor,
+                   "content" => content,
+                   "to" => [ActivityPub.Config.public_uri()]
+                 }
+               })
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:remote, pointer_id),
+             "control: the post is in the feed before the Delete"
+
+      # its origin now says it is gone
+      mock(fn
+        %{method: :get, url: @remote_actor} ->
+          json(Simulate.actor_json(@remote_actor))
+
+        %{method: :get, url: ^post_id} ->
+          json(%{"id" => post_id, "type" => "Tombstone", "formerType" => "Note"})
+
+        %{method: :get} ->
+          %Tesla.Env{status: 404, body: ""}
+      end)
+
+      # unsigned and with only the object id, so the receiver has to confirm it with the origin
+      assert {:ok, _} =
+               ActivityPub.Federator.Transformer.handle_incoming(%{
+                 "@context" => "https://www.w3.org/ns/activitystreams",
+                 "id" => "#{post_id}/delete",
+                 "type" => "Delete",
+                 "actor" => @remote_actor,
+                 "object" => post_id
+               })
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:remote, pointer_id),
+             "the origin confirmed the deletion, but the post is still in the feed"
     end
 
     test "incoming Delete for an object we have never seen locally is a graceful no-op (not an error that Oban would retry)" do

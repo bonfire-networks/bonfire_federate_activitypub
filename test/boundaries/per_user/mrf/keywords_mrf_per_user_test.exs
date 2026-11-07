@@ -75,15 +75,34 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.KeywordsMRFPerUserTest do
              )
   end
 
-  test "an incoming post is matched once against the instance's list, and once per recipient who has a list",
+  test "a recipient who hides the keyword behind a warning keeps the post; one who hides it completely doesn't",
        %{alice: alice, bob: bob, actor: actor} do
+    {:ok, _} = BlockKeywords.put_warn_keywords_settings(["viagra"], current_user: bob)
+    bobs_ap_id = local_actor_ids(bob)
+
+    assert {:ok, %{to: [^bobs_ap_id]}} =
+             BoundariesMRF.filter(remote_post(actor, [alice, bob], "cheap viagra for you"), false)
+  end
+
+  test "an incoming post's text is read once, however many recipients have lists, and each list is matched once",
+       %{alice: alice, bob: bob, actor: actor} do
+    # both lists in one write: a second write with the same `bob` would start from his settings as loaded before the first, and drop what it saved
+    {:ok, _} =
+      Bonfire.Common.Settings.put_raw(
+        [:activity_pub, :mrf_keyword],
+        %{reject: ["eggs"], warn: ["spoiler"]},
+        current_user: bob
+      )
+
     # string keys, as an incoming activity has them (the keyword policy reads no other)
     activity =
       remote_post(actor, [alice, bob], "hello there")
       |> Map.new(fn {key, value} -> {to_string(key), value} end)
 
-    mfa = {ActivityPub.MRF.KeywordMatcher, :match?, 3}
-    :erlang.trace_pattern(mfa, true, [:call_count])
+    prepare = {ActivityPub.MRF.KeywordMatcher, :prepare, 2}
+    match = {ActivityPub.MRF.KeywordMatcher, :match?, 3}
+    :erlang.trace_pattern(prepare, true, [:call_count])
+    :erlang.trace_pattern(match, true, [:call_count])
 
     try do
       assert {:ok, _} =
@@ -93,10 +112,13 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.KeywordsMRFPerUserTest do
                  false
                )
 
-      # the instance's list once, alice's once; bob has no list
-      assert {:call_count, 2} == :erlang.trace_info(mfa, :call_count)
+      # the instance has no list, so its policy reads nothing; the recipients' lists share one reading
+      assert {:call_count, 1} == :erlang.trace_info(prepare, :call_count)
+      # alice's `reject`, bob's `reject` and bob's `warn`, once each
+      assert {:call_count, 3} == :erlang.trace_info(match, :call_count)
     after
-      :erlang.trace_pattern(mfa, false, [:call_count])
+      :erlang.trace_pattern(prepare, false, [:call_count])
+      :erlang.trace_pattern(match, false, [:call_count])
     end
   end
 

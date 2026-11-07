@@ -172,6 +172,79 @@ defmodule Bonfire.Federate.ActivityPub.DeleteUserWithRemoteFollowerTest do
            "a Delete exists but not for the deleted actor #{ap_id}: #{inspect(Enum.map(deletes, &e(&1, :data, "object", nil)))}"
   end
 
+  # The path a person takes from the account settings: deleting the whole account has to federate the `Delete` of each of its profiles, as deleting one profile does
+  test "deleting an account delivers the Delete of its user to the user's remote follower" do
+    account = fake_account!()
+    local_user = fake_user!(account)
+
+    follow = %{
+      "type" => "Follow",
+      "id" => "#{@remote_actor}/follows/delete-account-federation",
+      "actor" => @remote_actor,
+      "object" => Bonfire.Me.Characters.character_url(local_user)
+    }
+
+    assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(follow)
+
+    {:ok, remote_user} = Users.by_ap_id(@remote_actor)
+
+    assert Follows.following?(remote_user, local_user),
+           "the incoming Follow should have been accepted"
+
+    drain_deliveries()
+
+    Oban.Testing.with_testing_mode(:inline, fn ->
+      assert {:ok, _} = Bonfire.Me.SensitiveActions.DeleteAccount.execute(%{account: account})
+    end)
+
+    assert {:error, :not_found} = Users.by_id(id(local_user))
+
+    ap_id = Bonfire.Me.Characters.character_url(local_user)
+    inboxes = delivered_deletes_of(ap_id)
+
+    assert Enum.any?(inboxes, &(URI.parse(&1).host == "mocked.local")),
+           "the Delete of #{ap_id} should reach the remote follower's inbox, it was delivered to: #{inspect(inboxes)}"
+  end
+
+  test "deleting an account delivers the Delete of its user to a remote actor the user follows" do
+    account = fake_account!()
+    local_user = fake_user!(account)
+
+    {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+    {:ok, remote_user} = Users.by_ap_id(@remote_actor)
+
+    # a follow of a remote actor is a request until their server accepts it
+    assert {:ok, request} = Follows.follow(local_user, remote_user, skip_boundary_check: true)
+    follow_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(request)
+
+    assert {:ok, _} =
+             ActivityPub.Federator.Transformer.handle_incoming(%{
+               "@context" => "https://www.w3.org/ns/activitystreams",
+               "type" => "Accept",
+               "id" => "#{@remote_actor}#accepts/follows/#{id(local_user)}",
+               "actor" => @remote_actor,
+               "object" => follow_activity.data,
+               "to" => [Bonfire.Me.Characters.character_url(local_user)]
+             })
+
+    assert Follows.following?(local_user, remote_user)
+    refute Follows.following?(remote_user, local_user)
+
+    drain_deliveries()
+
+    Oban.Testing.with_testing_mode(:inline, fn ->
+      assert {:ok, _} = Bonfire.Me.SensitiveActions.DeleteAccount.execute(%{account: account})
+    end)
+
+    assert {:error, :not_found} = Users.by_id(id(local_user))
+
+    ap_id = Bonfire.Me.Characters.character_url(local_user)
+    inboxes = delivered_deletes_of(ap_id)
+
+    assert Enum.any?(inboxes, &(URI.parse(&1).host == "mocked.local")),
+           "the Delete of #{ap_id} should reach the inbox of the remote actor they follow, it was delivered to: #{inspect(inboxes)}"
+  end
+
   test "a user who follows a remote actor can be deleted" do
     local_user = fake_user!()
 
@@ -185,5 +258,28 @@ defmodule Bonfire.Federate.ActivityPub.DeleteUserWithRemoteFollowerTest do
     end)
 
     assert {:error, :not_found} = Users.by_id(id(local_user))
+  end
+
+  # deliveries recorded before the delete (eg. the `Accept` of a Follow) are not what the delete sent
+  defp drain_deliveries do
+    receive do
+      {:delivered, _url, _body} -> drain_deliveries()
+    after
+      0 -> :ok
+    end
+  end
+
+  # the inboxes a `Delete` of `ap_id` was delivered to
+  defp delivered_deletes_of(ap_id, inboxes \\ []) do
+    receive do
+      {:delivered, url, body} ->
+        data = if is_binary(body), do: Jason.decode!(body), else: body
+
+        if data["type"] == "Delete" and ActivityPub.Object.get_ap_id(data["object"]) == ap_id,
+          do: delivered_deletes_of(ap_id, [url | inboxes]),
+          else: delivered_deletes_of(ap_id, inboxes)
+    after
+      0 -> inboxes
+    end
   end
 end

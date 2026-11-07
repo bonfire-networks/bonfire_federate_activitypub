@@ -587,7 +587,12 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     params =
       %{
         profile: %{
-          name: data["name"],
+          # an actor with no display name (eg. a Mastodon account that never set one) gets its username, as on creation, since the profile requires a name and the whole update would fail otherwise
+          name:
+            if(empty?(data["name"]),
+              do: e(character, :character, :username, nil) || data["preferredUsername"],
+              else: data["name"]
+            ),
           summary: data["summary"],
           location: e(data["location"], "name", nil),
           icon_id:
@@ -614,6 +619,8 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     # pick up a change of mind about discoverability or indexing, since these are only saved as settings at creation otherwise
     character = AdapterUtils.maybe_save_remote_privacy_flags(character, data)
 
+    maybe_apply_remote_suspension(character, data["suspended"])
+
     # WIP - support types other than user
     case AdapterUtils.character_module(character) do
       nil ->
@@ -635,6 +642,15 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
     info(other, "could not find the character to update, gonna try to create instead")
     maybe_create_remote_actor(actor)
   end
+
+  # An actor its origin suspended is kept, with what it posted, but hidden instance-wide, so it comes back when its origin lifts the suspension (`ActivityPub.Actor.update_actor/5` marks that `suspended: false`). Absent, nothing changes, so a silence a moderator here chose stays
+  defp maybe_apply_remote_suspension(character, true = _suspended),
+    do: Bonfire.Boundaries.Blocks.block(character, :silence, :instance_wide)
+
+  defp maybe_apply_remote_suspension(character, false = _suspended),
+    do: Bonfire.Boundaries.Blocks.unblock(character, :silence, :instance_wide)
+
+  defp maybe_apply_remote_suspension(_character, _suspended), do: nil
 
   @doc """
   For updating an Actor in cache after a User/etc is updated

@@ -3,11 +3,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
   How an AP actor's `type` maps to a local schema, in both directions. See the "Non-`Group` actors"
   section of the public group federation plan.
 
-  Today the type does exactly one thing: pick a context module at `AdapterUtils.character_module/1`
-  (`adapter_utils.ex:1666`). `Service`/`Application`/`Organization` are registered to
-  `Bonfire.Me.SharedUsers` (`shared_users.ex:21`), but that module implements neither
-  `create_remote/2` nor `create/2`, so `maybe_apply_or` silently falls back to
-  `Users.create_remote/2` and the type is discarded.
+  The type picks a context module at `AdapterUtils.character_module/1`. `Service`/`Application`/`Organization` are registered to `Bonfire.Me.SharedUsers`, whose `create_remote/2` records the type as the shared user's label. It has no update function, so setting the avatar and banner after creation falls back to `Users.update_remote_actor/2`.
 
   These tests pin the decided end state. Tests marked RED fail until that lands.
   """
@@ -89,6 +85,31 @@ defmodule Bonfire.Federate.ActivityPub.ActorTypesTest do
 
       assert %Bonfire.Data.Identity.User{} = user
       assert is_nil(e(user, :shared_user, nil)), "a plain Person must not become a shared user"
+    end
+
+    test "a Person actor keeps its avatar and banner" do
+      user =
+        create_remote!("#{@remote_instance}/users/a_person")
+        |> repo().preload(:profile, force: true)
+
+      assert user.profile.icon_id
+      assert user.profile.image_id
+    end
+
+    # Lemmy bots are Service actors, and these lost their avatar and banner on creation
+    for {type, username} <- [
+          {"Service", "a_service"},
+          {"Application", "an_app"},
+          {"Organization", "an_org"}
+        ] do
+      test "a #{type} actor keeps its avatar and banner" do
+        user =
+          create_remote!("#{@remote_instance}/users/#{unquote(username)}")
+          |> repo().preload(:profile, force: true)
+
+        assert user.profile.icon_id
+        assert user.profile.image_id
+      end
     end
   end
 

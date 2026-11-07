@@ -989,6 +989,50 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
       assert {:error, :not_found} =
                Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic)
     end
+
+    # the collection is read, but a topic it lists can't be fetched when the mirror is made, and its fetch job gets a single attempt: someone joining within the `children_sync_interval` must still bring it
+    test "a group someone here joins has a topic mirrored whose fetch failed in the sync made with its mirror",
+         ctx do
+      # with the AP caches off (the tests' default), so the 404 below isn't remembered (`[:activity_pub, :fetch_error_cache_ttl]`, which the join tests above cover). With them on, each actor made here waits out a DB checkout in the sandbox (its moderators looked up from the cache's own process while the test holds the connection), and three of them outlast the sandbox's `ownership_timeout`
+      second = "https://bonfire.local/pub/actors/topic#{System.unique_integer([:positive])}"
+      second_actor = bonfire_actor(ctx.served, second, %{"broader" => ctx.group})
+
+      # both listed, the first one can't be fetched yet: a 404
+      serve_narrower(
+        %{ctx | actors: ctx.actors |> Map.delete(ctx.topic) |> Map.put(second, second_actor)},
+        [ctx.topic, second]
+      )
+
+      assert {:ok, %{type: :group} = group} =
+               Adapter.maybe_create_remote_actor(%{"id" => ctx.group})
+
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, second_mirror} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(second),
+             "the other topic is mirrored when the mirror is made"
+
+      assert parent_id_of(second_mirror) == id(group)
+
+      assert {:error, :not_found} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic),
+             "control: the topic whose fetch failed isn't"
+
+      # and now it can be fetched
+      serve_narrower(%{ctx | actors: Map.put(ctx.actors, second, second_actor)}, [
+        ctx.topic,
+        second
+      ])
+
+      assert {:ok, joined} = Categories.join_and_follow_group(fake_user!(), id(group))
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
+      assert {:ok, topic} =
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.topic),
+             "the topic whose fetch failed is mirrored once someone joins (#{inspect(joined)})"
+
+      assert parent_id_of(topic) == id(group)
+    end
   end
 
   # A handle is hashed with its underscores dropped and look-alikes folded (`Character.hash/1`), so `jan_beta` and `janbeta` on one instance are two accounts to PeerTube and one to us. Seen on bonfire.cafe: the second, a moderator of mirrors being repaired, RAISED out of `create_remote_actor/1` (the unique index refuses the insert, and the failed insert aborts the transaction around it) and ended the repair of every mirror listing it
