@@ -87,6 +87,12 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
             :allowlisted_by_users_subset,
             [allowlist_candidates, scope_user_ids],
             fallback_return: nil
+          ),
+        # the local recipients whose own filtered keywords an incoming post matches: dropped from its recipients, as someone who silenced its author is (one query for their settings)
+        keyword_filtered_ids:
+          if(opts[:is_local] != true,
+            do: keyword_filtered_ids(local_recipient_ids, activity),
+            else: MapSet.new()
           )
       }
       |> info("pre-resolved data for MRF checks")
@@ -139,6 +145,41 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
 
   def filter(object, is_local?) when is_boolean(is_local?) do
     filter(object, is_local: is_local?)
+  end
+
+  defp keyword_filtered_ids([], _activity), do: MapSet.new()
+
+  defp keyword_filtered_ids(local_recipient_ids, activity) do
+    object = ed(activity, "object", nil) || ed(activity, :object, nil)
+
+    with true <- (ed(activity, "type", nil) || ed(activity, :type, nil)) in ["Create", "Update"],
+         %{} <- object,
+         [_ | _] = user_ids <-
+           local_recipient_ids
+           |> Enum.map(&uid(elem(&1, 1)))
+           |> Enum.reject(&is_nil/1)
+           |> Enum.uniq() do
+      import Ecto.Query
+
+      from(u in Bonfire.Data.Identity.User, where: u.id in ^user_ids, preload: [:settings])
+      |> Bonfire.Common.Repo.many()
+      |> Enum.filter(fn user ->
+        case Boundaries.BlockKeywords.block_keywords_settings(current_user: user) do
+          nil ->
+            false
+
+          compiled ->
+            Boundaries.BlockKeywords.text_fields_match?(
+              object,
+              ["content", "summary", "name"],
+              compiled
+            ) == true
+        end
+      end)
+      |> MapSet.new(& &1.id)
+    else
+      _ -> MapSet.new()
+    end
   end
 
   defp maybe_check_and_filter(
@@ -690,10 +731,16 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         |> debug("by_characters & actor_to_check")
 
       #  || Bonfire.Federate.ActivityPub.Peered.actor_blocked?(recipient_actor_uri, :any, :instance_wide) # NOTE: no need to check the instance-wide block here because that's being handled by Boundaries.is_blocked?
-      MRF.subdomain_match?(rejects, recipient_actor_uri.host)
-      |> debug(
-        "filter '#{recipient_actor_uri.host}' blocked #{inspect(block_types)} instance in config?"
-      ) ||
+      (not is_local? and
+         MapSet.member?(
+           e(opts, :resolved, :keyword_filtered_ids, nil) || MapSet.new(),
+           uid(by_characters)
+         ))
+      |> debug("filter local recipient whose filtered keywords the post matches?") ||
+        MRF.subdomain_match?(rejects, recipient_actor_uri.host)
+        |> debug(
+          "filter '#{recipient_actor_uri.host}' blocked #{inspect(block_types)} instance in config?"
+        ) ||
         MRF.subdomain_match?(rejects, clean_recipient_actor_uri)
         |> debug(
           "filter '#{clean_recipient_actor_uri}' blocked #{inspect(block_types)} actor in config?"

@@ -282,12 +282,23 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
 
     defp matches?(data, filters) do
       Enum.all?(filters, fn
-        {:type, type} -> data["type"] == type
-        {:from, actor} -> Object.get_ap_id(data["actor"]) == actor
-        {:about, ap_ids} when is_list(ap_ids) -> Enum.any?(ap_ids, &references?(data["object"], &1))
-        {:about, ap_id} -> references?(data["object"], ap_id)
-        {:audience, ap_id} -> addressed_to?(data, ap_id)
-        _ -> true
+        {:type, type} ->
+          data["type"] == type
+
+        {:from, actor} ->
+          Object.get_ap_id(data["actor"]) == actor
+
+        {:about, ap_ids} when is_list(ap_ids) ->
+          Enum.any?(ap_ids, &references?(data["object"], &1))
+
+        {:about, ap_id} ->
+          references?(data["object"], ap_id)
+
+        {:audience, ap_id} ->
+          addressed_to?(data, ap_id)
+
+        _ ->
+          true
       end)
     end
 

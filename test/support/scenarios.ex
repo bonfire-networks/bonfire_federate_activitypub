@@ -64,7 +64,9 @@ defmodule Bonfire.Federate.ActivityPub.Testing.Scenarios do
           Interop.await_incoming(accept, seconds: first_wait, since: since) ||
             (
               ActivityPub.Federator.PendingFollows.check(follow.data["id"], actor.data["inbox"])
-              |> IO.inspect(label: "no Accept after #{first_wait}s, so the check of the Follow ran")
+              |> IO.inspect(
+                label: "no Accept after #{first_wait}s, so the check of the Follow ran"
+              )
 
               Interop.await_incoming(accept, seconds: wait - first_wait, since: since)
             )

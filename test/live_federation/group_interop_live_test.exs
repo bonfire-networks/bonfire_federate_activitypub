@@ -245,8 +245,8 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
       # Replaced: it counted only an Accept of the first Follow, and the re-send went out at once under Oban's inline engine, rather than after its delay
       {arrivals, _follows, _checked} =
         Enum.reduce_while(1..div(wait, 10), {%{}, follows, MapSet.new()}, fn _tick,
-                                                                               {arrived, follows,
-                                                                                checked} ->
+                                                                             {arrived, follows,
+                                                                              checked} ->
           Process.sleep(10_000)
 
           # once the delay has passed, each Follow still waiting gets its check, as the scheduled job does in prod; a snoozed check is run again at the next tick
@@ -261,7 +261,8 @@ defmodule Bonfire.Federate.ActivityPub.LiveFederation.GroupInteropLiveTest do
                 case ActivityPub.Federator.PendingFollows.check(first_id, actor.data["inbox"])
                      |> IO.inspect(label: "check of the pending Follow #{first_id}") do
                   {:ok, %{data: %{"id" => resent_id}}} ->
-                    {Map.put(follows, first_id, ids ++ [resent_id]), MapSet.put(checked, first_id)}
+                    {Map.put(follows, first_id, ids ++ [resent_id]),
+                     MapSet.put(checked, first_id)}
 
                   {:snooze, _} ->
                     {follows, checked}
