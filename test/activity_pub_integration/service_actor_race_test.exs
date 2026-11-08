@@ -19,9 +19,9 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
   setup do
     service_id = AdapterUtils.service_character_id()
 
-    # the race is in making the key, so it can only be seen while none is saved: one in the shared DB is not ours to delete
-    assert stored_keys(service_id) == [],
-           "a service actor key is already committed in the test DB, made by something else"
+    # the race is in making the key, so it can only be seen while none is saved. Other tests that commit data (the live federation ones) sign fetches as the service actor, which saves its key in the shared DB, so one may be there already. It is made again on first use, so it is cleared rather than waited for.
+    clear_key(service_id)
+    assert stored_keys(service_id) == []
 
     started_at = DateTime.utc_now()
 
@@ -75,6 +75,13 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
     assert results |> Enum.map(fn {:ok, actor} -> actor.keys end) |> Enum.uniq() == [stored_key]
   end
 
+  defp clear_key(service_id) do
+    repo().update_all(
+      from(a in Bonfire.Data.ActivityPub.Actor, where: a.id == ^service_id),
+      set: [signing_key: nil]
+    )
+  end
+
   defp stored_keys(service_id) do
     repo().all(
       from(a in Bonfire.Data.ActivityPub.Actor,
@@ -102,10 +109,7 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorRaceTest do
 
   # the data is committed, so it is undone by hand, and only what the test made: the saved signing key. The service character stays, since an install makes it and other tests use it.
   defp clean_up(service_id, started_at) do
-    repo().update_all(
-      from(a in Bonfire.Data.ActivityPub.Actor, where: a.id == ^service_id),
-      set: [signing_key: nil]
-    )
+    clear_key(service_id)
 
     # saving its key used to queue an `Update` of the service actor for delivery: the activity and its job are removed, those queued while the test ran
     jobs =

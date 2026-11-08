@@ -332,13 +332,15 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsTest do
       assert object.post_content.html_body =~ emoji_url
 
       # Fetch the AP JSON to double-check for emoji tags
-      {:ok, %{status: 200, body: body}} =
-        ActivityPub.Federator.HTTP.get(
-          canonical_url,
-          [{"accept", "application/activity+json"}]
-        )
-
-      ap_json = Jason.decode!(body)
+      # the fetcher signs the request, as the remote instance requires for objects
+      # {:ok, %{status: 200, body: body}} =
+      #   ActivityPub.Federator.HTTP.get(
+      #     canonical_url,
+      #     [{"accept", "application/activity+json"}]
+      #   )
+      #
+      # ap_json = Jason.decode!(body)
+      {:ok, ap_json} = ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(canonical_url)
 
       # TODO: Check for tags with type Emoji or emoji urls
       # emoji_tags =

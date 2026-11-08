@@ -107,7 +107,10 @@ defmodule Bonfire.Federate.ActivityPub.Dance.C2STest do
           Req.get(
             req,
             url: created_note,
-            headers: [{"accept", "application/activity+json"}]
+            headers: [
+              {"authorization", "Bearer #{access_token}"},
+              {"accept", "application/activity+json"}
+            ]
           )
           |> debug("C2S Test - Fetch Created Note by URL")
 
