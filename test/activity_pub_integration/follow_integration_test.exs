@@ -2,12 +2,15 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
   use Bonfire.Federate.ActivityPub.DataCase
 
   alias Bonfire.Social.Graph.Follows
+  alias ActivityPub.Federator.Transformer
 
   import Tesla.Mock
 
   @remote_instance "https://mocked.local"
   @actor_name "karen@mocked.local"
   @remote_actor @remote_instance <> "/users/karen"
+  # a second remote actor, which nobody here follows
+  @other_actor @remote_instance <> "/users/kip"
   # an actor that approves its followers by hand
   @locked_actor @remote_instance <> "/users/locked"
 
@@ -22,6 +25,13 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       %{method: :get, url: @remote_actor} ->
         json(Simulate.actor_json(@remote_actor))
+
+      %{method: :get, url: @other_actor} ->
+        json(Simulate.actor_json(@other_actor))
+
+      # an activity id nobody serves
+      %{method: :get, url: @remote_instance <> "/accepts/" <> _} ->
+        %Tesla.Env{status: 404, body: ""}
 
       %{method: :get, url: @locked_actor} ->
         json(Simulate.actor_json(@locked_actor, "locked", %{"manuallyApprovesFollowers" => true}))
@@ -187,6 +197,70 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
 
       assert Bonfire.Social.Graph.Follows.following?(follower, followed)
+    end
+
+    # Owncast, Gancio, PeerTube and Pixelfed answer with a Follow of their own making: an id we never gave it
+    test "an Accept whose embedded Follow has a foreign id completes the follow we have pending to that actor" do
+      %{follower: follower, followed: followed, ap_follower: ap_follower} = follow_and_deliver()
+
+      assert Follows.requested?(follower, followed)
+
+      accept = accept_json(@remote_actor, ap_follower, embedded_foreign_follow(ap_follower))
+
+      assert {:ok, _} = Transformer.handle_incoming(accept, from_inbox: true)
+
+      assert Follows.following?(follower, followed)
+    end
+
+    # some servers send the Accept with only the id of a Follow we do not know, and nothing signing it
+    test "an unsigned Accept with a bare-id object, through the worker, completes the follow we have pending to that actor" do
+      %{follower: follower, followed: followed, ap_follower: ap_follower} = follow_and_deliver()
+
+      assert Follows.requested?(follower, followed)
+
+      accept = accept_json(@remote_actor, ap_follower, @remote_instance <> "/follows/foreign-bare")
+
+      result = deliver_unsigned(accept)
+
+      refute match?({:cancel, _}, result), "the worker cancelled it: #{inspect(result)}"
+      refute match?({:error, _}, result), "the worker errored: #{inspect(result)}"
+
+      assert Follows.following?(follower, followed)
+    end
+
+    # controls: what the rule above must not let through
+    test "control: an Accept from an actor we have no pending follow to does not complete our follow" do
+      %{follower: follower, followed: followed, ap_follower: ap_follower} = follow_and_deliver()
+
+      # a real, fetchable actor that we never followed
+      assert {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @other_actor)
+
+      embedded = accept_json(@other_actor, ap_follower, embedded_foreign_follow(ap_follower, @other_actor))
+      assert {:error, _} = Transformer.handle_incoming(embedded, from_inbox: true)
+
+      bare = accept_json(@other_actor, ap_follower, @remote_instance <> "/follows/foreign-bare")
+      assert {:cancel, _} = deliver_unsigned(bare)
+
+      assert Follows.requested?(follower, followed)
+      refute Follows.following?(follower, followed)
+    end
+
+    test "control: an Accept from the followed actor that names someone else in `to` does not complete our follow" do
+      %{follower: follower, followed: followed, ap_follower: ap_follower} = follow_and_deliver()
+
+      bystander = fake_user!()
+      {:ok, ap_bystander} = ActivityPub.Federator.Adapter.get_actor_by_id(bystander.id)
+
+      embedded =
+        accept_json(@remote_actor, ap_bystander, embedded_foreign_follow(ap_follower))
+
+      assert {:error, _} = Transformer.handle_incoming(embedded, from_inbox: true)
+
+      bare = accept_json(@remote_actor, ap_bystander, @remote_instance <> "/follows/foreign-bare")
+      assert {:cancel, _} = deliver_unsigned(bare)
+
+      assert Follows.requested?(follower, followed)
+      refute Follows.following?(follower, followed)
     end
 
     test "incoming follow request works" do
@@ -542,6 +616,43 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       ap_followed: ap_followed,
       follow_activity: follow_activity
     }
+  end
+
+  # an Accept as a remote server sends it, to `to_actor`
+  defp accept_json(accepting_actor_id, to_actor, object) do
+    %{
+      "@context" => "https://www.w3.org/ns/activitystreams",
+      "type" => "Accept",
+      "id" => @remote_instance <> "/accepts/#{System.unique_integer([:positive])}",
+      "actor" => accepting_actor_id,
+      "to" => [to_actor.data["id"]],
+      "object" => object
+    }
+  end
+
+  # the Follow as the remote server restates it, under an id of its own
+  defp embedded_foreign_follow(ap_follower, followed_id \\ @remote_actor) do
+    %{
+      "type" => "Follow",
+      "id" => @remote_instance <> "/follows/foreign-#{System.unique_integer([:positive])}",
+      "actor" => ap_follower.data["id"],
+      "object" => followed_id
+    }
+  end
+
+  # as the inbox worker handles a document with no HTTP signature that holds
+  defp deliver_unsigned(document) do
+    ActivityPub.Federator.Worker.ReceiverHelpers.perform(
+      %Oban.Job{
+        args: %{
+          "op" => "incoming_unverified_ap_doc",
+          "params" => document,
+          "headers" => %{},
+          "repo" => ActivityPub.Utils.repo()
+        }
+      },
+      :unverified
+    )
   end
 
   # runs what is queued for delivery now, and the deliveries those jobs queue, but not what is scheduled later (such as the check itself)

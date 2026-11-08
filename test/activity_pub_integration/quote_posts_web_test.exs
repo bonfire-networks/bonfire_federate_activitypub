@@ -131,4 +131,67 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsWebTest do
 
     assert rejected_link_tags == []
   end
+
+  # A remote user's quote of our user's post needs approval: the author sees "wants to quote your post" in their notifications and presses Decline
+  test "the author declining a remote quote request from their notifications shows no error" do
+    account = fake_account!()
+    author = fake_user!(account)
+
+    {:ok, original_post} =
+      Posts.publish(
+        current_user: author,
+        post_attrs: %{post_content: %{html_body: "This is my original content"}},
+        boundary: "public"
+      )
+
+    original_url = Bonfire.Common.URIs.canonical_url(original_post, preload_if_needed: true)
+
+    # the inbox holds more than the test page size of 2
+    Process.put([:bonfire, :default_pagination_limit], 10)
+
+    n = System.unique_integer([:positive])
+    note_id = "#{@remote_actor}/statuses/#{n}"
+
+    note = %{
+      "id" => note_id,
+      "type" => "Note",
+      "attributedTo" => @remote_actor,
+      "content" => "<p>Quoting this!</p><p>RE: #{original_url}</p>",
+      "quote" => original_url,
+      "to" => [ActivityPub.Config.public_uri()],
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    mock(fn
+      %{method: :get, url: @remote_actor} -> json(Simulate.actor_json(@remote_actor))
+      %{method: :get, url: ^note_id} -> json(note)
+      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
+      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+    end)
+
+    assert {:ok, _} =
+             ActivityPub.Federator.Transformer.handle_incoming(%{
+               "id" => "#{note_id}/quote_request",
+               "type" => "QuoteRequest",
+               "actor" => @remote_actor,
+               "object" => original_url,
+               "instrument" => note
+             })
+
+    assert {:ok, %{pointer_id: quote_post_id}} = ActivityPub.Object.get_cached(ap_id: note_id)
+
+    assert Quotes.requested?(quote_post_id, original_post),
+           "control: the quote needs approval"
+
+    conn(user: author, account: account)
+    |> visit("/notifications")
+    |> wait_async()
+    |> assert_has_or_open_browser("[data-role=quote_request_footer]")
+    |> click_button("[data-role=quote_request_footer] button", "Decline")
+    |> wait_async()
+    |> refute_has("[data-id=flash_error]")
+
+    refute Quotes.requested?(quote_post_id, original_post),
+           "declined from the notification but the request is still pending"
+  end
 end

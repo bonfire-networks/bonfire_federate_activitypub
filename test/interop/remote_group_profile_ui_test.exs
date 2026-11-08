@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
   @moduledoc """
   The profile page (`/@handle`) of a remote `Group` on an instance with no group pages: the social flavour, which has `bonfire_classify` but not `bonfire_ui_groups`. The group is mirrored as a `Category`, and with no `GroupLive` its page is `ProfileLive`. Its members write the posts and the group announces them, and the profile has to show those posts, as `/tag/<handle>` already does.
 
-  Groups send their `Announce` in three shapes: with the post's id, with the post embedded, and with the author's `Create` of it embedded (FEP-1b12, as Lemmy does). Each is sent from a remote `Group` (the Flipboard magazine capture, hosts rewritten) and, as the control that the path works at all, from a remote `Person`.
+  Groups send their `Announce` in three shapes: with the post's id, with the post embedded, and with the author's `Create` of it embedded (FEP-1b12, as Lemmy does). Each is sent from a remote `Group` (the Flipboard magazine capture, hosts rewritten) and, as the control that the path works at all, from a remote `Person`. A third announcer is the same `Group` announcing a post whose own `audience` names it (how a Bonfire group relays its members' posts): that also publishes the post in the group, which is asserted first where the group is a `Category`.
 
   Also guards the case with no `bonfire_classify` at all, where the group falls back to being a remote user (`Users.create_remote/2`) and its `Announce`s are stored as its boosts.
   """
@@ -22,7 +22,13 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
   @person "https://mocked.local/users/karen"
   @member "https://mastodon.local/users/reporter"
 
-  @announcers [person: @person, group: @group]
+  # `group_audience` is the same group, announcing a post whose own `audience` names it: the shape in which a Bonfire group relays its members' posts, which also publishes the post in the group
+  @announcers [person: @person, group: @group, group_audience: @group]
+  @announcer_labels %{
+    person: "remote person's",
+    group: "remote group's",
+    group_audience: "remote group's (the post names it in `audience`)"
+  }
   @shapes [
     id: "the post's id",
     object: "the post embedded",
@@ -73,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
     @announcer announcer
     @shape shape
 
-    test "#{setup_label}, a remote #{kind}'s Announce with #{shape_label} shows on its profile",
+    test "#{setup_label}, a #{@announcer_labels[kind]} Announce with #{shape_label} shows on its profile",
          %{conn: conn, me: me} do
       with_flavour(@setup, fn ->
         assert {:ok, announcer} = Adapter.maybe_create_remote_actor(%{"id" => @announcer})
@@ -90,6 +96,10 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
         assert is_binary(post_id), "the announced post is linked to a local record"
 
         stored = activities_of(post_id, announcer)
+
+        # positive first: the post is published IN the group, before anything is asserted about how it is listed
+        if @setup == :social and @kind == :group_audience,
+          do: assert_published_in_group(post_id, announcer, stored)
 
         assert Bonfire.Social.Boosts.boosted?(announcer, post_id),
                "the Announce is stored as the announcer's boost; the post's activities (subject, verb, feed) are: #{inspect(stored)}"
@@ -116,7 +126,20 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
   defp with_flavour(:no_classify, fun),
     do: Bonfire.Common.Testing.with_extension_disabled(:bonfire_classify, fun)
 
-  defp assert_mirrored_as(:social, :group, announcer) do
+  # published in the group, not only boosted by it: the group is the post's tree parent, and the group's outbox lists it
+  # separate assertions rather than one boolean, so a failure says which part is missing
+  defp assert_published_in_group(post_id, group, stored) do
+    assert {:ok, _, %{id: group_id}} = Bonfire.Classify.Categories.group_of_object(post_id)
+    assert group_id == id(group), "its tree parent is the group"
+
+    # a Flipboard magazine declares no moderators and no members, so it is mirrored as a `:topic` (`Categories.remote_type/1`), and only a `:group` has the moderators ACL attached to what is published in it (`Boundaries.acl_ids_for_published_in/1`), so no ACL is asserted here
+    assert group.type == :topic
+
+    assert Enum.any?(stored, fn {_subject, _verb, feed} -> feed == :announcer_outbox end),
+           "the group's outbox lists it; the post's activities (subject, verb, feed) are: #{inspect(stored)}"
+  end
+
+  defp assert_mirrored_as(:social, kind, announcer) when kind in [:group, :group_audience] do
     assert %Bonfire.Classify.Category{} = announcer,
            "with classify, a remote Group is mirrored as a Category (got #{inspect(announcer.__struct__)})"
   end
@@ -150,7 +173,7 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
     do: "A member post announced by the #{kind} as #{shape} (#{setup})"
 
   defp member_note(setup, kind, shape) do
-    %{
+    note = %{
       "id" => "#{@member}/statuses/#{setup}-#{kind}-#{shape}",
       "type" => "Note",
       "attributedTo" => @member,
@@ -159,6 +182,8 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
       "to" => [@public],
       "cc" => ["#{@member}/followers"]
     }
+
+    if kind == :group_audience, do: Map.put(note, "audience", @group), else: note
   end
 
   defp announce(announcer, note, shape) do
@@ -171,7 +196,7 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
           note
 
         :create ->
-          %{
+          create = %{
             "id" => "#{note["id"]}/activity",
             "type" => "Create",
             "actor" => @member,
@@ -179,6 +204,9 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupProfileUITest do
             "cc" => note["cc"],
             "object" => note
           }
+
+          # as Lemmy does, the activity names the group too when the post does
+          if note["audience"], do: Map.put(create, "audience", note["audience"]), else: create
       end
 
     %{

@@ -579,8 +579,69 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert authorization["interactionTarget"] == quoted_ap_id
   end
 
+  # The Decline button on the quote request notification sends `quote_reject` with the request's id, which the LiveHandler hands to `Quotes.reject/2` as the quoted post's author. Mastodon keeps the quote "Pending" until it gets a Reject whose `object` is its QuoteRequest, addressed to the quoting account.
+  test "declining a quote request from Mastodon queues a Reject that Mastodon can match to its QuoteRequest",
+       context do
+    %{request: request, quote_request_id: quote_request_id, quote_post_id: quote_post_id} =
+      receive_quote_request(context)
+
+    assert [] == queued_activities("Reject"), "control: nothing rejected before declining"
+
+    assert {:ok, _} = Quotes.reject(id(request), current_user: context.user)
+
+    refute Quotes.requested?(quote_post_id, context.original_post),
+           "the request should no longer be pending once declined"
+
+    assert [reject] = queued_activities("Reject")
+    assert accept_object_id(reject) == quote_request_id
+    assert @remote_actor in List.wrap(reject["to"])
+    assert reject["actor"] == actor_ap_id(context.user)
+  end
+
+  # control: the same decline for a quote post by a local user
+  test "declining a quote request from a local user rejects it", context do
+    other_user = fake_user!()
+
+    {:ok, quote_post} =
+      Posts.publish(
+        current_user: other_user,
+        post_attrs: %{post_content: %{html_body: "Quoting this! #{context.original_url}"}},
+        boundary: "public"
+      )
+
+    assert {:ok, request} = Quotes.requested(quote_post, context.original_post),
+           "control: the quote needs approval"
+
+    assert {:ok, _} = Quotes.reject(id(request), current_user: context.user)
+
+    refute Quotes.requested?(id(quote_post), context.original_post),
+           "the request should no longer be pending once declined"
+
+    assert [reject] = queued_activities("Reject")
+    assert is_binary(accept_object_id(reject))
+    assert actor_ap_id(other_user) in List.wrap(reject["to"])
+  end
+
+  defp actor_ap_id(user) do
+    {:ok, actor} = ActivityPub.Actor.get_cached(pointer: user)
+    actor.ap_id
+  end
+
   # A Mastodon user quotes our user's post, which needs approval: Mastodon sends only a QuoteRequest, with the quote post inlined as `instrument`, and our user approves it as the UI does
   defp receive_quote_request_and_approve(context) do
+    %{request: request, quote_request_id: quote_request_id, note_id: note_id} =
+      receive_quote_request(context)
+
+    assert [] == queued_accepts(), "control: nothing accepted before approval"
+
+    assert {:ok, _} = Quotes.accept(id(request), current_user: context.user)
+
+    assert [accept] = queued_accepts()
+    %{accept: accept, quote_request_id: quote_request_id, note_id: note_id}
+  end
+
+  # A Mastodon user quotes our user's post, which needs approval: Mastodon sends only a QuoteRequest, with the quote post inlined as `instrument`
+  defp receive_quote_request(context) do
     n = System.unique_integer([:positive])
     note_id = "#{@remote_actor}/statuses/#{n}"
     quote_request_id = "#{note_id}/quote_request"
@@ -620,20 +681,22 @@ defmodule Bonfire.Federate.ActivityPub.QuotePostsTest do
     assert {:ok, request} = Quotes.requested(quote_post_id, context.original_post),
            "control: the quote needs approval"
 
-    assert [] == queued_accepts(), "control: nothing accepted before approval"
-
-    assert {:ok, _} = Quotes.accept(id(request), current_user: context.user)
-
-    assert [accept] = queued_accepts()
-    %{accept: accept, quote_request_id: quote_request_id, note_id: note_id}
+    %{
+      request: request,
+      quote_request_id: quote_request_id,
+      note_id: note_id,
+      quote_post_id: quote_post_id
+    }
   end
 
-  defp queued_accepts do
+  defp queued_accepts, do: queued_activities("Accept")
+
+  defp queued_activities(type) do
     Oban.Testing.all_enqueued(repo(), worker: ActivityPub.Federator.Workers.PublisherWorker)
     |> Enum.filter(&(&1.args["op"] == "publish"))
     |> Enum.flat_map(fn %{args: %{"activity_id" => activity_id}} ->
       case ActivityPub.Object.get_cached(id: activity_id) do
-        {:ok, %{data: %{"type" => "Accept"} = data}} -> [data]
+        {:ok, %{data: %{"type" => ^type} = data}} -> [data]
         _ -> []
       end
     end)

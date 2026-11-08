@@ -18,12 +18,12 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   @applied_when_made ["Create", "Update"]
 
   # Engagement-ping activity types (e.g. PeerTube `View`) that Bonfire does not model. We skip these cleanly instead of letting them fall through to the fallback store, which tried to persist them and crashed with a DB error that the Oban worker then retried 3×. See #1802.
-  # Compile-time config so it can be used directly in the guard below (override in config).
-  @skip_activity_types Application.compile_env(
-                         :bonfire_federate_activitypub,
-                         :skip_activity_types,
-                         ["View", "Listen", "WatchAction"]
-                       )
+  # The list now lives in `ActivityPub.Config.skip_activity_types/0` (matched with `is_in/2` in the guard below), so the library skips them before storing them too.
+  # @skip_activity_types Application.compile_env(
+  #                        :bonfire_federate_activitypub,
+  #                        :skip_activity_types,
+  #                        ["View", "Listen", "WatchAction"]
+  #                      )
 
   def receive_activity(activity_id) when is_binary(activity_id) do
     info("AP - load the activity data from ID")
@@ -32,8 +32,10 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     |> receive_activity()
   end
 
+  # def receive_activity(%{data: %{"type" => type}} = activity)
+  #     when type in @skip_activity_types do
   def receive_activity(%{data: %{"type" => type}} = activity)
-      when type in @skip_activity_types do
+      when is_in(type, :skip_activity_types) do
     # short-circuit before any actor/object fetch or store
     debug(activity, "AP - '#{type}' activity is not modelled by Bonfire, skipping cleanly")
     {:ok, :skip}
