@@ -123,6 +123,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MediaLinkTest do
     if reason = Tester.skip_reason(receiver, [:resolve, :find_post]), do: @tag(skip: reason)
     # real servers' accounts run the same scenario in `live_federation/media_link_live_test.exs`
     test "#{inspect(receiver)}: a post's image attachment keeps its alt text", context do
+      # `fedify lookup` fetches unsigned (signing needs it to publish a one-time key through a public tunnel), and while `reject_unsigned` is on a post is only served to a signed fetch, so this receiver gets unsigned fetches allowed for this test. It is application env, read by every instance in this BEAM, hence restored on exit.
+      if context[:receiver] == Tester.FedifyTester do
+        orig = Application.get_env(:activity_pub, :reject_unsigned)
+        Application.put_env(:activity_pub, :reject_unsigned, false)
+        on_exit(fn -> Application.put_env(:activity_pub, :reject_unsigned, orig) end)
+      end
+
       Scenarios.alt_text(context, Tester.new(context[:receiver], context))
     end
   end
