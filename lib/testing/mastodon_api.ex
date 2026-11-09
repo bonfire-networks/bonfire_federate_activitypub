@@ -145,13 +145,27 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
       do: get(client, "/api/v1/statuses/#{status_id}/context")
 
     @doc """
-    Posts a status. Options: `:in_reply_to_id`, `:visibility` (default `"public"`), `:spoiler_text`.
+    Finds the status for a post's `uri` (its ActivityPub id), making the server fetch it from its home if it does not know it yet (`resolve=true`). Another status the search returns along with it is not taken for it: no match is `{:error, :not_found}`.
+    """
+    def resolve_status(%__MODULE__{} = client, uri) do
+      with {:ok, %{"statuses" => statuses}} <-
+             get(client, "/api/v2/search", q: uri, resolve: true, type: "statuses", limit: 5) do
+        case Enum.find(statuses, &(&1["uri"] == uri or &1["url"] == uri)) do
+          nil -> {:error, :not_found}
+          status -> {:ok, status}
+        end
+      end
+    end
+
+    @doc """
+    Posts a status. Options: `:in_reply_to_id`, `:visibility` (default `"public"`), `:spoiler_text`, `:quoted_status_id` (Mastodon 4.5+ quotes).
     """
     def post_status(%__MODULE__{} = client, text, opts \\ []) do
       body =
         %{status: text, visibility: opts[:visibility] || "public"}
         |> put_unless_nil(:in_reply_to_id, opts[:in_reply_to_id])
         |> put_unless_nil(:spoiler_text, opts[:spoiler_text])
+        |> put_unless_nil(:quoted_status_id, opts[:quoted_status_id])
 
       post(client, "/api/v1/statuses", body)
     end

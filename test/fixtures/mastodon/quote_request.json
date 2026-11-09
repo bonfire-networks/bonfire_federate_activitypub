@@ -1,0 +1,107 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "QuoteRequest": "https://w3id.org/fep/044f#QuoteRequest",
+      "_misskey_quote": "https://misskey-hub.net/ns#_misskey_quote",
+      "atomUri": "ostatus:atomUri",
+      "automaticApproval": {
+        "@id": "gts:automaticApproval",
+        "@type": "@id"
+      },
+      "canFeature": {
+        "@id": "https://w3id.org/fep/7aa9#canFeature",
+        "@type": "@id"
+      },
+      "canQuote": {
+        "@id": "gts:canQuote",
+        "@type": "@id"
+      },
+      "conversation": "ostatus:conversation",
+      "gts": "https://gotosocial.org/ns#",
+      "inReplyToAtomUri": "ostatus:inReplyToAtomUri",
+      "interactionPolicy": {
+        "@id": "gts:interactionPolicy",
+        "@type": "@id"
+      },
+      "manualApproval": {
+        "@id": "gts:manualApproval",
+        "@type": "@id"
+      },
+      "ostatus": "http://ostatus.org#",
+      "quote": {
+        "@id": "https://w3id.org/fep/044f#quote",
+        "@type": "@id"
+      },
+      "quoteAuthorization": {
+        "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+        "@type": "@id"
+      },
+      "quoteUri": "http://fedibird.com/ns#quoteUri",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "votersCount": "toot:votersCount"
+    },
+    "https://w3id.org/security/v1"
+  ],
+  "actor": "https://mastodon.local/users/mayel",
+  "id": "https://mastodon.local/users/mayel/quote_requests/92402adb-3b23-4e40-a02a-ec987f0e729f",
+  "instrument": {
+    "_misskey_quote": "https://bonfire.local/pub/objects/01M707BB0DYKCZJDYSY5F71R1Y",
+    "atomUri": "https://mastodon.local/users/mayel/statuses/117586677253939412",
+    "attachment": [],
+    "attributedTo": "https://mastodon.local/users/mayel",
+    "cc": [
+      "https://mastodon.local/users/mayel/followers"
+    ],
+    "content": "<p class=\"quote-inline\">RE: <a href=\"https://bonfire.local/pub/objects/01M707BB0DYKCZJDYSY5F71R1Y\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">bonfire.local/pub/objects</span><span class=\"invisible\">/01M707BB0DYKCZJDYSY5F71R1Y</span></a></p><p>Quoting a Bonfire post 29508</p>",
+    "contentMap": {
+      "en": "<p class=\"quote-inline\">RE: <a href=\"https://bonfire.local/pub/objects/01M707BB0DYKCZJDYSY5F71R1Y\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">bonfire.local/pub/objects</span><span class=\"invisible\">/01M707BB0DYKCZJDYSY5F71R1Y</span></a></p><p>Quoting a Bonfire post 29508</p>"
+    },
+    "context": "https://mastodon.local/contexts/17535-117586677253939412",
+    "conversation": "https://mastodon.local/contexts/17535-117586677253939412",
+    "id": "https://mastodon.local/users/mayel/statuses/117586677253939412",
+    "inReplyTo": null,
+    "inReplyToAtomUri": null,
+    "interactionPolicy": {
+      "canQuote": {
+        "automaticApproval": [
+          "https://www.w3.org/ns/activitystreams#Public"
+        ]
+      }
+    },
+    "likes": {
+      "id": "https://mastodon.local/users/mayel/statuses/117586677253939412/likes",
+      "totalItems": 0,
+      "type": "Collection"
+    },
+    "published": "2026-11-09T13:18:24Z",
+    "quote": "https://bonfire.local/pub/objects/01M707BB0DYKCZJDYSY5F71R1Y",
+    "quoteUri": "https://bonfire.local/pub/objects/01M707BB0DYKCZJDYSY5F71R1Y",
+    "replies": {
+      "first": {
+        "items": [],
+        "next": "https://mastodon.local/users/mayel/statuses/117586677253939412/replies?only_other_accounts=true&page=true",
+        "partOf": "https://mastodon.local/users/mayel/statuses/117586677253939412/replies",
+        "type": "CollectionPage"
+      },
+      "id": "https://mastodon.local/users/mayel/statuses/117586677253939412/replies",
+      "type": "Collection"
+    },
+    "sensitive": false,
+    "shares": {
+      "id": "https://mastodon.local/users/mayel/statuses/117586677253939412/shares",
+      "totalItems": 0,
+      "type": "Collection"
+    },
+    "summary": null,
+    "tag": [],
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "type": "Note",
+    "url": "https://mastodon.local/@mayel/117586677253939412"
+  },
+  "object": "https://bonfire.local/pub/objects/01M707BB0DYKCZJDYSY5F71R1Y",
+  "type": "QuoteRequest"
+}

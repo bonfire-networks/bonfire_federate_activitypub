@@ -47,6 +47,9 @@ defmodule Bonfire.Federate.ActivityPub.DataCase do
     Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, false)
     Bonfire.Federate.ActivityPub.set_federating(:instance, true)
 
+    # live runs talk to real servers: print every request in and out, as nothing the tunnelled server logs is shown
+    if tags[:live_federation], do: Bonfire.Federate.ActivityPub.Testing.Interop.log_requests()
+
     :ok
   end
 

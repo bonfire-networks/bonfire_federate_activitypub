@@ -46,6 +46,76 @@ if Application.compile_env(:bonfire, :env) in [:test, :dev] do
     # this extension's own test fixtures, resolved from `__DIR__` rather than the cwd: the extension is built from `deps/` in CI and from `extensions/` locally, and only `__DIR__` is right in both
     @default_fixtures_path Path.expand("../../test/fixtures", __DIR__)
 
+    @doc """
+    Prints one line for every HTTP request our instance answers (`<- IN`) and every request it sends (`-> OUT`): method, URL, status, time, and the ActivityPub `type` and `actor` of a POSTed body. A refused inbox delivery shows as its status (eg. 401, 403), since the line is printed when the response is sent.
+
+    For live runs: test config switches the logger backends off, and the tunnelled server's request processes are not test processes, so nothing they log is shown. This prints with `IO.puts`, as the live tests do. It listens to the telemetry events Phoenix (`[:phoenix, :endpoint, :stop]`) and the activity_pub HTTP client (`[:tesla, :request, :stop]`) already emit. Attaching again is a no-op.
+    """
+    def log_requests do
+      case :telemetry.attach_many(
+             "bonfire-interop-request-log",
+             [[:phoenix, :endpoint, :stop], [:tesla, :request, :stop]],
+             &__MODULE__.handle_request_event/4,
+             nil
+           ) do
+        :ok -> :ok
+        {:error, :already_exists} -> :ok
+      end
+    end
+
+    @doc false
+    def handle_request_event([:phoenix, :endpoint, :stop], measurements, %{conn: conn}, _) do
+      url =
+        conn.request_path <>
+          if(conn.query_string in [nil, ""], do: "", else: "?" <> conn.query_string)
+
+      IO.puts(
+        "<- IN  #{conn.method} #{url} #{conn.status} #{ms(measurements)}#{activity_summary(conn.body_params)} #{user_agent(conn)}"
+      )
+    rescue
+      e -> IO.puts("<- IN  (could not describe the request: #{Exception.message(e)})")
+    end
+
+    def handle_request_event([:tesla, :request, :stop], measurements, metadata, _) do
+      env = metadata[:env] || %{}
+
+      outcome =
+        case metadata[:error] do
+          nil -> Map.get(env, :status)
+          error -> "ERROR #{inspect(error)}"
+        end
+
+      IO.puts(
+        "-> OUT #{env |> Map.get(:method) |> to_string() |> String.upcase()} #{Map.get(env, :url)} #{outcome} #{ms(measurements)}#{activity_summary(Map.get(env, :body))}"
+      )
+    rescue
+      e -> IO.puts("-> OUT (could not describe the request: #{Exception.message(e)})")
+    end
+
+    defp ms(%{duration: duration}),
+      do: "#{System.convert_time_unit(duration, :native, :millisecond)}ms"
+
+    defp ms(_), do: ""
+
+    defp activity_summary(body) when is_binary(body) and body != "" do
+      case Jason.decode(body) do
+        {:ok, %{} = doc} -> activity_summary(doc)
+        _ -> ""
+      end
+    end
+
+    defp activity_summary(%{"type" => type} = doc),
+      do: " [#{type}#{if is_binary(doc["actor"]), do: " by #{doc["actor"]}", else: ""}]"
+
+    defp activity_summary(_), do: ""
+
+    defp user_agent(conn) do
+      case Plug.Conn.get_req_header(conn, "user-agent") do
+        [ua | _] -> "(#{ua})"
+        _ -> ""
+      end
+    end
+
     @doc "Where captures and fixtures are written: `AP_CAPTURE_JSON` if set, else this extension's fixture tree."
     def fixtures_path do
       case System.get_env("AP_CAPTURE_JSON") do
