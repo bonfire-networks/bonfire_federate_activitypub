@@ -218,7 +218,8 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
 
       assert Follows.requested?(follower, followed)
 
-      accept = accept_json(@remote_actor, ap_follower, @remote_instance <> "/follows/foreign-bare")
+      accept =
+        accept_json(@remote_actor, ap_follower, @remote_instance <> "/follows/foreign-bare")
 
       result = deliver_unsigned(accept)
 
@@ -235,7 +236,9 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       # a real, fetchable actor that we never followed
       assert {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @other_actor)
 
-      embedded = accept_json(@other_actor, ap_follower, embedded_foreign_follow(ap_follower, @other_actor))
+      embedded =
+        accept_json(@other_actor, ap_follower, embedded_foreign_follow(ap_follower, @other_actor))
+
       assert {:error, _} = Transformer.handle_incoming(embedded, from_inbox: true)
 
       bare = accept_json(@other_actor, ap_follower, @remote_instance <> "/follows/foreign-bare")
