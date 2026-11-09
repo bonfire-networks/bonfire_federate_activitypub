@@ -686,6 +686,25 @@ defmodule Bonfire.Federate.ActivityPub.GroupOutgoingTest do
                ActivityPub.Object.get_existing_announce(group_ap_id(group), like)
     end
 
+    # Lemmy reads the relayed activity as a vote, and a vote's `object` is a URL (`Vote.object` in `crates/apub/activities/src/protocol/voting/vote.rs`), so the whole liked post in its place is refused as a whole (#2503)
+    test "naming the liked post by its id", %{group: group, post: post, ap_post: ap_post} do
+      liker = fake_user!()
+      assert {:ok, _} = Bonfire.Social.Likes.like(liker, post)
+      {:ok, %{ap_id: liker_ap_id}} = ActivityPub.Actor.get_cached(pointer: liker)
+
+      like = ActivityPub.Object.get_existing_like(liker_ap_id, ap_post.data["id"])
+
+      assert %{data: %{"type" => "Announce"} = announce} =
+               ActivityPub.Object.get_existing_announce(group_ap_id(group), like),
+             "control: the group relayed the like"
+
+      assert {:ok, %{"object" => %{"type" => "Like"} = relayed}} =
+               ActivityPub.Federator.Transformer.prepare_outgoing(announce)
+
+      assert relayed["object"] == ap_post.data["id"],
+             "the relayed Like carries the liked post as #{inspect(relayed["object"], limit: 4)}, where a Lemmy vote needs its id"
+    end
+
     test "and its undoing", %{group: group, post: post, ap_post: ap_post} do
       liker = fake_user!()
       assert {:ok, _} = Bonfire.Social.Likes.like(liker, post)
