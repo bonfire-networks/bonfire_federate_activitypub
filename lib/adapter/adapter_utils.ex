@@ -2754,13 +2754,15 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   ## Examples
 
-      iex> pointer_id_from_ap_object("https://remote.example/objects/123")
-      "01FXYZ123ABC"
+  When a `Peered` record exists for the URI (these need that record, so they are not run as doctests):
+
+      pointer_id_from_ap_object("https://remote.example/objects/123")
+      # => "01FXYZ123ABC"
+
+      pointer_id_from_ap_object(%{data: %{"id" => "https://remote.example/objects/123"}})
+      # => "01FXYZ123ABC"
 
       iex> pointer_id_from_ap_object(%{pointer_id: "01FXYZ123ABC"})
-      "01FXYZ123ABC"
-
-      iex> pointer_id_from_ap_object(%{data: %{"id" => "https://remote.example/objects/123"}})
       "01FXYZ123ABC"
 
       iex> pointer_id_from_ap_object(%{})
@@ -2880,6 +2882,30 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       %{"name" => author, "type" => "Person"}
     end
   end
+
+  @doc """
+  Returns the web page URL of an AP object from its `url`, which can be a string, a Link, or a list of either. Prefers a Link with `mediaType` `text/html`, then the first URL.
+
+      iex> Bonfire.Federate.ActivityPub.AdapterUtils.ap_object_web_url(%{"url" => [%{"href" => "https://a.local/x.mp4", "mediaType" => "video/mp4"}, %{"href" => "https://a.local/x", "mediaType" => "text/html"}]})
+      "https://a.local/x"
+
+      iex> Bonfire.Federate.ActivityPub.AdapterUtils.ap_object_web_url(%{"id" => "https://a.local/objects/1"})
+      nil
+  """
+  def ap_object_web_url(%{"url" => url}), do: do_ap_object_web_url(url)
+  def ap_object_web_url(_), do: nil
+
+  defp do_ap_object_web_url(url) when is_binary(url), do: url
+  defp do_ap_object_web_url(%{"href" => href}) when is_binary(href), do: href
+
+  defp do_ap_object_web_url(urls) when is_list(urls) do
+    Enum.find_value(urls, fn
+      %{"href" => href, "mediaType" => "text/html"} when is_binary(href) -> href
+      _ -> nil
+    end) || Enum.find_value(urls, &do_ap_object_web_url/1)
+  end
+
+  defp do_ap_object_web_url(_), do: nil
 
   def get_author(nil), do: nil
 
