@@ -1964,7 +1964,7 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
 
   defp alias_maybe_attach_property_values(aliases) when is_list(aliases) and aliases != [] do
     Enum.map(aliases, fn o ->
-      uri = Bonfire.Common.URIs.canonical_url(o)
+      uri = alias_link_url(o)
 
       maybe_attach_property_value(
         ed(o, :metadata, "label", nil) || ed(o, :media_type, nil) || ed(o, :username, nil) ||
@@ -1975,6 +1975,12 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   end
 
   defp alias_maybe_attach_property_values(_), do: []
+
+  # a link alias (eg. ORCID or a website) is shown as the address it links to, not as Bonfire's copy of it
+  defp alias_link_url(%{__struct__: Bonfire.Files.Media} = media),
+    do: Bonfire.Common.Media.media_url(media)
+
+  defp alias_link_url(o), do: Bonfire.Common.URIs.canonical_url(o)
 
   def create_remote_actor({:ok, a}),
     do: create_remote_actor(a)

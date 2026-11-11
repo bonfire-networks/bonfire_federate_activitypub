@@ -175,6 +175,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
 
         assert {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => community})
 
+        # the moderators collection is read by a queued job, not while the mirror is made
+        Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
         assert Bonfire.Classify.Categories.moderators(group) != [],
                "#{name}: declares moderators at #{inspect(moderators)}, so the mirrored group should have some"
       end
