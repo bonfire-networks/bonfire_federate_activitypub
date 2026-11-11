@@ -105,6 +105,17 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     end
   end
 
+  # A `Remove` of a member as Mobilizon sends it: the object is a Member URL and the group is its `origin`. The URL is served to the group's members only, so it is not fetched here (as the service actor it would be refused) but by the handler, as one of our members of that group
+  def receive_activity(
+        %{data: %{"type" => "Remove", "origin" => origin, "object" => member_url} = data} =
+          activity
+      )
+      when is_binary(origin) and is_binary(member_url) and not is_map_key(data, "target") do
+    info(member_url, "AP - a Remove naming a Member URL, left for the handler to fetch")
+
+    receive_activity(activity, %{data: %{"type" => "Member", "id" => member_url}})
+  end
+
   def receive_activity(
         %{
           data: %{
@@ -718,6 +729,26 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
              fallback_fun: &no_federation_module_match/2
            ) do
       {:ok, pointable_object}
+    end
+  end
+
+  # An `Update` of a `Member` (a group changing someone's role): the member is no object to create or update here, whatever its id (which is also the id of the `Join` that made it), so the module that claimed it applies the change
+  defp handle_activity_with(
+         {:ok, module},
+         character,
+         %{data: %{"type" => "Update"}} = activity,
+         %{data: %{"type" => "Member"}} = object
+       )
+       when is_atom(module) and not is_nil(module) do
+    with {:ok, %{id: _} = changed} <-
+           Utils.maybe_apply(
+             module,
+             :ap_receive_activity,
+             [character, activity, object],
+             no_argument_rescue: true,
+             fallback_fun: &no_federation_module_match/2
+           ) do
+      {:ok, changed}
     end
   end
 

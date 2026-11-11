@@ -1681,6 +1681,9 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       # declared whatever the visibility, since the URI says nothing about who is in it (serving it is what checks visibility, see `Categories.collection_items/2`). Declaring one is how a remote server tells that membership here is not following, as with Mobilizon and Smithereen, unlike the threadiverse
       "members" => ActivityPub.Utils.collection_ap_id("members", id(group)),
       "capabilities" => %{"acceptsJoins" => true},
+      # how many members there are, which a mirror reads to decide whether to copy the list (Mobilizon states it as `memberCount` too); one count query for each actor document built
+      "memberCount" =>
+        maybe_apply(Bonfire.Classify.Categories, :members_count, [group], fallback_return: nil),
       "openness" =>
         case dims[:membership] do
           "on_request" -> "moderated"

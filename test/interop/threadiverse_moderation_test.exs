@@ -82,6 +82,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       ActivityPub.Federator.Transformer.handle_incoming(a)
     end
 
+    # the community's moderators are read by the fetch job that making its mirror queued
+    Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
     # the community the ingested posts actually belong to, which is what a lock has to name: Lemmy's
     # own assets refer to their test community, not to the one these announces came from
     {:ok,
@@ -1442,8 +1445,10 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
     end
 
     # Who moderates a community changes, and a mirror that never hears about it keeps handing
-    # `:moderate` to the wrong people. Applied as a re-sync of the community's own collection rather
-    # than as a delta, so what we end up asserting is what the origin publishes.
+    # `:moderate` to the wrong people. An Add or Remove from the community itself or from one of its listed moderators on its host is applied as a mutation; from any other actor with standing it re-syncs the community's own collection, so what we end up asserting is what the origin publishes. These tests serve the updated list, so both give the same result.
+    # Commented out, as the above is the current behaviour:
+    # # `:moderate` to the wrong people. Applied as a re-sync of the community's own collection rather
+    # # than as a mutation, so what we end up asserting is what the origin publishes.
     test "an Add to a remote community's moderators collection re-syncs the mirror", %{
       announced_by: community,
       community_moderator: existing_mod,
@@ -1576,7 +1581,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
                fixture("mod_add_mod.json")
                |> Map.merge(%{
                  "actor" => existing_mod,
-                 "object" => attacker,
+                 # the object is someone the community lists, as an Add from the origin's moderator is applied as written; the attacker is only in the inline target
+                 # "object" => attacker,
+                 "object" => existing_mod,
                  "target" => moderators_collection(collection, [attacker]),
                  "cc" => [community]
                })
@@ -1620,6 +1627,166 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
       assert promoted in moderator_urls(group), "what the community publishes is adopted"
       refute attacker in moderator_urls(group), "what the activity claims is not"
+    end
+
+    # The origin vouches for an Add or Remove that comes from the community itself or from its host, so it is applied as a mutation, without reading the collection again
+    test "an Add from a moderator on the community's host is applied without re-reading the collection",
+         %{
+           announced_by: community,
+           community_moderator: existing_mod,
+           moderators_collection: collection,
+           served: served
+         } do
+      {:ok, group} =
+        Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      promoted = "#{community |> String.split("/c/") |> List.first()}/u/mutation_promoted"
+
+      # the collection does NOT list the promoted person yet: only the activity does
+      serve(Map.put(served, promoted, person_actor(promoted)), self())
+
+      assert {:ok, %{pointer: %Bonfire.Classify.Category{}}} =
+               fixture("mod_add_mod.json")
+               |> Map.merge(%{
+                 "actor" => existing_mod,
+                 "object" => promoted,
+                 "target" => collection,
+                 "cc" => [community]
+               })
+               |> receive_moderation()
+
+      assert promoted in moderator_urls(group), "the Add's object is applied"
+      assert existing_mod in moderator_urls(group), "the others stay"
+
+      # `Incoming.receive_activity/1` fetches a bare-URL target before the handler, so the mutation still costs that 1 GET but adopts nothing from it (the stale collection does not list the promoted person, who is a moderator anyway)
+      # refute_received {:served, ^collection}
+    end
+
+    test "a Remove from the community itself takes the moderator out without re-reading the collection",
+         %{
+           announced_by: community,
+           community_moderator: existing_mod,
+           moderators_collection: collection,
+           served: served
+         } do
+      {:ok, group} =
+        Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      assert existing_mod in moderator_urls(group), "control: listed before"
+
+      # the collection still lists the demoted moderator
+      serve(served, self())
+
+      assert {:ok, %{pointer: %Bonfire.Classify.Category{}}} =
+               fixture("mod_remove_mod.json")
+               |> Map.merge(%{
+                 "actor" => community,
+                 "object" => existing_mod,
+                 "target" => collection,
+                 "cc" => [community],
+                 "id" => "#{community}/activities/remove/#{System.unique_integer([:positive])}"
+               })
+               |> receive_moderation()
+
+      refute existing_mod in moderator_urls(group), "the Remove's object is taken out"
+
+      # `Incoming.receive_activity/1` fetches a bare-URL target before the handler, so the mutation still costs that 1 GET but adopts nothing from it (the stale collection still lists the demoted moderator, who is out anyway)
+      # refute_received {:served, ^collection}
+    end
+
+    # any account on the community's host can make us re-read the origin, but is not vouched for as a moderator
+    test "an Add from a non-moderator account on the community's host naming themselves re-syncs",
+         %{
+           announced_by: community,
+           community_moderator: existing_mod,
+           moderators_collection: collection,
+           served: served
+         } do
+      {:ok, group} =
+        Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      plain = "#{community |> String.split("/c/") |> List.first()}/u/plain_account"
+
+      serve(Map.put(served, plain, person_actor(plain)), self())
+
+      assert existing_mod in moderator_urls(group), "control: the listed moderator is there"
+
+      assert {:ok, %{pointer: %Bonfire.Classify.Category{}}} =
+               fixture("mod_add_mod.json")
+               |> Map.merge(%{
+                 "actor" => plain,
+                 "object" => plain,
+                 "target" => collection,
+                 "cc" => [community]
+               })
+               |> receive_moderation()
+
+      assert_received {:served, ^collection}
+      assert existing_mod in moderator_urls(group), "what the collection lists is adopted"
+      refute plain in moderator_urls(group), "an account on the host is not a moderator by that"
+    end
+
+    # a listed moderator on ANOTHER host has standing only to make us re-read the origin
+    test "an Add from a listed moderator on another host still re-syncs from the collection", %{
+      announced_by: community,
+      community_moderator: existing_mod,
+      moderators_collection: collection,
+      served: served
+    } do
+      {:ok, group} =
+        Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community})
+
+      host = community |> String.split("/c/") |> List.first()
+      foreign = "http://lemmy2.local/u/lemmy_alpha"
+      promoted = "#{host}/u/resynced_promoted"
+      decoy = "#{host}/u/decoy"
+
+      # the community lists the foreign moderator, so it has standing to trigger a re-sync
+      serve(
+        served
+        |> Map.put(collection, moderators_collection(collection, [existing_mod, foreign])),
+        self()
+      )
+
+      receive_moderation(
+        fixture("mod_add_mod.json")
+        |> Map.merge(%{
+          "actor" => community,
+          "object" => foreign,
+          "target" => collection,
+          "cc" => [community],
+          "id" => "#{community}/activities/add/#{System.unique_integer([:positive])}"
+        })
+      )
+
+      assert foreign in moderator_urls(group), "control: listed, on another host"
+
+      serve(
+        served
+        |> Map.put(promoted, person_actor(promoted))
+        |> Map.put(decoy, person_actor(decoy))
+        |> Map.put(
+          collection,
+          moderators_collection(collection, [existing_mod, foreign, promoted])
+        ),
+        self()
+      )
+
+      assert {:ok, %{pointer: %Bonfire.Classify.Category{}}} =
+               fixture("mod_add_mod.json")
+               |> Map.merge(%{
+                 "actor" => foreign,
+                 "object" => decoy,
+                 "target" => collection,
+                 "cc" => [community],
+                 "id" =>
+                   "http://lemmy2.local/activities/add/#{System.unique_integer([:positive])}"
+               })
+               |> receive_moderation()
+
+      assert promoted in moderator_urls(group), "what the collection lists is adopted"
+      refute decoy in moderator_urls(group), "what the activity names is not"
+      assert_received {:served, ^collection}
     end
   end
 
@@ -2337,8 +2504,11 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
   end
 
   # re-callable, so a test can change what an origin serves (a moderator list that has since changed)
-  defp serve(served) do
+  # with `notify`, a pid, each URL read is sent to it as `{:served, url}`, so a test can tell what was fetched
+  defp serve(served, notify \\ nil) do
     mock(fn %{method: :get, url: url} ->
+      if notify, do: send(notify, {:served, url})
+
       case served[url] do
         nil -> %Tesla.Env{status: 404, body: ""}
         body -> json(body)

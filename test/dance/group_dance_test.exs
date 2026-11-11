@@ -189,7 +189,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert {:ok, mirror} = AdapterUtils.get_by_url_ap_id_or_username(remote[:canonical_url])
       assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(local, mirror)
 
-      assert Bonfire.Classify.Categories.member?(local, mirror)
+      # being a member waits for the group's Accept of the Join, as being a follower does for its Accept of the Follow
+      assert Bonfire.Classify.Categories.member?(local, mirror),
+             "the group's Accept of the Join did not come back"
 
       assert Follows.following?(local, mirror),
              "the group's Accept of the Follow did not come back"

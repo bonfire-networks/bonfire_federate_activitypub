@@ -1094,6 +1094,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
                Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.folded),
              "control: the folded one wasn't mirrored (its handle is taken)"
 
+      # the moderators are read by the queued fetch job
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
       assert {:ok, other_mirror} =
                Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.other)
 
@@ -1129,6 +1132,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
                  "object" => updated
                })
 
+      # the moderators are read by the queued fetch job
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
+
       assert {:ok, other_mirror} =
                Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.other)
 
@@ -1162,6 +1168,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
 
       assert {:ok, %{type: :group}} = Categories.get(id(mirror), skip_boundary_check: true),
              "the repair stopped at the moderator whose handle is taken"
+
+      # the moderators are read by the queued fetch job
+      Oban.drain_queue(queue: :remote_fetcher, with_recursion: true)
 
       assert {:ok, other_mirror} =
                Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ctx.other)

@@ -245,9 +245,12 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
         follower = fake_user!()
         {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
 
-        # an open magazine admits at once, and the Follow sent alongside waits for Mbin's answer
-        assert {:ok, %{member: true, requested: true}} =
+        # an open magazine is asked too, and both the Join and the Follow sent alongside wait for Mbin's answer to the Follow
+        assert {:ok, %{member: false, requested: true}} =
                  Bonfire.Classify.Categories.join_and_follow_group(follower, group)
+
+        refute Bonfire.Classify.Categories.member?(follower, group),
+               "#{accept_file}: the magazine has not agreed yet"
 
         assert Bonfire.Social.Requests.requested?(follower, Bonfire.Data.Social.Follow, group)
 
@@ -428,8 +431,18 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
 
         assert {:ok, _} = Bonfire.Classify.Categories.join_group(member, group)
 
+        refute Bonfire.Classify.Categories.member?(member, group),
+               "#{name}: the community has not agreed yet"
+
+        # the community admits them when it answers, applied here as its Accept applies it
+        assert {:ok, _} =
+                 Bonfire.Classify.Categories.join_group(member, group,
+                   skip_boundary_check: true,
+                   incoming: true
+                 )
+
         assert Bonfire.Classify.Categories.member?(member, group),
-               "#{name}: control: joining the mirror made a member, not a requester"
+               "#{name}: control: the community's answer made a member, not a requester"
 
         assert Bonfire.Social.FeedLoader.feed_contains?(:my_groups, post, current_user: member),
                "#{name}: the announced #{object["type"]} should be in My groups once joined"

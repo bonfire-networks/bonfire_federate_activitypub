@@ -28,9 +28,9 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupBellTest do
     account = fake_account!()
     user = fake_user!(account)
     assert {:ok, _} = Categories.join_and_follow_group(user, group)
-    assert Categories.member?(user, group), "control: they joined the remote group"
+    refute Categories.member?(user, group), "control: the group has not agreed to the join yet"
 
-    # the group accepts their Follow, as a live one does: until then the follow is pending, and the bell is only offered once following
+    # the group accepts their Follow, as a live one does: until then the follow is pending, and the bell is only offered once following. With no `members` collection, that Accept also admits them
     {:ok, actor} = ActivityPub.Actor.get_cached(pointer: user)
 
     [follow] =
@@ -53,6 +53,8 @@ defmodule Bonfire.Federate.ActivityPub.RemoteGroupBellTest do
 
     assert Bonfire.Social.Graph.Follows.following?(user, group),
            "control: the group accepted their follow"
+
+    assert Categories.member?(user, group), "control: and so they joined the remote group"
 
     {:ok, group: group, user: user, conn: conn(user: user, account: account)}
   end

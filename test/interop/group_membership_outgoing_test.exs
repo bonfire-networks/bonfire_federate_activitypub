@@ -4,7 +4,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
 
   Pressing Join means join AND follow, so both go out: Lemmy acts on the `Follow` (following IS joining there) and ignores the `Join`, while Mobilizon makes them a member from the `Join` and a follower from the `Follow`. Sending both is what works for both families without detecting which software hosts the group.
 
-  Until the group answers, our mirror decides from what the group declares: an `open` one makes them a member at once, an `on_request` one leaves a pending join request. The group's `Accept(Join)` or `Reject(Join)` then settles it.
+  Until the group answers, whatever it declares, they wait: a pending join request, and no membership. The group's `Accept(Join)` or `Reject(Join)` then settles it (and where following is joining, the answer to the `Follow` does). A group hosted here that is open still admits at once.
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 
@@ -87,22 +87,103 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
   defp join_requested?(user, group),
     do: Bonfire.Social.Requests.requested?(user, Bonfire.Boundaries.Verbs.get_id!(:join), group)
 
+  # how each thing they did themself reads in their own notifications
+  defp notified_as(user) do
+    %{edges: edges} =
+      Bonfire.Social.FeedLoader.feed(:notifications, current_user: user, preload: false)
+
+    edges
+    |> Enum.map(& &1.activity)
+    |> Enum.filter(&(&1.subject_id == id(user)))
+    |> Enum.map(&Bonfire.Social.Activities.experienced_as(&1, id(user)))
+  end
+
+  # what is put in their notifications feed, read where it is published: a feed read hides what they may not read
+  defp own_notification_rows(user) do
+    feed_id = Bonfire.Social.Feeds.feed_id(:notifications, user)
+
+    Bonfire.Data.Social.FeedPublish
+    |> Ecto.Query.where(feed_id: ^feed_id)
+    |> repo().all()
+  end
+
   describe "joining an open remote group" do
-    test "sends a Join and a Follow as them, and makes them a member" do
+    test "sends a Join and a Follow as them, and waits for the group's Accept to make them a member" do
       user = fake_user!()
       group = remote_group("open")
 
-      assert {:ok, _} = Categories.join_and_follow_group(user, group)
+      assert {:ok, %{requested: true}} = Categories.join_and_follow_group(user, group)
+
+      assert [join] = sent("Join", user), "the group never hears they joined"
+      assert [_] = sent("Follow", user), "a peer where following is joining hears nothing"
+      assert join_requested?(user, group)
+      refute Categories.member?(user, group), "the group has not agreed yet"
+
+      # their own pending join stays a record, and is not put in their own notifications: they hear when it is granted
+      assert [] == own_notification_rows(user), "a pending join is in their own notifications"
+
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", join))
 
       assert Categories.member?(user, group)
-      assert [_] = sent("Join", user), "the group never hears they joined"
-      assert [_] = sent("Follow", user), "a peer where following is joining hears nothing"
+      refute join_requested?(user, group), "the request was answered, so it is no longer pending"
+      assert [_] = sent("Join", user), "being accepted is not joining again"
+
+      assert notified_as(user) == [],
+             "an open group was always going to let them in, so the Accept tells them nothing new"
+    end
+
+    # follow IS join there (no `members` collection), so it is the Accept of the Follow that admits them
+    test "where following is joining, the Accept of the Follow makes them a member" do
+      user = fake_user!()
+      group = remote_group("open")
+      assert {:ok, _} = Categories.join_and_follow_group(user, group)
+      assert [follow] = sent("Follow", user)
+      refute Categories.member?(user, group), "the group has not agreed yet"
+
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", follow))
+
+      assert Categories.member?(user, group), "the group will never answer the Join"
+      refute join_requested?(user, group)
+    end
+
+    test "pressing Join again while waiting sends nothing more and asks once" do
+      user = fake_user!()
+      group = remote_group("open")
+      assert {:ok, %{requested: true}} = Categories.join_and_follow_group(user, group)
+
+      assert {:ok, %{requested: true}} = Categories.join_and_follow_group(user, group)
+
+      assert [_] = sent("Join", user)
+      assert join_requested?(user, group)
+      refute Categories.member?(user, group)
+    end
+
+    test "a group hosted here that is open still admits at once" do
+      creator = fake_user!()
+      group = Bonfire.Classify.Simulate.fake_group!(creator)
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "open",
+                 visibility: "global",
+                 participation: "anyone",
+                 default_content_visibility: "public"
+               })
+
+      user = fake_user!()
+      assert {:ok, _} = Categories.join_group(user, group)
+
+      assert Categories.member?(user, group)
+      refute join_requested?(user, group)
     end
 
     test "then leaving sends a Leave" do
       user = fake_user!()
       group = remote_group("open")
       assert {:ok, _} = Categories.join_group(user, group)
+      assert [join] = sent("Join", user)
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", join))
+      assert Categories.member?(user, group), "control: a member"
 
       assert {:ok, _} = Categories.leave_group(user, group)
 
@@ -162,6 +243,9 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
 
       assert [_] = sent("Join", user),
              "being accepted is not joining again, so nothing more goes out"
+
+      assert notified_as(user) == [:join],
+             "they asked, and the group's Accept is the answer, so they are told once, as a member"
     end
 
     # the answered `Join` is found by its id alone, so only the group it was sent to may settle it. The Accept test above is the positive control
@@ -222,14 +306,15 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
       end
     end
 
-    # an open group admits at once and records no request, so its instant Accept has nothing to settle: it must leave them a member, as it does now
-    test "arriving at once for an open group keeps them a member" do
+    # once the Accept has made them a member and cleared the request, a second one (a retry, or a group announcing it again) has nothing to settle: it must leave them a member
+    test "arriving a second time for an open group keeps them a member" do
       user = fake_user!()
       group = remote_group("open")
       assert {:ok, _} = Categories.join_group(user, group)
-      assert Categories.member?(user, group), "an open group admits at once"
-      refute join_requested?(user, group), "and records no request for the Accept to settle"
       assert [join] = sent("Join", user)
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", join))
+      assert Categories.member?(user, group), "control: the first Accept admitted them"
+      refute join_requested?(user, group), "and cleared the request for the next to settle"
 
       assert {:ok, _} = Transformer.handle_incoming(answer("Accept", join))
 
@@ -280,6 +365,55 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipOutgoingTest do
       assert Bonfire.Social.Graph.Follows.following?(user, group),
              "the Accept never landed, so this test proves nothing"
 
+      refute Categories.member?(user, group)
+    end
+  end
+
+  # a group that said yes can take it back (a removed member): honoured, and not answered, since the group already knows
+  describe "the group's Reject after it said yes" do
+    test "of an accepted Join removes the member, and no Leave goes out" do
+      user = fake_user!()
+      group = remote_group("moderated")
+      assert {:ok, _} = Categories.join_group(user, group)
+      assert [join] = sent("Join", user)
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", join))
+      assert Categories.member?(user, group), "control: a member"
+
+      Transformer.handle_incoming(answer("Reject", join))
+
+      refute Categories.member?(user, group)
+      assert sent("Leave", user) == []
+    end
+
+    test "of the Follow where following is joining removes the membership and the follow" do
+      user = fake_user!()
+      group = remote_group(@follow_is_join)
+      assert {:ok, _} = Categories.join_and_follow_group(user, group)
+      assert [follow] = sent("Follow", user)
+      assert {:ok, _} = Transformer.handle_incoming(answer("Accept", follow))
+      assert Categories.member?(user, group), "control: a member"
+      assert Bonfire.Social.Graph.Follows.following?(user, group), "control: following"
+
+      Transformer.handle_incoming(answer("Reject", follow))
+
+      refute Bonfire.Social.Graph.Follows.following?(user, group)
+      refute Categories.member?(user, group)
+    end
+
+    # Lemmy and Mbin embed the Follow they answer
+    test "of the Follow, embedded, drops a pending join and the follow request" do
+      user = fake_user!()
+      group = remote_group(@follow_is_join)
+      assert {:ok, _} = Categories.join_and_follow_group(user, group)
+      assert [%{data: %{"id" => follow_id}} = follow] = sent("Follow", user)
+      assert join_requested?(user, group), "control: a join waits"
+
+      embedded = answer("Reject", follow) |> Map.put("object", follow.data)
+      assert follow.data["id"] == follow_id
+      Transformer.handle_incoming(embedded)
+
+      refute join_requested?(user, group)
+      refute Bonfire.Social.Requests.requested?(user, Bonfire.Data.Social.Follow, group)
       refute Categories.member?(user, group)
     end
   end

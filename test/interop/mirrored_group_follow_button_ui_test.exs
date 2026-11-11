@@ -47,9 +47,31 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupFollowButtonUITest do
     {:ok, group: group, me: me, conn: conn(user: me, account: account)}
   end
 
+  # the group answers the Join as its Accept would, leaving the Follow sent alongside still waiting for its own answer
+  defp admit!(me, group) do
+    assert {:ok, _} =
+             Categories.join_group(me, group, skip_boundary_check: true, incoming: true)
+
+    assert Categories.member?(me, group), "control: the group admitted them"
+  end
+
+  test "while the group has not answered the Join, the page says Joining and offers neither Join nor a Follow",
+       %{conn: conn, group: group, me: me} do
+    assert {:ok, _} = Categories.join_and_follow_group(me, group)
+    refute Categories.member?(me, group), "control: no answer has arrived"
+
+    conn
+    |> visit(Bonfire.Common.URIs.path(group))
+    |> wait_async()
+    |> assert_has("button", text: "Joining…")
+    |> refute_has("button", text: "Join", exact: true)
+    |> refute_has(@round_not_following)
+  end
+
   test "after joining a mirrored group, its round Follow shows the pending request, not a plain Follow",
        %{conn: conn, group: group, me: me} do
     assert {:ok, _} = Categories.join_and_follow_group(me, group)
+    admit!(me, group)
 
     refute Follows.following?(me, group),
            "control: no `Accept` has arrived, so the follow is still pending"
@@ -70,6 +92,7 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupFollowButtonUITest do
     me: me
   } do
     assert {:ok, _} = Categories.join_and_follow_group(me, group)
+    admit!(me, group)
 
     conn
     |> visit(Bonfire.Common.URIs.path(group))

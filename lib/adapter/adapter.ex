@@ -71,19 +71,58 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
   def collection_total(%Object{} = collection, opts \\ []),
     do: collection_via_module(collection, :collection_total, opts)
 
+  # A collection of another instance that we fetched, applied by the module that claims its type (`{:collection, type}`, as for serving ours): a group's `members` by `Bonfire.Classify.Categories`
+  def handle_remote_collection(%{type: type} = collection, items) do
+    with {:ok, module} <-
+           Bonfire.Federate.ActivityPub.FederationModules.federation_module({:collection, type}) do
+      maybe_apply(module, :handle_remote_collection, [collection, items],
+        fallback_return: {:ok, :ignored}
+      )
+    else
+      _ -> {:ok, :ignored}
+    end
+  end
+
   # whether to serve who is in a collection or only how many. The members and the followers of a group are its roster, and the group says whether it lists it. Anything else is listed
-  def items_listed?(%Object{data: %{"id" => collection_id}}, "members") do
+  # A group's members are listed to whoever may read its roster (`Categories.roster_listed?/1`), and to a signed requester who is a member of it, can moderate it, or is an instance admin where it is hosted (`Categories.roster_visible?/2`): a member of a group on another server reads who else is in it, as Mobilizon's members do
+  def items_listed?(%Object{data: %{"id" => collection_id}}, "members", requester) do
     case ActivityPub.Utils.parse_collection_ap_id(collection_id) do
-      {:ok, "members", group_id} -> roster_listed?(group_id)
-      _ -> true
+      {:ok, "members", group_id} ->
+        roster_listed?(group_id) or roster_visible_to?(group_id, requester)
+
+      _ ->
+        true
     end
   end
 
   # only a `Group` actor can be a group, so a person's followers (the common case) cost no lookup
-  def items_listed?(%Actor{data: %{"type" => "Group"}} = actor, "followers"),
+  def items_listed?(%Actor{data: %{"type" => "Group"}} = actor, "followers", _requester),
     do: roster_listed?(AdapterUtils.character_id_from_actor(actor))
 
-  def items_listed?(_actor_or_collection, _kind), do: true
+  def items_listed?(_actor_or_collection, _kind, _requester), do: true
+
+  # was `items_listed?/2`, which had no requester:
+  # def items_listed?(%Object{data: %{"id" => collection_id}}, "members") do
+  #   case ActivityPub.Utils.parse_collection_ap_id(collection_id) do
+  #     {:ok, "members", group_id} -> roster_listed?(group_id)
+  #     _ -> true
+  #   end
+  # end
+
+  defp roster_visible_to?(_group_id, nil), do: false
+
+  defp roster_visible_to?(group_id, requester) do
+    with viewer when is_binary(viewer) <- e(requester, :pointer_id, nil) || e(requester, :id, nil),
+         {:ok, group} <- Bonfire.Common.Needles.get(group_id, skip_boundary_check: true) do
+      group = repo().maybe_preload(group, character: [:peered])
+
+      maybe_apply(Bonfire.Classify.Categories, :roster_visible?, [group, viewer],
+        fallback_return: false
+      ) == true
+    else
+      _ -> false
+    end
+  end
 
   # Whether a local actor may be served over ActivityPub by any route: its own boundaries must let the `activity_pub` circle read it (`AdapterUtils.character_ap_readable?/2`), as for what it sends (`Outgoing.federate_outgoing?/2`). One that can't be found here is not this check's to refuse.
   # a cached local actor carries its character, so there is nothing to look up

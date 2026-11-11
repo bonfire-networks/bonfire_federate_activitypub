@@ -267,6 +267,35 @@ defmodule Bonfire.Federate.ActivityPub.ActorIntegrationTest do
     assert conn["indexable"] == false
   end
 
+  test "a linked ORCID is federated as a profile field linking to orcid.org" do
+    user = fake_user!()
+    orcid_url = "https://orcid.org/0000-0002-1825-0097"
+
+    # the same shape the OpenID/ORCID sign-in and link flow uses
+    assert {:ok, _} =
+             Bonfire.Social.Graph.Aliases.add(
+               user,
+               {:provider, :orcid, "ORCID",
+                Bonfire.OpenID.Client.user_external_url(
+                  %{"iss" => "https://orcid.org", "sub" => "0000-0002-1825-0097"},
+                  []
+                )
+                |> elem(1), %{"iss" => "https://orcid.org", "sub" => "0000-0002-1825-0097"}},
+               current_user: user
+             )
+
+    assert %{path: ^orcid_url} = Bonfire.Files.Media.get_by_path(orcid_url) |> elem(1)
+
+    actor = get_actor_json("/pub/actors/#{user.character.username}")
+
+    values =
+      for %{"type" => "PropertyValue", "value" => v} <- actor["attachment"] || [], do: v
+
+    # the field values are rendered as `<a rel="me" href="…">` links
+    assert Enum.any?(values, &(&1 =~ ~s(href="#{orcid_url}"))),
+           "expected the ORCID URL among the profile field values, got: #{inspect(values)}"
+  end
+
   test "remote actor creation" do
     {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
     # debug(actor)

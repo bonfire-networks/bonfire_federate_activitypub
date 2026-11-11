@@ -499,12 +499,14 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
 
   Non-fatal, which every caller relies on: whatever the activity asked for is already recorded by the time this runs, and in allowlist-only or archipelago mode delivering the reply to a non-allowlisted remote is legitimately filtered out. A failure is warned and returned, never raised.
   """
-  def send_accept(accepter, activity) do
+  def send_accept(accepter, activity, opts \\ []) do
     with {:ok, actor} <- accepter_actor(accepter),
          {:ok, accept} <-
            ActivityPub.accept(%{
              actor: actor,
-             to: [e(activity, :data, "actor", nil) || e(activity, "actor", nil)],
+             # addressed to the sender, unless the caller says more (a group telling its other members too: `to` and `bcc`)
+             to: opts[:to] || [e(activity, :data, "actor", nil) || e(activity, "actor", nil)],
+             bcc: opts[:bcc],
              object: activity_to_accept(activity),
              local: true
            }) do

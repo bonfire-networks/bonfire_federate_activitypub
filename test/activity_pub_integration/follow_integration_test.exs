@@ -199,6 +199,72 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       assert Bonfire.Social.Graph.Follows.following?(follower, followed)
     end
 
+    # what the follower is told by the Accept: only an account that approves followers by hand held them up, so only its Accept is news
+    test "an Accept from an account that approves followers tells the follower they now follow it, and one from an account that does not tells them nothing" do
+      for {actor_id, expected} <- [{@locked_actor, [:follow]}, {@remote_actor, []}] do
+        %{follower: follower, followed: followed, ap_follower: ap_follower} =
+          follow_and_deliver(actor_id)
+
+        assert Follows.requested?(follower, followed), "control: #{actor_id}: still a request"
+
+        accept =
+          accept_json(actor_id, ap_follower, embedded_foreign_follow(ap_follower, actor_id))
+
+        assert {:ok, _} = Transformer.handle_incoming(accept, from_inbox: true)
+        assert Follows.following?(follower, followed), "control: #{actor_id}: the Accept landed"
+
+        %{edges: edges} =
+          Bonfire.Social.FeedLoader.feed(:notifications, current_user: follower, preload: false)
+
+        assert edges
+               |> Enum.map(& &1.activity)
+               |> Enum.filter(&(&1.subject_id == id(follower)))
+               |> Enum.map(&Bonfire.Social.Activities.experienced_as(&1, id(follower))) ==
+                 expected,
+               "#{actor_id}: what the follower is told"
+      end
+    end
+
+    # incoming Rejects: we send none when declining, but a refusal from the other side is honoured
+    test "a Reject embedding our Follow (as Mastodon sends it) ends the request" do
+      %{follower: follower, followed: followed, ap_follower: ap_follower, follow_activity: follow} =
+        follow_and_deliver()
+
+      assert Follows.requested?(follower, followed), "control: still a request"
+
+      reject = reject_json(@remote_actor, ap_follower, follow.data)
+      assert {:ok, _} = Transformer.handle_incoming(reject, from_inbox: true)
+
+      refute Follows.requested?(follower, followed)
+      refute Follows.following?(follower, followed)
+    end
+
+    test "a Reject of a follow already accepted (a removed follower) unfollows" do
+      %{follower: follower, followed: followed, ap_follower: ap_follower, follow_activity: follow} =
+        follow_and_deliver()
+
+      accept = accept_json(@remote_actor, ap_follower, follow.data)
+      assert {:ok, _} = Transformer.handle_incoming(accept, from_inbox: true)
+      assert Follows.following?(follower, followed), "control: they followed"
+
+      reject = reject_json(@remote_actor, ap_follower, follow.data)
+      assert {:ok, _} = Transformer.handle_incoming(reject, from_inbox: true)
+
+      refute Follows.following?(follower, followed)
+    end
+
+    # the Accept clause is given the Reject's `to` to find a Follow by, and the Reject clause is not
+    test "a Reject naming a Follow by an id we never gave it, to our follower, ends the request" do
+      %{follower: follower, followed: followed, ap_follower: ap_follower} = follow_and_deliver()
+      assert Follows.requested?(follower, followed), "control: still a request"
+
+      reject = reject_json(@remote_actor, ap_follower, embedded_foreign_follow(ap_follower))
+      assert {:ok, _} = Transformer.handle_incoming(reject, from_inbox: true)
+
+      refute Follows.requested?(follower, followed)
+      refute Follows.following?(follower, followed)
+    end
+
     # Owncast, Gancio, PeerTube and Pixelfed answer with a Follow of their own making: an id we never gave it
     test "an Accept whose embedded Follow has a foreign id completes the follow we have pending to that actor" do
       %{follower: follower, followed: followed, ap_follower: ap_follower} = follow_and_deliver()
@@ -448,19 +514,14 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
         follower: follower,
         followed: followed,
         ap_follower: ap_follower,
-        ap_followed: ap_followed,
         follow_activity: follow_activity
       } = follow_and_deliver()
 
-      {:ok, accept} =
-        ActivityPub.accept(%{
-          actor: ap_followed,
-          to: [ap_follower.data],
-          object: follow_activity.data,
-          local: false
-        })
-
-      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
+      # sent once, as the inbox gets it. This used to build the Accept with `ActivityPub.accept(local: false)`, which already runs the adapter, and then hand it to `Incoming.receive_activity/1` again, so it was handled twice, which the inbox never does
+      # {:ok, accept} = ActivityPub.accept(%{actor: ap_followed, to: [ap_follower.data], object: follow_activity.data, local: false})
+      # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(accept)
+      accept = accept_json(@remote_actor, ap_follower, follow_activity.data)
+      assert {:ok, _} = Transformer.handle_incoming(accept, from_inbox: true)
       assert Follows.following?(follower, followed), "control: the Accept made us a follower"
 
       assert_no_resend(follow_activity)
@@ -471,19 +532,14 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
         follower: follower,
         followed: followed,
         ap_follower: ap_follower,
-        ap_followed: ap_followed,
         follow_activity: follow_activity
       } = follow_and_deliver()
 
-      {:ok, reject} =
-        ActivityPub.reject(%{
-          actor: ap_followed,
-          to: [ap_follower.data["id"]],
-          object: follow_activity.data["id"],
-          local: false
-        })
-
-      assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(reject)
+      # sent once, as the inbox gets it (see the Accepted twin above)
+      # {:ok, reject} = ActivityPub.reject(%{actor: ap_followed, to: [ap_follower.data["id"]], object: follow_activity.data["id"], local: false})
+      # assert {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(reject)
+      reject = reject_json(@remote_actor, ap_follower, follow_activity.data["id"])
+      assert {:ok, _} = Transformer.handle_incoming(reject, from_inbox: true)
       refute Follows.requested?(follower, followed), "control: the Reject ended the request"
 
       assert_no_resend(follow_activity)
@@ -631,6 +687,15 @@ defmodule Bonfire.Federate.ActivityPub.FollowIntegrationTest do
       "to" => [to_actor.data["id"]],
       "object" => object
     }
+  end
+
+  # a Reject as a remote server sends it, to `to_actor`
+  defp reject_json(rejecting_actor_id, to_actor, object) do
+    accept_json(rejecting_actor_id, to_actor, object)
+    |> Map.merge(%{
+      "type" => "Reject",
+      "id" => @remote_instance <> "/rejects/#{System.unique_integer([:positive])}"
+    })
   end
 
   # the Follow as the remote server restates it, under an id of its own
