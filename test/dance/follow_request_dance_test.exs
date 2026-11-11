@@ -120,6 +120,32 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowRequestTest do
     assert Follows.following?(local_follower, followed_on_local)
     refute Follows.requested?(local_follower, followed_on_local)
 
+    Logger.metadata(action: info("check the follower is told their request was granted"))
+    follow_verb_id = Bonfire.Boundaries.Verbs.get(:follow)[:id]
+
+    %{edges: local_notifs} =
+      Bonfire.Social.FeedLoader.feed(:notifications,
+        current_user: local_follower,
+        preload: false
+      )
+
+    granted =
+      Enum.find_value(local_notifs, fn e ->
+        if e.activity.verb_id == follow_verb_id and e.activity.subject_id == uid(local_follower),
+          do: e.activity
+      end)
+
+    assert granted, "expected the follower's own Follow in their notifications"
+
+    assert Bonfire.Social.Activities.experienced_as(granted, uid(local_follower)) == :follow
+
+    assert Bonfire.Social.Notifications.phrase_for(
+             :follow,
+             granted.object_id,
+             uid(local_follower),
+             granted.subject_id
+           ) == "You are now following"
+
     Logger.metadata(action: info("check that post was federated and is the follower's feed"))
 
     assert Bonfire.Social.FeedLoader.feed_contains?(:my, post_attrs.post_content.html_body,

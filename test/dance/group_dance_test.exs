@@ -5,6 +5,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     @moduletag :test_instance
 
     import Untangle
+    require Ecto.Query
     import Bonfire.Common.Config, only: [repo: 0]
     import Bonfire.Federate.ActivityPub.SharedDataDanceCase
     import Bonfire.Classify.Simulate
@@ -301,6 +302,33 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "accepted at the origin, but no Accept of the Join came back, so the joiner's own instance still shows them waiting"
 
       refute Bonfire.Social.Requests.requested?(local, join_verb(), mirror)
+
+      # what the joiner sees: the :join record in their notifications, worded for them, and the same row (not a second one) in the mirror's moderation log, which lives here since it is the mirror's own notifications feed
+      %{edges: notifs} =
+        Bonfire.Social.FeedLoader.feed(:notifications, current_user: local, preload: false)
+
+      joined =
+        Enum.find_value(notifs, fn e ->
+          if e.activity.verb_id == join_verb() and e.activity.subject_id == id(local),
+            do: e.activity
+        end)
+
+      assert joined, "expected the joiner's own :join record in their notifications"
+      assert Bonfire.Social.Activities.experienced_as(joined, id(local)) == :join
+
+      assert Bonfire.Social.Notifications.phrase_for(
+               :join,
+               joined.object_id,
+               id(local),
+               joined.subject_id
+             ) == "You are now a member of"
+
+      log_feed_id = Bonfire.Social.Feeds.feed_id(:notifications, mirror)
+
+      assert Bonfire.Data.Social.FeedPublish
+             |> Ecto.Query.where(feed_id: ^log_feed_id, id: ^joined.id)
+             |> repo().exists?(),
+             "the same record is not in the mirror's moderation log"
     end
 
     # whichever side refuses (our mirror, or the origin on receiving the Join), neither may end up with a member or a request the group never asked for. The test above is the control: the same steps for a group that reviews joins do make a request at the origin

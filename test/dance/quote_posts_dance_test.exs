@@ -197,6 +197,31 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
         # check that the quoteAuthorization field is present
         # FIXME
         assert remote_ap_json["quoteAuthorization"]
+
+        # and the quoter is told: the ask they made is in their own notifications, read as the approved kind
+        remote_quoter = context[:remote][:user]
+        request_verb_id = Bonfire.Boundaries.Verbs.get_id!(:request)
+
+        %{edges: remote_notifs} =
+          Bonfire.Social.FeedLoader.feed(:notifications,
+            current_user: remote_quoter,
+            preload: false
+          )
+
+        asks =
+          remote_notifs
+          |> Enum.map(& &1.activity)
+          |> Enum.filter(&(&1.verb_id == request_verb_id))
+          |> repo().maybe_preload(edge: [subject: [:created]], object: [:created])
+
+        assert asks != [], "the quoter's approved ask is not in their notifications"
+
+        quoter_id = Bonfire.Common.Types.uid(remote_quoter)
+
+        assert Enum.all?(
+                 asks,
+                 &(Bonfire.Social.Activities.experienced_as(&1, quoter_id) == :quote)
+               )
       end)
 
       # --------------------------------------------------------------------
