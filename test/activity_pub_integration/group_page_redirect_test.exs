@@ -30,6 +30,24 @@ defmodule Bonfire.Federate.ActivityPub.GroupPageRedirectTest do
     assert redirect_of("/group/#{group.id}") == actor_id
   end
 
+  test "a topic's page inside its group goes to the topic, not the group", %{
+    group: group,
+    actor_id: group_actor_id
+  } do
+    topic =
+      Bonfire.Classify.Simulate.fake_category!(fake_user!(), group, %{
+        name: "Race reports",
+        type: :topic
+      })
+
+    topic_id = URIs.canonical_url(topic, preload_if_needed: true)
+    # the positive first: the topic has an id of its own here, which isn't the group's
+    assert topic_id =~ URIs.base_url() <> "/pub/"
+    refute topic_id == group_actor_id
+
+    assert redirect_of(Bonfire.Classify.Web.GroupNavigation.topic_path(group, topic)) == topic_id
+  end
+
   test "a mirrored group's page goes to its id on its own server", %{group: group} do
     assert {:ok, _} =
              Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
