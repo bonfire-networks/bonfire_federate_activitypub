@@ -437,27 +437,32 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
       # TODO: put exceptions in config
       {:ok, filtered}
     else
-      if opts[:is_local] do
-        if opts[:from_c2s] do
+      cond do
+        # an account import bringing in the person's own post that was addressed to nobody (Mastodon's private mention with no one mentioned), which the import then keeps to them. Set by the import's own code, never from what a server sends
+        opts[:own_post_to_nobody] == true ->
+          {:ok, filtered}
+
+        opts[:is_local] && opts[:from_c2s] ->
           debug(
             activity,
             "try self-addressing local activity because it has no recipients or they were all filtered"
           )
 
           maybe_self_address_activity(filtered)
-        else
+
+        opts[:is_local] ->
           # `warn` not `info`: this silently discards a user's post (no AP object is written, nothing is queued), and at prod log level an `info` left no trace at all, which is why circle-scoped posts appeared to vanish. The check itself is unchanged.
           warn(activity, "Skip federation of local activity with no recipients")
           :ignore
-        end
-      else
-        debug(
-          activity,
-          "reject remote activity because it has no recipients or they were all filtered"
-        )
 
-        {:reject,
-         "Do not accept incoming federated activity because it has no recipients or they were all filtered"}
+        true ->
+          debug(
+            activity,
+            "reject remote activity because it has no recipients or they were all filtered"
+          )
+
+          {:reject,
+           "Do not accept incoming federated activity because it has no recipients or they were all filtered"}
       end
     end
   end

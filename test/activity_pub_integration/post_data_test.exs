@@ -298,6 +298,30 @@ defmodule Bonfire.Federate.ActivityPub.PostDataTest do
       # debug(feed_entry)
     end
 
+    # an interaction policy (Mastodon gives every non-public post `canQuote` for its author only) grants or denies verbs, it names nobody the post is sent to, so it doesn't make the post a message
+    test "creates a private Post, not a message, for an incoming non-public Note that addresses nobody we know but has an interaction policy" do
+      # the recipient is someone their server no longer has
+      mock(fn
+        %{method: :get, url: @remote_actor} -> json(Simulate.actor_json(@remote_actor))
+        %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+      end)
+
+      {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
+
+      to = [@remote_instance <> "/users/someone-we-dont-know"]
+
+      params =
+        remote_activity_json(actor, to, %{
+          "to" => to,
+          "interactionPolicy" => %{"canQuote" => %{"automaticApproval" => [@remote_actor]}}
+        })
+
+      assert {:ok, activity} = ActivityPub.create(params)
+      assert %Bonfire.Data.Social.Post{} = post = activity.pointer
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post)
+    end
+
     test "creates a Post for an incoming public Note with link and fetches link metadata" do
       {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
