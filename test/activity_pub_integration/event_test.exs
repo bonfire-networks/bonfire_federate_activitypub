@@ -31,6 +31,10 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
 
   describe "" do
     # test "event is recorded as APActivity" do … (until events had their own module: it asserted an `APActivity` with the AS2 json, and filtered the feed by the json type `"Event"`)
+    # (struct-free patterns, as `bonfire_gatherings` may not be there; skipped then)
+    @tag skip:
+           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
+             "needs bonfire_gatherings"
     test "event is recorded as a native event, and is in the explore feed" do
       data =
         "../fixtures/mobilizon.org-event.json"
@@ -40,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
 
       {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
-      assert {:ok, %Bonfire.Gatherings.Event{} = event} =
+      assert {:ok, %{__struct__: Bonfire.Gatherings.Event} = event} =
                Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
       assert {:ok, _} = Bonfire.Social.Objects.read(event.id)
@@ -55,6 +59,9 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
     end
 
     # was "non-public event is recorded as private APActivity", until events had their own module
+    @tag skip:
+           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
+             "needs bonfire_gatherings"
     test "non-public event is recorded as a private native event" do
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
@@ -77,7 +84,7 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
       # assert activity.__struct__ == Bonfire.Data.Social.APActivity
       # assert activity.json["type"] == type
       # assert is_binary(activity.json["content"])
-      assert %Bonfire.Gatherings.Event{} = activity
+      assert %{__struct__: Bonfire.Gatherings.Event} = activity
 
       assert {:error, _} = Bonfire.Social.Objects.read(activity.id)
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id, current_user: recipient)

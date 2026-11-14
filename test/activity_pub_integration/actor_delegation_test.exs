@@ -414,6 +414,10 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegationTest do
       assert activity.local, "a delegated post is authored here, so it must be local"
     end
 
+    # (a struct-free pattern, as `bonfire_gatherings` may not be there; skipped then, the event being an APActivity)
+    @tag skip:
+           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
+             "needs bonfire_gatherings"
     test "creates a local object, so the post can appear in feeds", %{
       conn: conn,
       username: username,
@@ -436,7 +440,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegationTest do
       #
       # assert local.json["type"] in ["Create", "Event"]
       # an `Event` has its own module now, so it becomes a native event rather than an `APActivity`
-      assert %Bonfire.Gatherings.Event{} =
+      assert %{__struct__: Bonfire.Gatherings.Event} =
                Bonfire.Common.Needles.get!(object.pointer_id, skip_boundary_check: true)
 
       assert %{edges: edges} = Bonfire.Social.FeedLoader.feed(:my, current_user: user)

@@ -1,3 +1,5 @@
+# native events only exist with `bonfire_gatherings`, which a flavour may not include (its structs then do not compile)
+if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
 defmodule Bonfire.Federate.ActivityPub.EventIngestTest do
   @moduledoc """
   An incoming ActivityPub `Event` (server to server, or posted by a local user to their outbox) becomes a native `Bonfire.Gatherings.Event`, rather than an `APActivity`.
@@ -584,4 +586,5 @@ defmodule Bonfire.Federate.ActivityPub.EventIngestTest do
       assert object.data["commentsEnabled"] == false
     end
   end
+end
 end

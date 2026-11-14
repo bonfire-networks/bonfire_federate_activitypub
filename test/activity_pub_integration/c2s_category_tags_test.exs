@@ -120,13 +120,17 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
 
   describe "a local user's Event posted to their outbox" do
     # a baseline, expected GREEN before any change: nothing tests `maybe_cast_tags` today (`hashtag_handling_test.exs` covers Posts only), and every later step edits it
+    # (struct-free patterns, as `bonfire_gatherings` may not be there; skipped then)
+    @tag skip:
+           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
+             "needs bonfire_gatherings"
     test "has its Hashtag tag tagged", %{conn: conn, user: user, username: username} do
       conn = post_event(conn, user, username, [%{"type" => "Hashtag", "name" => "#jazz"}])
 
       assert conn.status == 201
 
       # assert %Bonfire.Data.Social.APActivity{} = activity = posted_activity(conn)
-      assert %Bonfire.Gatherings.Event{} = activity = posted_activity(conn)
+      assert %{__struct__: Bonfire.Gatherings.Event} = activity = posted_activity(conn)
 
       hashtag_names =
         activity.tags
@@ -136,6 +140,9 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       assert "jazz" in hashtag_names
     end
 
+    @tag skip:
+           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
+             "needs bonfire_gatherings"
     test "has the local topic its Category tag names tagged",
          %{conn: conn, user: user, username: username} do
       topic = fake_category!(user, nil, %{type: :topic, name: "Jazz"})
@@ -147,7 +154,7 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       assert conn.status == 201
 
       # assert %Bonfire.Data.Social.APActivity{} = activity = posted_activity(conn)
-      assert %Bonfire.Gatherings.Event{} = activity = posted_activity(conn)
+      assert %{__struct__: Bonfire.Gatherings.Event} = activity = posted_activity(conn)
 
       assert topic.id in Enum.map(activity.tags, & &1.id)
     end
