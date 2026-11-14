@@ -3248,13 +3248,17 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       )
       |> debug("can request")
 
-    can_request_urls = policy_circles_urls(subject, can_circles_request)
+    # the author's AP id: `actor_id:` when the caller already has it (eg. the `actor` of a client's C2S document), which spares loading what the subject's canonical URL needs
+    actor_id = opts[:actor_id] || Bonfire.Common.URIs.canonical_url(subject)
+
+    # can_request_urls = policy_circles_urls(subject, can_circles_request)
+    can_request_urls = policy_circles_urls(actor_id, can_circles_request)
 
     include_verbs =
       opts[:include_verbs] ||
         [{:boost, "Announce"}, {:quote, "Quote"}, {:reply, "Reply"}, {:like, "Like"}]
 
-    actor_id = Bonfire.Common.URIs.canonical_url(subject)
+    # actor_id = Bonfire.Common.URIs.canonical_url(subject)
 
     Enum.reduce(include_verbs, %{}, fn {verb_slug, policy_verb}, acc ->
       can_circles =

@@ -265,7 +265,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
                  "A post to be boosted",
                  "MODIFIED: This content was changed in the exported JSON"
                ])
-             )
+             ),
+             "the imported posts' content: #{inspect(content_texts)}"
 
       # Verify that imported boosts preserve their original dates
       Logger.metadata(action: info("verify original dates are preserved"))

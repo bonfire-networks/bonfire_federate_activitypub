@@ -76,24 +76,35 @@ defmodule Bonfire.Federate.ActivityPub.TopicAddressUITest do
     group_address =
       group
       |> repo().maybe_preload(character: [:peered])
-      |> Bonfire.Me.Characters.display_username(true)
+      |> Bonfire.Me.Characters.display_username(true, nil, "")
 
     topic_address =
       topic
       |> repo().maybe_preload(character: [:peered])
-      |> Bonfire.Me.Characters.display_username(true)
+      |> Bonfire.Me.Characters.display_username(true, nil, "")
 
-    # the control: the address is the topic's own, on its origin server
-    assert topic_address == "+harvest@bonfire.local"
+    # the control: the address is the topic's own, on its origin server, shown with no prefix
+    assert topic_address == "harvest@bonfire.local"
 
     conn
     |> visit(topic_path(group, topic))
     |> wait_async()
-    |> assert_has(
-      "[data-id=group_hero] [data-role=group-address][data-clipboard-text='#{group_address}']"
+    # the visible text may break before the host (`<wbr>`), so the handle and the host are checked apart
+    |> assert_has("[data-role=group-topic-info] [data-role=group-address]", text: "harvest")
+    |> assert_has("[data-role=group-topic-info] [data-role=group-address]",
+      text: "@bonfire.local"
     )
     |> assert_has(
-      "[data-role=group-topic-info] [data-role=group-address][phx-hook=Copy][data-clipboard-text='#{topic_address}']"
+      "[data-id=group_hero] [data-role=group-address-copy][phx-hook=Copy][data-clipboard-text='!#{group_address}']"
     )
+    |> assert_has(
+      "[data-role=group-topic-info] [data-role=group-address-copy][phx-hook=Copy][data-clipboard-text='!#{topic_address}']"
+    )
+    |> assert_has(
+      "[data-role=group-topic-info] [data-role=group-address-copy][phx-hook=Copy][data-clipboard-text='@#{topic_address}']"
+    )
+
+    # old: the `+` prefixed address was the copy target
+    # |> assert_has("[data-role=group-topic-info] [data-role=group-address][phx-hook=Copy][data-clipboard-text='+harvest@bonfire.local']")
   end
 end

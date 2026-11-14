@@ -30,40 +30,36 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
   end
 
   describe "" do
-    test "event is recorded as APActivity" do
-      type = "Event"
-
+    # test "event is recorded as APActivity" do … (until events had their own module: it asserted an `APActivity` with the AS2 json, and filtered the feed by the json type `"Event"`)
+    test "event is recorded as a native event, and is in the explore feed" do
       data =
         "../fixtures/mobilizon.org-event.json"
         |> Path.expand(__DIR__)
         |> File.read!()
         |> Jason.decode!()
 
-      # |> Map.put("type", type)
-
       {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
-      assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+      assert {:ok, %Bonfire.Gatherings.Event{} = event} =
+               Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
-      # NOTE: temp until an extension implements events
-      assert activity.__struct__ == Bonfire.Data.Social.APActivity
-      assert activity.json["type"] == type
-      assert is_binary(activity.json["content"])
-
-      assert {:ok, _} = Bonfire.Social.Objects.read(activity.id)
+      assert {:ok, _} = Bonfire.Social.Objects.read(event.id)
 
       feed = Bonfire.Social.FeedLoader.feed(:explore)
-      assert Bonfire.Social.FeedLoader.feed_contains?(feed, activity)
+      assert Bonfire.Social.FeedLoader.feed_contains?(feed, event)
 
-      feed = Bonfire.Social.FeedLoader.feed(:explore, %{object_types: ["Event"]}, [])
-      assert Bonfire.Social.FeedLoader.feed_contains?(feed, activity)
+      feed =
+        Bonfire.Social.FeedLoader.feed(:explore, %{object_types: [Bonfire.Gatherings.Event]}, [])
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(feed, event)
     end
 
-    test "non-public event is recorded as private APActivity" do
+    # was "non-public event is recorded as private APActivity", until events had their own module
+    test "non-public event is recorded as a private native event" do
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)
 
-      type = "Event"
+      # type = "Event"
 
       data =
         "../fixtures/mobilizon.org-event.json"
@@ -78,9 +74,10 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
 
       assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
 
-      assert activity.__struct__ == Bonfire.Data.Social.APActivity
-      assert activity.json["type"] == type
-      assert is_binary(activity.json["content"])
+      # assert activity.__struct__ == Bonfire.Data.Social.APActivity
+      # assert activity.json["type"] == type
+      # assert is_binary(activity.json["content"])
+      assert %Bonfire.Gatherings.Event{} = activity
 
       assert {:error, _} = Bonfire.Social.Objects.read(activity.id)
       assert {:ok, _} = Bonfire.Social.Objects.read(activity.id, current_user: recipient)
@@ -146,7 +143,9 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
       end
     end
 
-    for type <- ["Event", "Workshop"] do
+    # for type <- ["Event", "Workshop"] do
+    # an Event has its own module now (its Update is in `event_ingest_test.exs`), so only the made-up type still goes through this path
+    for type <- ["Workshop"] do
       test "updates the #{type} it is about, instead of recording a second one" do
         type = unquote(type)
         id = "#{@actor}/objects/#{Needle.UID.generate()}"

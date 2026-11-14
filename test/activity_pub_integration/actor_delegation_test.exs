@@ -431,10 +431,13 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegationTest do
       assert object.pointer_id,
              "the AP object was stored but never linked to a local object"
 
-      assert %Bonfire.Data.Social.APActivity{} =
-               local = Bonfire.Common.Needles.get!(object.pointer_id, skip_boundary_check: true)
-
-      assert local.json["type"] in ["Create", "Event"]
+      # assert %Bonfire.Data.Social.APActivity{} =
+      #          local = Bonfire.Common.Needles.get!(object.pointer_id, skip_boundary_check: true)
+      #
+      # assert local.json["type"] in ["Create", "Event"]
+      # an `Event` has its own module now, so it becomes a native event rather than an `APActivity`
+      assert %Bonfire.Gatherings.Event{} =
+               Bonfire.Common.Needles.get!(object.pointer_id, skip_boundary_check: true)
 
       assert %{edges: edges} = Bonfire.Social.FeedLoader.feed(:my, current_user: user)
 

@@ -950,6 +950,103 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "sent without the reporter's name: here, the report isn't theirs"
     end
 
+    # A member of a group hosted on this instance who is on the other instance posts into one of its topics, as the topic page's composer does (`composer_opts/1` in `bonfire_ui_groups/lib/views/group/group_live.ex`: `context_id` and `to_circles` the topic, and `to_boundaries` its default content visibility). They follow the group, not the topic. The topic files the post at its host, and the post shows in the topic's mirror there too, for the poster, since the topic's boost is addressed to the post's author. Another member of the group there does not get it.
+    test "a member on the other instance posting into a topic of a group here files it under the topic on both instances, for the poster",
+         context do
+      moderator = context[:local][:user]
+      html_body = "post into a topic from afar"
+
+      group =
+        fancy_fake_category!(moderator,
+          type: :group,
+          membership: "open",
+          visibility: "global",
+          participation: "anyone"
+        )
+
+      topic = fake_category!(moderator, group[:category], %{type: :topic})
+      topic_url = Bonfire.Me.Characters.character_url(topic)
+      {:ok, %{ap_id: topic_ap_id}} = ActivityPub.Actor.get_cached(pointer: topic)
+
+      remote =
+        TestInstanceRepo.apply(fn ->
+          author = context[:remote][:user]
+          other_member = fake_user!()
+
+          assert {:ok, group_on_remote} =
+                   AdapterUtils.get_or_fetch_and_create_by_uri(group[:canonical_url])
+
+          for member <- [author, other_member] do
+            assert {:ok, _} =
+                     Bonfire.Classify.Categories.join_and_follow_group(member, group_on_remote)
+          end
+
+          assert {:ok, %Bonfire.Classify.Category{type: :topic} = topic_on_remote} =
+                   AdapterUtils.get_by_url_ap_id_or_username(topic_url)
+
+          {:ok, post} =
+            Bonfire.Posts.publish(
+              current_user: author,
+              post_attrs: %{post_content: %{html_body: html_body}},
+              context_id: id(topic_on_remote),
+              to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(topic_on_remote),
+              to_boundaries:
+                List.wrap(
+                  Bonfire.Classify.Boundaries.read_default_content_visibility(topic_on_remote)
+                )
+            )
+
+          post_url =
+            post
+            |> repo().maybe_preload([:peered, created: [:peered]])
+            |> Bonfire.Common.URIs.canonical_url()
+
+          %{
+            author: author,
+            other_member: other_member,
+            post: post,
+            post_url: post_url,
+            topic_on_remote: topic_on_remote,
+            author_follows_topic: Follows.following?(author, topic_on_remote),
+            author_follows_group: Follows.following?(author, group_on_remote),
+            # filed under the topic's mirror, for the poster, straight after publishing
+            in_topic_mirror_for_poster:
+              FeedLoader.feed_contains?(:user_activities, post,
+                by: topic_on_remote,
+                current_user: author
+              )
+          }
+        end)
+
+      assert post_held?(remote.post_url), "control: the post reached the group's instance"
+
+      {:ok, ap_post} = ActivityPub.Object.get_cached(ap_id: remote.post_url)
+
+      assert {:ok, local_post} =
+               Bonfire.Common.Needles.get(ap_post.pointer_id, skip_boundary_check: true)
+
+      assert FeedLoader.feed_contains?(:user_activities, local_post,
+               by: topic,
+               current_user: moderator
+             ),
+             "the post is filed under the topic on the group's instance"
+
+      assert %{} = ActivityPub.Object.get_existing_announce(topic_ap_id, ap_post),
+             "control: the topic announced it on its own instance"
+
+      TestInstanceRepo.apply(fn ->
+        assert remote.in_topic_mirror_for_poster,
+               "the post shows in the topic's mirror for the poster"
+
+        # Another member there doesn't get the post: the topic's boost is addressed to the post's author and the topic's followers, and they follow neither the topic nor are they the author.
+        # assert FeedLoader.feed_contains?(:user_activities, remote.post,
+        #          by: remote.topic_on_remote,
+        #          current_user: remote.other_member
+        #        ),
+        #        "and for another member of the group there"
+      end)
+    end
+
     # how many `Update`s of this object the current instance holds
     defp updates_of(object_ap_id) do
       import Ecto.Query

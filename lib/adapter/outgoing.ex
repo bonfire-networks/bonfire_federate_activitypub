@@ -82,6 +82,42 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
   end
 
   # The AP object stored for a local object made from one (a C2S post). Its `pointer_id` is set only after the epic that makes the object has returned (`Incoming.link_ap_object/3`), so a lookup by pointer misses while the object is being federated, and a second `Create` was built that collided with the stored one. The epic hands the AP object over (`ap_object:`), and its id is the one the object's id was made from (`AdapterUtils.pointer_id_from_url/1`): another flow may put a different AP object there, which is left alone.
+  # A client (C2S) that says nothing about who may interact gets the same `interactionPolicy` and `commentsEnabled` a post made here would carry, read off the boundary the object was given, so other servers do not assume their own defaults. Only the keys the client left out: what it said is kept. Written to the stored object, so a later fetch returns what was sent, and its proof is signed again over it (`ActivityPub.Object` renews a local object's signed original when its data changes).
+  defp maybe_fill_interaction_policy(
+         activity,
+         subject,
+         local_object,
+         %ActivityPub.Object{local: true, data: %{"id" => ap_id} = data} = ap_object,
+         opts
+       ) do
+    case Enum.reject(["interactionPolicy", "commentsEnabled"], &Map.has_key?(data, &1)) do
+      [] ->
+        activity
+
+      missing ->
+        fill =
+          AdapterUtils.ap_prepare_outgoing_interaction_policy(
+            subject,
+            local_object,
+            # the author as the client's document names them
+            Keyword.put(opts, :actor_id, data["attributedTo"] || activity.data["actor"])
+          )
+          |> Map.take(missing)
+
+        with true <- fill != %{},
+             {:ok, _} <-
+               ActivityPub.Object.update_existing(ap_object.id, %{data: Map.merge(data, fill)}) do
+          # loaded again, as the activity is sent with its object as now stored
+          ActivityPub.Object.get_activity_for_object_ap_id(ap_id) || activity
+        else
+          _ -> activity
+        end
+    end
+  end
+
+  defp maybe_fill_interaction_policy(activity, _subject, _local_object, _ap_object, _opts),
+    do: activity
+
   defp existing_ap_object(local_object, opts) do
     local_id = Enums.id(local_object)
 
@@ -135,7 +171,10 @@ defmodule Bonfire.Federate.ActivityPub.Outgoing do
           "Federating existing AP activity with original data (e.g. from C2S)"
         )
 
-        ActivityPub.Federator.publish(existing_activity)
+        # ActivityPub.Federator.publish(existing_activity)
+        existing_activity
+        |> maybe_fill_interaction_policy(subject, local_object, existing_ap_object, opts)
+        |> ActivityPub.Federator.publish()
       else
         _ ->
           object_type = Types.object_type_schema(local_object) || struct_type

@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
   @moduledoc """
   The tags of an `Event` that a local user posts to their own outbox (C2S).
 
-  Nothing models an `Event`, so it is stored as an `APActivity` with the raw AS2 json, and the items of its `tag` have to become real tags there, on a create and on an update.
+  It becomes a native `Bonfire.Gatherings.Event`, and the items of its `tag` have to become real tags of it, on a create and on an update.
   """
   # `@moduletag :federation` comes with this case
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
@@ -90,7 +90,7 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
     |> post("#{ActivityPub.Utils.ap_base_url()}/actors/#{username}/outbox", doc)
   end
 
-  # the `APActivity` that the posted `Event` became, with its tags
+  # the native event that the posted `Event` became, with its tags
   defp posted_activity(conn) do
     resp = json_response(conn, 201)
 
@@ -125,7 +125,8 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
 
       assert conn.status == 201
 
-      assert %Bonfire.Data.Social.APActivity{} = activity = posted_activity(conn)
+      # assert %Bonfire.Data.Social.APActivity{} = activity = posted_activity(conn)
+      assert %Bonfire.Gatherings.Event{} = activity = posted_activity(conn)
 
       hashtag_names =
         activity.tags
@@ -145,7 +146,8 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
 
       assert conn.status == 201
 
-      assert %Bonfire.Data.Social.APActivity{} = activity = posted_activity(conn)
+      # assert %Bonfire.Data.Social.APActivity{} = activity = posted_activity(conn)
+      assert %Bonfire.Gatherings.Event{} = activity = posted_activity(conn)
 
       assert topic.id in Enum.map(activity.tags, & &1.id)
     end
@@ -184,6 +186,34 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
 
       refute topic.id in Enum.map(posted_activity(dropped).tags, & &1.id),
              "dropped by an Update that does not"
+    end
+
+    test "is tagged with the topic of an FEP-8a8e value when its Category tag has that value's name, and makes no topic of its own",
+         %{conn: conn, user: user, username: username} do
+      conn =
+        post_event(conn, user, username, [
+          %{
+            "type" => "Category",
+            "id" => "https://lauti.example/category/7",
+            "inScheme" => "https://w3id.org/fep/9b2b#Form",
+            "name" => "Music"
+          },
+          # its translated label matches too
+          %{"type" => "Category", "name" => "food & drink"}
+        ])
+
+      assert conn.status == 201
+
+      assert ["food_drink_events", "music_events"] ==
+               conn
+               |> posted_activity()
+               |> tagged_categories()
+               |> repo().maybe_preload(:character)
+               |> Enum.map(& &1.character.username)
+               |> Enum.sort()
+
+      # no topic named after it beside the value's
+      assert {:error, _} = Bonfire.Classify.Categories.get("music", skip_boundary_check: true)
     end
 
     test "has a new local topic tagged for a Category tag with no id",
@@ -235,7 +265,18 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       topics = tagged_categories(activity)
 
       assert ["bar", "foo"] == topics |> Enum.map(& &1.profile.name) |> Enum.sort()
-      assert Enum.all?(topics, &(&1.type == :topic))
+      # assert Enum.all?(topics, &(&1.type == :topic))
+      # its category ("bar", `#Form`, what kind of event) is a topic; its topic ("foo", `#Topic`, what it is about) is a label, under the "Events" label. Both named as the event category topics are
+      topics = repo().maybe_preload(topics, [:character, :tree])
+
+      assert %{type: :topic, character: %{username: "bar_events"}} =
+               Enum.find(topics, &(&1.profile.name == "bar"))
+
+      assert %{
+               type: :label,
+               character: %{username: "foo_events"},
+               tree: %{parent_id: "1ABE1SF0REVENTSANDGATHER1N"}
+             } = Enum.find(topics, &(&1.profile.name == "foo"))
     end
 
     test "puts a Lauti event in the feed of each topic made from its categories",
@@ -295,9 +336,16 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
     end
 
     # records the defaults of open point 3a of `plans/events-categories.md`: the poster is the creator of the topic, so holds `:administer` and may tag it, and the default boundary of a top-level topic lets every local user follow it but not tag it
-    test "creates a topic that its poster may tag, and any other local user may follow but not tag",
+    test "creates a topic that its poster may tag, the instance's moderators administer, and any other local user may follow but not tag",
          %{conn: conn, user: user, username: username} do
       other = fake_user!()
+      mod = fake_user!()
+
+      {:ok, _} =
+        Bonfire.Boundaries.Circles.add_to_circles(
+          mod,
+          Bonfire.Boundaries.Scaffold.Instance.mod_circle()
+        )
 
       conn = post_event(conn, user, username, [%{"type" => "Category", "name" => "Poetry"}])
 
@@ -306,6 +354,11 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       assert Bonfire.Boundaries.can?(user, :tag, topic)
       assert Bonfire.Boundaries.can?(other, :follow, topic)
       refute Bonfire.Boundaries.can?(other, :tag, topic)
+
+      # the instance's moderators administer a topic that nobody set up by hand
+      assert Bonfire.Boundaries.can?(mod, :mediate, topic)
+      assert Bonfire.Boundaries.can?(mod, :edit, topic)
+      refute Bonfire.Boundaries.can?(other, :mediate, topic)
     end
 
     test "is in the feed of the topic it made from its Category tag",
