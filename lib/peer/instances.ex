@@ -282,25 +282,26 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
 
   def instance_allowlisted?(_, _opts), do: false
 
-  def add_to_allowlist(host_or_peer, scope \\ :instance_wide)
+  # `opts` as for `Bonfire.Boundaries.Allowlist.allow/2`: `current_user:` for their own list, plus `scope: :instance_wide` for the instance's, or `skip_boundary_check: true` where nobody acts
+  def add_to_allowlist(host_or_peer, opts \\ [])
 
-  def add_to_allowlist(%Peer{display_hostname: display_hostname}, scope),
-    do: add_to_allowlist(display_hostname, scope)
+  def add_to_allowlist(%Peer{display_hostname: display_hostname}, opts),
+    do: add_to_allowlist(display_hostname, opts)
 
-  def add_to_allowlist(host_or_uri, scope) when is_binary(host_or_uri) do
+  def add_to_allowlist(host_or_uri, opts) when is_binary(host_or_uri) do
     with {:ok, circle} <- get_or_create_instance_circle(host_or_uri) do
-      Bonfire.Boundaries.Allowlist.allow(circle, scope)
+      Bonfire.Boundaries.Allowlist.allow(circle, opts)
     end
   end
 
-  def remove_from_allowlist(host_or_peer, scope \\ :instance_wide)
+  def remove_from_allowlist(host_or_peer, opts \\ [])
 
-  def remove_from_allowlist(%Peer{display_hostname: display_hostname}, scope),
-    do: remove_from_allowlist(display_hostname, scope)
+  def remove_from_allowlist(%Peer{display_hostname: display_hostname}, opts),
+    do: remove_from_allowlist(display_hostname, opts)
 
-  def remove_from_allowlist(host_or_uri, scope) when is_binary(host_or_uri) do
+  def remove_from_allowlist(host_or_uri, opts) when is_binary(host_or_uri) do
     with {:ok, circle} <- get_instance_circle(host_or_uri) do
-      Bonfire.Boundaries.Allowlist.unallow(circle, scope)
+      Bonfire.Boundaries.Allowlist.unallow(circle, opts)
     end
   end
 

@@ -144,8 +144,8 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     Blocks.unblock(local, remote_user_on_local)
     Blocks.unblock(remote_user_on_local, local)
     # and any instance-wide blocks/silences (not per-user scoped)
-    Blocks.unblock(remote_user_on_local, :instance_wide)
-    Blocks.unblock(local, :instance_wide)
+    Blocks.unblock(remote_user_on_local, scope: :instance_wide, skip_boundary_check: true)
+    Blocks.unblock(local, scope: :instance_wide, skip_boundary_check: true)
 
     Follows.unfollow(local, remote_user_on_local)
 
@@ -155,7 +155,7 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
     remote_host = URIs.base_domain(remote)
 
     with {:ok, instance_circle} <- Instances.get_or_create_instance_circle(remote_host) do
-      Allowlist.unallow(instance_circle)
+      Allowlist.unallow(instance_circle, scope: :instance_wide, skip_boundary_check: true)
     end
   end
 
@@ -179,7 +179,10 @@ defmodule Bonfire.Federate.ActivityPub.SharedDataDanceCase do
 
   def allowlist_remote_instance(context) do
     {:ok, instance_circle} = Instances.get_or_create_instance_circle(remote_host(context))
-    assert {:ok, _} = Allowlist.allow(instance_circle)
+
+    assert {:ok, _} =
+             Allowlist.allow(instance_circle, scope: :instance_wide, skip_boundary_check: true)
+
     instance_circle
   end
 

@@ -66,7 +66,13 @@ defmodule Bonfire.Federate.ActivityPub.ArchipelagoSignedFetchTest do
 
   defp archipelago_with_allowed_instance! do
     Bonfire.Federate.ActivityPub.set_allowlist_only(:instance, true)
-    {:ok, _} = Instances.add_to_allowlist("allowed.local")
+
+    {:ok, _} =
+      Instances.add_to_allowlist("allowed.local",
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
+
     :ok
   end
 

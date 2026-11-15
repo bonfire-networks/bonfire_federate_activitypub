@@ -120,7 +120,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
       {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, bot} = Bonfire.Federate.ActivityPub.Adapter.get_or_create_service_actor()
       moderator = Bonfire.Me.Fake.instance_moderator!(fake_user!())
-      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!(), skip_boundary_check: true)
       someone_else = fake_user!()
 
       params = remote_activity_json_with_mentions(actor, bot)
@@ -141,7 +141,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
       {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, bot} = Bonfire.Federate.ActivityPub.Adapter.get_or_create_service_actor()
       moderator = Bonfire.Me.Fake.instance_moderator!(fake_user!())
-      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!(), skip_boundary_check: true)
       someone_else = fake_user!()
 
       params = remote_activity_json_with_mentions(actor, [bot, ActivityPub.Config.public_uri()])
@@ -165,7 +165,7 @@ defmodule Bonfire.Federate.ActivityPub.MessageIntegrationTest do
       someone = fake_user!()
       bot = Bonfire.Federate.ActivityPub.AdapterUtils.get_or_create_service_character()
       moderator = Bonfire.Me.Fake.instance_moderator!(fake_user!())
-      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!(), skip_boundary_check: true)
 
       # prove the positive first: a message to an ordinary user is still a message
       assert {:ok, %Bonfire.Data.Social.Message{}} =

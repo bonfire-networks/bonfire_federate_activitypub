@@ -84,7 +84,11 @@ defmodule Bonfire.Federate.ActivityPub.ExternalFollowersTest do
       assert Enum.any?(followers, &(&1.ap_id == remote_actor.ap_id))
 
       {:ok, remote_user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(remote_user, :ghost, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(remote_user, :ghost,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       assert {:ok, followers} =
                Adapter.external_followers_for_activity(local_actor, activity_data)
@@ -103,7 +107,7 @@ defmodule Bonfire.Federate.ActivityPub.ExternalFollowersTest do
       assert Enum.any?(followers, &(&1.ap_id == remote_actor.ap_id))
 
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, scope: :instance_wide, skip_boundary_check: true)
 
       assert {:ok, followers} =
                Adapter.external_followers_for_activity(local_actor, activity_data)
@@ -143,7 +147,7 @@ defmodule Bonfire.Federate.ActivityPub.ExternalFollowersTest do
       refute Enum.any?(followers, &(&1.ap_id == remote_actor.ap_id))
 
       {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
-      Bonfire.Boundaries.Allowlist.allow(peered)
+      Bonfire.Boundaries.Allowlist.allow(peered, scope: :instance_wide, skip_boundary_check: true)
 
       assert {:ok, followers} =
                Adapter.external_followers_for_activity(local_actor, activity_data)
@@ -157,7 +161,7 @@ defmodule Bonfire.Federate.ActivityPub.ExternalFollowersTest do
       activity_data: activity_data
     } do
       Process.put(:federating, :allowlist_only)
-      Instances.add_to_allowlist("mocked.local")
+      Instances.add_to_allowlist("mocked.local", scope: :instance_wide, skip_boundary_check: true)
 
       assert {:ok, followers} =
                Adapter.external_followers_for_activity(local_actor, activity_data)

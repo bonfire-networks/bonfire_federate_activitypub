@@ -63,7 +63,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFInstanceWideTes
       {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(user, :silence, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(user, :silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       local_activity = local_activity_json_to(@remote_actor)
 
@@ -84,7 +88,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.ActorSilenceMRFInstanceWideTes
       {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(user, :silence, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(user, :silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 

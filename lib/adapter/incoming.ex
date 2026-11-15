@@ -978,7 +978,11 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
         nil
 
       tags ->
-        Utils.maybe_apply(Bonfire.Tag, :maybe_tag, [creator, pointer_id, tags],
+        # the incoming object has just been made by its creator
+        Utils.maybe_apply(
+          Bonfire.Tag,
+          :maybe_tag,
+          [creator, pointer_id, tags, true, [skip_boundary_check: true]],
           fallback_return: nil
         )
 

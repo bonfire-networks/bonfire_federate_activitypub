@@ -239,7 +239,7 @@ defmodule Bonfire.Federate.ActivityPub.Peered do
       host = URIs.base_domain(canonical_uri)
 
       with {:ok, instance_circle} <- Instances.get_or_create_instance_circle(host) do
-        module.add_to_circles(id_or_peered, instance_circle)
+        module.add_to_circles(id_or_peered, instance_circle, skip_boundary_check: true)
       end
     end
     |> debug()

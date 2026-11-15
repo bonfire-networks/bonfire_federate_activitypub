@@ -35,6 +35,7 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
     # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
     if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
       do: @tag(skip: "needs bonfire_gatherings")
+
     test "event is recorded as a native event, and is in the explore feed" do
       data =
         "../fixtures/mobilizon.org-event.json"
@@ -62,6 +63,7 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
     # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
     if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
       do: @tag(skip: "needs bonfire_gatherings")
+
     test "non-public event is recorded as a private native event" do
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)

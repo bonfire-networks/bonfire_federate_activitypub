@@ -173,7 +173,10 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
       {:ok, _} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(follow_activity)
 
       {:ok, circle} = Bonfire.Boundaries.Circles.create(author, %{named: %{name: "friends"}})
-      {:ok, _} = Bonfire.Boundaries.Circles.add_to_circles(id(karen), circle)
+
+      {:ok, _} =
+        Bonfire.Boundaries.Circles.add_to_circles(id(karen), circle, skip_boundary_check: true)
+
       {:ok, acl} = Bonfire.Boundaries.Acls.simple_create(author, "friends only")
 
       Bonfire.Boundaries.Grants.grant(circle.id, acl.id, [:see, :read], true,

@@ -33,7 +33,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.CircleBoundariesDanceTest do
   # a non-public custom ACL granting see+read to a circle containing `member`
   defp publish_with_circle_boundary!(author, member, html_body) do
     {:ok, circle} = Circles.create(author, %{named: %{name: "besties"}})
-    {:ok, _} = Circles.add_to_circles(id(member), circle)
+    {:ok, _} = Circles.add_to_circles(id(member), circle, skip_boundary_check: true)
 
     {:ok, acl} = Acls.simple_create(author, "besties only")
     Grants.grant(circle.id, acl.id, [:see, :read], true, current_user: author)

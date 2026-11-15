@@ -124,6 +124,7 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
     # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
     if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
       do: @tag(skip: "needs bonfire_gatherings")
+
     test "has its Hashtag tag tagged", %{conn: conn, user: user, username: username} do
       conn = post_event(conn, user, username, [%{"type" => "Hashtag", "name" => "#jazz"}])
 
@@ -143,6 +144,7 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
     # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
     if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
       do: @tag(skip: "needs bonfire_gatherings")
+
     test "has the local topic its Category tag names tagged",
          %{conn: conn, user: user, username: username} do
       topic = fake_category!(user, nil, %{type: :topic, name: "Jazz"})
@@ -199,6 +201,7 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
     # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
     if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
       do: @tag(skip: "needs bonfire_gatherings")
+
     test "is tagged with the topic of an FEP-8a8e value when its Category tag has that value's name, and makes no topic of its own",
          %{conn: conn, user: user, username: username} do
       conn =
@@ -360,7 +363,8 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       {:ok, _} =
         Bonfire.Boundaries.Circles.add_to_circles(
           mod,
-          Bonfire.Boundaries.Scaffold.Instance.mod_circle()
+          Bonfire.Boundaries.Scaffold.Instance.mod_circle(),
+          skip_boundary_check: true
         )
 
       conn = post_event(conn, user, username, [%{"type" => "Category", "name" => "Poetry"}])

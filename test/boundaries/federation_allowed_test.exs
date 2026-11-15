@@ -40,14 +40,18 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
     end
 
     test "allows URI whose instance is allowlisted" do
-      Instances.add_to_allowlist("mocked.local")
+      Instances.add_to_allowlist("mocked.local", scope: :instance_wide, skip_boundary_check: true)
       assert Federation.federation_allowed?(@remote_actor)
     end
 
     test "rejects URI even if allowlisted when also blocked" do
-      Instances.add_to_allowlist("mocked.local")
+      Instances.add_to_allowlist("mocked.local", scope: :instance_wide, skip_boundary_check: true)
       {:ok, peer} = Instances.get_or_create(@remote_actor)
-      Bonfire.Boundaries.Blocks.block(peer, :total, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(peer, :total,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       refute Federation.federation_allowed?(@remote_actor)
     end
@@ -58,7 +62,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
       # fetch actor while open so Peered record is created, then switch to allowlist mode
       {:ok, _actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
-      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Bonfire.Boundaries.Allowlist.allow(peered, scope: :instance_wide, skip_boundary_check: true)
 
       Process.put(:federating, :allowlist_only)
       assert Federation.federation_allowed?(@remote_actor)
@@ -68,7 +72,7 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
       other_actor = @remote_instance <> "/users/other"
       {:ok, _actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
-      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Bonfire.Boundaries.Allowlist.allow(peered, scope: :instance_wide, skip_boundary_check: true)
 
       Process.put(:federating, :allowlist_only)
       refute Federation.federation_allowed?(other_actor)
@@ -131,7 +135,11 @@ defmodule Bonfire.Federate.ActivityPub.FederationAllowedTest do
 
     defp block_instance! do
       {:ok, peer} = Instances.get_or_create(@remote_actor)
-      Bonfire.Boundaries.Blocks.block(peer, :total, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(peer, :total,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
     end
 
     test "an unblocked instance is fetched from" do

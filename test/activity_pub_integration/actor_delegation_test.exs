@@ -418,6 +418,7 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegationTest do
     # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
     if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
       do: @tag(skip: "needs bonfire_gatherings")
+
     test "creates a local object, so the post can appear in feeds", %{
       conn: conn,
       username: username,

@@ -365,7 +365,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                AdapterUtils.get_or_fetch_and_create_by_uri(context[:remote][:canonical_url])
 
       {:ok, circle} = Bonfire.Classify.Categories.moderators_circle(group[:category])
-      Bonfire.Boundaries.Circles.remove_from_circles(remote_moderator, [circle])
+
+      Bonfire.Boundaries.Circles.remove_from_circles(remote_moderator, [circle],
+        skip_boundary_check: true
+      )
 
       refute Bonfire.Boundaries.can?(remote_moderator, :mediate, group[:category]),
              "control: no longer a moderator here"
@@ -651,7 +654,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         remote_member_post_in_group!(context, "a post its admin will delete")
 
       TestInstanceRepo.apply(fn ->
-        {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+        {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!(), skip_boundary_check: true)
         assert {:ok, _} = Bonfire.Social.Objects.delete(remote_post_id, current_user: admin)
       end)
 

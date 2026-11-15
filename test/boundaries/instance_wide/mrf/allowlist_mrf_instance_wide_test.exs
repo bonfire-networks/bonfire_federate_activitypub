@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
 
   describe "incoming: allow when origin is allowlisted" do
     test "remote activity from allowlisted domain passes" do
-      Instances.add_to_allowlist("mocked.local")
+      Instances.add_to_allowlist("mocked.local", scope: :instance_wide, skip_boundary_check: true)
 
       remote_activity = remote_activity_json()
       assert {:ok, _} = BoundariesMRF.filter(remote_activity, false)
@@ -41,11 +41,15 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
 
   describe "allowlisted + blocked = rejected (blocks win)" do
     test "remote activity is rejected even when allowlisted if instance is also blocked" do
-      Instances.add_to_allowlist("mocked.local")
+      Instances.add_to_allowlist("mocked.local", scope: :instance_wide, skip_boundary_check: true)
 
       {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(user, :total,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       remote_activity = remote_activity_json()
       assert reject_or_no_recipients?(BoundariesMRF.filter(remote_activity, false))
@@ -69,7 +73,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
 
   describe "outgoing: allowlisted recipients pass" do
     test "local activity to allowlisted remote actor is delivered" do
-      Instances.add_to_allowlist("mocked.local")
+      Instances.add_to_allowlist("mocked.local", scope: :instance_wide, skip_boundary_check: true)
 
       local_activity = local_activity_json_to(@remote_actor)
       assert {:ok, _} = BoundariesMRF.filter(local_activity, true)
@@ -82,7 +86,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
       Process.put(:federating, true)
       {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
-      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Bonfire.Boundaries.Allowlist.allow(peered, scope: :instance_wide, skip_boundary_check: true)
       Process.put(:federating, :allowlist_only)
 
       remote_activity = remote_activity_json()
@@ -93,7 +97,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
       Process.put(:federating, true)
       {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
-      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Bonfire.Boundaries.Allowlist.allow(peered, scope: :instance_wide, skip_boundary_check: true)
       Process.put(:federating, :allowlist_only)
 
       other_actor = @remote_instance <> "/users/other"
@@ -107,7 +111,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.AllowlistInstanceWideTest do
       Process.put(:federating, true)
       {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
       {:ok, peered} = Bonfire.Federate.ActivityPub.Peered.get_by_uri(@remote_actor)
-      Bonfire.Boundaries.Allowlist.allow(peered, :instance_wide)
+      Bonfire.Boundaries.Allowlist.allow(peered, scope: :instance_wide, skip_boundary_check: true)
       Process.put(:federating, :allowlist_only)
 
       local_activity = local_activity_json_to(@remote_actor)

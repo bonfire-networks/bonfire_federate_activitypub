@@ -44,7 +44,11 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
       {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(user, :total,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       assert reject_or_no_recipients?(BoundariesMRF.filter(remote_actor.data, false))
     end
@@ -63,7 +67,11 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
       {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(user, :total,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       local_activity = local_activity_json_to(@remote_actor)
 
@@ -75,7 +83,11 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
       {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(user, :total,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       assert :ignore =
                @remote_actor
@@ -112,7 +124,11 @@ defmodule Bonfire.Federate.ActivityPub.MRF.ActorBlockInstanceWideTest do
       {:ok, remote_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @remote_actor)
 
       assert {:ok, user} = Bonfire.Me.Users.by_username(remote_actor.username)
-      Bonfire.Boundaries.Blocks.block(user, :total, :instance_wide)
+
+      Bonfire.Boundaries.Blocks.block(user, :total,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 

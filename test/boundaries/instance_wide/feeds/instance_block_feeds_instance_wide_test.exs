@@ -32,7 +32,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceBlockFeedsTest do
   test "does not show in feeds a Post for an incoming Note with blocked instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     # |> debug
-    ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
+    ~> Bonfire.Boundaries.Blocks.block(:total, scope: :instance_wide, skip_boundary_check: true)
 
     recipient = fake_user!(@local_actor)
     assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
@@ -46,7 +46,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceBlockFeedsTest do
 
   #   Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
   #   # |> debug
-  #   ~> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
+  #   ~> Bonfire.Boundaries.Blocks.block(:total, scope: :instance_wide, skip_boundary_check: true)
 
   #   refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post, current_user: recipient)
   # end

@@ -218,7 +218,7 @@ defmodule Bonfire.Federate.ActivityPub.BlockFederationTest do
       post = receive_post(@blocker)
 
       [ghost_them] = Bonfire.Boundaries.Circles.stereotype_circles_for(them, [:ghost_them])
-      Bonfire.Boundaries.Circles.add_to_circles(me, ghost_them)
+      Bonfire.Boundaries.Circles.add_to_circles(me, ghost_them, skip_boundary_check: true)
 
       assert Bonfire.Boundaries.can?(me, :read, post),
              "control: encircled with no ACL reading the circle, the block denies nothing"

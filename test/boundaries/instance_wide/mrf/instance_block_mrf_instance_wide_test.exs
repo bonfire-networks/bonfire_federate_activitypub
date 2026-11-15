@@ -82,7 +82,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
+      |> Bonfire.Boundaries.Blocks.block(:total, scope: :instance_wide, skip_boundary_check: true)
 
       refute match?(
                {:ok, follow_activity},
@@ -104,7 +104,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Boundaries.Blocks.block(:total, :instance_wide)
+      |> Bonfire.Boundaries.Blocks.block(:total, scope: :instance_wide, skip_boundary_check: true)
 
       refute match?(
                {:ok, follow_activity},
@@ -126,7 +126,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
     test "there's a remote activity with instance-wide blocked host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       # |> debug
-      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, scope: :instance_wide, skip_boundary_check: true)
 
       # |> debug
 
@@ -153,7 +153,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
 
     test "there's a remote actor with instance-wide blocked host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, scope: :instance_wide, skip_boundary_check: true)
 
       remote_actor = remote_actor_json()
 
@@ -187,7 +187,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
 
     test "there's a local activity with instance-wide blocked host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, scope: :instance_wide, skip_boundary_check: true)
 
       local_activity = local_activity_json_to(@remote_actor)
 
@@ -225,7 +225,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
 
     test "there's a local activity with instance-wide blocked host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:block, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:block, scope: :instance_wide, skip_boundary_check: true)
 
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 

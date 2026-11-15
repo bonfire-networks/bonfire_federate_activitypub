@@ -149,7 +149,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
         {:ok, _} =
           Bonfire.Boundaries.Circles.add_to_circles(
             mod,
-            Bonfire.Boundaries.Scaffold.Instance.mod_circle()
+            Bonfire.Boundaries.Scaffold.Instance.mod_circle(),
+            skip_boundary_check: true
           )
 
         # (a) the category of a remote event

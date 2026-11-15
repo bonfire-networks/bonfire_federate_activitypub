@@ -184,7 +184,11 @@ defmodule Bonfire.Federate.ActivityPub.FollowersCollectionEndpointTest do
       assert URIs.canonical_url(deactivated) in served_items(followers_url(actor)),
              "control: listed while active"
 
-      {:ok, _} = Bonfire.Boundaries.Blocks.block(deactivated, :instance_wide)
+      {:ok, _} =
+        Bonfire.Boundaries.Blocks.block(deactivated,
+          scope: :instance_wide,
+          skip_boundary_check: true
+        )
 
       refute URIs.canonical_url(deactivated) in served_items(followers_url(actor))
     end
@@ -197,7 +201,11 @@ defmodule Bonfire.Federate.ActivityPub.FollowersCollectionEndpointTest do
       assert URIs.canonical_url(deactivated) in served_items(following),
              "control: listed while active"
 
-      {:ok, _} = Bonfire.Boundaries.Blocks.block(deactivated, :instance_wide)
+      {:ok, _} =
+        Bonfire.Boundaries.Blocks.block(deactivated,
+          scope: :instance_wide,
+          skip_boundary_check: true
+        )
 
       refute URIs.canonical_url(deactivated) in served_items(following)
     end

@@ -684,10 +684,18 @@ defmodule Bonfire.Federate.ActivityPub.Adapter do
 
   # An actor its origin suspended is kept, with what it posted, but hidden instance-wide, so it comes back when its origin lifts the suspension (`ActivityPub.Actor.update_actor/5` marks that `suspended: false`). Absent, nothing changes, so a silence a moderator here chose stays
   defp maybe_apply_remote_suspension(character, true = _suspended),
-    do: Bonfire.Boundaries.Blocks.block(character, :silence, :instance_wide)
+    do:
+      Bonfire.Boundaries.Blocks.block(character, :silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
   defp maybe_apply_remote_suspension(character, false = _suspended),
-    do: Bonfire.Boundaries.Blocks.unblock(character, :silence, :instance_wide)
+    do:
+      Bonfire.Boundaries.Blocks.unblock(character, :silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
   defp maybe_apply_remote_suspension(_character, _suspended), do: nil
 

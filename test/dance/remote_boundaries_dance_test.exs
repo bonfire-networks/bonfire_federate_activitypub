@@ -372,7 +372,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.RemoteBoundariesDanceTest do
 
     # create a circle with bob_remote in it
     {:ok, circle} = Circles.create(alice_local, %{named: %{name: "family"}})
-    {:ok, _} = Circles.add_to_circles(bob_remote_user_on_local.id, circle)
+
+    {:ok, _} =
+      Circles.add_to_circles(bob_remote_user_on_local.id, circle, skip_boundary_check: true)
 
     # on remote instance, bob_remote follows alice_local
     TestInstanceRepo.apply(fn ->

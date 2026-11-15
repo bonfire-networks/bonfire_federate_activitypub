@@ -3584,8 +3584,10 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
   def add_to_circle_by_uri(uri, circle, current_user) when is_binary(uri) do
     alias Bonfire.Boundaries.Circles
 
-    with {:ok, subject} <- resolve_uri(uri, current_user, circle: circle),
-         {:ok, _} <- Circles.add_to_circles(subject, circle) do
+    # the person's own circle, their allowlist and blocklist stereotypes included, which `add_to_circles/3` would refuse them as it only lets someone change circles they manage
+    with {:ok, _} <- Circles.get_for_caretaker(uid(circle), current_user),
+         {:ok, subject} <- resolve_uri(uri, current_user, circle: circle),
+         {:ok, _} <- Circles.add_to_circles(subject, circle, skip_boundary_check: true) do
       {:ok, subject}
     end
   end

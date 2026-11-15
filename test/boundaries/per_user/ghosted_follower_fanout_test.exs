@@ -318,7 +318,11 @@ defmodule Bonfire.Federate.ActivityPub.GhostedFollowerFanoutTest do
       assert {:ok, ghosted_instance} =
                Bonfire.Federate.ActivityPub.Instances.get_or_create(@on_ghosted_instance)
 
-      assert {:ok, _} = Blocks.block(ghosted_instance, :ghost, :instance_wide)
+      assert {:ok, _} =
+               Blocks.block(ghosted_instance, :ghost,
+                 scope: :instance_wide,
+                 skip_boundary_check: true
+               )
 
       assert {:ok, my_ghosted_instance} =
                Bonfire.Federate.ActivityPub.Instances.get_or_create(@on_my_ghosted_instance)

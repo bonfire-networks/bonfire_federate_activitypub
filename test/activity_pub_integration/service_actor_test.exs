@@ -51,7 +51,10 @@ defmodule Bonfire.Federate.ActivityPub.ServiceActorTest do
     me = Bonfire.Me.Fake.fake_user!()
     bot = AdapterUtils.get_or_create_service_character()
     moderator = Bonfire.Me.Fake.instance_moderator!(Bonfire.Me.Fake.fake_user!())
-    {:ok, admin} = Bonfire.Me.Users.make_admin(Bonfire.Me.Fake.fake_user!())
+
+    {:ok, admin} =
+      Bonfire.Me.Users.make_admin(Bonfire.Me.Fake.fake_user!(), skip_boundary_check: true)
+
     someone_else = Bonfire.Me.Fake.fake_user!()
 
     assert {:ok, post} =

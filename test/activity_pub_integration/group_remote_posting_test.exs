@@ -152,7 +152,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupRemotePostingTest do
       author = fake_user!()
       post = post_in_group_as_composer_would(author, group, "<p>soon gone</p>")
       {:ok, %{data: %{"id" => ap_id}}} = ActivityPub.Object.get_cached(pointer: post)
-      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!())
+      {:ok, admin} = Bonfire.Me.Users.make_admin(fake_user!(), skip_boundary_check: true)
 
       assert {:ok, _} = Bonfire.Social.Objects.delete(post, current_user: admin)
 

@@ -42,7 +42,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceMRFInstanceWide
     test "there's a remote activity with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       # |> debug
-      ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       # |> debug
 
@@ -69,7 +72,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceMRFInstanceWide
 
     test "there's a remote actor with instance-wide silenced host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       remote_actor = remote_actor_json()
 
@@ -106,7 +112,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceMRFInstanceWide
         remote_user
         |> e(:character, :peered, :peer_id, nil)
         # |> debug
-        |> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+        |> Bonfire.Boundaries.Blocks.block(:silence,
+          scope: :instance_wide,
+          skip_boundary_check: true
+        )
 
       refute match?(
                {:ok, follow_activity},
@@ -130,7 +139,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceMRFInstanceWide
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       |> debug("peeeer")
-      |> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+      |> Bonfire.Boundaries.Blocks.block(:silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       assert {:ok, follow_activity} =
                ActivityPub.follow(%{actor: remote_actor, object: local_actor, local: false})
@@ -180,7 +192,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceMRFInstanceWide
 
     test "there's a local activity with instance-wide silenced host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       local_activity = local_activity_json_to(@remote_actor)
 
@@ -213,7 +228,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceMRFInstanceWide
 
     test "there's a local activity with instance-wide silenced host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:silence,
+        scope: :instance_wide,
+        skip_boundary_check: true
+      )
 
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 

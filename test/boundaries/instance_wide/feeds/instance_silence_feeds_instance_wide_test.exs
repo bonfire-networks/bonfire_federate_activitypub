@@ -44,7 +44,7 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
   test "does not accept an incoming Note from a silenced instance" do
     Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     # |> debug
-    ~> Bonfire.Boundaries.Blocks.block(:silence, :instance_wide)
+    ~> Bonfire.Boundaries.Blocks.block(:silence, scope: :instance_wide, skip_boundary_check: true)
 
     recipient = fake_user!(@local_actor)
     assert {:error, _} = receive_remote_activity_to([recipient, ActivityPub.Config.public_uri()])
@@ -58,7 +58,10 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
 
     {:ok, instance} = Bonfire.Federate.ActivityPub.Instances.get_or_create(@remote_actor)
     # |> debug
-    Bonfire.Boundaries.Blocks.block(instance, :silence, :instance_wide)
+    Bonfire.Boundaries.Blocks.block(instance, :silence,
+      scope: :instance_wide,
+      skip_boundary_check: true
+    )
 
     assert Bonfire.Federate.ActivityPub.Instances.instance_blocked?(
              instance,
@@ -71,7 +74,11 @@ defmodule Bonfire.Federate.ActivityPub.Boundaries.InstanceSilenceFeedsInstanceWi
     refute Bonfire.Social.FeedLoader.feed_contains?(:remote, post)
 
     # we show it once again
-    assert Bonfire.Boundaries.Blocks.unblock(instance, :silence, :instance_wide)
+    assert Bonfire.Boundaries.Blocks.unblock(instance, :silence,
+             scope: :instance_wide,
+             skip_boundary_check: true
+           )
+
     assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, recipient)
     assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post, bob)
     assert Bonfire.Social.FeedLoader.feed_contains?(:remote, post)

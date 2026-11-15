@@ -42,7 +42,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceGhostInstanceWideTest do
       remote_user
       |> e(:character, :peered, :peer_id, nil)
       # |> debug
-      |> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
+      |> Bonfire.Boundaries.Blocks.block(:ghost, scope: :instance_wide, skip_boundary_check: true)
 
       refute match?(
                {:ok, follow_activity},
@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceGhostInstanceWideTest do
 
     test "there's a local activity with instance-wide ghosted host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, scope: :instance_wide, skip_boundary_check: true)
 
       local_activity = local_activity_json_to(@remote_actor)
 
@@ -103,7 +103,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceGhostInstanceWideTest do
 
     test "there's a local activity with instance-wide ghosted host as recipient (in DB)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, scope: :instance_wide, skip_boundary_check: true)
 
       local_activity = local_activity_json_to([@remote_actor, ActivityPub.Config.public_uri()])
 
@@ -165,7 +165,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceGhostInstanceWideTest do
     test "there's a remote activity with instance-wide ghosted host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
       # |> debug
-      ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, scope: :instance_wide, skip_boundary_check: true)
 
       # |> debug
 
@@ -194,7 +194,7 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceGhostInstanceWideTest do
 
     test "there's a remote actor with instance-wide ghosted host (in DB/boundaries)" do
       Bonfire.Federate.ActivityPub.Instances.get_or_create("https://mocked.local")
-      ~> Bonfire.Boundaries.Blocks.block(:ghost, :instance_wide)
+      ~> Bonfire.Boundaries.Blocks.block(:ghost, scope: :instance_wide, skip_boundary_check: true)
 
       remote_actor = remote_actor_json()
 

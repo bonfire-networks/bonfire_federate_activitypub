@@ -65,7 +65,7 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
 
   defp publish_with_circle_boundary!(author, member, html_body) do
     {:ok, circle} = Circles.create(author, %{named: %{name: "friends"}})
-    {:ok, _} = Circles.add_to_circles(id(member), circle)
+    {:ok, _} = Circles.add_to_circles(id(member), circle, skip_boundary_check: true)
 
     {:ok, acl} = Acls.simple_create(author, "friends only")
     Grants.grant(circle.id, acl.id, [:see, :read], true, current_user: author)
@@ -151,7 +151,7 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
       follow!(karen_actor, alice_actor)
 
       {:ok, circle} = Circles.create(alice, %{named: %{name: "friends"}})
-      {:ok, _} = Circles.add_to_circles(id(karen), circle)
+      {:ok, _} = Circles.add_to_circles(id(karen), circle, skip_boundary_check: true)
       {:ok, acl} = Acls.simple_create(alice, "friends, but not karen")
       Grants.grant(circle.id, acl.id, [:see, :read], true, current_user: alice)
       Grants.grant(id(karen), acl.id, [:see, :read], false, current_user: alice)
@@ -225,8 +225,8 @@ defmodule Bonfire.Federate.ActivityPub.CircleAudienceTest do
       follow!(dave_actor, alice_actor)
 
       {:ok, circle} = Circles.create(alice, %{named: %{name: "friends"}})
-      {:ok, _} = Circles.add_to_circles(id(karen), circle)
-      {:ok, _} = Circles.add_to_circles(id(dave), circle)
+      {:ok, _} = Circles.add_to_circles(id(karen), circle, skip_boundary_check: true)
+      {:ok, _} = Circles.add_to_circles(id(dave), circle, skip_boundary_check: true)
 
       {:ok, acl} = Acls.simple_create(alice, "friends only")
       Grants.grant(circle.id, acl.id, [:see, :read], true, current_user: alice)

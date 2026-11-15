@@ -458,7 +458,11 @@ defmodule Bonfire.Federate.ActivityPub.Dance.QuotePostsTest do
       Bonfire.Boundaries.Circles.create(local_user, %{named: %{name: "auto quote trusted"}})
 
     {:ok, _} =
-      Bonfire.Boundaries.Circles.add_to_circles(remote_user_on_local.id, trusted_circle)
+      Bonfire.Boundaries.Circles.add_to_circles(
+        remote_user_on_local.id,
+        trusted_circle,
+        skip_boundary_check: true
+      )
 
     # Create a new post specifically for auto-acceptance testing
     Logger.metadata(action: "create new post for auto-acceptance test")

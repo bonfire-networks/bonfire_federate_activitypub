@@ -1349,7 +1349,12 @@ defmodule Bonfire.Federate.ActivityPub.GroupOrTopicTest do
           from(c in Bonfire.Data.AccessControl.Controlled, where: c.id == ^id(mirror))
         )
 
-        if acl_ids != [], do: Bonfire.Boundaries.Controlleds.add_acls(id(mirror), acl_ids)
+        if acl_ids != [],
+          do:
+            Bonfire.Boundaries.Controlleds.add_acls(id(mirror), acl_ids,
+              skip_boundary_check: true
+            )
+
         :ok
       end
 
