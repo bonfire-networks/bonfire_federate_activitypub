@@ -121,9 +121,9 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
   describe "a local user's Event posted to their outbox" do
     # a baseline, expected GREEN before any change: nothing tests `maybe_cast_tags` today (`hashtag_handling_test.exs` covers Posts only), and every later step edits it
     # (struct-free patterns, as `bonfire_gatherings` may not be there; skipped then)
-    @tag skip:
-           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
-             "needs bonfire_gatherings"
+    # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
+    if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
+      do: @tag(skip: "needs bonfire_gatherings")
     test "has its Hashtag tag tagged", %{conn: conn, user: user, username: username} do
       conn = post_event(conn, user, username, [%{"type" => "Hashtag", "name" => "#jazz"}])
 
@@ -140,9 +140,9 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       assert "jazz" in hashtag_names
     end
 
-    @tag skip:
-           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
-             "needs bonfire_gatherings"
+    # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
+    if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
+      do: @tag(skip: "needs bonfire_gatherings")
     test "has the local topic its Category tag names tagged",
          %{conn: conn, user: user, username: username} do
       topic = fake_category!(user, nil, %{type: :topic, name: "Jazz"})
@@ -195,6 +195,10 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
              "dropped by an Update that does not"
     end
 
+    # (the matching is in gatherings' ingest; skipped without it)
+    # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
+    if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
+      do: @tag(skip: "needs bonfire_gatherings")
     test "is tagged with the topic of an FEP-8a8e value when its Category tag has that value's name, and makes no topic of its own",
          %{conn: conn, user: user, username: username} do
       conn =
@@ -272,18 +276,23 @@ defmodule Bonfire.Federate.ActivityPub.C2SCategoryTagsTest do
       topics = tagged_categories(activity)
 
       assert ["bar", "foo"] == topics |> Enum.map(& &1.profile.name) |> Enum.sort()
-      # assert Enum.all?(topics, &(&1.type == :topic))
-      # its category ("bar", `#Form`, what kind of event) is a topic; its topic ("foo", `#Topic`, what it is about) is a label, under the "Events" label. Both named as the event category topics are
-      topics = repo().maybe_preload(topics, [:character, :tree])
 
-      assert %{type: :topic, character: %{username: "bar_events"}} =
-               Enum.find(topics, &(&1.profile.name == "bar"))
+      if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
+        # its category ("bar", `#Form`, what kind of event) is a topic; its topic ("foo", `#Topic`, what it is about) is a label, under the "Events" label. Both named as the event category topics are (options gatherings' ingest passes)
+        topics = repo().maybe_preload(topics, [:character, :tree])
 
-      assert %{
-               type: :label,
-               character: %{username: "foo_events"},
-               tree: %{parent_id: "1ABE1SF0REVENTSANDGATHER1N"}
-             } = Enum.find(topics, &(&1.profile.name == "foo"))
+        assert %{type: :topic, character: %{username: "bar_events"}} =
+                 Enum.find(topics, &(&1.profile.name == "bar"))
+
+        assert %{
+                 type: :label,
+                 character: %{username: "foo_events"},
+                 tree: %{parent_id: "1ABE1SF0REVENTSANDGATHER1N"}
+               } = Enum.find(topics, &(&1.profile.name == "foo"))
+      else
+        # without it, stored as an APActivity, both are plain topics
+        assert Enum.all?(topics, &(&1.type == :topic))
+      end
     end
 
     test "puts a Lauti event in the feed of each topic made from its categories",

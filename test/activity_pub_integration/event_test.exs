@@ -32,9 +32,9 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
   describe "" do
     # test "event is recorded as APActivity" do … (until events had their own module: it asserted an `APActivity` with the AS2 json, and filtered the feed by the json type `"Event"`)
     # (struct-free patterns, as `bonfire_gatherings` may not be there; skipped then)
-    @tag skip:
-           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
-             "needs bonfire_gatherings"
+    # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
+    if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
+      do: @tag(skip: "needs bonfire_gatherings")
     test "event is recorded as a native event, and is in the explore feed" do
       data =
         "../fixtures/mobilizon.org-event.json"
@@ -59,9 +59,9 @@ defmodule Bonfire.Federate.ActivityPub.EventTest do
     end
 
     # was "non-public event is recorded as private APActivity", until events had their own module
-    @tag skip:
-           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
-             "needs bonfire_gatherings"
+    # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
+    if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
+      do: @tag(skip: "needs bonfire_gatherings")
     test "non-public event is recorded as a private native event" do
       recipient = fake_user!()
       recipient_actor = ActivityPub.Actor.get_cached!(pointer: recipient.id)

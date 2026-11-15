@@ -415,9 +415,9 @@ defmodule Bonfire.Federate.ActivityPub.ActorDelegationTest do
     end
 
     # (a struct-free pattern, as `bonfire_gatherings` may not be there; skipped then, the event being an APActivity)
-    @tag skip:
-           not Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) &&
-             "needs bonfire_gatherings"
+    # tagged only without gatherings: any `:skip` tag excludes a test, even `skip: false`
+    if !Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
+      do: @tag(skip: "needs bonfire_gatherings")
     test "creates a local object, so the post can appear in feeds", %{
       conn: conn,
       username: username,
