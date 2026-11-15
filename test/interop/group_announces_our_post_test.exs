@@ -6,6 +6,8 @@ defmodule Bonfire.Federate.ActivityPub.GroupAnnouncesOurPostTest do
   """
   use Bonfire.Federate.ActivityPub.DataCase, async: false
 
+  use Bonfire.Common.E
+
   import Tesla.Mock
   import Bonfire.Federate.ActivityPub.Test.ThreadiverseFixtures, only: [served_for: 1]
 
@@ -102,5 +104,43 @@ defmodule Bonfire.Federate.ActivityPub.GroupAnnouncesOurPostTest do
       })
 
     assert {:ok, _} = receive_announce(announce_of(reply))
+  end
+
+  # the notifications of `user` that are the group's boost of `post`
+  defp group_boost_notifications(user, group, post) do
+    Bonfire.Social.FeedLoader.feed(:notifications, %{feed_name: :notifications},
+      current_user: user
+    )
+    |> e(:edges, [])
+    |> Enum.map(&(e(&1, :activity, nil) || &1))
+    |> Enum.filter(
+      &(e(&1, :object_id, nil) == uid(post) and e(&1, :subject_id, nil) == uid(group))
+    )
+  end
+
+  test "the community's Announce of a post published in it does not notify the post's author, one that only shares someone's post still does",
+       %{user: user, group: group} do
+    other_group = Bonfire.Classify.Simulate.fake_category!(fake_user!(), nil, %{type: :group})
+    assert {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(user, other_group)
+
+    # the positive first: a post that names another group (or none) is only shared by the community, so its author is told
+    shared =
+      publish_in(user, other_group, %{post_content: %{html_body: "<p>published elsewhere</p>"}})
+
+    assert {:ok, _} = receive_announce(announce_of(shared))
+
+    assert [_] = group_boost_notifications(user, group, shared),
+           "a group sharing a post published elsewhere should still notify its author"
+
+    published_in =
+      publish_in(user, group, %{post_content: %{html_body: "<p>published in it</p>"}})
+
+    assert {:ok, _} = receive_announce(announce_of(published_in))
+
+    assert [] ==
+             Enum.map(
+               group_boost_notifications(user, group, published_in),
+               &{e(&1, :verb_id, nil), e(&1, :subject_id, nil)}
+             )
   end
 end
