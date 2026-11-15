@@ -52,7 +52,24 @@ defmodule Bonfire.Federate.ActivityPub.PersonActorDeclarationsTest do
     @remote "https://mastodon.local/users/lockable"
     @public "https://www.w3.org/ns/activitystreams#Public"
 
-    defp remote_doc(overrides), do: APSimulate.actor_json(@remote, "lockable", overrides)
+    # dated, since a document replaces the one we hold only when it is provably newer
+    defp remote_doc(overrides),
+      do:
+        APSimulate.actor_json(
+          @remote,
+          "lockable",
+          Map.merge(%{"published" => "2026-01-01T00:00:00Z"}, overrides)
+        )
+
+    # each one later than the last
+    defp newer(doc) do
+      updated =
+        ~U[2026-02-01 00:00:00Z]
+        |> DateTime.add(System.unique_integer([:positive, :monotonic]), :second)
+        |> DateTime.to_iso8601()
+
+      Map.put(doc, "updated", updated)
+    end
 
     defp origin_serves(doc) do
       mock(fn
@@ -68,8 +85,10 @@ defmodule Bonfire.Federate.ActivityPub.PersonActorDeclarationsTest do
       remote
     end
 
-    # signed by the actor itself, so the embedded document is applied as sent
+    # signed by the actor itself, so the embedded document, being newer than the one held, is applied as sent
     defp receive_update!(doc) do
+      doc = newer(doc)
+
       assert {:ok, _} =
                Transformer.handle_incoming(
                  %{

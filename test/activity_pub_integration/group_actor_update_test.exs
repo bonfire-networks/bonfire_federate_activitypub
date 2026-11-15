@@ -139,7 +139,7 @@ defmodule Bonfire.Federate.ActivityPub.GroupActorUpdateTest do
     assert {:ok, remote_group} = Categories.get(id(remote_group), skip_boundary_check: true)
 
     assert :ok =
-             Bonfire.Classify.Boundaries.replace(remote_group, nil, %{
+             Bonfire.Classify.Boundaries.replace(remote_group, remote_group, %{
                membership: "on_request",
                visibility: "global",
                participation: "moderators",

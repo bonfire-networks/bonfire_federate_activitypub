@@ -21,9 +21,15 @@ defmodule Bonfire.Federate.ActivityPub.RemoteActorSuspensionTest do
     post_id = "#{@remote_actor}/statuses/suspended-later-#{n}"
 
     mock(fn
-      %{method: :get, url: @remote_actor} -> json(Simulate.actor_json(@remote_actor))
-      %{method: :post} -> %Tesla.Env{status: 202, body: ""}
-      %{method: :get} -> %Tesla.Env{status: 404, body: ""}
+      %{method: :get, url: @remote_actor} ->
+        # dated, since a signed `Update` replaces the document we hold only when it is provably newer
+        json(Map.put(Simulate.actor_json(@remote_actor), "published", "2026-01-01T00:00:00Z"))
+
+      %{method: :post} ->
+        %Tesla.Env{status: 202, body: ""}
+
+      %{method: :get} ->
+        %Tesla.Env{status: 404, body: ""}
     end)
 
     assert {:ok, %{pointer: %{id: pointer_id}}} =
@@ -162,7 +168,7 @@ defmodule Bonfire.Federate.ActivityPub.RemoteActorSuspensionTest do
                  "type" => "Update",
                  "id" => "#{@remote_actor}#updates/suspended",
                  "actor" => @remote_actor,
-                 "object" => suspended_actor_json(),
+                 "object" => Map.put(suspended_actor_json(), "updated", "2026-02-01T00:00:00Z"),
                  "to" => [@public]
                },
                authenticated: :http_signature,

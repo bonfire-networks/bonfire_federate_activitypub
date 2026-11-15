@@ -510,7 +510,12 @@ defmodule Bonfire.Federate.ActivityPub.OutOfOrderThreadTest do
       Agent.update(served, fn docs ->
         docs
         |> Map.put(opener["id"], opener)
-        |> Map.put(context_url, with_first_item(context_collection("mastodon"), opener["id"]))
+        |> Map.put(
+          context_url,
+          context_collection("mastodon")
+          |> with_first_item(opener["id"])
+          |> served_at(context_url)
+        )
       end)
 
       receive_in(ActivityPub.Federator.Workers.ReceiverWorker, create(opener))
@@ -570,7 +575,8 @@ defmodule Bonfire.Federate.ActivityPub.OutOfOrderThreadTest do
     Enum.each(Enum.drop(chain, -1), serve)
 
     if is_map(context) do
-      Agent.update(served, &Map.put(&1, context_url, with_first_item(context, opener_id)))
+      collection = context |> with_first_item(opener_id) |> served_at(context_url)
+      Agent.update(served, &Map.put(&1, context_url, collection))
     end
 
     chain
@@ -581,6 +587,16 @@ defmodule Bonfire.Federate.ActivityPub.OutOfOrderThreadTest do
       Path.join([__DIR__, "..", "fixtures", dir, "context_collection.json"])
       |> File.read!()
       |> Jason.decode!()
+
+  # the captured collection as the server at `url` serves it: a document is only taken from a host it names in its own `id`, so the id (and the page's `partOf`) is the url it is served at, not the one it was captured from
+  defp served_at(collection, url) do
+    collection = Map.put(collection, "id", url)
+
+    case collection do
+      %{"first" => %{"partOf" => _} = page} -> Map.put(collection, "first", Map.put(page, "partOf", url))
+      _ -> collection
+    end
+  end
 
   # the captured collection, its first item (the opener) pointed at this test's
   defp with_first_item(%{"first" => %{"items" => [_ | rest]}} = collection, id),

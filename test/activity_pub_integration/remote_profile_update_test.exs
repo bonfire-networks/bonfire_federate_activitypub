@@ -14,8 +14,14 @@ defmodule Bonfire.Federate.ActivityPub.RemoteProfileUpdateTest do
   @remote_actor "https://mastodon.local/users/liaizon"
   @public "https://www.w3.org/ns/activitystreams#Public"
 
+  # dated, since a document replaces the one we hold only when it is provably newer
   defp actor_doc(overrides),
-    do: APSimulate.actor_json(@remote_actor, "liaizon", overrides)
+    do:
+      APSimulate.actor_json(
+        @remote_actor,
+        "liaizon",
+        Map.merge(%{"published" => "2026-01-01T00:00:00Z"}, overrides)
+      )
 
   defp original,
     do: actor_doc(%{"name" => "Original name", "summary" => "<p>Original bio</p>"})
@@ -65,9 +71,14 @@ defmodule Bonfire.Federate.ActivityPub.RemoteProfileUpdateTest do
   test "an Update signed by the actor itself changes the profile name and bio", %{
     remote_user: remote_user
   } do
-    updated = actor_doc(%{"name" => "New name", "summary" => "<p>New bio</p>"})
+    updated =
+      actor_doc(%{
+        "name" => "New name",
+        "summary" => "<p>New bio</p>",
+        "updated" => "2026-02-01T00:00:00Z"
+      })
 
-    # the origin still serves the old document, so only applying the vouched-for document can make this pass
+    # the origin still serves the old document, so only applying the vouched-for, newer document can make this pass
     assert {:ok, _} =
              Transformer.handle_incoming(update_activity(updated),
                authenticated: :http_signature,
