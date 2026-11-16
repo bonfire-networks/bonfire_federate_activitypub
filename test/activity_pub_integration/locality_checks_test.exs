@@ -1,5 +1,6 @@
 defmodule Bonfire.Federate.ActivityPub.LocalityChecksTest do
   use Bonfire.Federate.ActivityPub.DataCase
+  use Repatch.ExUnit
 
   alias Bonfire.Me.Fake
   alias Bonfire.Social.Graph.Follows
@@ -132,6 +133,83 @@ defmodule Bonfire.Federate.ActivityPub.LocalityChecksTest do
                ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(good_url)
 
       assert_received {:fetched, ^good_url}
+    end
+  end
+
+  # an `Undo` of a `Delete` brings an actor back only when its origin serves that same actor again, not another one under the address
+  describe "Undo of the Delete of an actor" do
+    @restored_actor "https://mocked.local/users/restored"
+    @someone_else "https://mocked.local/users/someone_else"
+
+    # what the origin answers for the actor's address, switched as the test goes on
+    defp origin_serves(document) do
+      Tesla.Mock.mock(fn
+        %{method: :get, url: @restored_actor} ->
+          case document do
+            nil -> %Tesla.Env{status: 410, body: ""}
+            document -> Tesla.Mock.json(document)
+          end
+
+        _ ->
+          %Tesla.Env{status: 404, body: ""}
+      end)
+    end
+
+    defp delete_then_undo do
+      origin_serves(Simulate.actor_json(@restored_actor, "restored"))
+      assert {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @restored_actor)
+      # our own copy of it, which is what a restoring brings back
+      assert {:ok, _} = Bonfire.Me.Users.by_ap_id(@restored_actor)
+
+      test_pid = self()
+
+      Repatch.patch(
+        Bonfire.Federate.ActivityPub.Adapter,
+        :undelete_remote_actor,
+        [mode: :shared],
+        fn ap_id ->
+          send(test_pid, {:undeleted, ap_id})
+          Repatch.real(Bonfire.Federate.ActivityPub.Adapter.undelete_remote_actor(ap_id))
+        end
+      )
+
+      # the origin deletes it: it stops serving it, which is what makes the deletion believed
+      origin_serves(nil)
+
+      delete = %{
+        "id" => @restored_actor <> "#delete",
+        "type" => "Delete",
+        "actor" => @restored_actor,
+        "object" => @restored_actor,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+      }
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(delete)
+
+      %{
+        "id" => @restored_actor <> "#undo",
+        "type" => "Undo",
+        "actor" => @restored_actor,
+        "object" => delete,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+      }
+    end
+
+    # the restoring itself is checked where the adapter does it; here what counts is whether it is asked for
+    test "control: the origin serving the same actor again has our copy restored" do
+      undo = delete_then_undo()
+      origin_serves(Simulate.actor_json(@restored_actor, "restored"))
+
+      ActivityPub.Federator.Transformer.handle_incoming(undo)
+      assert_received {:undeleted, @restored_actor}
+    end
+
+    test "the origin serving another actor under the address does not restore it" do
+      undo = delete_then_undo()
+      origin_serves(Simulate.actor_json(@someone_else, "restored"))
+
+      refute match?({:ok, _}, ActivityPub.Federator.Transformer.handle_incoming(undo))
+      refute_received {:undeleted, _}
     end
   end
 

@@ -419,10 +419,18 @@ defmodule Bonfire.Federate.ActivityPub.BoundariesMRF do
         apply_filtered_recipients(filtered, activity, opts)
 
       filtered ->
-        debug(filtered, "accept non-create activity (even with no recipients)")
-        {:ok, filtered}
+        # a Like, an Announce or any other incoming activity from a blocked host or actor has no recipients to filter: it is refused as a whole, as a `Create` is. A host's own retractions are still taken, so what it made earlier can be taken back.
+        if opts[:is_local] != true and not retraction?(activity) and
+             activity_blocked?(block_types, [], activity, rejects_regex(block_types), opts) do
+          {:reject, "activity from a blocked actor or instance"}
+        else
+          debug(filtered, "accept non-create activity (even with no recipients)")
+          {:ok, filtered}
+        end
     end
   end
+
+  defp retraction?(activity), do: ed(activity, "type", nil) in ["Delete", "Undo"]
 
   defp apply_filtered_recipients(filtered, activity, opts) do
     if filtered != activity,

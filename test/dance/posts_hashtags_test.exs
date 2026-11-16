@@ -34,6 +34,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.PostsHashtagsTest do
        do: @tag(skip: reason)
 
     test "#{direction}: finds a public post, and shows its text and hashtags", context do
+      # `fedify lookup` fetches unsigned (signing needs it to publish a one-time key through a public tunnel), and while `reject_unsigned` is on a post is only served to a signed fetch, so this receiver gets unsigned fetches allowed for this test. It is application env, read by every instance in this BEAM, hence restored on exit.
+      if context[:receiver] == Tester.FedifyTester do
+        orig = Application.get_env(:activity_pub, :reject_unsigned)
+        Application.put_env(:activity_pub, :reject_unsigned, false)
+        on_exit(fn -> Application.put_env(:activity_pub, :reject_unsigned, orig) end)
+      end
+
       Scenarios.posts_hashtags(
         context,
         Tester.new(context[:sender], context),

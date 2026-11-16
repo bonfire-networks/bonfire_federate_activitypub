@@ -521,11 +521,10 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
               })
 
             url == "https://#{host}/nodeinfo/2.0" ->
-              %Tesla.Env{
-                env
-                | status: 200,
-                  body: Jason.encode!(%{"software" => %{"name" => software_name}})
-              }
+              struct(env,
+                status: 200,
+                body: Jason.encode!(%{"software" => %{"name" => software_name}})
+              )
 
             body = served[url] ->
               json(body)
@@ -783,6 +782,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
         |> variant_of("closed")
         |> put_in(["object", "object", "commentsEnabled"], false)
 
+      serve_posts_of([closed_announce])
       receive_announce(closed_announce)
       closed = announced_post!("PieFed", closed_announce["object"]["object"]["id"])
 
@@ -805,6 +805,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
         |> variant_of("closed")
         |> put_in(["object", "object", "commentsEnabled"], false)
 
+      serve_posts_of([closed_announce])
       receive_announce(closed_announce)
       closed = announced_post!("Lemmy link", closed_announce["object"]["object"]["id"])
 
@@ -824,6 +825,7 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
 
     batch = Map.put(announce, "object", [announce["object"], second["object"]])
 
+    serve_posts_of([second])
     receive_announce(batch)
 
     for {a, which} <- [{announce, "first"}, {second, "second"}] do
@@ -1015,5 +1017,21 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseInteropTest do
     |> Map.update!("id", &"#{&1}/#{suffix}")
     |> update_in(["object", "id"], &"#{&1}/#{suffix}")
     |> update_in(["object", "object", "id"], &"#{&1}/#{suffix}")
+  end
+
+  # The post of a relayed `Create` is taken from its origin unless the relayer is a group we follow, so a variant's post has to be served there under its own id, as the captured one is.
+  defp serve_posts_of(announces) do
+    also_served =
+      Map.new(announces, fn a -> {a["object"]["object"]["id"], a["object"]["object"]} end)
+
+    served = Map.merge(served(), also_served)
+
+    mock(fn
+      %{method: :get, url: url} ->
+        if body = served[url], do: json(body), else: %Tesla.Env{status: 404, body: ""}
+
+      %{method: :post} ->
+        %Tesla.Env{status: 202, body: ""}
+    end)
   end
 end

@@ -271,6 +271,84 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
     end
   end
 
+  # A follow they sent themselves outlives their membership only where the group still lets a non-member follow, since `:follow` is granted by the group's visibility and a members-only group grants it to its members alone
+  describe "an incoming Leave from a members-only group" do
+    setup %{creator: creator, group: group} do
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "invite_only",
+                 visibility: "members:private",
+                 participation: "group_members",
+                 default_content_visibility: "members:private"
+               })
+
+      # added by hand: an `invite_only` group refuses a `Join`, and this is about what a `Leave` leaves behind
+      user = remote_user()
+      {:ok, circle} = Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
+      Bonfire.Boundaries.Circles.add_to_circles(user, circle, skip_boundary_check: true)
+
+      %{user: user}
+    end
+
+    defp post_in(creator, group, text) do
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: creator,
+          post_attrs: %{post_content: %{html_body: "<p>#{text}</p>"}},
+          boundary: "mentions",
+          publish_in: uid(group)
+        )
+
+      post
+    end
+
+    test "drops a follow they sent themselves, since non-members may not follow", %{
+      user: user,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Follow", group_ap_id))
+
+      assert Categories.member?(user, group), "control: a member"
+      assert Bonfire.Social.Graph.Follows.following?(user, group), "control: following"
+      assert Bonfire.Boundaries.can?(user, :follow, group), "control: members may follow"
+
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Leave", group_ap_id))
+
+      refute Categories.member?(user, group)
+
+      refute Bonfire.Boundaries.can?(user, :follow, group),
+             "control: the group lets only its members follow, which they no longer are"
+
+      refute Bonfire.Social.Graph.Follows.following?(user, group),
+             "a follow nobody could make now is a leftover, not a choice the group still allows"
+    end
+
+    test "stops the group's later posts reaching them", %{
+      creator: creator,
+      user: user,
+      group: group,
+      group_ap_id: group_ap_id
+    } do
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Follow", group_ap_id))
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(
+               :my,
+               post_in(creator, group, "while a member"),
+               current_user: user
+             ),
+             "control: a member's feed gets the group's posts"
+
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Leave", group_ap_id))
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(
+               :my,
+               post_in(creator, group, "after they left"),
+               current_user: user
+             )
+    end
+  end
+
   # `Undo{Follow}` is ambiguous in exactly the way `Follow` is, and the two peer families need opposite answers from the same message. Lemmy has no `Leave` at all, so `Undo{Follow}` is the only way its users can leave; Mobilizon distinguishes, so for its users the same message must be unsubscribing and nothing more. Reading every peer as one or the other strands the other family.
   #
   # Both paths are pinned here, and what resolves them is recording how the MEMBERSHIP was created: one that came from a `Follow` is linked to it and goes when that `Follow` is undone, one that came from a `Join` is linked to the `Join` instead, so an `Undo{Follow}` finds nothing to remove and only the subscription stops.

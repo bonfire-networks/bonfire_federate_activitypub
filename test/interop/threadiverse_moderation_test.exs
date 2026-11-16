@@ -77,6 +77,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
     serve(served)
 
+    # the community is one that one of our users follows, and which has accepted: that is how its posts reach us, and the only way a post we do not hold is taken from its relay as it comes
+    follow_community_accepted!(announce["actor"])
+
     # delivered once, as a real delivery is: the transformer hands each to the adapter itself (a second `Incoming.receive_activity/1` applied it twice)
     for a <- [announce, text_announce] do
       ActivityPub.Federator.Transformer.handle_incoming(a)
@@ -2507,6 +2510,33 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
 
   # re-callable, so a test can change what an origin serves (a moderator list that has since changed)
   # with `notify`, a pid, each URL read is sent to it as `{:served, url}`, so a test can tell what was fetched
+  defp follow_community_accepted!(community_id) do
+    follower = fake_user!()
+    {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
+
+    {:ok, group} =
+      Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(%{"id" => community_id})
+
+    {:ok, request} = Bonfire.Social.Graph.Follows.follow(follower, group)
+    follow_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(request)
+
+    {:ok, _} =
+      ActivityPub.Federator.Transformer.handle_incoming(%{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "id" => "#{community_id}/accept/#{System.unique_integer([:positive])}",
+        "type" => "Accept",
+        "actor" => community_id,
+        "to" => [follower_actor.ap_id],
+        "object" => %{
+          "id" => follow_activity.data["id"],
+          "type" => "Follow",
+          "actor" => follower_actor.ap_id,
+          "object" => community_id,
+          "state" => "pending"
+        }
+      })
+  end
+
   defp serve(served, notify \\ nil) do
     mock(fn %{method: :get, url: url} ->
       if notify, do: send(notify, {:served, url})

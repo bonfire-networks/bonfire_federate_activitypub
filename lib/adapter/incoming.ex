@@ -272,7 +272,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     fallback_module = fallback_federation_module()
 
-    with {:ok, subject} <- AdapterUtils.activity_character(activity) |> info("activity_character"),
+    with :ok <- check_creator_owns_object(activity, object),
+         {:ok, subject} <- AdapterUtils.activity_character(activity) |> info("activity_character"),
          # a type claimed via `APActivities.handle_object_types` is kept whole, beating any module handling one of the document's OTHER types: e.g. when configure in :handle_object_types a recipe with type `["Note", "Preparation"]` is a Preparation we keep as APActivity, not a Post with the recipe discarded
          {:no_federation_module_match, _} <-
            if(handled_as_ap_activity?(object_type, fallback_module),
@@ -880,6 +881,66 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
     # error(object, "AP - no module defined to handle_activity_with object")
     {:no_federation_module_match, :ignore}
   end
+
+  # A `Create` received from elsewhere is applied only when its actor is one of the owners of the object it creates: someone else's `Create` can not make a post that is theirs of something another actor owns. An object that names no owner (or an actor, whose `attributedTo` names its moderators) is for the rules about objects with no author, and one of ours (`local`) is not received. A mismatch needs an explicit allowance (`foreign_owner_allowed?/2`).
+  defp check_creator_owns_object(%{local: true}, _object), do: :ok
+
+  defp check_creator_owns_object(
+         %{data: %{"type" => "Create"} = data} = activity,
+         %{
+           data: %{} = object_data
+         } = object
+       ) do
+    owners = owner_ids(object_data)
+
+    actors =
+      data["actor"]
+      |> List.wrap()
+      |> Enum.map(&ActivityPub.Object.get_ap_id/1)
+      |> Enum.reject(&is_nil/1)
+
+    cond do
+      owners == [] or actors == [] ->
+        :ok
+
+      object_data["type"] in ActivityPub.Config.supported_actor_types() ->
+        :ok
+
+      Enum.any?(actors, &(&1 in owners)) ->
+        :ok
+
+      foreign_owner_allowed?(activity, object) ->
+        :ok
+
+      true ->
+        error(
+          object_data["id"],
+          "a Create by #{inspect(actors)} of an object owned by #{inspect(owners)}, so it is not applied"
+        )
+    end
+  end
+
+  defp check_creator_owns_object(_activity, _object), do: :ok
+
+  # Whether a `Create` may create an object that its actor does not own. Two cases need it, and no other: the owner vouched for the object itself, with a proof or an LD signature of its own (the library marks the object so only when the signer is its owner); and a document we fetched ourselves whose author we could not resolve, which the library attributes to our own service actor (a delivery is refused instead). A group's relay of a member's post is an `Announce`, and the `Create` inside it is the member's own.
+  defp foreign_owner_allowed?(activity, object) do
+    signed_by_owner?(object) or by_service_actor?(activity)
+  end
+
+  defp signed_by_owner?(%{authenticated: authenticated}),
+    do: authenticated in [:integrity_proof, :ld_signature]
+
+  defp signed_by_owner?(_object), do: false
+
+  defp by_service_actor?(%{data: %{"actor" => actor}}) do
+    with {:ok, service_actor} <- ActivityPub.Utils.service_actor() do
+      ActivityPub.Object.get_ap_id(actor) == service_actor.ap_id
+    else
+      _ -> false
+    end
+  end
+
+  defp by_service_actor?(_activity), do: false
 
   # who an object names as its owners: a PeerTube video names its account and its channel
   defp owner_ids(object_data) do

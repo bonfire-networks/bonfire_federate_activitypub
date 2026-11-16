@@ -45,13 +45,22 @@ defmodule Bonfire.Federate.ActivityPub.DataMigrations.DuplicateRemoteMedia do
   end
 
   @impl DataMigration
-  def migrate(copies) do
-    Enum.each(copies, &safely(fn -> remove_copy(&1) end, &1))
+  def migrate(copies), do: migrate(copies, [])
+
+  # `opts[:repo]` is the repo the migration runs on (the migration passes its own `repo/0`), else the normal one
+  @impl DataMigration
+  def migrate(copies, opts) do
+    repo = Keyword.get(opts, :repo, Bonfire.Common.Repo)
+
+    # the contexts reached from here find their repo through `repo()`, which reads this process: the runner's task when async, which does not inherit the migration's
+    if opts[:repo], do: Process.put(:ecto_repo_module, repo)
+
+    Enum.each(copies, &safely(fn -> remove_copy(&1, repo) end, &1))
 
     copies
     |> Enum.map(& &1.ap_id)
     |> Enum.uniq()
-    |> Enum.each(&safely(fn -> lead_to_earliest(&1) end, &1))
+    |> Enum.each(&safely(fn -> lead_to_earliest(&1, repo) end, &1))
   end
 
   defp safely(fun, what) do
@@ -70,7 +79,7 @@ defmodule Bonfire.Federate.ActivityPub.DataMigrations.DuplicateRemoteMedia do
       )
   end
 
-  defp remove_copy(%{id: id}) do
+  defp remove_copy(%{id: id}, repo) do
     with {:ok, media} <- Bonfire.Files.Media.one(id: id),
          # its activities, `Peered` and mixins; someone else's, so deleted here only, nothing sent
          {:ok, _} <-
@@ -79,20 +88,18 @@ defmodule Bonfire.Federate.ActivityPub.DataMigrations.DuplicateRemoteMedia do
              skip_federation: true
            ) do
       # its `Peered`, which `do_delete` leaves for a `Media`, and which would keep its AP id leading to it rather than to the copy kept
-      Bonfire.Common.Repo.delete_all(
-        from(p in Bonfire.Data.ActivityPub.Peered, where: p.id == ^id)
-      )
+      repo.delete_all(from(p in Bonfire.Data.ActivityPub.Peered, where: p.id == ^id))
 
       # removed, not hidden: `do_delete` only sets a `Media`'s own `deleted_at`. The row, not `Media.hard_delete/2`, which also deletes the files: a remote copy's is the origin's URL
-      Bonfire.Common.Repo.delete(media, stale_error_field: :id)
+      repo.delete(media, stale_error_field: :id)
     end
   end
 
   # the copy kept is what its AP id leads to: the `Peered` URL a later `Update` finds it by (`AdapterUtils.pointer_id_from_ap_object/1`), and the AP row, if there is one
-  defp lead_to_earliest(ap_id) do
-    # `Bonfire.Common.Repo` by name: `use DataMigration` imports `Ecto.Migration`'s `repo/0`
+  defp lead_to_earliest(ap_id, repo) do
+    # `repo` is the one given to `migrate/2`, not `repo/0`: that is `Ecto.Migration`'s, which needs the migration's own process, and this runs in the runner's task when async
     with [earliest_id | _] <-
-           Bonfire.Common.Repo.all(
+           repo.all(
              from(m in Bonfire.Files.Media,
                where: fragment("?->'json_ld'->>'id'", m.metadata) == ^ap_id,
                order_by: [asc: m.id],

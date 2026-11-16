@@ -18,9 +18,10 @@ defmodule Bonfire.Federate.ActivityPub.RepairCorruptedActorPointers do
   import Ecto.Query
   alias Bonfire.Common.Repo
 
-  def run do
-    {a, _} = repair_shape_a()
-    {b, _} = repair_shape_b()
+  @doc "Repairs both shapes in `repo`: a migration passes its own repo, so it repairs the database being migrated (e.g. a second instance's)."
+  def run(repo \\ Repo) do
+    {a, _} = repair_shape_a(repo)
+    {b, _} = repair_shape_b(repo)
     {a + b, nil}
   end
 
@@ -28,8 +29,8 @@ defmodule Bonfire.Federate.ActivityPub.RepairCorruptedActorPointers do
   # — null out the pointer_id. Safe: non-actor types (Add, Video, Note, etc.) should never
   # point to character records. Post/activity objects with pointer_ids to posts are unaffected
   # (posts are not in bonfire_data_identity_character).
-  defp repair_shape_a do
-    Repo.query!("""
+  defp repair_shape_a(repo) do
+    repo.query!("""
     UPDATE ap_object
     SET pointer_id = NULL
     WHERE data->>'type' NOT IN ('Person', 'Group', 'Organization', 'Service', 'Application', 'Tombstone')
@@ -39,8 +40,8 @@ defmodule Bonfire.Federate.ActivityPub.RepairCorruptedActorPointers do
     |> then(&{&1.num_rows, nil})
   end
 
-  defp repair_shape_b do
-    Repo.query!("""
+  defp repair_shape_b(repo) do
+    repo.query!("""
     UPDATE ap_object ap
     SET pointer_id = m.character_id
     FROM (

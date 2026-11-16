@@ -1,0 +1,769 @@
+{
+  "@context": [
+    "https://join-lemmy.org/context.json",
+    "https://www.w3.org/ns/activitystreams"
+  ],
+  "type": "Group",
+  "id": "https://voyager.lemmy.ml/c/privfedtest",
+  "preferredUsername": "privfedtest",
+  "inbox": "https://voyager.lemmy.ml/inbox",
+  "followers": "https://voyager.lemmy.ml/c/privfedtest/followers",
+  "publicKey": {
+    "id": "https://voyager.lemmy.ml/c/privfedtest#main-key",
+    "owner": "https://voyager.lemmy.ml/c/privfedtest",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqVk3hboJRJ102tVqI7Dv\n5Rp3c5yv+/a0pGQ0bOUIse57B/XW6xFRYFMODT/96xgdSCZcno/4MwyBQcIe0ldp\nY728wptv5MYsl31q3O8Hxd6gtutgHmhW6KvwQkg/jZDhcnw1sPUgORXNCeOfVxql\nH/kejDQT2Vv5Qw5l58FJ/ob062qOjlO0Ax0EfFJ6fuuzqhCExnKUUNCEVQCR6i5F\nvX+BGUfU9LXzUJNA++7Pp9nqLV6AvjjZOylTFL1DB2ArdkLJ8DXat0/+NKIXL5qY\nt/I8gAZmTxRkj5b55amlrBeJcF3CAwEXSk2X9Ur4Jic/K/had7GECUMv0brzrxGc\ndwIDAQAB\n-----END PUBLIC KEY-----\n"
+  },
+  "name": "Private Federation Fest 1",
+  "sensitive": false,
+  "attributedTo": "https://voyager.lemmy.ml/c/privfedtest/moderators",
+  "postingRestrictedToMods": false,
+  "outbox": "https://voyager.lemmy.ml/c/privfedtest/outbox",
+  "featured": "https://voyager.lemmy.ml/c/privfedtest/featured",
+  "language": [
+    {
+      "identifier": "und",
+      "name": "Undetermined"
+    },
+    {
+      "identifier": "aa",
+      "name": "Afaraf"
+    },
+    {
+      "identifier": "ab",
+      "name": "аҧсуа бызшәа"
+    },
+    {
+      "identifier": "ae",
+      "name": "avesta"
+    },
+    {
+      "identifier": "af",
+      "name": "Afrikaans"
+    },
+    {
+      "identifier": "ak",
+      "name": "Akan"
+    },
+    {
+      "identifier": "am",
+      "name": "አማርኛ"
+    },
+    {
+      "identifier": "an",
+      "name": "aragonés"
+    },
+    {
+      "identifier": "ar",
+      "name": "اَلْعَرَبِيَّةُ"
+    },
+    {
+      "identifier": "as",
+      "name": "অসমীয়া"
+    },
+    {
+      "identifier": "av",
+      "name": "авар мацӀ"
+    },
+    {
+      "identifier": "ay",
+      "name": "aymar aru"
+    },
+    {
+      "identifier": "az",
+      "name": "azərbaycan dili"
+    },
+    {
+      "identifier": "ba",
+      "name": "башҡорт теле"
+    },
+    {
+      "identifier": "be",
+      "name": "беларуская мова"
+    },
+    {
+      "identifier": "bg",
+      "name": "български език"
+    },
+    {
+      "identifier": "bi",
+      "name": "Bislama"
+    },
+    {
+      "identifier": "bm",
+      "name": "bamanankan"
+    },
+    {
+      "identifier": "bn",
+      "name": "বাংলা"
+    },
+    {
+      "identifier": "bo",
+      "name": "བོད་ཡིག"
+    },
+    {
+      "identifier": "br",
+      "name": "brezhoneg"
+    },
+    {
+      "identifier": "bs",
+      "name": "bosanski jezik"
+    },
+    {
+      "identifier": "ca",
+      "name": "Català"
+    },
+    {
+      "identifier": "ce",
+      "name": "нохчийн мотт"
+    },
+    {
+      "identifier": "ch",
+      "name": "Chamoru"
+    },
+    {
+      "identifier": "co",
+      "name": "corsu"
+    },
+    {
+      "identifier": "cr",
+      "name": "ᓀᐦᐃᔭᐍᐏᐣ"
+    },
+    {
+      "identifier": "cs",
+      "name": "čeština"
+    },
+    {
+      "identifier": "cu",
+      "name": "ѩзыкъ словѣньскъ"
+    },
+    {
+      "identifier": "cv",
+      "name": "чӑваш чӗлхи"
+    },
+    {
+      "identifier": "cy",
+      "name": "Cymraeg"
+    },
+    {
+      "identifier": "da",
+      "name": "dansk"
+    },
+    {
+      "identifier": "de",
+      "name": "Deutsch"
+    },
+    {
+      "identifier": "dv",
+      "name": "ދިވެހި"
+    },
+    {
+      "identifier": "dz",
+      "name": "རྫོང་ཁ"
+    },
+    {
+      "identifier": "ee",
+      "name": "Eʋegbe"
+    },
+    {
+      "identifier": "el",
+      "name": "Ελληνικά"
+    },
+    {
+      "identifier": "en",
+      "name": "English"
+    },
+    {
+      "identifier": "eo",
+      "name": "Esperanto"
+    },
+    {
+      "identifier": "es",
+      "name": "Español"
+    },
+    {
+      "identifier": "et",
+      "name": "eesti"
+    },
+    {
+      "identifier": "eu",
+      "name": "euskara"
+    },
+    {
+      "identifier": "fa",
+      "name": "فارسی"
+    },
+    {
+      "identifier": "ff",
+      "name": "Fulfulde"
+    },
+    {
+      "identifier": "fi",
+      "name": "suomi"
+    },
+    {
+      "identifier": "fj",
+      "name": "vosa Vakaviti"
+    },
+    {
+      "identifier": "fo",
+      "name": "føroyskt"
+    },
+    {
+      "identifier": "fr",
+      "name": "Français"
+    },
+    {
+      "identifier": "fy",
+      "name": "Frysk"
+    },
+    {
+      "identifier": "ga",
+      "name": "Gaeilge"
+    },
+    {
+      "identifier": "gd",
+      "name": "Gàidhlig"
+    },
+    {
+      "identifier": "gl",
+      "name": "galego"
+    },
+    {
+      "identifier": "gn",
+      "name": "Avañe'ẽ"
+    },
+    {
+      "identifier": "gu",
+      "name": "ગુજરાતી"
+    },
+    {
+      "identifier": "gv",
+      "name": "Gaelg"
+    },
+    {
+      "identifier": "ha",
+      "name": "هَوُسَ"
+    },
+    {
+      "identifier": "he",
+      "name": "עברית"
+    },
+    {
+      "identifier": "hi",
+      "name": "हिन्दी"
+    },
+    {
+      "identifier": "ho",
+      "name": "Hiri Motu"
+    },
+    {
+      "identifier": "hr",
+      "name": "Hrvatski"
+    },
+    {
+      "identifier": "ht",
+      "name": "Kreyòl ayisyen"
+    },
+    {
+      "identifier": "hu",
+      "name": "magyar"
+    },
+    {
+      "identifier": "hy",
+      "name": "Հայերեն"
+    },
+    {
+      "identifier": "hz",
+      "name": "Otjiherero"
+    },
+    {
+      "identifier": "ia",
+      "name": "Interlingua"
+    },
+    {
+      "identifier": "id",
+      "name": "Bahasa Indonesia"
+    },
+    {
+      "identifier": "ie",
+      "name": "Interlingue"
+    },
+    {
+      "identifier": "ig",
+      "name": "Asụsụ Igbo"
+    },
+    {
+      "identifier": "ii",
+      "name": "ꆈꌠ꒿ Nuosuhxop"
+    },
+    {
+      "identifier": "ik",
+      "name": "Iñupiaq"
+    },
+    {
+      "identifier": "io",
+      "name": "Ido"
+    },
+    {
+      "identifier": "is",
+      "name": "Íslenska"
+    },
+    {
+      "identifier": "it",
+      "name": "Italiano"
+    },
+    {
+      "identifier": "iu",
+      "name": "ᐃᓄᒃᑎᑐᑦ"
+    },
+    {
+      "identifier": "ja",
+      "name": "日本語"
+    },
+    {
+      "identifier": "jv",
+      "name": "basa Jawa"
+    },
+    {
+      "identifier": "ka",
+      "name": "ქართული"
+    },
+    {
+      "identifier": "kg",
+      "name": "Kikongo"
+    },
+    {
+      "identifier": "ki",
+      "name": "Gĩkũyũ"
+    },
+    {
+      "identifier": "kj",
+      "name": "Kuanyama"
+    },
+    {
+      "identifier": "kk",
+      "name": "қазақ тілі"
+    },
+    {
+      "identifier": "kl",
+      "name": "kalaallisut"
+    },
+    {
+      "identifier": "km",
+      "name": "ខេមរភាសា"
+    },
+    {
+      "identifier": "kn",
+      "name": "ಕನ್ನಡ"
+    },
+    {
+      "identifier": "ko",
+      "name": "한국어"
+    },
+    {
+      "identifier": "kr",
+      "name": "Kanuri"
+    },
+    {
+      "identifier": "ks",
+      "name": "कश्मीरी"
+    },
+    {
+      "identifier": "ku",
+      "name": "Kurdî"
+    },
+    {
+      "identifier": "kv",
+      "name": "коми кыв"
+    },
+    {
+      "identifier": "kw",
+      "name": "Kernewek"
+    },
+    {
+      "identifier": "ky",
+      "name": "Кыргызча"
+    },
+    {
+      "identifier": "la",
+      "name": "latine"
+    },
+    {
+      "identifier": "lb",
+      "name": "Lëtzebuergesch"
+    },
+    {
+      "identifier": "lg",
+      "name": "Luganda"
+    },
+    {
+      "identifier": "li",
+      "name": "Limburgs"
+    },
+    {
+      "identifier": "ln",
+      "name": "Lingála"
+    },
+    {
+      "identifier": "lo",
+      "name": "ພາສາລາວ"
+    },
+    {
+      "identifier": "lt",
+      "name": "lietuvių kalba"
+    },
+    {
+      "identifier": "lu",
+      "name": "Kiluba"
+    },
+    {
+      "identifier": "lv",
+      "name": "latviešu valoda"
+    },
+    {
+      "identifier": "mg",
+      "name": "fiteny malagasy"
+    },
+    {
+      "identifier": "mh",
+      "name": "Kajin M̧ajeļ"
+    },
+    {
+      "identifier": "mi",
+      "name": "te reo Māori"
+    },
+    {
+      "identifier": "mk",
+      "name": "македонски јазик"
+    },
+    {
+      "identifier": "ml",
+      "name": "മലയാളം"
+    },
+    {
+      "identifier": "mn",
+      "name": "Монгол хэл"
+    },
+    {
+      "identifier": "mr",
+      "name": "मराठी"
+    },
+    {
+      "identifier": "ms",
+      "name": "Bahasa Melayu"
+    },
+    {
+      "identifier": "mt",
+      "name": "Malti"
+    },
+    {
+      "identifier": "my",
+      "name": "ဗမာစာ"
+    },
+    {
+      "identifier": "na",
+      "name": "Dorerin Naoero"
+    },
+    {
+      "identifier": "nb",
+      "name": "Norsk bokmål"
+    },
+    {
+      "identifier": "nd",
+      "name": "isiNdebele"
+    },
+    {
+      "identifier": "ne",
+      "name": "नेपाली"
+    },
+    {
+      "identifier": "ng",
+      "name": "Owambo"
+    },
+    {
+      "identifier": "nl",
+      "name": "Nederlands"
+    },
+    {
+      "identifier": "nn",
+      "name": "Norsk nynorsk"
+    },
+    {
+      "identifier": "no",
+      "name": "Norsk"
+    },
+    {
+      "identifier": "nr",
+      "name": "isiNdebele"
+    },
+    {
+      "identifier": "nv",
+      "name": "Diné bizaad"
+    },
+    {
+      "identifier": "ny",
+      "name": "chiCheŵa"
+    },
+    {
+      "identifier": "oc",
+      "name": "occitan"
+    },
+    {
+      "identifier": "oj",
+      "name": "ᐊᓂᔑᓈᐯᒧᐎᓐ"
+    },
+    {
+      "identifier": "om",
+      "name": "Afaan Oromoo"
+    },
+    {
+      "identifier": "or",
+      "name": "ଓଡ଼ିଆ"
+    },
+    {
+      "identifier": "os",
+      "name": "ирон æвзаг"
+    },
+    {
+      "identifier": "pa",
+      "name": "ਪੰਜਾਬੀ"
+    },
+    {
+      "identifier": "pi",
+      "name": "पाऴि"
+    },
+    {
+      "identifier": "pl",
+      "name": "Polski"
+    },
+    {
+      "identifier": "ps",
+      "name": "پښتو"
+    },
+    {
+      "identifier": "pt",
+      "name": "Português"
+    },
+    {
+      "identifier": "qu",
+      "name": "Runa Simi"
+    },
+    {
+      "identifier": "rm",
+      "name": "rumantsch grischun"
+    },
+    {
+      "identifier": "rn",
+      "name": "Ikirundi"
+    },
+    {
+      "identifier": "ro",
+      "name": "Română"
+    },
+    {
+      "identifier": "ru",
+      "name": "Русский"
+    },
+    {
+      "identifier": "rw",
+      "name": "Ikinyarwanda"
+    },
+    {
+      "identifier": "sa",
+      "name": "संस्कृतम्"
+    },
+    {
+      "identifier": "sc",
+      "name": "sardu"
+    },
+    {
+      "identifier": "sd",
+      "name": "सिन्धी"
+    },
+    {
+      "identifier": "se",
+      "name": "Davvisámegiella"
+    },
+    {
+      "identifier": "sg",
+      "name": "yângâ tî sängö"
+    },
+    {
+      "identifier": "si",
+      "name": "සිංහල"
+    },
+    {
+      "identifier": "sk",
+      "name": "slovenčina"
+    },
+    {
+      "identifier": "sl",
+      "name": "slovenščina"
+    },
+    {
+      "identifier": "sm",
+      "name": "gagana fa'a Samoa"
+    },
+    {
+      "identifier": "sn",
+      "name": "chiShona"
+    },
+    {
+      "identifier": "so",
+      "name": "Soomaaliga"
+    },
+    {
+      "identifier": "sq",
+      "name": "Shqip"
+    },
+    {
+      "identifier": "sr",
+      "name": "српски језик"
+    },
+    {
+      "identifier": "ss",
+      "name": "SiSwati"
+    },
+    {
+      "identifier": "st",
+      "name": "Sesotho"
+    },
+    {
+      "identifier": "su",
+      "name": "Basa Sunda"
+    },
+    {
+      "identifier": "sv",
+      "name": "Svenska"
+    },
+    {
+      "identifier": "sw",
+      "name": "Kiswahili"
+    },
+    {
+      "identifier": "ta",
+      "name": "தமிழ்"
+    },
+    {
+      "identifier": "te",
+      "name": "తెలుగు"
+    },
+    {
+      "identifier": "tg",
+      "name": "тоҷикӣ"
+    },
+    {
+      "identifier": "th",
+      "name": "ไทย"
+    },
+    {
+      "identifier": "ti",
+      "name": "ትግርኛ"
+    },
+    {
+      "identifier": "tk",
+      "name": "Türkmençe"
+    },
+    {
+      "identifier": "tl",
+      "name": "Wikang Tagalog"
+    },
+    {
+      "identifier": "tn",
+      "name": "Setswana"
+    },
+    {
+      "identifier": "to",
+      "name": "faka Tonga"
+    },
+    {
+      "identifier": "tr",
+      "name": "Türkçe"
+    },
+    {
+      "identifier": "ts",
+      "name": "Xitsonga"
+    },
+    {
+      "identifier": "tt",
+      "name": "татар теле"
+    },
+    {
+      "identifier": "tw",
+      "name": "Twi"
+    },
+    {
+      "identifier": "ty",
+      "name": "Reo Tahiti"
+    },
+    {
+      "identifier": "ug",
+      "name": "ئۇيغۇرچە‎"
+    },
+    {
+      "identifier": "uk",
+      "name": "Українська"
+    },
+    {
+      "identifier": "ur",
+      "name": "اردو"
+    },
+    {
+      "identifier": "uz",
+      "name": "Ўзбек"
+    },
+    {
+      "identifier": "ve",
+      "name": "Tshivenḓa"
+    },
+    {
+      "identifier": "vi",
+      "name": "Tiếng Việt"
+    },
+    {
+      "identifier": "vo",
+      "name": "Volapük"
+    },
+    {
+      "identifier": "wa",
+      "name": "walon"
+    },
+    {
+      "identifier": "wo",
+      "name": "Wollof"
+    },
+    {
+      "identifier": "xh",
+      "name": "isiXhosa"
+    },
+    {
+      "identifier": "yi",
+      "name": "ייִדיש"
+    },
+    {
+      "identifier": "yo",
+      "name": "Yorùbá"
+    },
+    {
+      "identifier": "za",
+      "name": "Saɯ cueŋƅ"
+    },
+    {
+      "identifier": "zh",
+      "name": "中文"
+    },
+    {
+      "identifier": "zu",
+      "name": "isiZulu"
+    }
+  ],
+  "manuallyApprovesFollowers": true,
+  "published": "2026-06-01T19:49:58.605037Z",
+  "updated": "2026-10-07T18:49:35.406156Z",
+  "discoverable": true,
+  "tag": [],
+  "postUpvotes": "all",
+  "postDownvotes": "all",
+  "commentUpvotes": "all",
+  "commentDownvotes": "all"
+}

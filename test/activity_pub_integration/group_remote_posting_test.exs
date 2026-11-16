@@ -17,12 +17,16 @@ defmodule Bonfire.Federate.ActivityPub.GroupRemotePostingTest do
   alias Bonfire.Federate.ActivityPub.Outgoing
 
   @community "https://lemmy.local/c/technology"
+  @private_community "https://voyager.lemmy.ml/c/privfedtest"
   @fixtures Path.join([__DIR__, "..", "fixtures"])
 
   setup do
     mock(fn
       %{method: :get, url: @community} ->
         json(fixture("lemmy", "community_actor.json"))
+
+      %{method: :get, url: @private_community} ->
+        json(fixture("lemmy", "community_actor_private.json"))
 
       %{method: :post} ->
         %Tesla.Env{status: 202, body: ""}
@@ -164,6 +168,106 @@ defmodule Bonfire.Federate.ActivityPub.GroupRemotePostingTest do
 
       assert @community in (List.wrap(delete["to"]) ++ List.wrap(delete["cc"])),
              "addressed to the community, so it reaches its inbox"
+    end
+  end
+
+  # A Lemmy community that approves its followers is a Private one (`community_visibility` in `crates/apub/objects/src/utils/functions.rs`), and `verify_visibility` there refuses an object with `Public` in `to`/`cc` in such a community. These tests record what we do about that today, so a change to it shows up here.
+  describe "a Private Lemmy community (manuallyApprovesFollowers: true)" do
+    defp private_mirror do
+      assert {:ok, %Bonfire.Classify.Category{type: :group} = group} =
+               Adapter.maybe_create_remote_actor(%{"id" => @private_community})
+
+      group
+    end
+
+    # a local person who joined: the Join button sends a Follow, and the community's Accept of it (the captured shape, bound to this Follow) makes them a member
+    defp member_of(group) do
+      user = fake_user!()
+      {:ok, user_actor} = ActivityPub.Actor.get_cached(pointer: user)
+
+      assert {:ok, %{member: false, requested: true}} =
+               Bonfire.Classify.Categories.join_and_follow_group(user, group)
+
+      follow_activity =
+        ActivityPub.Object.fetch_latest_activity(user_actor.ap_id, @private_community, "Follow")
+
+      accept =
+        fixture("mbin", "accept_follow_after_join.json")
+        |> Map.put("actor", @private_community)
+        |> put_in(["object", "id"], follow_activity.data["id"])
+        |> put_in(["object", "actor"], user_actor.ap_id)
+        |> put_in(["object", "object"], @private_community)
+
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(accept)
+
+      assert Bonfire.Classify.Categories.member?(user, group),
+             "control: the person is a member, so what follows is not about a non-member being refused"
+
+      user
+    end
+
+    defp post_in(user, group, boundary) do
+      assert {:ok, post} =
+               Bonfire.Posts.publish(
+                 current_user: user,
+                 post_attrs: %{post_content: %{html_body: "<p>into the private community</p>"}},
+                 context_id: uid(group),
+                 to_circles: ClassifyBoundaries.post_circles_for_group(group),
+                 to_boundaries: [boundary]
+               )
+
+      post
+    end
+
+    defp wire(post) do
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: post)
+      Map.take(data, ["to", "cc", "audience"])
+    end
+
+    test "the actor declares itself as one" do
+      actor = fixture("lemmy", "community_actor_private.json")
+
+      assert actor["manuallyApprovesFollowers"] == true,
+             "control: the capture is a community that approves its followers"
+    end
+
+    test "is mirrored as on request to join, global to read, and members-only to post" do
+      dims = Bonfire.Boundaries.Presets.group_dimension_slugs(private_mirror())
+
+      assert dims[:membership] == "on_request"
+      assert dims[:visibility] == "global"
+      assert dims[:participation] == "group_members"
+    end
+
+    test "a public post in it is addressed publicly, to the community, with it as audience" do
+      group = private_mirror()
+      post = post_in(member_of(group), group, "public")
+      wire = wire(post)
+
+      assert ActivityPub.Config.public_uri() in (List.wrap(wire["to"]) ++ List.wrap(wire["cc"])),
+             "Public is in to/cc, which Lemmy refuses in a Private community"
+
+      assert @private_community in (List.wrap(wire["to"]) ++ List.wrap(wire["cc"]))
+      assert wire["audience"] == @private_community
+    end
+
+    test "a post that isn't public in it is not addressed to the community" do
+      group = private_mirror()
+      user = member_of(group)
+      post = post_in(user, group, "public")
+      post = repo().maybe_preload(post, [:tree, replied: [thread: [created: :creator]]])
+
+      recipients =
+        Bonfire.Federate.ActivityPub.AdapterUtils.determine_recipients(user, post, false)
+
+      addressed = List.wrap(recipients.to) ++ List.wrap(recipients.cc)
+
+      refute ActivityPub.Config.public_uri() in addressed
+
+      refute @private_community in addressed,
+             "so Lemmy never receives it: it is accepted there only when addressed to the community and its followers, never Public"
+
+      assert is_nil(recipients.audience)
     end
   end
 end

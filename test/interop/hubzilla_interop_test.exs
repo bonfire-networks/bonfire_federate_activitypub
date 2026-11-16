@@ -112,6 +112,8 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
   # The container's owner is named as the group of what it relays, which gives it a group's standing over the post, eg to relay later activities on it unverified. A conversation's owner can also be a Person (whoever started the thread), whose relay still delivers the post but makes them no group
   describe "who the relayed post's group is" do
     test "a forum relaying is named as the post's group", %{add: add, note: note} do
+      # a post we do not hold is taken from the forum itself only when one of us follows it
+      follow_forum!()
       receive_add(add)
 
       assert {:ok, object} = ActivityPub.Object.get_cached(ap_id: note["id"])
@@ -153,6 +155,32 @@ defmodule Bonfire.Federate.ActivityPub.HubzillaInteropTest do
   end
 
   # delivered once, as a real delivery is: the transformer hands the activity to the adapter itself, so calling `Incoming.receive_activity/1` after it applied it twice
+  # one of our users follows the forum, and the forum has accepted
+  defp follow_forum! do
+    follower = fake_user!()
+    {:ok, follower_actor} = ActivityPub.Actor.get_cached(pointer: follower)
+    {:ok, group} = Adapter.maybe_create_remote_actor(%{"id" => @forum})
+
+    assert {:ok, request} = Bonfire.Social.Graph.Follows.follow(follower, group)
+    follow_activity = Bonfire.Federate.ActivityPub.Outgoing.ap_activity!(request)
+
+    assert {:ok, _} =
+             ActivityPub.Federator.Transformer.handle_incoming(%{
+               "@context" => "https://www.w3.org/ns/activitystreams",
+               "id" => "#{@forum}/accept/#{System.unique_integer([:positive])}",
+               "type" => "Accept",
+               "actor" => @forum,
+               "to" => [follower_actor.ap_id],
+               "object" => %{
+                 "id" => follow_activity.data["id"],
+                 "type" => "Follow",
+                 "actor" => follower_actor.ap_id,
+                 "object" => @forum,
+                 "state" => "pending"
+               }
+             })
+  end
+
   defp receive_add(add) do
     case ActivityPub.Federator.Transformer.handle_incoming(add) do
       {:ok, activity} -> {:ok, activity}

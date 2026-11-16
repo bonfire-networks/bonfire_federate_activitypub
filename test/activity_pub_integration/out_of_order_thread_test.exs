@@ -593,8 +593,11 @@ defmodule Bonfire.Federate.ActivityPub.OutOfOrderThreadTest do
     collection = Map.put(collection, "id", url)
 
     case collection do
-      %{"first" => %{"partOf" => _} = page} -> Map.put(collection, "first", Map.put(page, "partOf", url))
-      _ -> collection
+      %{"first" => %{"partOf" => _} = page} ->
+        Map.put(collection, "first", Map.put(page, "partOf", url))
+
+      _ ->
+        collection
     end
   end
 

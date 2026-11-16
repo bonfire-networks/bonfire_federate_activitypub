@@ -209,6 +209,119 @@ defmodule Bonfire.Federate.ActivityPub.MRF.InstanceBlockInstanceWideTest do
     end
   end
 
+  # An instance-wide block of a host refuses what its actors send of any kind, not only their posts: a like, as much as a post, is taken from nobody on a blocked host, whether they send it themselves or a relay hands it to us wrapped in an `Announce`.
+  describe "block other activities from a blocked host" do
+    alias ActivityPub.Federator.Worker.ReceiverHelpers
+    alias Bonfire.Social.Likes
+
+    @blocked_host "blocked.local"
+    @blocked_actor "https://blocked.local/users/bob"
+    @relay_actor "https://relay.local/users/relay"
+    @public "https://www.w3.org/ns/activitystreams#Public"
+
+    setup do
+      mock(fn
+        %{method: :get, url: @blocked_actor} ->
+          json(Simulate.actor_json(@blocked_actor, "bob"))
+
+        %{method: :get, url: @relay_actor} ->
+          json(Simulate.actor_json(@relay_actor, "relay"))
+
+        %{method: :get} ->
+          %Tesla.Env{status: 404, body: ""}
+
+        %{method: :post} ->
+          %Tesla.Env{status: 202, body: ""}
+      end)
+
+      # both are known before the block is made, as the actors of a host that is blocked later
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @blocked_actor)
+      {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @relay_actor)
+      {:ok, blocked_user} = Bonfire.Me.Users.by_ap_id(@blocked_actor)
+
+      author = fake_user!()
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: author,
+          post_attrs: %{post_content: %{html_body: "a post that is liked from far away"}},
+          boundary: "public"
+        )
+
+      %{
+        blocked_user: blocked_user,
+        post: post,
+        post_url: Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true),
+        author_url: Bonfire.Common.URIs.canonical_url(author)
+      }
+    end
+
+    # a like of the post, addressed to its author only (as a like is by Mastodon), not to the public
+    defp like_doc(ctx) do
+      %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "id" => "https://blocked.local/likes/#{System.unique_integer([:positive])}",
+        "type" => "Like",
+        "actor" => @blocked_actor,
+        "to" => [ctx.author_url],
+        "object" => ctx.post_url
+      }
+    end
+
+    # handed to the receiver worker as the inbox does once the signature of `signer` held
+    defp receive_signed(signer, doc) do
+      ReceiverHelpers.perform(
+        %Oban.Job{
+          args: %{
+            "op" => "incoming_ap_doc",
+            "params" => doc,
+            "signed_by" => signer,
+            "repo" => ActivityPub.Utils.repo()
+          }
+        },
+        :verified
+      )
+    end
+
+    test "control: a like from a host that is not blocked is taken", ctx do
+      Config.put([:boundaries, :block], ["non.matching.remote"])
+
+      receive_signed(@blocked_actor, like_doc(ctx))
+
+      assert Likes.liked?(ctx.blocked_user, ctx.post)
+    end
+
+    test "a like sent by an actor of a blocked host is refused", ctx do
+      Config.put([:boundaries, :block], [@blocked_host])
+
+      receive_signed(@blocked_actor, like_doc(ctx))
+
+      refute Likes.liked?(ctx.blocked_user, ctx.post)
+    end
+
+    test "a post sent by an actor of a blocked host is refused", ctx do
+      Config.put([:boundaries, :block], [@blocked_host])
+      note_id = "https://blocked.local/notes/#{System.unique_integer([:positive])}"
+
+      receive_signed(@blocked_actor, %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "id" => note_id <> "/activity",
+        "type" => "Create",
+        "actor" => @blocked_actor,
+        "to" => [@public],
+        "object" => %{
+          "id" => note_id,
+          "type" => "Note",
+          "attributedTo" => @blocked_actor,
+          "content" => "from a blocked host",
+          "to" => [@public]
+        }
+      })
+
+      refute match?({:ok, _}, ActivityPub.Object.get_cached(ap_id: note_id))
+    end
+  end
+
   describe "filter recipients when" do
     test "there's a local activity with instance-wide blocked host as recipient (in config)" do
       Config.put([:boundaries, :block], ["mocked.local"])
