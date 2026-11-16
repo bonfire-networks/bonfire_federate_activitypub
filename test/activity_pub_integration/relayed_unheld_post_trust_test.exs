@@ -143,6 +143,57 @@ defmodule Bonfire.Federate.ActivityPub.RelayedUnheldPostTrustTest do
     refute held?(id), "a post relayed by a group it does not name was stored under its id"
   end
 
+  # an `Update` of a post we hold nothing of is handed to the adapter, which makes the post (with no AP row of its own)
+  defp post_made?(id),
+    do: is_binary(Bonfire.Federate.ActivityPub.AdapterUtils.pointer_id_from_ap_object(id))
+
+  # `relayer`'s `Announce` of an unsigned `Update` by the member of `object`, a post that we do not hold
+  defp announce_update(relayer, object) do
+    %{
+      "@context" => "https://www.w3.org/ns/activitystreams",
+      "id" => "#{relayer}/announce/#{System.unique_integer([:positive])}",
+      "type" => "Announce",
+      "actor" => relayer,
+      "to" => [@public],
+      "object" => %{
+        "id" => "https://member.local/activities/update/#{System.unique_integer([:positive])}",
+        "type" => "Update",
+        "actor" => @member,
+        "to" => [@public],
+        "audience" => object["audience"],
+        "object" => object
+      }
+    }
+  end
+
+  test "control: an Update of a post we do not hold, relayed by a followed Group named in the post's audience, is taken unfetched" do
+    follow_accepted!(@group)
+    id = post_id()
+
+    Transformer.handle_incoming(announce_update(@group, page(id, @group)))
+
+    assert post_made?(id),
+           "the Update of a post we do not hold, from a followed Group, made no post"
+  end
+
+  test "an ordinary actor relaying an Update of a post we do not hold stores nothing under the post's id" do
+    id = post_id()
+
+    Transformer.handle_incoming(announce_update(@person, page(id, @person)))
+
+    refute held?(id) or post_made?(id),
+           "an Update relayed by a non-Group was stored under the post's id"
+  end
+
+  test "a Group that nobody here follows, relaying an Update of a post we do not hold, stores nothing under the post's id" do
+    id = post_id()
+
+    Transformer.handle_incoming(announce_update(@other_group, page(id, @other_group)))
+
+    refute held?(id) or post_made?(id),
+           "an Update relayed by a Group nobody follows was stored under the post's id"
+  end
+
   test "the post of an untrusted relay is stored from its origin when the origin serves it", %{
     served: served
   } do

@@ -272,8 +272,8 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
 
     fallback_module = fallback_federation_module()
 
-    with :ok <- check_creator_owns_object(activity, object),
-         {:ok, subject} <- AdapterUtils.activity_character(activity) |> info("activity_character"),
+    # (the check of who may create the object is made where it is created, `create_unless_exists/5`, which every path goes through)
+    with {:ok, subject} <- AdapterUtils.activity_character(activity) |> info("activity_character"),
          # a type claimed via `APActivities.handle_object_types` is kept whole, beating any module handling one of the document's OTHER types: e.g. when configure in :handle_object_types a recipe with type `["Note", "Preparation"]` is a Preparation we keep as APActivity, not a Post with the recipe discarded
          {:no_federation_module_match, _} <-
            if(handled_as_ap_activity?(object_type, fallback_module),
@@ -555,114 +555,122 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
       warn(ap_id, "Already exists locally")
       Bonfire.Common.Needles.get(ap_id, skip_boundary_check: true)
     else
-      local? = e(activity, :local, false)
+      # whichever path brought the object here (any match, a fallback, a list re-dispatched), it is made only by who may make it, and as its owner when the owner vouched for it
+      with :ok <- check_creator_owns_object(activity, object),
+           {:ok, character} <- creator_of_object(character, activity, object) do
+        create_object(ap_id, module, character, activity, object)
+      end
+    end
+  end
 
-      previous_pointer_id = e(object, :pointer_id, nil)
+  defp create_object(ap_id, module, character, activity, object) do
+    local? = e(activity, :local, false)
 
-      # a placeholder that replies to it are threaded under (`AdapterUtils.get_or_create_placeholder/1`): it is created under that id, so they stay where they are
-      placeholder_id = if !local?, do: AdapterUtils.placeholder_id(ap_id)
+    previous_pointer_id = e(object, :pointer_id, nil)
 
-      pointer_id =
-        placeholder_id ||
-          if local? do
-            debug("activity is local (prob processed via C2S)")
+    # a placeholder that replies to it are threaded under (`AdapterUtils.get_or_create_placeholder/1`): it is created under that id, so they stay where they are
+    placeholder_id = if !local?, do: AdapterUtils.placeholder_id(ap_id)
 
-            # TODO: better architecture, maybe updating these instead of deleting?
+    pointer_id =
+      placeholder_id ||
+        if local? do
+          debug("activity is local (prob processed via C2S)")
 
-            if pointer_id = AdapterUtils.pointer_id_from_url(ap_id) do
-              # set pointer ID to the same one as was initially created in AP db
-              pointer_id
-            end
-          end ||
-          with published when is_binary(published) <-
-                 e(object, :data, "published", nil) || e(activity, :data, "published", nil),
-               # dated by the same rule as its AP row (`ActivityPub.Utils.published_at/2`): one we fetched from its origin keeps its date however old, one delivered to us only within a range, so a sender cannot float or bury a post with a date it chose
-               %DateTime{} = date <-
-                 ActivityPub.Utils.published_at(published, received_as(activity, object)) do
-            DatesTimes.generate_ulid(date)
-            # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
-          else
-            _ -> nil
+          # TODO: better architecture, maybe updating these instead of deleting?
+
+          if pointer_id = AdapterUtils.pointer_id_from_url(ap_id) do
+            # set pointer ID to the same one as was initially created in AP db
+            pointer_id
           end
-
-      debug(
-        "AP - handle_activity_with OK: #{module} to Create #{ap_id} as #{inspect(pointer_id)} using #{module}"
-      )
-
-      fallback_module = fallback_federation_module()
-
-      # A local C2S activity is not federated by `ActivityPub.create/2` (which skips `maybe_federate` when `from_c2s`), so it has to be published from here, but it still needs a local object first: the `ActivityPub.Object` stored by `Object.insert` is not a pointable and never reaches a feed.
-      publish_after_create? = local? and module == fallback_module
-
-      if placeholder_id, do: prepare_placeholder_fill(placeholder_id)
-
-      with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
-             Utils.maybe_apply(
-               module,
-               :ap_receive_activity,
-               ap_receive_args(
-                 module,
-                 [
-                   character,
-                   if(not is_map(object),
-                     do: Map.merge(activity, %{pointer_id: pointer_id}),
-                     else: activity
-                   ),
-                   if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
-                 ],
-                 activity,
-                 object
-               ),
-               no_argument_rescue: true,
-               fallback_fun: &no_federation_module_match/2
-             )
-             |> debug("attempted creation of object") do
-        debug(
-          "AP - created object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
-        )
-
-        if placeholder_id == pointable_object_id, do: fill_placeholder(placeholder_id, type)
-
-        link_ap_object(object, pointable_object_id,
-          activity: activity,
-          ap_id: ap_id,
-          local?: local?,
-          previous_pointer_id: previous_pointer_id
-        )
-
-        maybe_apply_comments_enabled(character, object, pointable_object_id)
-
-        if !local?,
-          do: maybe_put_in_feed_of_group_not_announcing(activity, object, pointable_object)
-
-        # replies that reached us before this object did, now that it is linked to its AP object
-        Utils.maybe_apply(Bonfire.Social.Threads, :adopt_orphaned_replies, [
-          pointable_object,
-          object
-        ])
-
-        if publish_after_create? do
-          info("Local C2S activity handled by the fallback module, federating it now")
-          ActivityPub.Federator.publish(activity)
+        end ||
+        with published when is_binary(published) <-
+               e(object, :data, "published", nil) || e(activity, :data, "published", nil),
+             # dated by the same rule as its AP row (`ActivityPub.Utils.published_at/2`): one we fetched from its origin keeps its date however old, one delivered to us only within a range, so a sender cannot float or bury a post with a date it chose
+             %DateTime{} = date <-
+               ActivityPub.Utils.published_at(published, received_as(activity, object)) do
+          DatesTimes.generate_ulid(date)
+          # DatesTimes.date_from_pointer(pointer_id) |> debug("date from pointer")
+        else
+          _ -> nil
         end
 
-        {:ok, pointable_object}
-      else
-        {:ok, :skipped} ->
-          debug(ap_id, "AP - object skipped (no Bonfire record needed)")
-          if placeholder_id, do: restore_placeholder(placeholder_id)
-          {:ok, :skipped}
+    debug(
+      "AP - handle_activity_with OK: #{module} to Create #{ap_id} as #{inspect(pointer_id)} using #{module}"
+    )
 
-        e ->
-          debug(e, "Could not create object")
-          if placeholder_id, do: restore_placeholder(placeholder_id)
+    fallback_module = fallback_federation_module()
 
-          error(
-            "Could not create object for #{ap_id}: #{Types.to_string_or_inspect(Errors.error_msg(e))}"
-          )
+    # A local C2S activity is not federated by `ActivityPub.create/2` (which skips `maybe_federate` when `from_c2s`), so it has to be published from here, but it still needs a local object first: the `ActivityPub.Object` stored by `Object.insert` is not a pointable and never reaches a feed.
+    publish_after_create? = local? and module == fallback_module
 
-          # throw({:error, "Could not process incoming activity"})
+    if placeholder_id, do: prepare_placeholder_fill(placeholder_id)
+
+    with {:ok, %{id: pointable_object_id, __struct__: type} = pointable_object} <-
+           Utils.maybe_apply(
+             module,
+             :ap_receive_activity,
+             ap_receive_args(
+               module,
+               [
+                 character,
+                 if(not is_map(object),
+                   do: Map.merge(activity, %{pointer_id: pointer_id}),
+                   else: activity
+                 ),
+                 if(is_map(object), do: Map.merge(object, %{pointer_id: pointer_id}))
+               ],
+               activity,
+               object
+             ),
+             no_argument_rescue: true,
+             fallback_fun: &no_federation_module_match/2
+           )
+           |> debug("attempted creation of object") do
+      debug(
+        "AP - created object with local ID #{pointable_object_id} of type #{inspect(type)} for #{ap_id}"
+      )
+
+      if placeholder_id == pointable_object_id, do: fill_placeholder(placeholder_id, type)
+
+      link_ap_object(object, pointable_object_id,
+        activity: activity,
+        ap_id: ap_id,
+        local?: local?,
+        previous_pointer_id: previous_pointer_id
+      )
+
+      maybe_apply_comments_enabled(character, object, pointable_object_id)
+
+      if !local?,
+        do: maybe_put_in_feed_of_group_not_announcing(activity, object, pointable_object)
+
+      # replies that reached us before this object did, now that it is linked to its AP object
+      Utils.maybe_apply(Bonfire.Social.Threads, :adopt_orphaned_replies, [
+        pointable_object,
+        object
+      ])
+
+      if publish_after_create? do
+        info("Local C2S activity handled by the fallback module, federating it now")
+        ActivityPub.Federator.publish(activity)
       end
+
+      {:ok, pointable_object}
+    else
+      {:ok, :skipped} ->
+        debug(ap_id, "AP - object skipped (no Bonfire record needed)")
+        if placeholder_id, do: restore_placeholder(placeholder_id)
+        {:ok, :skipped}
+
+      e ->
+        debug(e, "Could not create object")
+        if placeholder_id, do: restore_placeholder(placeholder_id)
+
+        error(
+          "Could not create object for #{ap_id}: #{Types.to_string_or_inspect(Errors.error_msg(e))}"
+        )
+
+        # throw({:error, "Could not process incoming activity"})
     end
   end
 
@@ -921,6 +929,44 @@ defmodule Bonfire.Federate.ActivityPub.Incoming do
   end
 
   defp check_creator_owns_object(_activity, _object), do: :ok
+
+  # Who is credited with the object: the one that sent it, unless it is a note its owner vouched for with a proof or LD signature of its own, sent by someone else: then its owner, who made it, and never the sender, who only passed it on.
+  defp creator_of_object(
+         character,
+         %{data: %{"type" => "Create"} = data} = activity,
+         %{authenticated: authenticated, data: %{} = object_data} = object
+       )
+       when authenticated in [:integrity_proof, :ld_signature] do
+    owners = owner_ids(object_data)
+
+    actors =
+      data["actor"]
+      |> List.wrap()
+      |> Enum.map(&ActivityPub.Object.get_ap_id/1)
+      |> Enum.reject(&is_nil/1)
+
+    cond do
+      Map.get(activity, :local) == true or owners == [] or actors == [] ->
+        {:ok, character}
+
+      object_data["type"] in ActivityPub.Config.supported_actor_types() ->
+        {:ok, character}
+
+      Enum.any?(actors, &(&1 in owners)) ->
+        {:ok, character}
+
+      true ->
+        signer = Map.get(object, :signed_by)
+        owner = if signer in owners, do: signer, else: List.first(owners)
+
+        case AdapterUtils.activity_character(owner) do
+          {:ok, owner_character} -> {:ok, owner_character}
+          other -> error(other, "could not find the owner of the object, who signed it")
+        end
+    end
+  end
+
+  defp creator_of_object(character, _activity, _object), do: {:ok, character}
 
   # Whether a `Create` may create an object that its actor does not own. Two cases need it, and no other: the owner vouched for the object itself, with a proof or an LD signature of its own (the library marks the object so only when the signer is its owner); and a document we fetched ourselves whose author we could not resolve, which the library attributes to our own service actor (a delivery is refused instead). A group's relay of a member's post is an `Announce`, and the `Create` inside it is the member's own.
   defp foreign_owner_allowed?(activity, object) do

@@ -53,9 +53,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
         "../fixtures/mastodon-post-object.json"
         |> Path.expand(__DIR__)
         |> File.read!()
+        |> Jason.decode!()
         |> json()
-
-      # |> Jason.decode!()
 
       # %{method: :get, url: "https://mocked.local/users/karen/statuses/114800379424129152/activity"} ->
       # "../fixtures/mastodon-post-activity.json"
@@ -602,7 +601,8 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
     end
 
     # should make sure we also tell the adapter to delete things that were pruned, as part of the work on https://github.com/bonfire-networks/bonfire-app/issues/850
-    test "delete object works for incoming when the object has been pruned from AP db" do
+    # An unsigned Delete of a post whose AP row was pruned is taken only when the origin confirms it: `status` is what the origin answers when asked for the post again (410 is a post deleted there, 200 one still served)
+    defp delete_pruned_remote_post(origin_status) do
       # Simulate receiving a remote post
       remote_post_data =
         "../fixtures/mastodon-post-activity.json"
@@ -638,6 +638,30 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       assert {:error, :not_found} = ActivityPub.Object.get_cached(ap_id: object_id)
       assert repo().exists?(Bonfire.Data.Social.Post, id: bonfire_post.id)
 
+      # what the origin answers now that the sender says the post is gone
+      post_url = "https://mocked.local/users/karen/statuses/114800379424129152"
+
+      mock(fn
+        %{method: :get, url: ^post_url} when origin_status == 410 ->
+          %Tesla.Env{status: 410, body: ""}
+
+        %{method: :get, url: ^post_url} ->
+          "../fixtures/mastodon-post-object.json"
+          |> Path.expand(__DIR__)
+          |> File.read!()
+          |> Jason.decode!()
+          |> json()
+
+        %{method: :get, url: @remote_actor} ->
+          json(Simulate.actor_json(@remote_actor))
+
+        %{method: :get, url: @remote_actor <> "/followers"} ->
+          json(%{})
+
+        _ ->
+          %Tesla.Env{status: 404, body: ""}
+      end)
+
       # Now receive a Delete activity from the remote instance for this object
       delete_data = %{
         "@context" => "https://www.w3.org/ns/activitystreams",
@@ -651,13 +675,22 @@ defmodule Bonfire.Federate.ActivityPub.PostWebTest do
       }
 
       # Handle the incoming Delete
-      {:ok, _delete_activity} =
-        ActivityPub.Federator.Transformer.handle_incoming(delete_data)
-        |> debug("handled delete activity")
+      {ActivityPub.Federator.Transformer.handle_incoming(delete_data)
+       |> debug("handled delete activity"),
+       repo().exists?(Bonfire.Data.Social.Post, id: bonfire_post.id)}
+    end
 
-      # Verify the Bonfire post was deleted even though AP object was already pruned
-      refute repo().exists?(Bonfire.Data.Social.Post, id: bonfire_post.id),
-             "Post should be deleted from Bonfire even when AP object was pruned"
+    test "delete object works for incoming when the object has been pruned from AP db" do
+      # the origin confirms it is gone, so the Bonfire post is deleted even though the AP object was already pruned
+      assert {{:ok, _delete_activity}, post_exists?} = delete_pruned_remote_post(410)
+
+      refute post_exists?, "Post should be deleted from Bonfire even when AP object was pruned"
+    end
+
+    test "an unsigned Delete of a pruned post that its origin still serves does not delete it" do
+      assert {_result, post_exists?} = delete_pruned_remote_post(200)
+
+      assert post_exists?, "an unsigned Delete the origin does not confirm deleted the post"
     end
 
     # A receiving instance that can't take the Delete on the sender's word fetches the object again to confirm it, so the origin has to answer "deleted" as soon as the post is deleted, even when the live JSON was cached by an earlier fetch
