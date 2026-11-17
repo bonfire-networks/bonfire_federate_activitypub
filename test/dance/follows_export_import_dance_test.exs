@@ -39,7 +39,8 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowsExportImportTest do
     # Verify follows exist locally
     assert Follows.following?(local_user, local_followee1[:user])
     assert Follows.following?(local_user, local_followee2[:user])
-    assert Follows.following?(local_user, remote_followee3_on_local)
+    # a follow of someone on the other instance is a request until that instance's `Accept` comes back
+    assert eventually(fn -> Follows.following?(local_user, remote_followee3_on_local) end)
 
     # Export follows to CSV using actual controller
     Logger.metadata(action: info("export follows via controller"))
@@ -84,12 +85,13 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowsExportImportTest do
 
       # Verify follows were imported correctly
       Logger.metadata(action: info("verify imported follows"))
-      assert Follows.following?(remote_user, followee1_on_remote)
+      # the first two are on the other instance, so each is a request until its `Accept` comes back
+      assert eventually(fn -> Follows.following?(remote_user, followee1_on_remote) end)
 
       assert {:ok, followee2_on_remote} =
                AdapterUtils.get_or_fetch_and_create_by_uri(followee2_ap_id)
 
-      assert Follows.following?(remote_user, followee2_on_remote)
+      assert eventually(fn -> Follows.following?(remote_user, followee2_on_remote) end)
 
       assert Follows.following?(remote_user, remote_followee3[:user])
     end)
