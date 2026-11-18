@@ -757,32 +757,47 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseModerationTest do
       assert [_] = lock_records.(), "the relayed copy doesn't lock it again"
     end
 
-    # with no id, a redelivery can't be told from a new Lock, and each would write another moderation record: refused, as any activity with no id is
-    test "a Lock with no id is refused, and writes no record", %{
-      text_post: locked,
-      announced_by: community,
-      community_moderator: moderator
-    } do
+    # A Lock with no id gets one derived from its actor and its content, so a redelivery finds the same id: it locks the thread once, with one moderation record, however often it arrives
+    test "a Lock with no id locks the thread once, with one record, however often it arrives",
+         %{
+           text_post: locked,
+           announced_by: community,
+           community_moderator: moderator
+         } do
       {:ok, %{pointer_id: pointer_id}} = ActivityPub.Object.get_cached(ap_id: locked)
       post = Bonfire.Common.Needles.get!(pointer_id, skip_boundary_check: true)
+
+      lock_verb_id = "10CKTHREADT0FVRTHERREP11ES"
+
+      lock_records = fn ->
+        Bonfire.Common.Repo.all(
+          from(a in Bonfire.Data.Social.Activity,
+            where: a.object_id == ^pointer_id and a.verb_id == ^lock_verb_id
+          )
+        )
+      end
 
       lock =
         fixture("mod_lock_page.json")
         |> Map.merge(%{"object" => locked, "audience" => community, "actor" => moderator})
         |> Map.delete("id")
 
-      refute match?({:ok, _}, ActivityPub.Federator.Transformer.handle_incoming(lock))
-      refute match?({:ok, _}, ActivityPub.Federator.Transformer.handle_incoming(lock))
+      assert {:ok, _} = ActivityPub.Federator.Transformer.handle_incoming(lock)
 
-      assert Bonfire.Boundaries.can?(fake_user!(), :reply, post), "the thread stays open"
+      refute Bonfire.Boundaries.can?(fake_user!(), :reply, post), "the thread is locked"
+      assert [_] = lock_records.(), "control: the Lock was applied, with its record"
+
+      ActivityPub.Federator.Transformer.handle_incoming(lock)
+
+      assert [_] = lock_records.(), "the redelivery doesn't lock it again"
     end
 
-    test "an Undo of a Lock with no id is refused", context do
+    test "an Undo of a Lock with no id reopens the thread", context do
       %{post: post, someone: someone, undo: undo} = lock_then_undo(context)
 
-      refute match?({:ok, _}, receive_moderation(Map.delete(undo, "id")))
+      assert {:ok, _} = receive_moderation(Map.delete(undo, "id"))
 
-      refute Bonfire.Boundaries.can?(someone, :reply, post), "the thread stays locked"
+      assert Bonfire.Boundaries.can?(someone, :reply, post), "reopened"
     end
 
     # One of OUR users who the community lists as a moderator acts on a post in it: the community applies it and announces it to its followers, us included (`send_activity_in_community`), so its echo comes back with an id we already hold, since we stored the activity when we sent it, and an actor who is local. That echo is what applies the action here, rather than applying it before the community has
