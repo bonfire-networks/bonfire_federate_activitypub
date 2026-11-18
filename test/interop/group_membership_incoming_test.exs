@@ -219,6 +219,55 @@ defmodule Bonfire.Federate.ActivityPub.GroupMembershipIncomingTest do
              "the follow is ours to record, not theirs to send: nothing may go out as them"
     end
 
+    # A copy of our own group's actor stored as a remote object (no pointer) was found on an instance, and every Join to the group then failed with "no local group to act on": the group's URL resolved to that row before the local actor. The row is put here as it was found, since this test is about an instance that already holds one.
+    test "still makes them a member, and is accepted, when a remote copy of our group's actor is stored",
+         %{group: group, group_ap_id: group_ap_id} do
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: group)
+
+      repo().insert!(%ActivityPub.Object{
+        id: Ecto.UUID.generate(),
+        data: actor.data,
+        local: false
+      })
+
+      assert {:ok, %{local: false, pointer_id: nil}} =
+               ActivityPub.Object.get_cached(ap_id: group_ap_id),
+             "control: the group's own URL finds the stray copy"
+
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Join", group_ap_id))
+
+      assert Categories.member?(remote_user(), group)
+      assert [_] = accepts_of("Join", group_ap_id)
+    end
+
+    # How such a copy gets made: a document from elsewhere listing actors in full (as NodeBB and Smithereen do), which ingest stores as remote actors, ours included
+    test "is still accepted after a collection from elsewhere lists our group's actor in full, which stores no copy of it",
+         %{group: group, group_ap_id: group_ap_id} do
+      {:ok, actor} = ActivityPub.Actor.get_cached(pointer: group)
+
+      ActivityPub.Federator.Fetcher.fetch_collection(
+        %{
+          "type" => "OrderedCollection",
+          "id" => "https://lemmy.local/c/elsewhere/narrower",
+          "totalItems" => 1,
+          "orderedItems" => [actor.data]
+        },
+        mode: true,
+        fetch_collection_entries: true
+      )
+
+      assert [] ==
+               ActivityPub.Object
+               |> repo().all()
+               |> Enum.filter(&(&1.data["id"] == group_ap_id and not &1.local)),
+             "a remote copy of our own group was stored"
+
+      assert {:ok, _} = Transformer.handle_incoming(membership_activity("Join", group_ap_id))
+
+      assert Categories.member?(remote_user(), group)
+      assert [_] = accepts_of("Join", group_ap_id)
+    end
+
     test "then an incoming Leave ends both the membership and that follow", %{
       group: group,
       group_ap_id: group_ap_id
