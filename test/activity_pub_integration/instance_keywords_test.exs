@@ -75,7 +75,7 @@ defmodule Bonfire.Federate.ActivityPub.InstanceKeywordsTest do
       assert length(publish_jobs()) > jobs_before, "it is queued to federate"
     end
 
-    # Fails: no job is queued (46 before and after). Not known yet whether `@karen@mocked.local` doesn't resolve as a mention in this setup, or a post to the people it mentions doesn't federate to them
+    # Fails: no job is queued (46 before and after), because `@karen@mocked.local` is not parsed as a mention: `.local` is not in Linkify's list of known TLDs, so with domain validation on the mention is dropped before any actor lookup. Setting `SKIP_LINK_DOMAINS_VALIDATION=1` for the test (as `DeleteRecipientsTest` does) lets it parse
     # test "a post without the instance's keywords, to the people it mentions, federates to someone on another instance it mentions",
     #      %{author: author} do
     #   jobs_before = length(publish_jobs())
