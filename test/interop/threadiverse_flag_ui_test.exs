@@ -54,7 +54,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseFlagUITest do
     |> wait_async()
     |> assert_has("[data-object_id='#{id(post)}']")
     |> within("[data-object_id='#{id(post)}']", fn session ->
-      click_button(session, "[data-role=open_modal]", "Flag this")
+      session
+      |> open_more_menu()
+      |> click_button("[data-role=open_modal]", "Flag this")
     end)
     # |> open_browser()
     |> assert_has(@group_checkbox)
@@ -116,7 +118,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseFlagUITest do
     |> wait_async()
     |> assert_has("[data-object_id='#{id(post_by_other)}']")
     |> within("[data-object_id='#{id(post_by_other)}']", fn session ->
-      click_button(session, "[data-role=open_modal]", "Flag this")
+      session
+      |> open_more_menu()
+      |> click_button("[data-role=open_modal]", "Flag this")
     end)
     |> assert_has("input[name=forward]")
     |> assert_has(@group_checkbox)
@@ -197,7 +201,9 @@ defmodule Bonfire.Federate.ActivityPub.ThreadiverseFlagUITest do
     |> wait_async()
     |> assert_has("[data-object_id='#{id(post_by_other)}']")
     |> within("[data-object_id='#{id(post_by_other)}']", fn session ->
-      click_button(session, "[data-role=open_modal]", "Flag this")
+      session
+      |> open_more_menu()
+      |> click_button("[data-role=open_modal]", "Flag this")
     end)
     |> assert_has("textarea[name=comment]")
     |> refute_has(@group_checkbox)
