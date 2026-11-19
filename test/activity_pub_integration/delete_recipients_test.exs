@@ -58,7 +58,10 @@ defmodule Bonfire.Federate.ActivityPub.DeleteRecipientsTest do
 
     {:ok, allowed_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @allowed_actor)
     {:ok, allowed} = Bonfire.Me.Users.by_ap_id(@allowed_actor)
-    {:ok, other_follower_actor} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @other_follower_actor)
+
+    {:ok, other_follower_actor} =
+      ActivityPub.Actor.get_cached_or_fetch(ap_id: @other_follower_actor)
+
     {:ok, _} = ActivityPub.Actor.get_cached_or_fetch(ap_id: @mentioned_actor)
     {:ok, mentioned} = Bonfire.Me.Users.by_ap_id(@mentioned_actor)
 

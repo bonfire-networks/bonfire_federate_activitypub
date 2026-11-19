@@ -40,7 +40,8 @@ defmodule Bonfire.Federate.ActivityPub.DataMigrations.OwnActorRemoteCopiesTest d
         from(o in ActivityPub.Object, where: fragment("?->>'id'", o.data) == ^ap_id, select: o.id)
       )
 
-  defp run, do: OwnActorRemoteCopies.base_query() |> repo().all() |> OwnActorRemoteCopies.migrate()
+  defp run,
+    do: OwnActorRemoteCopies.base_query() |> repo().all() |> OwnActorRemoteCopies.migrate()
 
   test "a remote copy of one of our actors is removed, and its URL leads to the actor again", %{
     group: group,
