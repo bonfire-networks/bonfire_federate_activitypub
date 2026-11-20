@@ -62,6 +62,26 @@ defmodule Bonfire.Federate.ActivityPub.MirroredGroupSettingsRedirectTest do
     end
   end
 
+  # The instance's admins have authority over the groups it hosts, and a mirror's settings are not changed here: an admin who doesn't moderate the mirror is sent where its moderators are
+  test "an instance admin who doesn't moderate the mirror lands on its Moderation page too", %{
+    group: group
+  } do
+    admin_account = fake_account!()
+    admin = fake_admin!(admin_account)
+    refute Bonfire.Boundaries.can?(admin, :mediate, group), "control: not a moderator of it"
+
+    for tab <- ["", "/boundaries", "/moderators"] do
+      conn(user: admin, account: admin_account)
+      |> visit(Bonfire.Common.URIs.path(group) <> "/settings" <> tab)
+      |> assert_path(Bonfire.Common.URIs.path(group) <> "/settings/moderation")
+      |> assert_has("[data-role=page_title]", text: "Moderation")
+      |> wait_async()
+      # the page itself, not either refusal
+      |> refute_has("*", text: "You don't have permission to edit this group's settings.")
+      |> refute_has("*", text: "Sorry, you cannot moderate this group.")
+    end
+  end
+
   test "a mirror's Moderation page shows a join request, but approving it is left to the group",
        %{
          conn: conn,
