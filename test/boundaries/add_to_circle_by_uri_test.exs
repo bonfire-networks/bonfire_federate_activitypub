@@ -70,13 +70,12 @@ defmodule Bonfire.Federate.ActivityPub.AddToCircleByUriTest do
 
     assert {:error, _} = AdapterUtils.add_to_circle_by_uri(remote_actor, ordinary_circle, me)
 
-    case AdapterUtils.get_character_by_ap_id(remote_actor) do
-      {:ok, actor} -> refute Circles.is_encircled_by?(actor, ordinary_circle)
-      _ -> :not_fetched
-    end
+    # refused by the fetch itself, which doesn't federate with a non-allowlisted host, so the actor is never known here
+    assert {:error, _} = AdapterUtils.get_character_by_ap_id(remote_actor)
   end
 
-  test "does not add an already known, non-allowlisted remote actor to an ordinary circle when user is in allowlist-only mode",
+  # allowlist-only mode limits who we federate with, not who someone puts in their circles: an actor already known here is added as the member search would add them
+  test "adds an already known, non-allowlisted remote actor to an ordinary circle when user is in allowlist-only mode",
        %{me: me} do
     remote_actor = "https://other.local/users/dave"
     mock(fn %{method: :get, url: ^remote_actor} -> json(Simulate.actor_json(remote_actor)) end)
@@ -90,8 +89,8 @@ defmodule Bonfire.Federate.ActivityPub.AddToCircleByUriTest do
 
     {:ok, ordinary_circle} = Circles.create(me, %{named: %{name: "friends"}})
 
-    assert {:error, _} = AdapterUtils.add_to_circle_by_uri(remote_actor, ordinary_circle, me)
-    refute Circles.is_encircled_by?(known_actor, ordinary_circle)
+    assert {:ok, _} = AdapterUtils.add_to_circle_by_uri(remote_actor, ordinary_circle, me)
+    assert Circles.is_encircled_by?(known_actor, ordinary_circle)
   end
 
   test "adds a bare domain to a circle as an instance circle", %{me: me, circle: circle} do

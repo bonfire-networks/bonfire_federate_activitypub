@@ -3552,13 +3552,14 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
       if federation_list_circle?(opts[:circle]) do
         get_by_url_ap_id_or_username(uri, current_user: current_user, federation_mode: true)
       else
-        # an actor we already know isn't fetched, so the check on the fetch doesn't apply to it: check here that it may be federated with
-        with {:ok, subject} <- get_by_url_ap_id_or_username(uri, current_user: current_user),
-             true <-
-               federation_allowed?(subject, current_user: current_user, skip_block_check: true) ||
-                 {:error, :not_allowed} do
-          {:ok, subject}
-        end
+        # archipelago (allowlist-only) mode limits who we federate with, not who someone puts in their circles: an actor already known here is added as the member search would add them, and an unknown non-allowlisted one is still refused by the fetch itself
+        # with {:ok, subject} <- get_by_url_ap_id_or_username(uri, current_user: current_user),
+        #      true <-
+        #        federation_allowed?(subject, current_user: current_user, skip_block_check: true) ||
+        #          {:error, :not_allowed} do
+        #   {:ok, subject}
+        # end
+        get_by_url_ap_id_or_username(uri, current_user: current_user)
       end
     end
   end
