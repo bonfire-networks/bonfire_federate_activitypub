@@ -558,8 +558,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
 
       test "with an FEP-8a8e category, is tagged with the mirror of that category, as a remote event is",
            %{conn: conn, user: user} do
-        # the values' topics reserved, as the startup task does on an instance (at boot in tests the sandbox is not open to it, so a fresh test database has none)
-        Bonfire.Gatherings.EventCategories.run()
+        # the values' topics reserved, as the startup task does on an instance (it does nothing in tests, so a fresh test database has none)
+        Bonfire.Gatherings.EventCategories.reserve_topics()
 
         conn =
           post_event(conn, user, %{
