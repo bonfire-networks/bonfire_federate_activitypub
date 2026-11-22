@@ -23,6 +23,35 @@ defmodule Bonfire.Federate.ActivityPub.Instances do
     repo().many(list_query())
   end
 
+  @doc "Hostnames of the known instances, leaving out those blocked instance-wide (ghosted or silenced), as Mastodon's peers list leaves out suspended domains. Three queries: the hostnames, their instance circles, which of those circles a block circle holds (the batch form of `instance_blocked?/3`)."
+  def list_unblocked_hostnames do
+    hosts =
+      from(p in Peer,
+        where: not is_nil(p.display_hostname),
+        distinct: true,
+        select: p.display_hostname
+      )
+      |> repo().all()
+
+    # %{host => circle}: blocking an instance encircles its circle, not the Peer
+    circles = get_instance_circles(hosts)
+
+    blocked =
+      Utils.maybe_apply(
+        Bonfire.Boundaries.Circles,
+        :encircled_subset,
+        [Map.values(circles), Bonfire.Boundaries.Blocks.instance_wide_circles(:any)],
+        fallback_return: MapSet.new()
+      )
+
+    Enum.reject(hosts, fn host ->
+      case circles[host] do
+        %{id: id} -> MapSet.member?(blocked, id)
+        _ -> false
+      end
+    end)
+  end
+
   def list_by_domains(canonical_uris) do
     query_by_domain(canonical_uris)
     |> repo().many()
