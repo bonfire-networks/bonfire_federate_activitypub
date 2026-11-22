@@ -353,6 +353,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
         assert {:ok, _} = Bonfire.Classify.Categories.get_archived("pets_events")
       end
 
+      if !Bonfire.Common.Extend.extension_enabled?(:bonfire_label),
+        do: @tag(skip: "needs bonfire_label")
+
       test "an FEP-8a8e value configured as a label is tagged as a label, under the Events label" do
         Process.put(
           [:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_as_labels],
@@ -374,6 +377,41 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
         assert label.character.username == "lgbtq_events"
 
         assert %{tree: %{parent_id: "1ABE1SF0REVENTSANDGATHER1N"}} = Repo.preload(label, :tree)
+      end
+
+      test "without the labels extension, an FEP-8a8e value configured as a label is tagged as a topic, under the parent" do
+        # as on a flavour without `bonfire_label`: its config read through the process tree, so the epic's tasks see it too (`Bonfire.Common.Extend`'s per-process cache would not reach them)
+        Process.put([:bonfire_label, :modularity], :disabled)
+
+        Process.put(
+          [:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_as_labels],
+          ["LGBTQ"]
+        )
+
+        assert {:ok, %Event{id: event_id}} =
+                 receive_wrapped(
+                   "Create",
+                   event_object(
+                     "#{@actor}/objects/#{Needle.UID.generate()}",
+                     "Pride Picnic",
+                     "2030-06-07T12:00:00Z",
+                     %{"category" => "LGBTQ"}
+                   )
+                 )
+
+        assert [%{type: :topic} = topic] = categories(native_event!(event_id))
+        assert topic.character.username == "lgbtq_events"
+
+        # under its group's topic (LGBTQ under CAUSES, in the configured nesting), itself under the parent
+        assert %{
+                 parent_category: %{
+                   character: %{username: "causes_events"},
+                   parent_category: %{character: %{username: "events"}}
+                 }
+               } =
+                 Repo.maybe_preload(topic,
+                   parent_category: [:character, parent_category: [:character]]
+                 )
       end
 
       test "with no end and a time zone, keeps the zone and has no end" do

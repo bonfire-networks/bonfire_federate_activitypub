@@ -2,7 +2,7 @@ defmodule Bonfire.Federate.ActivityPub.CategoryTagsTest do
   @moduledoc """
   The tags of an `Event` that arrives from a remote actor (S2S). See `plans/events-categories.md`.
 
-  Nothing models an `Event`, so it is stored as an `APActivity` with the raw AS2 json, and the items of its `tag` have to become real tags there.
+  Without `bonfire_gatherings`, nothing models an `Event`, so it is stored as an `APActivity` with the raw AS2 json; with it, as a native `Bonfire.Gatherings.Event`. Either way the items of its `tag` have to become real tags.
   """
   # `@moduletag :federation` comes with this case
   use Bonfire.Federate.ActivityPub.ConnCase, async: false
@@ -45,7 +45,14 @@ defmodule Bonfire.Federate.ActivityPub.CategoryTagsTest do
     {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
 
     assert {:ok, activity} = Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
-    assert %Bonfire.Data.Social.APActivity{} = activity
+    # assert %Bonfire.Data.Social.APActivity{} = activity
+    # a native event where `bonfire_gatherings` is installed, else an `APActivity`: the tags are the same either way
+    expected =
+      if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings),
+        do: Bonfire.Gatherings.Event,
+        else: Bonfire.Data.Social.APActivity
+
+    assert %{__struct__: ^expected} = activity
 
     repo().maybe_preload(activity, tags: [:named, :character])
   end
