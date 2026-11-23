@@ -37,6 +37,34 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
       :ok
     end
 
+    # the configured categories with each one's `parent` and `label` set as given (by default none: flat, and all topics), rather than the flavour's defaults
+    defp put_category_grouping(parents \\ %{}, labels \\ []) do
+      categories =
+        for {key, config} <-
+              Bonfire.Common.Config.get([Bonfire.Gatherings.Events, :categories], []) do
+          config = Keyword.drop(config, [:parent, :label])
+
+          config =
+            if parent = parents[to_string(key)], do: [{:parent, parent} | config], else: config
+
+          config = if to_string(key) in labels, do: [{:label, true} | config], else: config
+          {key, config}
+        end
+
+      Process.put([:bonfire_gatherings, Bonfire.Gatherings.Events, :categories], categories)
+    end
+
+    # the configured categories as they are, with these values made labels
+    defp put_category_labels(labels) do
+      categories =
+        for {key, config} <-
+              Bonfire.Common.Config.get([Bonfire.Gatherings.Events, :categories], []) do
+          {key, if(to_string(key) in labels, do: Keyword.put(config, :label, true), else: config)}
+        end
+
+      Process.put([:bonfire_gatherings, Bonfire.Gatherings.Events, :categories], categories)
+    end
+
     defp mobilizon_event do
       "../fixtures/mobilizon.org-event.json"
       |> Path.expand(__DIR__)
@@ -236,10 +264,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
 
         # a category whose topic already exists, from before the parent was configured (it is by default, so set to none here)
         Process.put([:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_parent], "")
-        # no grouping, so each value is directly under the parent
-        Process.put([:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_nesting], %{})
-        # and no labels, so each value is a topic
-        Process.put([:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_as_labels], [])
+
+        # no grouping, so each value is directly under the parent, and no labels, so each value is a topic
+        put_category_grouping()
 
         assert {:ok, %Event{}} =
                  receive_wrapped(
@@ -299,13 +326,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
           "events"
         )
 
-        Process.put(
-          [:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_nesting],
-          %{"ARTS" => ["THEATRE"]}
-        )
-
         # and no labels, so each value is a topic
-        Process.put([:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_as_labels], [])
+        put_category_grouping(%{"THEATRE" => "ARTS"})
 
         Bonfire.Gatherings.EventCategories.reserve_topics()
 
@@ -357,10 +379,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
         do: @tag(skip: "needs bonfire_label")
 
       test "an FEP-8a8e value configured as a label is tagged as a label, under the Events label" do
-        Process.put(
-          [:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_as_labels],
-          ["LGBTQ"]
-        )
+        put_category_labels(["LGBTQ"])
 
         assert {:ok, %Event{id: event_id}} =
                  receive_wrapped(
@@ -383,10 +402,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
         # as on a flavour without `bonfire_label`: its config read through the process tree, so the epic's tasks see it too (`Bonfire.Common.Extend`'s per-process cache would not reach them)
         Process.put([:bonfire_label, :modularity], :disabled)
 
-        Process.put(
-          [:bonfire_gatherings, Bonfire.Gatherings.Events, :categories_as_labels],
-          ["LGBTQ"]
-        )
+        put_category_labels(["LGBTQ"])
 
         assert {:ok, %Event{id: event_id}} =
                  receive_wrapped(
@@ -427,6 +443,92 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
                  )
 
         assert %{has_end: nil, timezone: "Europe/Paris"} = native_event!(event_id).time_span
+      end
+
+      # the fixture event, with the fields Mobilizon sets for an event that is booked elsewhere (`joinMode: "external"`) or held online
+      defp mobilizon_event_with(fields) do
+        mobilizon_event()
+        |> Map.put("id", "https://mobilizon.local/events/#{Needle.UID.generate()}")
+        |> Map.merge(fields)
+      end
+
+      defp event_info(id),
+        do: native_event!(id) |> Repo.preload(:extra_info) |> Map.get(:extra_info)
+
+      test "keeps its external participation URL and its online address, and only those" do
+        assert {:ok, %Event{id: booked_id}} =
+                 mobilizon_event_with(%{
+                   "joinMode" => "external",
+                   "externalParticipationUrl" => "https://tickets.mobilizon.local/e/1"
+                 })
+                 |> receive_s2s()
+
+        assert %{info: info} = event_info(booked_id)
+        assert info == %{"external_participation_url" => "https://tickets.mobilizon.local/e/1"}
+
+        assert {:ok, %Event{id: online_id}} =
+                 mobilizon_event_with(%{"onlineAddress" => "https://meet.mobilizon.local/room"})
+                 |> receive_s2s()
+
+        assert %{info: %{"online_address" => "https://meet.mobilizon.local/room"} = info} =
+                 event_info(online_id)
+
+        refute Map.has_key?(info, "external_participation_url")
+        refute Map.has_key?(info, "join_mode")
+      end
+
+      test "drops a participation URL or online address that is not an http(s) URL" do
+        assert {:ok, %Event{id: id}} =
+                 mobilizon_event_with(%{
+                   "externalParticipationUrl" => "javascript:alert(1)",
+                   "onlineAddress" => "come to the back garden"
+                 })
+                 |> receive_s2s()
+
+        assert is_nil(event_info(id)), "no extra info row when nothing valid is left"
+      end
+
+      test "an event with neither has no extra info" do
+        assert {:ok, %Event{id: id}} = receive_s2s(mobilizon_event())
+        assert is_nil(event_info(id))
+      end
+
+      test "an Update changes them, and leaves other extra info alone" do
+        id = "#{@actor}/objects/#{Needle.UID.generate()}"
+
+        assert {:ok, %Event{id: event_id}} =
+                 receive_wrapped(
+                   "Create",
+                   event_object(id, "booked", "2030-06-01T17:00:00Z", %{
+                     "externalParticipationUrl" => "https://tickets.mobilizon.local/e/1",
+                     "onlineAddress" => "https://meet.mobilizon.local/room"
+                   })
+                 )
+
+        # something else kept in the same map
+        %{info: info} = extra = event_info(event_id)
+
+        assert {:ok, _} =
+                 extra
+                 |> Bonfire.Data.Identity.ExtraInfo.changeset(%{
+                   info: Map.put(info, "other", "kept")
+                 })
+                 |> Repo.update()
+
+        assert {:ok, _} =
+                 receive_wrapped(
+                   "Update",
+                   event_object(id, "booked", "2030-06-01T17:00:00Z", %{
+                     "externalParticipationUrl" => "https://tickets.mobilizon.local/e/2"
+                   })
+                 )
+
+        # the online address is not in the Update, but the stored object keeps what an Update leaves out, so it is kept
+        assert event_info(event_id).info == %{
+                 "external_participation_url" => "https://tickets.mobilizon.local/e/2",
+                 "online_address" => "https://meet.mobilizon.local/room",
+                 "other" => "kept"
+               }
       end
 
       test "an Update changes the event, and leaves one" do
@@ -484,6 +586,204 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
 
         assert {:ok, _} = Bonfire.Gatherings.Events.read(id, current_user: recipient)
         assert {:error, _} = Bonfire.Gatherings.Events.read(id, current_user: other)
+      end
+    end
+
+    describe "an Event whose Place has an address but no coordinates" do
+      setup do
+        :meck.new(Bonfire.Geolocate.Geocode, [:passthrough, :no_link])
+        on_exit(fn -> :meck.unload(Bonfire.Geolocate.Geocode) end)
+        :ok
+      end
+
+      defp stub_geocoder(result),
+        do: :meck.expect(Bonfire.Geolocate.Geocode, :coordinates, fn _query -> result end)
+
+      defp geocoder_queries,
+        do:
+          :meck.history(Bonfire.Geolocate.Geocode)
+          |> Enum.map(fn {_, {_, :coordinates, [q]}, _} -> q end)
+
+      # the Place of the fixture event, with its own coordinates and address taken out and `fields` put in
+      defp place_with(fields) do
+        mobilizon_event()["location"]
+        |> Map.drop(["geo", "address"])
+        |> Map.put("id", "https://mobilizon.local/address/#{Needle.UID.generate()}")
+        |> Map.merge(fields)
+      end
+
+      defp stored_point(event_id),
+        do: native_event!(event_id).primary_geolocation.geolocation.geom
+
+      @postal_address %{
+        "type" => "PostalAddress",
+        "streetAddress" => " 4 Rue des Ducs ",
+        "postalCode" => nil,
+        "addressLocality" => "Nantes",
+        "addressRegion" => "Pays de la Loire",
+        "addressCountry" => "France"
+      }
+
+      test "a PostalAddress is geocoded, the point stored longitude first" do
+        stub_geocoder({:ok, %{lat: 47.2184, lon: -1.5536}})
+
+        assert {:ok, %Event{id: id}} =
+                 mobilizon_event_with(%{
+                   "location" => place_with(%{"address" => @postal_address})
+                 })
+                 |> receive_s2s()
+
+        assert %{coordinates: {-1.5536, 47.2184}} = stored_point(id)
+
+        assert geocoder_queries() == ["4 Rue des Ducs, Nantes, Pays de la Loire, France"]
+      end
+
+      test "a plain string address (and a Place with no id) is geocoded the same" do
+        stub_geocoder({:ok, %{lat: 45.07, lon: 7.69}})
+
+        place = place_with(%{"address" => "Via Roma 1, Torino"}) |> Map.delete("id")
+
+        assert {:ok, %Event{id: id}} =
+                 mobilizon_event_with(%{"location" => place}) |> receive_s2s()
+
+        assert %{coordinates: {7.69, 45.07}} = stored_point(id)
+        assert geocoder_queries() == ["Via Roma 1, Torino"]
+      end
+
+      test "a Place with coordinates keeps them and is not geocoded" do
+        stub_geocoder({:ok, %{lat: 0.0, lon: 0.0}})
+
+        assert {:ok, %Event{id: id}} =
+                 mobilizon_event_with(%{
+                   "location" =>
+                     place_with(%{
+                       "address" => @postal_address,
+                       "latitude" => 50.43,
+                       "longitude" => -3.68
+                     })
+                 })
+                 |> receive_s2s()
+
+        assert %{coordinates: {-3.68, 50.43}} = stored_point(id)
+        assert geocoder_queries() == []
+      end
+
+      test "a Place's `geo` is ignored: it is geocoded like any Place with no latitude and longitude" do
+        stub_geocoder({:ok, %{lat: 48.8566, lon: 2.3522}})
+
+        # the fixture's own Place, which has a `geo` (and a PostalAddress)
+        assert mobilizon_event()["location"]["geo"]
+
+        assert {:ok, %Event{id: id}} =
+                 mobilizon_event_with(%{
+                   "location" =>
+                     Map.put(
+                       mobilizon_event()["location"],
+                       "id",
+                       "https://mobilizon.local/address/#{Needle.UID.generate()}"
+                     )
+                 })
+                 |> receive_s2s()
+
+        assert %{coordinates: {2.3522, 48.8566}} = stored_point(id)
+        assert [_] = geocoder_queries()
+      end
+
+      test "the same address (trimmed, any case) is geocoded once, and the next place reuses the point" do
+        stub_geocoder({:ok, %{lat: 45.07, lon: 7.69}})
+
+        assert {:ok, %Event{id: first}} =
+                 mobilizon_event_with(%{
+                   "location" => place_with(%{"address" => "Via Roma 1, Torino"})
+                 })
+                 |> receive_s2s()
+
+        assert {:ok, %Event{id: second}} =
+                 mobilizon_event_with(%{
+                   "location" => place_with(%{"address" => "  VIA ROMA 1, TORINO "})
+                 })
+                 |> receive_s2s()
+
+        assert %{coordinates: {7.69, 45.07}} = stored_point(first)
+        assert %{coordinates: {7.69, 45.07}} = stored_point(second)
+        assert geocoder_queries() == ["Via Roma 1, Torino"]
+      end
+
+      test "a name that is not a place (eg. Online) is not geocoded, a real name is" do
+        stub_geocoder({:ok, %{lat: 50.43, lon: -3.68}})
+
+        assert {:ok, %Event{id: online}} =
+                 mobilizon_event_with(%{"location" => place_with(%{"name" => "Online"})})
+                 |> receive_s2s()
+
+        assert is_nil(stored_point(online))
+        assert geocoder_queries() == []
+
+        assert {:ok, %Event{id: real}} =
+                 mobilizon_event_with(%{
+                   "location" => place_with(%{"name" => "The Mansion, Totnes"})
+                 })
+                 |> receive_s2s()
+
+        assert %{coordinates: {-3.68, 50.43}} = stored_point(real)
+        assert geocoder_queries() == ["The Mansion, Totnes"]
+      end
+
+      test "a name that looks like a URL is not geocoded" do
+        stub_geocoder({:ok, %{lat: 50.43, lon: -3.68}})
+
+        for name <- ["https://meet.jit.si/abc", "zoom.us/j/123", "www.example"] do
+          assert {:ok, %Event{id: id}} =
+                   mobilizon_event_with(%{"location" => place_with(%{"name" => name})})
+                   |> receive_s2s()
+
+          assert is_nil(stored_point(id))
+        end
+
+        assert geocoder_queries() == []
+      end
+
+      test "a short name (up to 3 words, no comma) with a non-place word is not geocoded, a longer one or one with a comma is" do
+        stub_geocoder({:ok, %{lat: 52.52, lon: 13.4}})
+
+        for name <- ["Online event", "Zoom call", "Virtual meetup"] do
+          assert {:ok, %Event{id: id}} =
+                   mobilizon_event_with(%{"location" => place_with(%{"name" => name})})
+                   |> receive_s2s()
+
+          assert is_nil(stored_point(id))
+        end
+
+        assert geocoder_queries() == []
+
+        assert {:ok, %Event{id: id}} =
+                 mobilizon_event_with(%{
+                   "location" => place_with(%{"name" => "Online Café, Berlin"})
+                 })
+                 |> receive_s2s()
+
+        assert %{coordinates: {13.4, 52.52}} = stored_point(id)
+        assert geocoder_queries() == ["Online Café, Berlin"]
+      end
+
+      test "when geocoding fails, the event is saved with no point and a warning names the address" do
+        stub_geocoder({:error, nil})
+
+        log =
+          ExUnit.CaptureLog.capture_log(fn ->
+            assert {:ok, %Event{id: id}} =
+                     mobilizon_event_with(%{
+                       "location" => place_with(%{"address" => "Nowhere Lane 9"})
+                     })
+                     |> receive_s2s()
+
+            send(self(), {:event_id, id})
+          end)
+
+        assert_received {:event_id, id}
+        assert %{name: _, geom: nil} = native_event!(id).primary_geolocation.geolocation
+        assert log =~ "Could not geocode the address"
+        assert log =~ "Nowhere Lane 9"
       end
     end
 
