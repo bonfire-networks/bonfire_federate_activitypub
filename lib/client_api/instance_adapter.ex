@@ -40,10 +40,8 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
       # non-standard
       "federating" => !!ActivityPub.Config.federating?(),
       "configuration" => %{
-        "urls" =>
-          %{
-            # "streaming"=> "wss://#{base_url}"
-          },
+        # nil when the endpoint has no streaming socket, so clients don't retry a 404
+        "urls" => %{"streaming" => if(streaming_mounted?(), do: streaming_url(base_uri))},
         "vapid" => %{
           # TODO
           "public_key" => nil
@@ -82,12 +80,12 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
     Map.merge(
       main(base_uri),
       %{
-        "thumbnail" => Config.get([:ui, :theme, :instance_icon], nil),
-        "background_image" => Config.get([:ui, :theme, :instance_image], nil),
+        "thumbnail" => icon_url(),
+        "background_image" =>
+          Bonfire.UI.Common.SEOImage.absolute_url(Config.get([:ui, :theme, :instance_image], nil)),
         "urls" => %{
-          # TODO
-          # "wss://#{base_url}"
-          "streaming_api" => nil
+          # always set: Ivory decodes it without a default
+          "streaming_api" => streaming_url(base_uri)
         },
         "poll_limits" => %{
           "max_expiration" => 31_536_000,
@@ -115,7 +113,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
 
     Map.merge(main, %{
       "thumbnail" => %{
-        "url" => Config.get([:ui, :theme, :instance_icon], nil),
+        "url" => icon_url(),
         # "blurhash"=> # TODO
         "versions" => %{}
       },
@@ -143,4 +141,23 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
     # For now, return empty array to indicate the endpoint exists but no custom emojis
     []
   end
+
+  @doc "Whether the endpoint mounts the Mastodon streaming socket (fixed when the endpoint compiles)."
+  def streaming_mounted? do
+    endpoint = Bonfire.Common.Config.endpoint_module()
+
+    Code.ensure_loaded?(endpoint) and function_exported?(endpoint, :__sockets__, 0) and
+      Enum.any?(
+        endpoint.__sockets__(),
+        &match?({_path, Bonfire.Notify.Web.MastoStreamingWebSocket, _opts}, &1)
+      )
+  end
+
+  # Mastodon advertises the bare ws(s) origin; clients append /api/v1/streaming
+  defp streaming_url(base_uri),
+    do: base_uri |> Bonfire.Common.URIs.base_url() |> String.replace_prefix("http", "ws")
+
+  # the spec wants a full URI; the theme config holds paths
+  defp icon_url,
+    do: Bonfire.UI.Common.SEOImage.absolute_url(Config.get([:ui, :theme, :instance_icon], nil))
 end
