@@ -206,7 +206,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
         current_user(
           Settings.put(
             [Bonfire.Federate.ActivityPub.Import.OutboxOps, :fetch_threads_on_import],
-            true, current_user: remote_user)
+            true,
+            current_user: remote_user
+          )
         )
 
       # Import activities without federating the boosts

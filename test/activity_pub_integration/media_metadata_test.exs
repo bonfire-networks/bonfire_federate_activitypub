@@ -592,4 +592,142 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
              "Mastodon & co. read authorship from `attributedTo` on the object, not from `actor`"
     end
   end
+
+  # each delivery gets its own file URLs (`/files/redir/f/<target>/…`), in every place the object has them, so the ones in `content` still match the ones in `attachment`
+  describe "file URLs rewritten per delivery" do
+    @file_url "https://bonfire.local/files/redir/local/data/uploads/u/images/a.png"
+    @cover_url "https://bonfire.local/files/redir/local/data/uploads/u/images/cover.png"
+
+    test "an object with a cover gets its image, its attachment and its content rewritten" do
+      data = %{
+        "image" => %{"type" => "Image", "url" => @cover_url},
+        "attachment" => [%{"type" => "Image", "url" => @file_url}],
+        "content" => ~s(<p>a</p><p><img src="#{@file_url}"></p>)
+      }
+
+      out =
+        Bonfire.Federate.ActivityPub.Adapter.transform_outgoing(data, "remote.example", nil)
+
+      assert out["image"]["url"] =~ "/files/redir/f/"
+      assert [%{"url" => attachment_url}] = out["attachment"]
+      assert attachment_url =~ "/files/redir/f/"
+      assert out["content"] =~ ~s(src="#{attachment_url}")
+    end
+
+    test "an object without a cover gets its attachment and its content rewritten" do
+      data = %{
+        "attachment" => [%{"type" => "Image", "url" => @file_url}],
+        "content" => ~s(<p><img src="#{@file_url}"></p>)
+      }
+
+      out =
+        Bonfire.Federate.ActivityPub.Adapter.transform_outgoing(data, "remote.example", nil)
+
+      assert [%{"url" => attachment_url}] = out["attachment"]
+      assert attachment_url =~ "/files/redir/f/"
+      assert out["content"] =~ ~s(src="#{attachment_url}")
+    end
+  end
+
+  # FEP-b2b8 has media embedded in `content` also listed in `attachment`, with the same URL: shown once, where the body has it, not again in the attachment list (see `Bonfire.Files.InlineMedia`)
+  describe "an incoming body that shows one of its attachments" do
+    @inline_image @remote_instance <> "/media/inline.png"
+    @other_image @remote_instance <> "/media/other.png"
+
+    defp article_with_image_in_body(attachment_urls) do
+      %{
+        "type" => "Article",
+        "name" => "An article",
+        "content" => ~s(<p>a</p><img src="#{@inline_image}"><p>b</p>),
+        "attachment" =>
+          for url <- attachment_urls do
+            %{"type" => "Image", "mediaType" => "image/png", "url" => url}
+          end
+      }
+    end
+
+    test "the attachment whose URL is an image in the body is placed by the body, and the body is kept" do
+      received =
+        article_with_image_in_body([@inline_image, @other_image])
+        |> as_remote_create("inline-image")
+        |> receive_incoming()
+
+      body = e(received, :post_content, :html_body, nil)
+      media = e(received, :media, [])
+
+      assert body =~ ~s(src="#{@inline_image}")
+      assert [%{path: @inline_image}] = Bonfire.Files.InlineMedia.placed(media, body)
+    end
+
+    test "a link in an HTML body doesn't place its attachment: the body isn't split, so it stays in the list" do
+      received =
+        %{
+          "type" => "Article",
+          "name" => "An article",
+          "content" => ~s(<p>a</p><p><a href="#{@other_image}">#{@other_image}</a></p><p>b</p>),
+          "attachment" => [
+            %{"type" => "Image", "mediaType" => "image/png", "url" => @other_image}
+          ]
+        }
+        |> as_remote_create("linked-image")
+        |> receive_incoming()
+
+      assert Bonfire.Files.InlineMedia.placed(
+               e(received, :media, []),
+               e(received, :post_content, :html_body, nil)
+             ) == []
+    end
+
+    # the sanitiser drops `iframe`, `video` and `audio`: each becomes a link where it was, so the body keeps the player's place
+    for {player, url} <- [
+          {~s(<iframe src="https://video.example.com/videos/embed/x" title="A video"></iframe>),
+           "https://video.example.com/videos/embed/x"},
+          {~s(<video controls><source src="https://video.example.com/v.mp4" type="video/mp4"></video>),
+           "https://video.example.com/v.mp4"},
+          {~s(<audio src="https://audio.example.com/a.mp3"></audio>),
+           "https://audio.example.com/a.mp3"}
+        ] do
+      test "an incoming #{player |> String.split(" ") |> hd()}> becomes a link where it was" do
+        received =
+          %{
+            "type" => "Article",
+            "name" => "An article",
+            "content" => "<p>a</p>#{unquote(player)}<p>b</p>"
+          }
+          |> as_remote_create("player")
+          |> receive_incoming()
+
+        assert e(received, :post_content, :html_body, nil) =~
+                 ~r/<p>a<\/p>.*<a [^>]*href="#{Regex.escape(unquote(url))}".*<p>b<\/p>/s
+      end
+    end
+
+    test "control: a player with a script or relative source leaves nothing, as before" do
+      received =
+        %{
+          "type" => "Article",
+          "name" => "An article",
+          "content" =>
+            ~s|<p>a</p><iframe src="javascript:alert(1)"></iframe><iframe src="/local/x"></iframe><p>b</p>|
+        }
+        |> as_remote_create("bad-player")
+        |> receive_incoming()
+
+      body = e(received, :post_content, :html_body, nil)
+      refute body =~ "javascript:"
+      refute body =~ "/local/x"
+    end
+
+    test "control: an attachment that isn't in the body isn't placed" do
+      received =
+        article_with_image_in_body([@other_image])
+        |> as_remote_create("inline-image-control")
+        |> receive_incoming()
+
+      assert Bonfire.Files.InlineMedia.placed(
+               e(received, :media, []),
+               e(received, :post_content, :html_body, nil)
+             ) == []
+    end
+  end
 end

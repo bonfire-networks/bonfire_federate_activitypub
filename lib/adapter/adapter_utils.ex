@@ -851,6 +851,18 @@ defmodule Bonfire.Federate.ActivityPub.AdapterUtils do
     |> cleanup_list()
   end
 
+  @doc """
+  The AP id other servers know `object` (a pointable, or its id) by, for referring to it in an outgoing activity: the id of its stored AP object (what its `Create` carried, or the id of the remote object it came from), else its canonical URL.
+
+  Use it rather than `Bonfire.Common.URIs.canonical_url/1` there: that one prefers a saved original URL (eg. an imported post's address on the site it came from), which other servers never saw as the object's id. Costs one cached AP object lookup.
+  """
+  def federated_object_id(object) do
+    case Object.get_cached(pointer: object) do
+      {:ok, %{data: %{"id" => id}}} when is_binary(id) -> id
+      _ -> URIs.canonical_url(object)
+    end
+  end
+
   def id_or_object_id(nil) do
     nil
   end
