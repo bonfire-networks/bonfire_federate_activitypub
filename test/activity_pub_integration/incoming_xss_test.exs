@@ -138,6 +138,46 @@ defmodule Bonfire.Federate.ActivityPub.IncomingXSSTest do
     end
   end
 
+  describe "title and summary of a remote post or article" do
+    for type <- ["Note", "Article"], field <- ["name", "summary"] do
+      test "entity-encoded markup in a #{type}'s #{field} shows as text, not as a tag", %{
+        conn: conn
+      } do
+        assert {:ok, object} =
+                 receive_create(%{
+                   "id" => object_id(),
+                   "type" => unquote(type),
+                   unquote(field) => "&lt;script&gt;alert(1)&lt;/script&gt; Safe",
+                   "content" => "<p>a perfectly fine body</p>",
+                   "published" => "2015-02-10T15:00:00Z"
+                 })
+
+        conn
+        |> visit(Bonfire.Common.URIs.path(object))
+        |> wait_async()
+        |> assert_has("[data-id=main_section]", text: "Safe")
+        |> refute_has("[data-id=main_section] [data-role=#{unquote(field)}] script")
+      end
+
+      test "markup in a #{type}'s #{field} is removed (control)", %{conn: conn} do
+        assert {:ok, object} =
+                 receive_create(%{
+                   "id" => object_id(),
+                   "type" => unquote(type),
+                   unquote(field) => "<script>alert(1)</script>Safe",
+                   "content" => "<p>a perfectly fine body</p>",
+                   "published" => "2015-02-10T15:00:00Z"
+                 })
+
+        conn
+        |> visit(Bonfire.Common.URIs.path(object))
+        |> wait_async()
+        |> assert_has("[data-id=main_section]", text: "Safe")
+        |> refute_has("[data-id=main_section] [data-role=#{unquote(field)}] script")
+      end
+    end
+  end
+
   describe "object types without a native type" do
     for type <- ["Event", "Audio"] do
       test "control: a benign #{type} shows its name", %{conn: conn} do

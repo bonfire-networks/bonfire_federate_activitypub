@@ -10,7 +10,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.FollowsExportImportTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Social.Graph.Follows
-  alias Bonfire.Social.Import
+  alias Bonfire.Common.Import
 
   test "export and import follows works between 2 instances", context do
     # Set up users

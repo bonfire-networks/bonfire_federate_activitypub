@@ -10,7 +10,7 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
   alias Bonfire.Social.Graph.Follows
-  alias Bonfire.Social.Import
+  alias Bonfire.Federate.ActivityPub.Import.OutboxOps, as: Import
   alias Bonfire.Posts
   alias Bonfire.Social.Boosts
 
@@ -204,7 +204,9 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MigrationExportImportTest do
       # specify we want to fetch replies too
       remote_user =
         current_user(
-          Settings.put([Bonfire.Social.Import, :fetch_threads_on_import], true,
+          Settings.put(
+            [Bonfire.Federate.ActivityPub.Import.OutboxOps, :fetch_threads_on_import],
+            true,
             current_user: remote_user
           )
         )
