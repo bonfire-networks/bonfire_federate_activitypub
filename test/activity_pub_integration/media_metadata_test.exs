@@ -459,7 +459,8 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
   end
 
   describe "link previews federate as an attachment" do
-    test "a link-preview Media attached to a post federates with its title and description" do
+    # FEP-8967: the `Link` has its `href` and its title as `name` (as AS2's own `Link` does), and what we resolved for the link goes in its `preview`
+    test "a link-preview Media attached to a post federates its title, and its title, description and cover image in its preview" do
       user = fake_user!()
       url = "https://example.com/some/article"
 
@@ -473,11 +474,52 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
                List.wrap(data["attachment"])
                |> Enum.filter(&(&1["href"] == url or &1["url"] == url))
 
+      assert attachment["type"] == "Link"
       assert attachment["name"] == "The Article Title"
-      assert attachment["summary"] == "What the article is about"
+      refute Map.has_key?(attachment, "summary")
+      refute Map.has_key?(attachment, "image")
 
-      assert attachment["image"]["url"] == "https://example.com/og.jpg",
+      assert attachment["preview"]["name"] == "The Article Title"
+      assert attachment["preview"]["summary"] == "What the article is about"
+
+      assert attachment["preview"]["image"]["url"] == "https://example.com/og.jpg",
              "the cover image we resolved for the link should not have to be re-fetched remotely"
+
+      assert attachment["preview"]["type"] == "Page"
+    end
+
+    # the `preview`'s `type` tells a receiver the link plays, so it fetches the player from the provider itself
+    test "a link to a player federates as a Video preview, with its author" do
+      user = fake_user!()
+      url = "https://video.example.com/w/a-player"
+
+      assert {:ok, media} =
+               Files.save_url_as_media(user, url, %{
+                 media_type: "link",
+                 metadata: %{
+                   "label" => "A Video",
+                   "oembed" => %{
+                     "type" => "video",
+                     "html" =>
+                       ~s(<iframe src="https://video.example.com/embed/a-player"></iframe>),
+                     "author_name" => "A Channel",
+                     "author_url" => "https://video.example.com/c/a-channel"
+                   }
+                 }
+               })
+
+      assert {:ok, post} = post_with(user, media, "watch: #{url}")
+
+      assert [attachment] =
+               List.wrap(published_object(post)["attachment"])
+               |> Enum.filter(&(&1["href"] == url))
+
+      assert attachment["preview"]["type"] == "Video"
+      assert attachment["preview"]["name"] == "A Video"
+      assert attachment["preview"]["attributedTo"]["name"] == "A Channel"
+
+      assert attachment["preview"]["attributedTo"]["url"]["href"] ==
+               "https://video.example.com/c/a-channel"
     end
 
     test "an incoming Link attachment keeps its title, description and cover image" do
@@ -565,6 +607,165 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
 
       assert Media.media_label(media) == "Described By The Sender",
              "the sender's title should survive, rather than being overwritten by a re-fetch"
+    end
+  end
+
+  @player_page "https://video.example.com/w/incoming-player"
+  @player_oembed %{
+    "version" => "1.0",
+    "type" => "video",
+    "title" => "The Provider's Title",
+    "html" => ~s(<iframe src="https://video.example.com/embed/incoming-player"></iframe>)
+  }
+
+  # each page a test serves, and a message to the test when it's fetched
+  defp mock_pages(pages) do
+    test = self()
+    # Faviconic fetches with Req, which Tesla.Mock doesn't intercept
+    Process.put(:req_adapter, fn request -> {request, Req.Response.new(status: 404)} end)
+
+    mock(fn
+      %{method: :get, url: "https://video.example.com/oembed" <> _} = env ->
+        send(test, {:fetched, env.url})
+
+        %Tesla.Env{
+          status: 200,
+          headers: [{"content-type", "application/json"}],
+          body: Jason.encode!(@player_oembed)
+        }
+
+      %{method: :get, url: url} = env ->
+        case Map.fetch(pages, url) do
+          {:ok, body} ->
+            send(test, {:fetched, url})
+            %Tesla.Env{env | status: 200, headers: [{"content-type", "text/html"}], body: body}
+
+          :error ->
+            apply(ActivityPub.Test.HttpRequestMock, :request, [env])
+        end
+
+      env ->
+        apply(ActivityPub.Test.HttpRequestMock, :request, [env])
+    end)
+  end
+
+  defp player_page_html do
+    ~s(<html><head><title>The Provider's Title</title><link rel="alternate" type="application/json+oembed" href="https://video.example.com/oembed?url=#{URI.encode_www_form(@player_page)}&amp;format=json"></head><body></body></html>)
+  end
+
+  defp receive_with_attachment(attachment) do
+    data =
+      "../fixtures/pixelfed-image.json"
+      |> Path.expand(__DIR__)
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.put("attachment", [attachment])
+
+    {:ok, data} = ActivityPub.Federator.Transformer.handle_incoming(data)
+
+    assert {:ok, post} =
+             Bonfire.Federate.ActivityPub.Incoming.receive_activity(data)
+             |> repo().maybe_preload([:post_content, :media])
+
+    post
+  end
+
+  # FEP-8967: what a sender resolved for a link comes in its `preview`, and `preview.type` says whether the page plays. A player is fetched from the provider (never embedded from what the sender sent); other links keep what was sent, unfetched
+  describe "incoming FEP-8967 link previews" do
+    test "a link whose preview is a Video is fetched, and gets the provider's player" do
+      mock_pages(%{@player_page => player_page_html()})
+
+      post =
+        receive_with_attachment(%{
+          "type" => "Link",
+          "href" => @player_page,
+          "preview" => %{"type" => "Video", "name" => "The Sender's Title"}
+        })
+
+      assert_received {:fetched, @player_page}
+      assert [media] = Enum.filter(post.media, &(&1.path == @player_page))
+      assert %{"type" => "video", "html" => html} = media.metadata["oembed"]
+      assert html =~ "https://video.example.com/embed/incoming-player"
+    end
+
+    test "control: a link whose preview is a Page keeps what was sent, unfetched" do
+      url = "https://example.com/a-described-page"
+      mock_pages(%{url => "<html><head><title>Fetched Title</title></head></html>"})
+
+      post =
+        receive_with_attachment(%{
+          "type" => "Link",
+          "href" => url,
+          "preview" => %{
+            "type" => "Page",
+            "name" => "The Sender's Title",
+            "summary" => "What the sender says it's about",
+            "image" => %{"type" => "Image", "url" => "https://example.com/sender-cover.jpg"}
+          }
+        })
+
+      refute_received {:fetched, _}
+      assert [media] = Enum.filter(post.media, &(&1.path == url))
+      assert Media.media_label(media) == "The Sender's Title"
+      assert Media.description(media) == "What the sender says it's about"
+      assert Media.preview_image_url(media) == "https://example.com/sender-cover.jpg"
+    end
+
+    # an older Bonfire (and AS2's own `Link`) puts the details at the top level
+    test "a link with its details only at the top level keeps them, unfetched" do
+      url = "https://example.com/a-top-level-page"
+      mock_pages(%{url => "<html><head><title>Fetched Title</title></head></html>"})
+
+      post =
+        receive_with_attachment(%{
+          "type" => "Link",
+          "href" => url,
+          "name" => "The Top Title",
+          "summary" => "The top summary",
+          "image" => %{"type" => "Image", "url" => "https://example.com/top-cover.jpg"}
+        })
+
+      refute_received {:fetched, _}
+      assert [media] = Enum.filter(post.media, &(&1.path == url))
+      assert Media.media_label(media) == "The Top Title"
+      assert Media.description(media) == "The top summary"
+      assert Media.preview_image_url(media) == "https://example.com/top-cover.jpg"
+    end
+
+    test "a link with details both at the top level and in its preview uses the preview's, unfetched" do
+      url = "https://example.com/a-page-with-both"
+      mock_pages(%{url => "<html><head><title>Fetched Title</title></head></html>"})
+
+      post =
+        receive_with_attachment(%{
+          "type" => "Link",
+          "href" => url,
+          "name" => "The Top Title",
+          "summary" => "The top summary",
+          "image" => %{"type" => "Image", "url" => "https://example.com/top-cover.jpg"},
+          "preview" => %{
+            "type" => "Page",
+            "name" => "The Preview Title",
+            "summary" => "The preview summary",
+            "image" => %{"type" => "Image", "url" => "https://example.com/preview-cover.jpg"}
+          }
+        })
+
+      refute_received {:fetched, _}
+      assert [media] = Enum.filter(post.media, &(&1.path == url))
+      assert Media.media_label(media) == "The Preview Title"
+      assert Media.description(media) == "The preview summary"
+      assert Media.preview_image_url(media) == "https://example.com/preview-cover.jpg"
+    end
+
+    test "a Mastodon-shaped link (only its href) is fetched" do
+      url = "https://example.com/a-bare-link"
+      mock_pages(%{url => "<html><head><title>Fetched Title</title></head></html>"})
+
+      post = receive_with_attachment(%{"type" => "Link", "href" => url})
+
+      assert_received {:fetched, ^url}
+      assert [_] = Enum.filter(post.media, &(&1.path == url))
     end
   end
 

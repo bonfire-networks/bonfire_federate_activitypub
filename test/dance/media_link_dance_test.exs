@@ -232,10 +232,12 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MediaLinkTest do
       assert intro =~ "Watch:"
       assert more =~ "more"
 
-      info(
-        e(Enum.find(remote_post.media, &(&1.path == url)), :metadata, nil),
-        "the player's metadata on the other instance"
-      )
+      metadata =
+        e(Enum.find(remote_post.media, &(&1.path == url)), :metadata, nil)
+        |> info("the player's metadata on the other instance")
+
+      # the FEP-8967 `preview` tells the other instance the link plays, so it fetches the player from the provider (which goes nowhere here: the host doesn't resolve)
+      assert e(metadata, "preview", "type", nil) == "Video"
     end)
   end
 end
