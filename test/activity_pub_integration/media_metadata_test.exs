@@ -667,7 +667,7 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
       assert [%{path: @inline_image}] = Bonfire.Files.InlineMedia.placed(media, body)
     end
 
-    test "a link in an HTML body doesn't place its attachment: the body isn't split, so it stays in the list" do
+    test "a link alone in its paragraph in an HTML body places its attachment, and the body is cut there" do
       received =
         %{
           "type" => "Article",
@@ -680,10 +680,13 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
         |> as_remote_create("linked-image")
         |> receive_incoming()
 
-      assert Bonfire.Files.InlineMedia.placed(
-               e(received, :media, []),
-               e(received, :post_content, :html_body, nil)
-             ) == []
+      body = e(received, :post_content, :html_body, nil)
+
+      assert [%{path: @other_image}] =
+               Bonfire.Files.InlineMedia.placed(e(received, :media, []), body)
+
+      assert [{:html, _}, {:url, @other_image}, {:html, _}] =
+               Bonfire.Common.Text.markdown_parts(body, MapSet.new([@other_image]), [])
     end
 
     # the sanitiser drops `iframe`, `video` and `audio`: each becomes a link where it was, so the body keeps the player's place

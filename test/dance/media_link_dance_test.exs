@@ -179,4 +179,63 @@ defmodule Bonfire.Federate.ActivityPub.Dance.MediaLinkTest do
                "https://example.com/attached-og.jpg"
     end)
   end
+
+  # a player's URL after its label in a local post is stored in its own paragraph, so on the other instance (which gets HTML) the body places the player where it is, not in the attachment list
+  @tag :test_instance
+  test "a player's URL after its label is placed where it is on the other instance too",
+       context do
+    local_user = context[:local][:user]
+
+    url = "https://video.example.com/w/dance-#{System.unique_integer([:positive])}"
+
+    {:ok, media} =
+      Bonfire.Files.save_url_as_media(local_user, url, %{
+        media_type: "link",
+        metadata: %{
+          "label" => "A Danced Video",
+          "oembed" => %{
+            "type" => "video",
+            "html" => ~s(<iframe src="https://video.example.com/embed/dance"></iframe>)
+          }
+        }
+      })
+
+    {:ok, post} =
+      Bonfire.Posts.publish(
+        current_user: local_user,
+        boundary: "public",
+        post_attrs: %{
+          post_content: %{html_body: "Intro\n\nWatch: #{url}\n\nmore"},
+          uploaded_media: [media]
+        }
+      )
+
+    canonical_url = Bonfire.Common.URIs.canonical_url(post, preload_if_needed: true)
+
+    TestInstanceRepo.apply(fn ->
+      Logger.metadata(action: "fetch the post with a player on the remote instance")
+
+      assert {:ok, remote_post} =
+               AdapterUtils.get_by_url_ap_id_or_username(canonical_url)
+               |> repo().maybe_preload([:post_content, :media])
+
+      body = e(remote_post, :post_content, :html_body, nil)
+
+      assert [%{path: ^url}] =
+               remote_post.media
+               |> Enum.filter(&(&1.path == url))
+               |> Bonfire.Files.InlineMedia.placed(body)
+
+      assert [{:html, intro}, {:url, ^url}, {:html, more}] =
+               Bonfire.Common.Text.markdown_parts(body, MapSet.new([url]), [])
+
+      assert intro =~ "Watch:"
+      assert more =~ "more"
+
+      info(
+        e(Enum.find(remote_post.media, &(&1.path == url)), :metadata, nil),
+        "the player's metadata on the other instance"
+      )
+    end)
+  end
 end
