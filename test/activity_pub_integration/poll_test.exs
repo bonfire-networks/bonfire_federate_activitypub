@@ -207,6 +207,62 @@ defmodule Bonfire.Federate.ActivityPub.PollTest do
     end
   end
 
+  describe "as a reply" do
+    test "an outgoing poll that replies to a post carries its inReplyTo" do
+      author = fake_user!()
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: author,
+          post_attrs: %{post_content: %{html_body: "a post to reply to"}},
+          boundary: "public"
+        )
+
+      assert {:ok, original_activity} = Outgoing.push_now!(post)
+
+      {:ok, question} =
+        Bonfire.Poll.Fake.fake_question_with_choices(
+          %{reply_to_id: post.id},
+          [%{name: "yay"}, %{name: "nay"}],
+          current_user: author,
+          boundary: "public"
+        )
+
+      # a poll federates when it's made, and its `Create` is intransitive, so the object is read back by pointer as the addressing tests do
+      assert {:ok, %{data: data}} = ActivityPub.Object.get_cached(pointer: question)
+
+      assert data["inReplyTo"] == original_activity.object.data["id"]
+    end
+
+    test "an incoming Question with inReplyTo is recorded as a reply to that post" do
+      author = fake_user!()
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: author,
+          post_attrs: %{post_content: %{html_body: "a post to reply to"}},
+          boundary: "public"
+        )
+
+      assert {:ok, original_activity} = Outgoing.push_now!(post)
+
+      data =
+        "../fixtures/poll_attachment.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+        |> Map.put("inReplyTo", original_activity.object.data["id"])
+
+      {:ok, activity} = ActivityPub.Federator.Transformer.handle_incoming(data)
+
+      assert {:ok, question} =
+               {:ok, activity.pointer}
+               |> repo().maybe_preload(:replied, force: true)
+
+      assert question.replied.reply_to_id == post.id
+    end
+  end
+
   describe "votes" do
     test "incoming vote (Create of a Note with name + inReplyTo) is recorded as a Bonfire Vote" do
       author = fake_user!()

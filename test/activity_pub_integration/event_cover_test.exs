@@ -12,6 +12,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
     @public "https://www.w3.org/ns/activitystreams#Public"
     @banner "https://mocked.local/media/banner.png"
     @poster "https://mocked.local/media/poster.png"
+    @stream "https://youtube.com/live/FNqRMKlybO8"
+    @stream_title "Are you getting fired? Info session for workers in The Netherlands."
+
+    alias Bonfire.Files.Media
 
     setup_all do
       mock_global(fn
@@ -20,6 +24,16 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
 
         %{method: :get, url: "https://mocked.local/.well-known/" <> _} ->
           %Tesla.Env{status: 404, body: ""}
+
+        # the stream of an online event: YouTube serves its page, and answers 401 from oEmbed for a video with embedding turned off
+        %{method: :get, url: "https://www.youtube.com/oembed" <> _} ->
+          %Tesla.Env{status: 401, body: "Unauthorized"}
+
+        %{method: :get, url: "https://youtube.com/live/" <> _} = env ->
+          stream_page(env)
+
+        %{method: :get, url: "https://www.youtube.com/live/" <> _} = env ->
+          stream_page(env)
 
         env ->
           apply(ActivityPub.Test.HttpRequestMock, :request, [env])
@@ -30,9 +44,27 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
 
     setup do
       Process.put(:federating, true)
+
+      # Faviconic fetches a link preview's favicon with Req, which Tesla.Mock does not intercept: answer it here so no test reaches the network
+      Process.put(:req_adapter, fn request -> {request, Req.Response.new(status: 404)} end)
       account = fake_account!()
       me = fake_user!(account)
       {:ok, conn: conn(user: me, account: account)}
+    end
+
+    defp stream_page(env) do
+      %Tesla.Env{
+        env
+        | status: 200,
+          headers: [{"content-type", "text/html"}],
+          body: """
+          <html><head>
+            <title>#{@stream_title} - YouTube</title>
+            <meta property="og:title" content="#{@stream_title}">
+            <meta property="og:image" content="https://i.ytimg.com/vi/FNqRMKlybO8/maxresdefault.jpg">
+          </head><body></body></html>
+          """
+      }
     end
 
     defp image(url),
@@ -118,6 +150,38 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_gatherings) do
       |> wait_async()
       |> assert_has_or_open_browser("[data-id=multimedia_list]")
       |> refute_has("[data-id=event_cover]")
+    end
+
+    # Gancio sends an online event's location as a `Link` named with its own URL, which is no title of its own
+    test "an online event's link named with its own URL gets our preview" do
+      receive_event!("Stream Party", %{
+        "attachment" => [
+          %{"type" => "Link", "mediaType" => "text/html", "name" => @stream, "href" => @stream}
+        ]
+      })
+
+      assert {:ok, media} = Media.get_by_url(@stream)
+      assert Media.media_label(media) == @stream_title, "label from #{inspect(media.metadata)}"
+    end
+
+    test "a link named with text of its own keeps that text, with no preview of ours" do
+      url = "https://mocked.local/streams/#{Needle.UID.generate()}"
+
+      receive_event!("Named Stream Party", %{
+        "attachment" => [
+          %{
+            "type" => "Link",
+            "mediaType" => "text/html",
+            "name" => "Watch the stream",
+            "href" => url
+          }
+        ]
+      })
+
+      assert {:ok, media} = Media.get_by_url(url)
+
+      assert Media.media_label(media) == "Watch the stream",
+             "label from #{inspect(media.metadata)}"
     end
 
     test "an event with no image shows the placeholder in a feed, with no media list",

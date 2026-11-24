@@ -31,6 +31,14 @@ defmodule Bonfire.Federate.ActivityPub.MediaMetadataTest do
       %{method: :get, url: "https://mocked.local/.well-known/nodeinfo"} ->
         %Tesla.Env{status: 404, body: ""}
 
+      # a page to preview for the link only in a post's body: a failed fetch saves no preview
+      %{method: :get, url: "https://example.com/only-in-the-body/article"} ->
+        %Tesla.Env{
+          status: 200,
+          headers: [{"content-type", "text/html"}],
+          body: "<html><head><title>Only in the body</title></head><body></body></html>"
+        }
+
       env ->
         apply(ActivityPub.Test.HttpRequestMock, :request, [env])
     end)
