@@ -1,5 +1,6 @@
 defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
   use Bonfire.Common.Config
+  use Bonfire.Common.Localise
 
   # Mastodon API instance configuration limits
   @max_featured_tags 1
@@ -27,8 +28,7 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
       "description" => Config.get([:ui, :theme, :instance_description], nil),
       "email" => "no-reply@no-reply.net",
       "languages" => Bonfire.Common.Localise.known_locales(),
-      # TODO
-      "rules" => [],
+      "rules" => rules(),
       "registrations" => !Bonfire.Me.Accounts.instance_is_invite_only?(),
       "invites_enabled" => Bonfire.Me.Accounts.instance_is_invite_only?(),
       # TODO
@@ -130,6 +130,57 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
         "users" => %{"active_month" => Bonfire.Me.Users.maybe_count()}
       }
     })
+  end
+
+  @doc """
+  The instance's community rules as Mastodon Rules, in the order /about shows them: numbered from 1, with the qualifier's label ("Not allowed") as the hint, or `""` for a rule without one (masto-instance-about decisions 1-3). Numbers change when an admin reorders the rules.
+  """
+  def rules do
+    Bonfire.Common.Utils.maybe_apply(Bonfire.CommunityRules, :get_instance_rules_sections, [],
+      fallback_return: []
+    )
+    |> Enum.flat_map(&(&1[:sections] || []))
+    |> Enum.flat_map(&(&1[:rules] || []))
+    |> Enum.with_index(1)
+    |> Enum.map(fn {rule, position} ->
+      %{
+        "id" => to_string(position),
+        "text" => rule[:name] || "",
+        "hint" =>
+          Bonfire.Common.Utils.maybe_apply(
+            Bonfire.CommunityRules.Qualifier,
+            :label,
+            [rule[:qualifier]],
+            fallback_return: ""
+          )
+      }
+    end)
+  end
+
+  @doc """
+  GET /api/v1/instance/extended_description: the code of conduct, rendered as /conduct renders it, or the same notice /conduct shows when the operators wrote none (masto-instance-about decision 4). Instance settings keep no timestamp, so `updated_at` is null.
+  """
+  def extended_description do
+    conduct =
+      case Config.get([:terms, :conduct]) do
+        terms when terms in [nil, ""] ->
+          l(
+            "The instance operator(s) have not yet added a code of conduct. Please use your best judgment, and consult the [code of conduct of the Bonfire project](https://bonfirenetworks.org/conduct) as a reference."
+          )
+
+        terms ->
+          terms
+      end
+
+    %{
+      "updated_at" => nil,
+      "content" =>
+        conduct
+        |> Bonfire.UI.Common.templated_or_remote_markdown()
+        |> Phoenix.HTML.safe_to_string()
+        # `rich/1` makes local links relative for LiveView navigation; an app needs them absolute
+        |> Bonfire.Common.Text.prepare_links_for_remote_render(:html)
+    }
   end
 
   @doc """
