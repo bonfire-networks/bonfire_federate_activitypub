@@ -1,0 +1,115 @@
+{
+ "id": "https://wp-test.event-federation.eu/?post_type=ap_outbox&p=517",
+ "type": "Update",
+ "published": "2026-11-05T06:55:11Z",
+ "updated": "2026-11-05T07:01:51Z",
+ "to": [
+  "https://www.w3.org/ns/activitystreams#Public"
+ ],
+ "cc": [
+  "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/actors/0/followers"
+ ],
+ "interactionPolicy": {
+  "canAnnounce": {
+   "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+   "always": "https://www.w3.org/ns/activitystreams#Public"
+  },
+  "canLike": {
+   "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+   "always": "https://www.w3.org/ns/activitystreams#Public"
+  },
+  "canQuote": {
+   "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+   "always": "https://www.w3.org/ns/activitystreams#Public"
+  },
+  "canReply": {
+   "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+   "always": "https://www.w3.org/ns/activitystreams#Public"
+  }
+ },
+ "object": {
+  "id": "https://wp-test.event-federation.eu/?p=509",
+  "type": "Event",
+  "attachment": [
+   {
+    "type": "Image",
+    "url": "https://wp-test.event-federation.eu/wp-content/uploads/2025/02/cropped-1a14b2a8eebccd6995543a3925034f4b-1024x341.jpg",
+    "mediaType": "image/jpeg",
+    "name": "Gancio Event 9 Feb"
+   }
+  ],
+  "attributedTo": "https://wp-test.event-federation.eu/@test",
+  "content": "<p>Is it working?</p>",
+  "context": "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/posts/509/context",
+  "contentMap": {
+   "en": "<p>Is it working?</p>"
+  },
+  "name": "Federated RSVP",
+  "nameMap": {
+   "en": "Federated RSVP"
+  },
+  "endTime": "2026-11-19T20:00:00+01:00",
+  "image": {
+   "type": "Image",
+   "url": "https://wp-test.event-federation.eu/wp-content/uploads/2025/02/cropped-1a14b2a8eebccd6995543a3925034f4b-1024x341.jpg",
+   "mediaType": "image/jpeg",
+   "name": "Gancio Event 9 Feb"
+  },
+  "published": "2026-11-05T06:55:11Z",
+  "startTime": "2026-11-19T18:00:00+01:00",
+  "summary": "Is it working?",
+  "summaryMap": {
+   "en": "Is it working?"
+  },
+  "tag": [],
+  "updated": "2026-11-05T07:01:51Z",
+  "url": "https://wp-test.event-federation.eu/event/federated-rsvp/",
+  "to": [
+   "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+   "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/actors/0/followers"
+  ],
+  "mediaType": "text/html",
+  "replies": {
+   "id": "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/posts/509/replies",
+   "type": "Collection",
+   "first": {
+    "id": "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/posts/509/replies?page=1",
+    "type": "CollectionPage",
+    "partOf": "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/posts/509/replies",
+    "items": []
+   }
+  },
+  "likes": {
+   "id": "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/posts/509/likes",
+   "type": "Collection",
+   "totalItems": 0
+  },
+  "shares": {
+   "id": "https://wp-test.event-federation.eu/wp-json/activitypub/1.0/posts/509/shares",
+   "type": "Collection",
+   "totalItems": 0
+  },
+  "interactionPolicy": {
+   "canAnnounce": {
+    "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+    "always": "https://www.w3.org/ns/activitystreams#Public"
+   },
+   "canLike": {
+    "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+    "always": "https://www.w3.org/ns/activitystreams#Public"
+   },
+   "canQuote": {
+    "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+    "always": "https://www.w3.org/ns/activitystreams#Public"
+   },
+   "canReply": {
+    "automaticApproval": "https://www.w3.org/ns/activitystreams#Public",
+    "always": "https://www.w3.org/ns/activitystreams#Public"
+   }
+  },
+  "timezone": "Europe/Vienna"
+ },
+ "actor": "https://wp-test.event-federation.eu/@test"
+}

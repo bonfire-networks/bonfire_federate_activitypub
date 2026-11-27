@@ -56,7 +56,8 @@ defmodule Bonfire.API.MastoCompatible.InstanceAdapter do
           "characters_reserved_per_url" => @chars_reserved_per_url
         },
         "media_attachments" => %{
-          "supported_mime_types" => Bonfire.Files.MimeTypes.allowed_media() |> Map.keys(),
+          # the types built at boot from the tools found, as the uploaders accept them
+          "supported_mime_types" => Config.get_ext(:bonfire_files, :all_allowed_media_types, []),
           "image_size_limit" => Bonfire.Files.ImageUploader.max_file_size(),
           "video_size_limit" => Bonfire.Files.VideoUploader.max_file_size(),
           "image_matrix_limit" => @image_matrix_limit,
